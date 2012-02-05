@@ -1,2 +1,5 @@
-pentago
+engine.so
+build
+gen
 *.o
+*.pyc
