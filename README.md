@@ -5,6 +5,8 @@ A simple pentago player using (essentially) alpha-beta search, a transposition
 table, and various precomputed lookup tables for move evaluating, win detection,
 etc.  For now it's extremely weak.
 
+For the rules of pentago, see http://en.wikipedia.org/wiki/Pentago.
+
 ### Dependencies
 
 The core engine is written in C++ and exposed to Python as an extension module.
