@@ -4,9 +4,30 @@ from __future__ import division
 import os
 import re
 import sys
+import optparse
 from numpy import *
 from interface import *
 import engine
 
-engine.init_table(24)
-play(0,0,[0,1],4)
+usage = "usage: %prog [options...]"
+parser = optparse.OptionParser(usage)
+parser.add_option('-b','--bits',type=int,default=24,help='size of transposition table in bits')
+parser.add_option('-d','--depth',type=int,default=3,help='search depth')
+parser.add_option('-s','--seed',type=int,default=hash('anya'),help='random seed')
+parser.add_option('-r','--record',type=str,help='append random game records to the given file')
+options,args = parser.parse_args()
+
+engine.init_table(options.bits)
+print 'rnadom seed = %d'%options.seed
+random.seed(abs(options.seed))
+
+if options.record:
+  file = open(options.record,'a')
+  while 1:
+    seed = random.randint(2**62)
+    random.seed(seed)
+    game = play(0,0,[0,1],options.depth,early_exit=True)
+    print>>file,seed,repr(game)
+    file.flush()
+else:
+  play(0,0,[0,1],options.depth)

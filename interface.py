@@ -73,7 +73,7 @@ def inv_parse_move(board,turn,next):
       pass
   raise ValueError('invalid move')
 
-def move(board,turn,depth):
+def move(board,turn,depth,rand=True):
   '''Returns (next,score), where next is the board position moved to and score = depth<<2 | 0 (loss), 1 (tie), or 2 (win).'''
   nexts = engine.moves(flipto(board,turn))
   assert nexts
@@ -87,17 +87,22 @@ def move(board,turn,depth):
         break
     elif (options[0][0]&3)==(score&3):
       options.append((score,next))
-  score,next = options[0]
+  score,next = options[random.randint(len(options)) if rand else 0]
   return flipto(next,1-turn),score
  
-def play(board,turn,sides,depth):
+def play(board,turn,sides,depth,early_exit=False):
+  first = turn
+  positions = []
   while 1:
-    print '\n---------------------------------------------------------'
-    print 'board = %d, turn = %d\n\n%s'%(board,turn,show_board(board))
+    positions.append(board)
+    header = 'board = %d, turn = %d'%(board,turn)
+    print '\n%s\n%s'%('-'*len(header),header)
+    print '\n'+show_board(board)
     s = status(board)
     if s:
       print {1:'win for 0',2:'win for 1',3:'simultaneous win (tie)'}[s]
-      return
+      value = (s&1)-(s>>1)
+      break
     if turn in sides:
       engine.clear_stats()
       next,result = move(board,turn,depth)
@@ -105,6 +110,9 @@ def play(board,turn,sides,depth):
       d,value = divmod(result,4)
       print "move '%s', depth %d, score %d (%s)"%(ms,d,value-1,('win for '+'01'[turn^(value<1)] if value!=1 else 'tie'))
       print ', '.join('%s = %d'%(k,v) for k,v in engine.stats().items())
+      if early_exit and value!=1:
+        value = (-1)**turn*(value-1)
+        break
     else:
       while 1:
         ms = raw_input('enter move (example: a2 ur l): ')
@@ -116,3 +124,4 @@ def play(board,turn,sides,depth):
           continue
         break
     board,turn = next,1-turn
+  return first,value,positions
