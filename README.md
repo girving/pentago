@@ -8,11 +8,10 @@ etc.  For now it's extremely weak.
 ### Dependencies
 
 The core engine is written in C++ and exposed to Python as an extension module.
-The rest of the code (tests, interface, etc.) is in Python.  Thus, the dependencies
-are
+The rest of the code (tests, interface, etc.) is in Python.  The dependencies are
 
 * [python](http://python.org)
-* [numpy](http://numpy.scipy.org): Requires a patched version (see below)
+* [numpy](http://numpy.scipy.org)
 
 On a Mac, these can be obtained through [MacPorts](http://www.macports.org) via
 
