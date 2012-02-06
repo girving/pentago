@@ -6,5 +6,7 @@ import re
 import sys
 from numpy import *
 from interface import *
+import engine
 
-play(0,0,[0,1],2)
+engine.init_table(24)
+play(0,0,[0,1],4)
