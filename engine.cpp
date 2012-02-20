@@ -13,44 +13,19 @@
  *    a proof of that.
  */
 
-#include <stdint.h>
-#include <algorithm>
-#include <iostream>
-#include <Python.h>
+#include <other/core/array/Array.h>
+#include <other/core/array/NdArray.h>
+#include <other/core/python/module.h>
+#include <other/core/utility/format.h>
+#include <other/core/utility/interrupts.h>
 
 using std::max;
 using std::cout;
 using std::endl;
 using std::swap;
+using namespace other;
 
 namespace {
-
-/**************** Debugging ****************/
-
-// A simple verion of static_assert
-template<bool c> struct assertion_helper {};
-template<> struct assertion_helper<true> { enum {value = 0}; };
-#define static_assert(condition) \
-  enum {assertion_helper_##__LINE__ = assertion_helper<(condition)!=0>::value};
-
-// We require 64 bits for now to make interaction with python easier
-static_assert(sizeof(long)==8);
-
-struct python_error {};
-
-#define raise(exn,format,...) \
-  do { \
-    PyErr_Format(PyExc_##exn,format,__VA_ARGS__); \
-    throw python_error(); \
-  } while (0)
-
-#define slow_assert(condition) \
-  if (condition) {} else raise(AssertionError,"file %s, line %d, condition %s",__FILE__,__LINE__,#condition)
-
-inline void check_interrupts() {
-  if (PyErr_CheckSignals())
-    throw python_error();
-}
 
 /***************** Statistics ****************/
 
@@ -91,7 +66,7 @@ inline score_t exact_score(int value) {
 }
 
 template<int q> inline quadrant_t quadrant(uint64_t state) {
-  static_assert(0<=q && q<4);
+  BOOST_STATIC_ASSERT(0<=q && q<4);
   return (state>>16*q)&0xffff;
 }
 
@@ -128,7 +103,7 @@ inline quadrant_t pack(quadrant_t side0, quadrant_t side1) {
 }
 
 template<int s> inline quadrant_t unpack(quadrant_t state) {
-  static_assert(0<=s && s<2);
+  BOOST_STATIC_ASSERT(0<=s && s<2);
   // static const uint16_t unpack[3**9][2] = {...};
   #include "gen/unpack.h"
   return unpack[state][s];
@@ -166,8 +141,10 @@ uint64_t table_mask = 0;
 uint64_t* table = 0;
 
 void init_table(int bits) {
+  if (bits<1 || bits>30)
+    throw ValueError(format("expected 1<=bits<=30, got bits = %d",bits));
   if (64-bits+10>64)
-    raise(ValueError,"bits = %d is too small, the high order hash bits won't fit",bits);
+    throw ValueError(format("bits = %d is too small, the high order hash bits won't fit",bits));
   free(table);
   table_bits = bits;
   table_mask = (1<<table_bits)-1;
@@ -190,6 +167,13 @@ void store(board_t board, score_t score) {
   uint64_t& entry = table[h&table_mask];
   if (entry>>score_bits==h>>table_bits || (entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
+}
+
+void check_board(board_t board) {
+  #define CHECK(q) \
+    if (!(quadrant<q>(board)<(int)pow(3.,9.))) \
+      throw ValueError(format("quadrant %d has invalid value %d",q,quadrant<q>(board)));
+  CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 
 // Evaluate the current status of a board, returning one bit for whether each player has 5 in a row.
@@ -324,6 +308,12 @@ score_t evaluate_recurse(int depth, board_t board) {
 // We maintain the invariant that player 0 is always the player to move.  The result is 1 for a win
 // 0 for tie, -1 for loss.
 score_t evaluate(int depth, board_t board) {
+  // We can afford error detection here since recursion happens into a different function
+  OTHER_ASSERT(depth>=0);
+  check_board(board);
+  if (table_bits<10)
+    throw AssertionError(format("transposition table not initialized: table_bits = %d",table_bits));
+
   // Exit immediately if possible
   score_t sc = quick_evaluate(board);
   if (sc>>2 >= depth)
@@ -333,98 +323,66 @@ score_t evaluate(int depth, board_t board) {
   return evaluate_recurse(depth,board);
 }
 
-/***************** Python interface ****************/
-
-void check_board(board_t board) {
-  #define CHECK(q) \
-    if (!(quadrant<q>(board)<(int)pow(3,9))) { \
-      PyErr_Format(PyExc_ValueError,"quadrant %d has invalid value %d",q,quadrant<q>(board)); \
-      throw python_error(); \
+NdArray<int> unpack_py(NdArray<const board_t> boards) {
+  for (int b=0;b<boards.flat.size();b++)
+    check_board(boards[b]);
+  Array<int> shape = boards.shape.copy();
+  shape.append(6);
+  shape.append(6);
+  NdArray<int> tables(shape,false);
+  for (int b=0;b<boards.flat.size();b++) {
+    #define QUADRANT(qx,qy) { \
+      quadrant_t q = quadrant<2*qx+qy>(boards.flat[b]); \
+      side_t s0 = unpack<0>(q), \
+             s1 = unpack<1>(q); \
+      for (int x=0;x<3;x++) for (int y=0;y<3;y++) \
+        tables.flat[36*b+6*(3*qx+x)+3*qy+y] = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1); \
     }
-  CHECK(0) CHECK(1) CHECK(2) CHECK(3)
-}
-
-PyObject* status_py(PyObject* self, PyObject* args, PyObject* kwargs) {
-  board_t board;
-  static const char* names[] = {"board",0};
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,"l",(char**)names,&board,0))
-    return 0;
-
-  try {
-    check_board(board);
-    return PyInt_FromLong(status(board));
-  } catch (...) {
-    return 0;
+    QUADRANT(0,0)
+    QUADRANT(0,1)
+    QUADRANT(1,0)
+    QUADRANT(1,1)
+    #undef QUADRANT
   }
+  return tables;
 }
 
-PyObject* evaluate_py(PyObject* self, PyObject* args, PyObject* kwargs) {
-  int depth;
-  board_t board;
-  static const char* names[] = {"depth","board",0};
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,"il",(char**)names,&depth,&board,0))
-    return 0;
-
-  try {
-    if (depth<0)
-      raise(ValueError,"expected nonnegative depth, got %d",depth);
-    check_board(board);
-    if (table_bits<10)
-      raise(AssertionError,"transposition table not initialized: table_bits = %d",table_bits);
-    return PyInt_FromLong(evaluate(depth,board));
-  } catch (...) {
-    return 0;
+NdArray<board_t> pack_py(NdArray<const int> tables) {
+  OTHER_ASSERT(tables.rank()>=2);
+  int r = tables.rank();
+  OTHER_ASSERT(tables.shape[r-2]==6 && tables.shape[r-1]==6);
+  NdArray<board_t> boards(tables.shape.slice(0,r-2).copy(),false);
+  for (int b=0;b<boards.flat.size();b++) {
+    quadrant_t q[4];
+    for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
+      quadrant_t s0=0,s1=0;
+      for (int x=0;x<3;x++) for (int y=0;y<3;y++) {
+        quadrant_t bit = 1<<(3*x+y);
+        switch (tables.flat[36*b+6*(3*qx+x)+3*qy+y]) {
+          case 1: s0 |= bit; break;
+          case 2: s1 |= bit; break;
+        }
+      }
+      q[2*qx+qy] = pack(s0,s1);
+    }
+    boards.flat[b] = quadrants(q[0],q[1],q[2],q[3]);
   }
+  return boards;
 }
 
-PyObject* moves_py(PyObject* self, PyObject* args, PyObject* kwargs) {
-  board_t board;
-  static const char* names[] = {"board",0};
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,"l",(char**)names,&board,0))
-    return 0;
-
-  try {
-    check_board(board);
-    // const board_t moves[total] = {...};
-    MOVES(board)
-    PyObject* tuple = PyTuple_New(total);
-    for (int i=0;i<total;i++)
-      PyTuple_SET_ITEM(tuple,i,PyInt_FromLong(moves[i]));
-    return tuple;
-  } catch (...) {
-    return 0;
-  }
+int status_py(board_t board) {
+  check_board(board);
+  return status(board);
 }
 
-PyObject* init_table_py(PyObject* self, PyObject* args, PyObject* kwargs) {
-  int bits;
-  static const char* names[] = {"bits",0};
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,"i",(char**)names,&bits,0))
-    return 0;
-
-  try {
-    if (bits<1 || bits>30)
-      raise(ValueError,"expected 1<=bits<=30, got bits = %d",bits);
-    init_table(bits);
-    Py_RETURN_NONE;
-  } catch (...) {
-    return 0;
-  }
+Array<board_t> moves(board_t board) {
+  check_board(board);
+  // const board_t moves[total] = {...};
+  MOVES(board)
+  return RawArray<board_t>(total,moves).copy();
 }
 
-PyObject* clear_stats_py(PyObject* self, PyObject* args, PyObject* kwargs) {
-  static const char* names[] = {0};
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,"",(char**)names,0))
-    return 0;
-  clear_stats();
-  Py_RETURN_NONE;
-}
-
-PyObject* stats_py(PyObject* self, PyObject* args, PyObject* kwargs) {
-  static const char* names[] = {0};
-  if (!PyArg_ParseTupleAndKeywords(args,kwargs,"",(char**)names,0))
-    return 0;
-
+PyObject* stats() {
   PyObject* stats = PyDict_New();
   #define ST(stat) PyDict_SetItemString(stats,#stat,PyInt_FromLong(stat));
   ST(expanded_nodes)
@@ -433,20 +391,16 @@ PyObject* stats_py(PyObject* self, PyObject* args, PyObject* kwargs) {
   return stats;
 }
 
-PyMethodDef methods[] = {
-  {"status",     (PyCFunction)status_py,     METH_VARARGS|METH_KEYWORDS,"compute the current status of a board"},
-  {"evaluate",   (PyCFunction)evaluate_py,   METH_VARARGS|METH_KEYWORDS,"evaluate(depth,board) evaluates the given packed Pentago position to the specified depth"},
-  {"moves",      (PyCFunction)moves_py,      METH_VARARGS|METH_KEYWORDS,"compute the set of player 0's possible moves starting from a given position"},
-  {"init_table", (PyCFunction)init_table_py, METH_VARARGS|METH_KEYWORDS,"initialize a transposition table with the given number of bits"},
-  {"clear_stats",(PyCFunction)clear_stats_py,METH_VARARGS|METH_KEYWORDS,"clear statistics"},
-  {"stats",      (PyCFunction)stats_py,      METH_VARARGS|METH_KEYWORDS,"retrieve statistics"},
-  {0} // sentinel
-};
-
 }
 
-PyMODINIT_FUNC
-initengine() {
-  PyObject* m = Py_InitModule3("engine",methods,"A Pentago engine");
-  if (!m) return;
+OTHER_PYTHON_MODULE(pentago) {
+  using namespace python;
+  function("status",status_py);
+  OTHER_FUNCTION(evaluate)
+  OTHER_FUNCTION(moves)
+  OTHER_FUNCTION(init_table)
+  OTHER_FUNCTION(clear_stats)
+  OTHER_FUNCTION(stats)
+  function("unpack",unpack_py);
+  function("pack",pack_py);
 }

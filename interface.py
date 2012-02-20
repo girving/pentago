@@ -5,22 +5,8 @@ import os
 import re
 import sys
 from numpy import *
-import engine
-from engine import status
-
-def unpack(board):
-  table = zeros((6,6),dtype=int)
-  for x in xrange(6):
-    for y in xrange(6):
-      table[x,y] = (board>>16*(2*(x//3)+y//3)&0xffff)//3**(3*(x%3)+y%3)%3
-  return table
-
-def pack(table):
-  board = 0
-  for x in xrange(6):
-    for y in xrange(6):
-      board += table[x,y]*3**(3*(x%3)+y%3)<<16*(2*(x//3)+y//3)
-  return board
+import libpentago as engine
+from libpentago import status,pack,unpack,init_table
 
 def flip(board):
   return pack((2*unpack(board))%3)
@@ -76,7 +62,7 @@ def inv_parse_move(board,turn,next):
 def move(board,turn,depth,rand=True):
   '''Returns (next,score), where next is the board position moved to and score = depth<<2 | 0 (loss), 1 (tie), or 2 (win).'''
   nexts = engine.moves(flipto(board,turn))
-  assert nexts
+  assert len(nexts)
   options = []
   for next in nexts:
     score = lift(engine.evaluate(depth-1,next))

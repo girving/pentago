@@ -1,5 +1,6 @@
-engine.so
+SConstruct
+SConstruct.options
+.sconsign.dblite
+site_scons
 build
-gen
-*.o
 *.pyc
