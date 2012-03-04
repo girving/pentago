@@ -18,96 +18,131 @@ def show_board(board):
   table = unpack(board)
   return '\n'.join('abcdef'[i]+'  '+''.join('_01'[table[j,5-i]] for j in xrange(6)) for i in xrange(6)) + '\n\n   123456'
 
-def moves(board,turn):
-  return [flipto(m,1-turn) for m in engine.moves(flipto(board,turn))]
+def moves(board,turn,simple=False):
+  return [flipto(m,1-turn) for m in (engine.simple_moves if simple else engine.moves)(flipto(board,turn))]
 
 def lift(score):
   depth,value = divmod(score,4)
-  if value!=1:
-    assert depth>=36, 'invalid score: depth %d, value %d'%(depth,value)
+  assert depth>=0 and 0<=value<=2, 'invalid score: depth %d, value %d'%(depth,value)
   return 4*(depth+1)+2-value
 
+def rotate(board,qx,qy,count):
+  count = (count%4+4)%4
+  table = unpack(board)
+  for i in xrange(count):
+    copy = table.copy()
+    for x in xrange(3):
+      for y in xrange(3):
+        copy[3*qx+x,3*qy+y] = table[3*qx+y,3*qy+2-x]
+    table = copy
+  return pack(table)
+
 move_pattern = re.compile(r'^\s*([abcdef])([123456])\s*([ul])([lr])\s*([lr])\s*$')
-def parse_move(board,turn,move):
-  m = move_pattern.match(move)
+simple_move_pattern = re.compile(r'^\s*([abcdef])([123456])\s*$')
+def parse_move(board,turn,move,simple=False):
+  m = (simple_move_pattern if simple else move_pattern).match(move)
   if not m:
-    raise SyntaxError("syntax error in move string '%s', example syntax: 'a2 ur l' for 'a2, upper right, rotate left'"%move.strip())
+    if simple:
+      raise SyntaxError("syntax error in move string '%s', example syntax: 'a2'"%move.strip())
+    else:
+      raise SyntaxError("syntax error in move string '%s', example syntax: 'a2 ur l' for 'a2, upper right, rotate left'"%move.strip())
   x = '123456'.find(m.group(2))
   y = 'fedcba'.find(m.group(1))
-  qx = 3*'lr'.find(m.group(4))
-  qy = 3*'lu'.find(m.group(3))
-  dir = m.group(5)
+  if not simple:
+    qx = 'lr'.find(m.group(4))
+    qy = 'lu'.find(m.group(3))
+    dir = m.group(5)
   table = unpack(board)
   if table[x,y]:
     raise ValueError("illegal move '%s', position is already occupied"%move.strip())
   table[x,y] = 1+turn
-  for i in xrange({'l':1,'r':3}[dir]):
-    copy = table.copy()
-    for x in xrange(3):
-      for y in xrange(3):
-        copy[qx+x,qy+y] = table[qx+y,qy+2-x]
-    table = copy
-  return pack(table)
+  if simple:
+    return pack(table)
+  else:
+    return rotate(pack(table),qx,qy,{'l':1,'r':-1}[dir])
 
 all_moves = ['%s%s %s%s %s'%(i,j,qi,qj,d) for i in 'abcdef' for j in '123456' for qi in 'ul' for qj in 'lr' for d in 'lr']
-def inv_parse_move(board,turn,next):
-  for m in all_moves:
+all_simple_moves = ['%s%s'%(i,j) for i in 'abcdef' for j in '123456']
+def inv_parse_move(board,turn,next,simple=False):
+  for m in all_simple_moves if simple else all_moves:
     try:
-      if parse_move(board,turn,m)==next:
+      if parse_move(board,turn,m,simple)==next:
         return m
     except ValueError:
       pass
   raise ValueError('invalid move')
 
-def move(board,turn,depth,rand=True):
+def move(board,turn,depth,rand=True,simple=False):
   '''Returns (next,score), where next is the board position moved to and score = depth<<2 | 0 (loss), 1 (tie), or 2 (win).'''
-  nexts = engine.moves(flipto(board,turn))
+  nexts = (engine.simple_moves if simple else engine.moves)(flipto(board,turn))
   assert len(nexts)
   options = []
   for next in nexts:
-    score = lift(engine.evaluate(depth-1,next))
+    score = lift((engine.simple_evaluate if simple else engine.evaluate)(depth-1,next))
     assert score//4>=depth, 'unexpected evaluation: depth %d, value %d, expected depth %d'%(score//4,score&3,depth)
     if not options or (options[0][0]&3)<(score&3):
       options = [(score,next)]
-      if (score&3)==2:
+      if (score&3)>=2: #(1 if simple and turn==1 else 2):
         break
     elif (options[0][0]&3)==(score&3):
       options.append((score,next))
   score,next = options[random.randint(len(options)) if rand else 0]
   return flipto(next,1-turn),score
  
-def play(board,turn,sides,depth,early_exit=False):
+def play(board,turn,sides,depth,early_exit=False,simple=False):
   first = turn
   positions = []
+  final_result = None
   while 1:
     positions.append(board)
     header = 'board = %d, turn = %d'%(board,turn)
     print '\n%s\n%s'%('-'*len(header),header)
     print '\n'+show_board(board)
-    s = status(board)
+    s = (simple_status if simple else status)(board)
     if s:
       print {1:'win for 0',2:'win for 1',3:'simultaneous win (tie)'}[s]
+      if simple and not status(board):
+        for qd in xrange(8):
+          qx = qd//4
+          qy = qd//2&1
+          c = (-1)**(qd&1)
+          rb = rotate(board,qx,qy,c)
+          if status(rb)==1:
+            print 'rotate %s%s %s to get'%('lu'[qy],'lr'[qx],('left','right')[c<0])
+            print show_board(rb)
+            break
+        else:
+          raise RuntimeError('not a rotated win for black')
       value = (s&1)-(s>>1)
       break
     if turn in sides:
       engine.clear_stats()
-      next,result = move(board,turn,depth)
-      ms = inv_parse_move(board,turn,next)
+      next,result = move(board,turn,depth,simple=simple)
+      ms = inv_parse_move(board,turn,next,simple=simple)
       d,value = divmod(result,4)
       print "move '%s', depth %d, score %d (%s)"%(ms,d,value-1,('win for '+'01'[turn^(value<1)] if value!=1 else 'tie'))
       print ', '.join('%s = %d'%(k,v) for k,v in engine.stats().items())
+      print 'total moves = %d'%sum(unpack(next)!=0)
+      fr = (-1)**turn*(value-1)
+      if final_result is not None:
+        assert final_result==fr
+      elif d>=36:
+        final_result = fr
       if early_exit and value!=1:
         value = (-1)**turn*(value-1)
         break
     else:
       while 1:
-        ms = raw_input('enter move (example: a2 ur l): ')
+        ms = raw_input('enter move (example: %s): '%('a2' if simple else 'a2 ur l'))
         try:
-          next = parse_move(board,turn,ms) 
+          next = parse_move(board,turn,ms,simple)
         except ValueError:
           continue
         except SyntaxError:
           continue
         break
     board,turn = next,1-turn
+    # Reduce search depth so that the game ends quickly
+    if final_result is not None:
+      depth -= 1
   return first,value,positions

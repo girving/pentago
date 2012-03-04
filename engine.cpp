@@ -74,6 +74,12 @@ inline uint64_t quadrants(quadrant_t q0, quadrant_t q1, quadrant_t q2, quadrant_
   return q0|(uint64_t)q1<<16|(uint64_t)q2<<32|(uint64_t)q3<<48;
 }
 
+// Pull in win contribution tables
+// static const uint64_t win_contributions[4][1<<9] = {...};
+#include "gen/win.h"
+// static const uint64_t rotated_win_contribution_deltas[4][1<<9] = {...};
+#include "gen/rotated_win.h"
+
 // Determine if one side has 5 in a row
 inline bool won(side_t side) {
   /* To test whether a position is a win for a given player, we note that
@@ -85,9 +91,6 @@ inline bool won(side_t side) {
    * and a few bit twiddling checks are sufficient to test whether 5 in a
    * row exists.  See helper for the precomputation code. */
 
-  // static const uint64_t win_contributions[4][1<<9] = {...};
-  #include "gen/win.h"
-
   uint64_t c = win_contributions[0][quadrant(side,0)]
              + win_contributions[1][quadrant(side,1)]
              + win_contributions[2][quadrant(side,2)]
@@ -96,10 +99,38 @@ inline bool won(side_t side) {
       || c&(0xaaaaaaaaaaaaaaaa<<8); // The remaining 28 ways require contributions from only two
 }
 
+// Determine if one side can win by rotating a quadrant
+inline bool rotated_won(side_t side) {
+  quadrant_t q0 = quadrant(side,0),
+             q1 = quadrant(side,1),
+             q2 = quadrant(side,2),
+             q3 = quadrant(side,3);
+  // First see how far we get without rotations
+  uint64_t c = win_contributions[0][q0]
+             + win_contributions[1][q1]
+             + win_contributions[2][q2]
+             + win_contributions[3][q3];
+  // We win if we only need to rotate a single quadrant
+  uint64_t c0 = c+rotated_win_contribution_deltas[0][q0],
+           c1 = c+rotated_win_contribution_deltas[1][q1],
+           c2 = c+rotated_win_contribution_deltas[2][q2],
+           c3 = c+rotated_win_contribution_deltas[3][q3];
+  // Check if we won
+  return (c0|c1|c2|c3)&(0xaaaaaaaaaaaaaaaa<<8) // The last remaining 28 ways of winning require contributions two quadrants
+      || ((c0&(c0>>1))|(c1&(c1>>1))|(c2&(c2>>1))|(c3&(c3>>1)))&0x55; // The first four require contributions from three
+}
+
 inline quadrant_t pack(quadrant_t side0, quadrant_t side1) {
   // static const uint16_t pack[1<<9] = {...};
   #include "gen/pack.h"
   return pack[side0]+2*pack[side1];
+}
+
+inline board_t pack(side_t side0, side_t side1) {
+  return quadrants(pack(quadrant(side0,0),quadrant(side1,0)),
+                   pack(quadrant(side0,1),quadrant(side1,1)),
+                   pack(quadrant(side0,2),quadrant(side1,2)),
+                   pack(quadrant(side0,3),quadrant(side1,3)));
 }
 
 inline quadrant_t unpack(quadrant_t state, int s) {
@@ -139,6 +170,7 @@ const int score_mask = (1<<score_bits)-1;
 int table_bits = 0;
 uint64_t table_mask = 0;
 uint64_t* table = 0;
+enum table_type_t {blank_table,normal_table,simple_table} table_type;
 
 void init_table(int bits) {
   if (bits<1 || bits>30)
@@ -149,6 +181,7 @@ void init_table(int bits) {
   table_bits = bits;
   table_mask = (1<<table_bits)-1;
   table = (uint64_t*)calloc(1L<<bits,sizeof(uint64_t));
+  table_type = blank_table;
 }
 
 score_t lookup(board_t board) {
@@ -159,7 +192,7 @@ score_t lookup(board_t board) {
     STAT(successful_lookups++);
     return entry&score_mask;
   }
-  return 1;
+  return score(0,1);
 }
 
 void store(board_t board, score_t score) {
@@ -199,10 +232,10 @@ inline int status(board_t board) {
 #define QR0(s,q,dir) rotations[quadrant(side##s,q)][dir]
 #define QR1(s,q) {QR0(s,q,0),QR0(s,q,1)}
 #define QR2(s) {QR1(s,0),QR1(s,1),QR1(s,2),QR1(s,3)}
-#define COUNT(q,qpp) \
-  const int offset##q = move_offsets[quadrant(filled,q)]; \
-  const int count##q       = move_offsets[quadrant(filled,q)+1]-offset##q; \
-  const int total##qpp     = total##q + 8*count##q;
+#define COUNT(stride,q,qpp) \
+  const int offset##q  = move_offsets[quadrant(filled,q)]; \
+  const int count##q   = move_offsets[quadrant(filled,q)+1]-offset##q; \
+  const int total##qpp = total##q + stride*count##q;
 #define MOVE_QUAD(q,qr,dir,i) \
   quadrant_t side0_quad##i, side1_quad##i; \
   if (qr!=i) { \
@@ -237,12 +270,26 @@ inline int status(board_t board) {
   /* Count the number of moves in each quadrant */ \
   const side_t filled = side0|side1; \
   const int total0 = 0; \
-  COUNT(0,1) COUNT(1,2) COUNT(2,3) COUNT(3,4) \
+  COUNT(8,0,1) COUNT(8,1,2) COUNT(8,2,3) COUNT(8,3,4) \
   int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
   /* Collect the list of all possible moves.  Note that we repack with the sides */ \
   /* flipped so that it's still player 0's turn. */ \
   board_t moves[total]; \
   COLLECT_MOVES(0) COLLECT_MOVES(1) COLLECT_MOVES(2) COLLECT_MOVES(3)
+
+// Same as MOVES, but ignores rotations and operates in unpacked mode
+#define SIMPLE_COLLECT_MOVES(q) \
+  for (int i=0;i<count##q;i++) \
+    moves[total##q+i] = side0|(side_t)move_flat[offset##q+i]<<16*q;
+#define SIMPLE_MOVES(side0,side1) \
+  /* Count the number of moves in each quadrant */ \
+  const side_t filled = side0|side1; \
+  const int total0 = 0; \
+  COUNT(1,0,1) COUNT(1,1,2) COUNT(1,2,3) COUNT(1,3,4) \
+  int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
+  /* Collect the list of possible moves.  Note that only side0 changes */ \
+  side_t moves[total]; \
+  SIMPLE_COLLECT_MOVES(0) SIMPLE_COLLECT_MOVES(1) SIMPLE_COLLECT_MOVES(2) SIMPLE_COLLECT_MOVES(3)
 
 // Evaluate position based only on current state and transposition table
 inline score_t quick_evaluate(board_t board) {
@@ -252,6 +299,15 @@ inline score_t quick_evaluate(board_t board) {
     return exact_score(1+(st&1)-(st>>1));
   // Did we already compute this value?
   return lookup(board);
+}
+
+// Evaluate position based only on current state and transposition table, ignoring rotations or white five-in-a-row
+template<bool black> inline score_t simple_quick_evaluate(side_t side0, side_t side1) {
+  // If we're white, check if we've lost
+  if (!black && rotated_won(side1))
+    return exact_score(0);
+  // Did we already compute this value?
+  return lookup(pack(side0,side1));
 }
 
 // Flip a score and increment its depth by one
@@ -267,7 +323,7 @@ score_t evaluate_recurse(int depth, board_t board) {
   MOVES(board)
 
   // Check status and transposition table for each move
-  score_t best = exact_score(0);
+  score_t best = score(depth,0);
   for (int i=total-1;i>=0;i--) {
     score_t sc = lift(quick_evaluate(moves[i]));
     if (sc>>2 >= depth)
@@ -291,9 +347,10 @@ score_t evaluate_recurse(int depth, board_t board) {
   // No move ordering for now, since all the remaining moves are ties as far the transposition table knows
   for (int i=0;i<total;i++) {
     score_t sc = lift(evaluate_recurse(depth-1,moves[i]));
-    if ((sc&3)==2)
-      return sc;
-    else if ((best&3)<(sc&3))
+    if ((sc&3)==2) {
+      best = sc;
+      goto done;
+    } else if ((best&3)<(sc&3))
       best = sc;
   }
 
@@ -313,6 +370,9 @@ score_t evaluate(int depth, board_t board) {
   check_board(board);
   if (table_bits<10)
     throw AssertionError(format("transposition table not initialized: table_bits = %d",table_bits));
+  if (table_type==blank_table)
+    table_type = normal_table;
+  OTHER_ASSERT(table_type==normal_table);
 
   // Exit immediately if possible
   score_t sc = quick_evaluate(board);
@@ -321,6 +381,93 @@ score_t evaluate(int depth, board_t board) {
 
   // Otherwise, recurse into children
   return evaluate_recurse(depth,board);
+}
+
+inline int popcount(uint64_t n) {
+  BOOST_STATIC_ASSERT(sizeof(long)==sizeof(uint64_t));
+  return __builtin_popcountl(n);
+}
+
+// Evaluate position ignoring rotations and white five-in-a-row
+template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, side_t side1) {
+  STAT(expanded_nodes++);
+
+  // Collect possible moves
+  SIMPLE_MOVES(side0,side1)
+
+  // Check status and transposition table for each move
+  score_t best = black?score(depth,1):exact_score(0);
+  for (int i=total-1;i>=0;i--) {
+    score_t sc = lift(simple_quick_evaluate<!black>(side1,moves[i]));
+    if (sc>>2 >= depth) {
+      if ((sc&3)>=(black?2:1))
+        return sc; // Win for black, or tie for white
+      else // Tie for black, or loss for white: remove from the list of moves
+        swap(moves[i],moves[--total]);
+    }
+  }
+
+  // If we're out of moves, we're done
+  if (!total)
+    goto done;
+
+  // Are we out of recursion depth?
+  if (depth==1) {
+    best = score(1,1);
+    goto done;
+  }
+
+  // Recurse
+  for (int i=0;i<total;i++) {
+    score_t sc = lift(simple_evaluate_recurse<!black>(depth-1,side1,moves[i]));
+    if ((sc&3)>=(black?2:1)) {
+      best = sc;
+      goto done;
+    }
+  }
+
+  // Store results and finish
+  done:
+  store(pack(side0,side1),best);
+  check_interrupts();
+  return best;
+}
+
+bool black_to_move(board_t board) {
+  check_board(board);
+  const side_t side0 = unpack(board,0),
+               side1 = unpack(board,1);
+  const int count0 = popcount(side0),
+            count1 = popcount(side1);
+  OTHER_ASSERT(count0==count1 || count1==count0+1);
+  return count0==count1;
+}
+
+// Evaluate a position down to a certain game tree depth, ignoring rotations and white wins.
+score_t simple_evaluate(int depth, board_t board) {
+  // We can afford error detection here since recursion happens into a different function
+  OTHER_ASSERT(depth>=0);
+  check_board(board);
+  if (table_bits<10)
+    throw AssertionError(format("transposition table not initialized: table_bits = %d",table_bits));
+  if (table_type==blank_table)
+    table_type = simple_table;
+  OTHER_ASSERT(table_type==simple_table);
+
+  // Determine whether player 0 is black (first to move) or white (second to move)
+  const side_t side0 = unpack(board,0),
+               side1 = unpack(board,1);
+  bool black = black_to_move(board);
+
+  // Exit immediately if possible
+  score_t sc = black?simple_quick_evaluate<true>(side0,side1)
+                    :simple_quick_evaluate<false>(side0,side1);
+  if (sc>>2 >= depth)
+    return sc;
+
+  // Otherwise, recurse into children
+  return black?simple_evaluate_recurse<true >(depth,side0,side1)
+              :simple_evaluate_recurse<false>(depth,side0,side1);
 }
 
 NdArray<int> unpack_py(NdArray<const board_t> boards) {
@@ -416,11 +563,28 @@ int status_py(board_t board) {
   return status(board);
 }
 
+int simple_status(board_t board) {
+  check_board(board);
+  return rotated_won(unpack(board,0))?1:0;
+}
+
 Array<board_t> moves(board_t board) {
   check_board(board);
   // const board_t moves[total] = {...};
   MOVES(board)
   return RawArray<board_t>(total,moves).copy();
+}
+
+Array<board_t> simple_moves(board_t board) {
+  check_board(board);
+  const side_t side0 = unpack(board,0),
+               side1 = unpack(board,1);
+  // const side_t moves[total] = {...};
+  SIMPLE_MOVES(side0,side1)
+  Array<board_t> result(total,false);
+  for (int i=0;i<total;i++)
+    result[i] = pack(side1,moves[i]);
+  return result;
 }
 
 PyObject* stats() {
@@ -438,10 +602,14 @@ OTHER_PYTHON_MODULE(pentago) {
   using namespace python;
   function("status",status_py);
   OTHER_FUNCTION(evaluate)
+  OTHER_FUNCTION(simple_evaluate)
   OTHER_FUNCTION(moves)
+  OTHER_FUNCTION(simple_moves)
   OTHER_FUNCTION(init_table)
   OTHER_FUNCTION(clear_stats)
   OTHER_FUNCTION(stats)
+  OTHER_FUNCTION(black_to_move)
+  OTHER_FUNCTION(simple_status)
   function("unpack",unpack_py);
   function("pack",pack_py);
   function("standardize",standardize_py);

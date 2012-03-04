@@ -10,14 +10,17 @@ from interface import *
 
 usage = "usage: %prog [options...]"
 parser = optparse.OptionParser(usage)
-parser.add_option('-b','--bits',type=int,default=24,help='size of transposition table in bits')
-parser.add_option('-d','--depth',type=int,default=3,help='search depth')
-parser.add_option('-s','--seed',type=int,default=hash('anya'),help='random seed')
+parser.add_option('-b','--bits',type=int,default=24,help='size of transposition table in bits (default %default)')
+parser.add_option('-d','--depth',type=int,default=3,help='search depth (default %default)')
+parser.add_option('-s','--seed',type=int,default=hash('anya'),help='random seed (default %default)')
 parser.add_option('-r','--record',type=str,help='append random game records to the given file')
+parser.add_option('-t','--simple',action='store_true',help='ignore rotations and white five-in-a-row')
+parser.add_option('--start',type=str,default='0,0',help='comma separated starting board and turn')
+parser.add_option('-m','--manual',type=int,default=-1,help='play the given side manually')
 options,args = parser.parse_args()
 
 engine.init_table(options.bits)
-print 'rnadom seed = %d'%options.seed
+print 'random seed = %d'%options.seed
 random.seed(abs(options.seed))
 
 if options.record:
@@ -29,4 +32,7 @@ if options.record:
     print>>file,seed,repr(game)
     file.flush()
 else:
-  play(0,0,[0,1],options.depth)
+  board,turn = map(int,options.start.split(','))
+  assert turn in (0,1)
+  sides = [0,1] if options.manual<0 else [1-options.manual]
+  play(board,turn,sides,options.depth,simple=options.simple)

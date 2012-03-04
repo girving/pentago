@@ -17,11 +17,14 @@ def test_misc():
     assert flip(flip(board))==board
     move = '%s%s %s%s %s'%('abcdef'[randint(6)],'123456'[randint(6)],'ul'[randint(2)],'lr'[randint(2)],'lr'[randint(2)])
     turn = randint(2)
-    try:
-      next = parse_move(board,turn,move)
-      assert next in moves(board,turn)
-    except ValueError:
-      pass
+    for simple in False,True:
+      if simple:
+        move = move[:2]
+      try:
+        next = parse_move(board,turn,move,simple=simple)
+        assert next in moves(board,turn,simple=simple)
+      except ValueError:
+        pass
 
 def test_known():
   known = [(1484828812733057276,0,'e5 ll l',1484829160625409948),
