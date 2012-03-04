@@ -6,7 +6,7 @@ import re
 import sys
 from numpy import *
 import libpentago as engine
-from libpentago import status,pack,unpack,init_table
+from libpentago import *
 
 def flip(board):
   return pack((2*unpack(board))%3)

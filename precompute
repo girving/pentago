@@ -122,6 +122,22 @@ def rotations():
   return 'static const uint16_t rotations' + cpp_array('0x%x',table)+';\n'
 
 @cache
+def reflections():
+  n = 3 
+  table = zeros((512,2),dtype=int16)
+  for v in xrange(512):
+    rx,ry = 0,0
+    for x in xrange(3):
+      for y in xrange(3):
+        if v&bit(n,x,y):
+          rx |= bit(n,2-x,y)
+          ry |= bit(n,x,2-y)
+    assert popcount(v)==popcount(rx)==popcount(ry)
+    table[v] = rx,ry
+  assert ahash(table)==5787381149236214080
+  return 'static const uint16_t reflections' + cpp_array('0x%x',table)+';\n'
+
+@cache
 def packings():
   '''There are 3**9 = 19683 possible states in each quadrant.  3**9 < 2**16, so we can store
   a quadrant state in 16 bits using radix 3.  However, radix 3 is inconvenient for computation,
@@ -186,6 +202,7 @@ if __name__=='__main__':
     open('%s/%s.h'%(prefix,name),'w').write(note+array)
   save('win',win_contributions())
   save('rotate',rotations())
+  save('reflect',reflections())
   save('pack',packings()[0])
   save('unpack',packings()[1])
   save('move',moves())

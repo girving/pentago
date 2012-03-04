@@ -65,8 +65,8 @@ inline score_t exact_score(int value) {
   return score(36,value);
 }
 
-template<int q> inline quadrant_t quadrant(uint64_t state) {
-  BOOST_STATIC_ASSERT(0<=q && q<4);
+inline quadrant_t quadrant(uint64_t state, int q) {
+  assert(0<=q && q<4);
   return (state>>16*q)&0xffff;
 }
 
@@ -88,10 +88,10 @@ inline bool won(side_t side) {
   // static const uint64_t win_contributions[4][1<<9] = {...};
   #include "gen/win.h"
 
-  uint64_t c = win_contributions[0][quadrant<0>(side)]
-             + win_contributions[1][quadrant<1>(side)]
-             + win_contributions[2][quadrant<2>(side)]
-             + win_contributions[3][quadrant<3>(side)];
+  uint64_t c = win_contributions[0][quadrant(side,0)]
+             + win_contributions[1][quadrant(side,1)]
+             + win_contributions[2][quadrant(side,2)]
+             + win_contributions[3][quadrant(side,3)];
   return c&(c>>1)&0x55 // The first four ways of winning require contributions from three quadrants
       || c&(0xaaaaaaaaaaaaaaaa<<8); // The remaining 28 ways require contributions from only two
 }
@@ -102,18 +102,18 @@ inline quadrant_t pack(quadrant_t side0, quadrant_t side1) {
   return pack[side0]+2*pack[side1];
 }
 
-template<int s> inline quadrant_t unpack(quadrant_t state) {
-  BOOST_STATIC_ASSERT(0<=s && s<2);
+inline quadrant_t unpack(quadrant_t state, int s) {
+  assert(0<=s && s<2);
   // static const uint16_t unpack[3**9][2] = {...};
   #include "gen/unpack.h"
   return unpack[state][s];
 }
 
-template<int s> inline side_t unpack(board_t board) {
-  return quadrants(unpack<s>(quadrant<0>(board)),
-                   unpack<s>(quadrant<1>(board)),
-                   unpack<s>(quadrant<2>(board)),
-                   unpack<s>(quadrant<3>(board)));
+inline side_t unpack(board_t board, int s) {
+  return quadrants(unpack(quadrant(board,0),s),
+                   unpack(quadrant(board,1),s),
+                   unpack(quadrant(board,2),s),
+                   unpack(quadrant(board,3),s));
 }
 
 inline uint64_t hash(board_t key) {
@@ -171,15 +171,15 @@ void store(board_t board, score_t score) {
 
 void check_board(board_t board) {
   #define CHECK(q) \
-    if (!(quadrant<q>(board)<(int)pow(3.,9.))) \
-      throw ValueError(format("quadrant %d has invalid value %d",q,quadrant<q>(board)));
+    if (!(quadrant(board,q)<(int)pow(3.,9.))) \
+      throw ValueError(format("quadrant %d has invalid value %d",q,quadrant(board,q)));
   CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 
 // Evaluate the current status of a board, returning one bit for whether each player has 5 in a row.
 inline int status(board_t board) {
-  const side_t side0 = unpack<0>(board),
-               side1 = unpack<1>(board);
+  const side_t side0 = unpack(board,0),
+               side1 = unpack(board,1);
   if ((side0|side1)==0x1ff01ff01ff01ff)
     return 3; // The board is full, so immediate tie
   const int won0 = won(side0),
@@ -196,18 +196,18 @@ inline int status(board_t board) {
 
 // We declare the move listing code as a huge macro in order to use it in multiple functions while taking advantage of gcc's variable size arrays.
 // To use, invoke MOVES(board) to fill a board_t moves[total] array.
-#define QR0(s,q,dir) rotations[quadrant<q>(side##s)][dir]
+#define QR0(s,q,dir) rotations[quadrant(side##s,q)][dir]
 #define QR1(s,q) {QR0(s,q,0),QR0(s,q,1)}
 #define QR2(s) {QR1(s,0),QR1(s,1),QR1(s,2),QR1(s,3)}
 #define COUNT(q,qpp) \
-  const int offset##q = move_offsets[quadrant<q>(filled)]; \
-  const int count##q       = move_offsets[quadrant<q>(filled)+1]-offset##q; \
+  const int offset##q = move_offsets[quadrant(filled,q)]; \
+  const int count##q       = move_offsets[quadrant(filled,q)+1]-offset##q; \
   const int total##qpp     = total##q + 8*count##q;
 #define MOVE_QUAD(q,qr,dir,i) \
   quadrant_t side0_quad##i, side1_quad##i; \
   if (qr!=i) { \
-    side0_quad##i = quadrant<i>(side1); \
-    side1_quad##i = q==i?changed:quadrant<i>(side0); \
+    side0_quad##i = quadrant(side1,i); \
+    side1_quad##i = q==i?changed:quadrant(side0,i); \
   } else { \
     side0_quad##i = rotated[1][i][dir]; \
     side1_quad##i = q==i?rotations[changed][dir]:rotated[0][i][dir]; \
@@ -222,7 +222,7 @@ inline int status(board_t board) {
 }
 #define COLLECT_MOVES(q) \
   for (int i=0;i<count##q;i++) { \
-    const quadrant_t changed = quadrant<q>(side0)|move_flat[offset##q+i]; \
+    const quadrant_t changed = quadrant(side0,q)|move_flat[offset##q+i]; \
     MOVE(q,0,0) MOVE(q,0,1) \
     MOVE(q,1,0) MOVE(q,1,1) \
     MOVE(q,2,0) MOVE(q,2,1) \
@@ -230,8 +230,8 @@ inline int status(board_t board) {
   }
 #define MOVES(board) \
   /* Unpack sides */ \
-  const side_t side0 = unpack<0>(board), \
-               side1 = unpack<1>(board); \
+  const side_t side0 = unpack(board,0), \
+               side1 = unpack(board,1); \
   /* Rotate all four quadrants left and right in preparation for move generation */ \
   const quadrant_t rotated[2][4][2] = {QR2(0),QR2(1)}; \
   /* Count the number of moves in each quadrant */ \
@@ -331,18 +331,13 @@ NdArray<int> unpack_py(NdArray<const board_t> boards) {
   shape.append(6);
   NdArray<int> tables(shape,false);
   for (int b=0;b<boards.flat.size();b++) {
-    #define QUADRANT(qx,qy) { \
-      quadrant_t q = quadrant<2*qx+qy>(boards.flat[b]); \
-      side_t s0 = unpack<0>(q), \
-             s1 = unpack<1>(q); \
+    for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
+      quadrant_t q = quadrant(boards.flat[b],2*qx+qy); \
+      side_t s0 = unpack(q,0), \
+             s1 = unpack(q,1); \
       for (int x=0;x<3;x++) for (int y=0;y<3;y++) \
         tables.flat[36*b+6*(3*qx+x)+3*qy+y] = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1); \
     }
-    QUADRANT(0,0)
-    QUADRANT(0,1)
-    QUADRANT(1,0)
-    QUADRANT(1,1)
-    #undef QUADRANT
   }
   return tables;
 }
@@ -368,6 +363,52 @@ NdArray<board_t> pack_py(NdArray<const int> tables) {
     boards.flat[b] = quadrants(q[0],q[1],q[2],q[3]);
   }
   return boards;
+}
+
+inline board_t pack(const Vector<Vector<quadrant_t,2>,4>& sides) {
+    return quadrants(pack(sides[0][0],sides[0][1]),
+                     pack(sides[1][0],sides[1][1]),
+                     pack(sides[2][0],sides[2][1]),
+                     pack(sides[3][0],sides[3][1]));
+}
+
+// Rotate and reflect a board to minimize its value
+board_t standardize(board_t board) {
+  Vector<Vector<quadrant_t,2>,4> sides;
+  for (int q=0;q<4;q++) for (int s=0;s<2;s++)
+    sides[q][s] = unpack(quadrant(board,q),s);
+  board_t transformed[8];
+  for (int rotation=0;rotation<4;rotation++) {
+    for (int reflection=0;reflection<2;reflection++) {
+      transformed[2*rotation+reflection] = pack(sides);
+      // Reflect about y axis
+      for (int q=0;q<4;q++)
+        for (int s=0;s<2;s++) {
+          // static const quadrant_t reflections[512][2] = {...};
+          #include "gen/reflect.h"
+          sides[q][s] = reflections[sides[q][s]][0];
+        }
+      for (int qy=0;qy<2;qy++)
+        swap(sides[qy],sides[2+qy]);
+    }
+    // Rotate left
+    for (int q=0;q<4;q++)
+      for (int s=0;s<2;s++)
+        sides[q][s] = rotations[sides[q][s]][0];
+    Vector<Vector<quadrant_t,2>,4> prev = sides;
+    sides[0] = prev[1];
+    sides[1] = prev[3];
+    sides[2] = prev[0];
+    sides[3] = prev[2];
+  }
+  return RawArray<board_t>(8,transformed).min();
+}
+
+NdArray<board_t> standardize_py(NdArray<const board_t> boards) {
+  NdArray<board_t> transformed(boards.shape,false);
+  for (int b=0;b<boards.flat.size();b++)
+    transformed.flat[b] = standardize(boards.flat[b]);
+  return transformed;
 }
 
 int status_py(board_t board) {
@@ -403,4 +444,5 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_FUNCTION(stats)
   function("unpack",unpack_py);
   function("pack",pack_py);
+  function("standardize",standardize_py);
 }
