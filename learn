@@ -40,3 +40,14 @@ counts = sum(unpack(everything).reshape(-1,36)!=0,axis=1)
 print '\ntotals:'
 for t in xrange(1,37):
   print '  %d stones, %d positions'%(t,sum(counts==t))
+print
+
+# Count lengths
+counts = zeros(36+2,int)
+for _,_,game in games:
+  counts[len(game)] += 1
+print 'lengths:'
+for n in xrange(len(counts)):
+  if counts[n]:
+    print '  length %d, games %d'%(n,counts[n])
+print
