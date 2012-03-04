@@ -14,10 +14,14 @@ The rest of the code (tests, interface, etc.) is in Python.  The dependencies ar
 
 * [python](http://python.org)
 * [numpy](http://numpy.scipy.org)
+* The Otherlab code base
 
-On a Mac, these can be obtained through [MacPorts](http://www.macports.org) via
+On a Mac, the first two can be obtained through [MacPorts](http://www.macports.org) via
 
     sudo port install py26-numpy
+
+Unfortunately, while the used portion of the Otherlab code base may be open source at
+some point, it's not publically available at this time.
 
 ### Usage
 
