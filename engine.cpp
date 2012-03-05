@@ -18,6 +18,8 @@
 #include <other/core/python/module.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
+#include "distance.h"
+namespace pentago {
 
 using std::max;
 using std::cout;
@@ -34,9 +36,13 @@ namespace {
 uint64_t expanded_nodes;
 uint64_t total_lookups;
 uint64_t successful_lookups;
+uint64_t distance_prunes;
 
 void clear_stats() {
-  expanded_nodes = total_lookups = successful_lookups = 0;
+  expanded_nodes = 0;
+  total_lookups = 0;
+  successful_lookups = 0;
+  distance_prunes = 0;
 }
 
 /***************** Engine ****************/
@@ -72,6 +78,11 @@ inline quadrant_t quadrant(uint64_t state, int q) {
 
 inline uint64_t quadrants(quadrant_t q0, quadrant_t q1, quadrant_t q2, quadrant_t q3) {
   return q0|(uint64_t)q1<<16|(uint64_t)q2<<32|(uint64_t)q3<<48;
+}
+
+inline int popcount(uint64_t n) {
+  BOOST_STATIC_ASSERT(sizeof(long)==sizeof(uint64_t));
+  return __builtin_popcountl(n);
 }
 
 // Pull in win contribution tables
@@ -232,7 +243,7 @@ inline int status(board_t board) {
 #define QR0(s,q,dir) rotations[quadrant(side##s,q)][dir]
 #define QR1(s,q) {QR0(s,q,0),QR0(s,q,1)}
 #define QR2(s) {QR1(s,0),QR1(s,1),QR1(s,2),QR1(s,3)}
-#define COUNT(stride,q,qpp) \
+#define COUNT_MOVES(stride,q,qpp) \
   const int offset##q  = move_offsets[quadrant(filled,q)]; \
   const int count##q   = move_offsets[quadrant(filled,q)+1]-offset##q; \
   const int total##qpp = total##q + stride*count##q;
@@ -270,7 +281,7 @@ inline int status(board_t board) {
   /* Count the number of moves in each quadrant */ \
   const side_t filled = side0|side1; \
   const int total0 = 0; \
-  COUNT(8,0,1) COUNT(8,1,2) COUNT(8,2,3) COUNT(8,3,4) \
+  COUNT_MOVES(8,0,1) COUNT_MOVES(8,1,2) COUNT_MOVES(8,2,3) COUNT_MOVES(8,3,4) \
   int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
   /* Collect the list of all possible moves.  Note that we repack with the sides */ \
   /* flipped so that it's still player 0's turn. */ \
@@ -285,7 +296,7 @@ inline int status(board_t board) {
   /* Count the number of moves in each quadrant */ \
   const side_t filled = side0|side1; \
   const int total0 = 0; \
-  COUNT(1,0,1) COUNT(1,1,2) COUNT(1,2,3) COUNT(1,3,4) \
+  COUNT_MOVES(1,0,1) COUNT_MOVES(1,1,2) COUNT_MOVES(1,2,3) COUNT_MOVES(1,3,4) \
   int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
   /* Collect the list of possible moves.  Note that only side0 changes */ \
   side_t moves[total]; \
@@ -299,15 +310,6 @@ inline score_t quick_evaluate(board_t board) {
     return exact_score(1+(st&1)-(st>>1));
   // Did we already compute this value?
   return lookup(board);
-}
-
-// Evaluate position based only on current state and transposition table, ignoring rotations or white five-in-a-row
-template<bool black> inline score_t simple_quick_evaluate(side_t side0, side_t side1) {
-  // If we're white, check if we've lost
-  if (!black && rotated_won(side1))
-    return exact_score(0);
-  // Did we already compute this value?
-  return lookup(pack(side0,side1));
 }
 
 // Flip a score and increment its depth by one
@@ -383,9 +385,73 @@ score_t evaluate(int depth, board_t board) {
   return evaluate_recurse(depth,board);
 }
 
-inline int popcount(uint64_t n) {
-  BOOST_STATIC_ASSERT(sizeof(long)==sizeof(uint64_t));
-  return __builtin_popcountl(n);
+// Evaluate position based only on current state and transposition table, ignoring rotations or white five-in-a-row
+template<bool black> inline score_t simple_quick_evaluate(side_t side0, side_t side1) {
+  // If we're white, check if we've lost
+  if (!black && rotated_won(side1))
+    return exact_score(0);
+  // Did we already compute this value?
+  return lookup(pack(side0,side1));
+}
+
+// Compute the minimum number of black moves required for a win, together with the number of different
+// ways that minimum can be achieved.  Returns ((6-min_distance)<<16)+count, so that a higher number means
+// closer to a black win.  If winning is impossible, the return value is 0.
+int simple_win_closeness(side_t black, side_t white) {
+  // Transpose into packed quadrants
+  const quadrant_t q0 = pack(quadrant(black,0),quadrant(white,0)),
+                   q1 = pack(quadrant(black,1),quadrant(white,1)),
+                   q2 = pack(quadrant(black,2),quadrant(white,2)),
+                   q3 = pack(quadrant(black,3),quadrant(white,3));
+  // Compute all distances
+  const uint64_t each = 321685687669321; // sum_{i<17} 1<<3*i
+  #define DISTANCES(i) ({ \
+    const uint64_t d0 = simple_win_distances[0][q0][i], \
+                   d1 = simple_win_distances[1][q1][i], \
+                   d2 = simple_win_distances[2][q2][i], \
+                   d3 = simple_win_distances[3][q3][i], \
+                   blocks = (d0|d1|d2|d3)&4*each, \
+                   blocked = blocks|blocks>>1|blocks>>2, \
+                   unblocked = ~blocked; \
+    (d0&unblocked)+(d1&unblocked)+(d2&unblocked)+(d3&unblocked)+(6*each&blocked); })
+  const uint64_t d0 = DISTANCES(0), // Each of these contains 17 3-bit distances in [0,6]
+                 d1 = DISTANCES(1),
+                 d2 = DISTANCES(2),
+                 d3 = DISTANCES(3);
+  #undef DISTANCES
+  // Determine minimum distance
+  const bool min_under_1 = (~((d0|d0>>1|d0>>2)&(d1|d1>>1|d1>>2)&(d2|d2>>1|d2>>2)&(d3|d3>>1|d3>>2))&each)!=0, // abc < 1 iff ~(a|b|c)
+             min_under_2 = (~((d0|d0>>1)&(d1|d1>>1)&(d2|d2>>1)&(d3|d3>>1))&2*each)!=0, // abc < 2 iff ~a&~b = ~(a|b)
+             min_under_3 = (~((d0>>2|(d0>>1&d0))&(d1>>2|(d1>>1&d1))&(d2>>2|(d2>>1&d2))&(d3>>2|(d3>>1&d3)))&each)!=0, // abc < 3 iff ~a&(~b|~c) = ~a&~(b&c) = ~(a|(b&c))
+             min_under_4 = (~(d0&d1&d2&d3)&4*each)!=0, // abc < 4 iff ~a
+             min_under_5 = (~((d0>>2&(d0>>1|d0))&(d1>>2&(d1>>1|d1))&(d2>>2&(d2>>1|d2))&(d3>>2&(d3>>1|d3)))&each)!=0, // abc < 5 iff ~a|(~b&~c) = ~a|~(b|c) = ~(a&(b|c))
+             min_under_6 = (~((d0&d0>>1)&(d1&d1>>1)&(d2&d2>>1)&(d3&d3>>1))&2*each)!=0; // abc < 6 iff ~a|~b = ~(a&b)
+  const int min_distance = min_under_4
+                             ?min_under_2
+                               ?min_under_1?0:1
+                               :min_under_3?2:3
+                             :min_under_5
+                               ?4
+                               :min_under_6?5:6;
+  // If we're in debug mode, check against the slow way
+#ifndef NDEBUG
+  #define SLOW_MIN_DISTANCE(d) ({ \
+    int md = 6; \
+    for (int i=0;i<17;i++) \
+      md = min(md,int(d>>3*i)&7); \
+    md; })
+  const int slow_min_distance = min(SLOW_MIN_DISTANCE(d0),SLOW_MIN_DISTANCE(d1),SLOW_MIN_DISTANCE(d2),SLOW_MIN_DISTANCE(d3));
+  OTHER_ASSERT(slow_min_distance==min_distance);
+#endif
+  // If the minimum distance is 6, a black win is impossible, so no need to count the ways
+  if (min_distance==6)
+    return 0;
+  // Count number of times min_distance occurs
+  const uint64_t mins = min_distance*each;
+  #define MATCHES(d) (~((d^mins)|(d^mins)>>1|(d^mins)>>2)&each)
+  const int count = popcount(MATCHES(d0))+popcount(MATCHES(d1)|MATCHES(d2)<<1|MATCHES(d3)<<2);
+  #undef MATCHES
+  return ((6-min_distance)<<16)+count;
 }
 
 // Evaluate position ignoring rotations and white five-in-a-row
@@ -415,6 +481,49 @@ template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, si
   if (depth==1) {
     best = score(1,1);
     goto done;
+  }
+
+  // Compute how close we are to a black win
+  int order[total]; // We'll sort moves in ascending order of this array
+  for (int i=total-1;i>=0;i--) {
+    int closeness = black?simple_win_closeness(moves[i],side1)
+                         :simple_win_closeness(side1,moves[i]);
+    int distance = 6-(closeness>>16);
+    if (distance==6 || distance>(depth-black)/2) { // We can't reach a black win within the given search depth
+      if (!black) {
+        STAT(distance_prunes++);
+        best = score(distance==6?36:2*distance-1+black,1);
+        goto done;
+      } else {
+        swap(moves[i],moves[total-1]);
+        swap(order[i],order[--total]);
+      }
+    }
+    order[i] = black?-closeness:closeness;
+  }
+
+  // Insertion sort moves based on order
+  for (int i=1;i<total;i++) {
+    const side_t move = moves[i];
+    const int key = order[i];
+    int j = i-1;
+    while (j>=0 && order[j]>key) {
+      moves[j+1] = moves[j];
+      order[j+1] = order[j];
+      j--;
+    }
+    moves[j+1] = move;
+    order[j+1] = key;
+  }
+
+  // Optionally print out move ordering information
+  if (0) {
+    cout << (black?"order black =":"order white =");
+    for (int i=0;i<total;i++) {
+      int o = black?-order[i]:order[i];
+      cout << ' '<<(6-(o>>16))<<','<<(o&0xffff);
+    }
+    cout<<endl;
   }
 
   // Recurse
@@ -593,10 +702,13 @@ PyObject* stats() {
   ST(expanded_nodes)
   ST(total_lookups)
   ST(successful_lookups)
+  ST(distance_prunes)
   return stats;
 }
 
 }
+}
+using namespace pentago;
 
 OTHER_PYTHON_MODULE(pentago) {
   using namespace python;

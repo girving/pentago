@@ -8,14 +8,8 @@ from numpy import *
 from other.core import *
 from other.core.value import parser
 
-def bit(n,x,y,flip=False,rotate=False):
-  assert 0<=x<n
-  assert 0<=y<n
-  if flip:
-    x,y = y,x
-  if rotate:
-    x,y = n-1-y,x
-  return 1<<(n*x+y)
+def qbit(x,y):
+  return 1<<(3*x+y)
 
 def popcount(x):
   count = 0
@@ -46,16 +40,24 @@ def ahash(*args):
     return hash(''.join(asarray(a).tostring() for a in args))
 
 @cache
-def win_contributions():
+def win_patterns():
+  def bit(x,y,flip=False,rotate=False):
+    assert 0<=x<6
+    assert 0<=y<6
+    if flip:
+      x,y = y,x
+    if rotate:
+      x,y = 5-y,x
+    return 1<<(16*(2*(x//3)+y//3)+3*(x%3)+y%3)
+
   # List the various ways of winning
   wins = []
   # Off-centered diagonal 5 in a row
-  n = 6
   for x in 0,1:
     for y in 0,1:
       p = 0
       for i in -2,-1,0,1,2:
-        p |= bit(n,2+x+i,2+y+i*(-1 if x==y else 1))
+        p |= bit(2+x+i,2+y+i*(-1 if x==y else 1))
       wins.append(p)
   # Axis aligned 5 in a row
   for flip in 0,1:
@@ -63,14 +65,14 @@ def win_contributions():
       for y in xrange(6):
         p = 0
         for i in xrange(5):
-          p |= bit(n,x+i,y,flip=flip)
+          p |= bit(x+i,y,flip=flip)
         wins.append(p)
   # Centered diagonal 5 in a row
   for rotate in 0,1:
     for x in 0,1:
       p = 0
       for i in xrange(5):
-        p |= bit(n,i+x,i+x,rotate=rotate)
+        p |= bit(i+x,i+x,rotate=rotate)
       wins.append(p)
 
   # Check that 5 bits are set in each
@@ -81,21 +83,20 @@ def win_contributions():
   # The first four of these are special: they require contributions from three quadrants.
   # The remaining 28 require contributions from only two quadrants.
   assert len(wins)==32==4*3*2+4+4
+  return wins
 
+@cache
+def win_contributions():
+  wins = win_patterns()
   # For each possible value of each quadrant, determine all the ways that quadrant can
   # contribute to victory.
   table = zeros((4,512),dtype=int64)
   for qx in xrange(2):
     for qy in xrange(2):
       q = 2*qx+qy
+      qb = 0x1ff<<16*q
       for v in xrange(512):
-        b = 0
-        qb = 0
-        for x in xrange(3):
-          for y in xrange(3):
-            qb |= bit(n,3*qx+x,3*qy+y)
-            if v&bit(3,x,y):
-              b |= bit(n,3*qx+x,3*qy+y)
+        b = v<<16*q
         for i,w in enumerate(wins):
           if w&qb and not ~b&(w&qb):
             table[q,v] |= 1<<(2*i)
@@ -108,16 +109,15 @@ def show_win_contributions():
 
 @cache
 def rotations():
-  n = 3
   table = zeros((512,2),dtype=int16)
   for v in xrange(512):
     left = 0
     right = 0
     for x in xrange(3):
       for y in xrange(3):
-        if v&bit(n,x,y):
-          left |= bit(n,2-y,x)
-          right |= bit(n,y,2-x)
+        if v&qbit(x,y):
+          left |= qbit(2-y,x)
+          right |= qbit(y,2-x)
     assert popcount(v)==popcount(left)==popcount(right)
     table[v] = left,right
   assert ahash(table)==-631278374917950784
@@ -135,27 +135,66 @@ def rotated_win_contributions():
   deltas = rwins - wins
   return 'static const uint64_t rotated_win_contribution_deltas' + cpp_array('0x%xL',deltas)+';\n'
 
+def if_(c,a,b):
+  c = c!=0
+  return c*a+(1-c)*b
+
+@cache
+def win_distances():
+  # Work out the various ways of winning, allowing at most one quadrant to rotate
+  patterns = win_patterns()
+  assert len(patterns)==32
+  rotated_patterns = [] # List of pattern,rotated_quadrant pairs
+  for pat in patterns:
+    for q in xrange(4):
+      if pat&(0x1ff<<16*q):
+        rotated_patterns.append((pat,q))
+  assert len(rotated_patterns)==68
+  rotated_patterns = asarray(rotated_patterns,object).reshape(4,17,2)
+
+  # Precompute small popcounts
+  count = asarray([popcount(i) for i in xrange(512)])
+
+  # Generate a distance table giving the total number of moves required for player 0 (black) to
+  # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
+  # has 3 bits (for 0,1,2,3 or 4=infinity), so we fit 17 patterns into each of 4 64-bit ints
+  table = zeros((4,3**9,4),int64) # indexed by quadrant,position,word
+  unpack_ = unpack()
+  rotations_ = rotations()
+  for i,pats in enumerate(rotated_patterns):
+    for j,(pat,qr) in enumerate(pats):
+      for q in xrange(4):
+        b = arange(3**9)
+        s0,s1 = unpack_[b].T
+        qp = (pat>>16*q)&0x1ff
+        d = if_(s1&qp,4,count[qp&~s0])
+        if q==qr:
+          for r in 0,1:
+            d = minimum(d,if_(rotations_[s1,r]&qp,4,count[qp&~rotations_[s0,r]]))
+        table[q,b,i] |= d<<3*j
+  assert ahash(table)==-1851827180569519993
+  return 'const uint64_t simple_win_distances' + cpp_array('0x%xL',table)+';\n'
+
 @cache
 def reflections():
-  n = 3 
   table = zeros((512,2),dtype=int16)
   for v in xrange(512):
     rx,ry = 0,0
     for x in xrange(3):
       for y in xrange(3):
-        if v&bit(n,x,y):
-          rx |= bit(n,2-x,y)
-          ry |= bit(n,x,2-y)
+        if v&qbit(x,y):
+          rx |= qbit(2-x,y)
+          ry |= qbit(x,2-y)
     assert popcount(v)==popcount(rx)==popcount(ry)
     table[v] = rx,ry
   assert ahash(table)==5787381149236214080
   return 'static const uint16_t reflections' + cpp_array('0x%x',table)+';\n'
 
+'''There are 3**9 = 19683 possible states in each quadrant.  3**9 < 2**16, so we can store
+a quadrant state in 16 bits using radix 3.  However, radix 3 is inconvenient for computation,
+so we need lookup tables to go to and from packed form.'''
 @cache
-def packings():
-  '''There are 3**9 = 19683 possible states in each quadrant.  3**9 < 2**16, so we can store
-  a quadrant state in 16 bits using radix 3.  However, radix 3 is inconvenient for computation,
-  so we need lookup tables to go to and from packed form.'''
+def pack():
   pack = zeros(2**9,dtype=int16)
   for v in xrange(512):
     pv = 0
@@ -163,6 +202,15 @@ def packings():
       if v&2**i:
         pv += 3**i
     pack[v] = pv
+  assert ahash(pack)==3488108636539942373
+  return pack
+
+@cache
+def show_pack():
+  return 'static const uint16_t pack'+cpp_array('%d',pack())+';\n'
+
+@cache
+def unpack():
   unpack = zeros((3**9,2),dtype=int16)
   for v in xrange(3**9):
     vv = v
@@ -175,11 +223,14 @@ def packings():
         p1 += 2**i
       vv //= 3
     unpack[v] = p0,p1
-  assert all(pack[unpack[:,0]]+2*pack[unpack[:,1]]==arange(3**9))
-  assert ahash(pack)==3488108636539942373
   assert ahash(unpack)==-3185216453998868236
-  return ['static const uint16_t pack'+cpp_array('%d',pack)+';\n',
-          'static const uint16_t unpack'+cpp_array('0x%x',unpack)+';\n']
+  return unpack
+
+def show_unpack():
+  return 'static const uint16_t unpack'+cpp_array('0x%x',unpack())+';\n'
+
+# pack and unpack should be inverses
+assert all(pack()[unpack()[:,0]]+2*pack()[unpack()[:,1]]==arange(3**9))
 
 @cache
 def moves():
@@ -216,8 +267,9 @@ if __name__=='__main__':
     open('%s/%s.h'%(prefix,name),'w').write(note+array)
   save('win',show_win_contributions())
   save('rotated_win',rotated_win_contributions())
+  save('distance',win_distances())
   save('rotate',show_rotations())
   save('reflect',reflections())
-  save('pack',packings()[0])
-  save('unpack',packings()[1])
+  save('pack',show_pack())
+  save('unpack',show_unpack())
   save('move',moves())
