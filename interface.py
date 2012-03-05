@@ -82,7 +82,7 @@ def move(board,turn,depth,rand=True,simple=False):
     assert score//4>=depth, 'unexpected evaluation: depth %d, value %d, expected depth %d'%(score//4,score&3,depth)
     if not options or (options[0][0]&3)<(score&3):
       options = [(score,next)]
-      if (score&3)>=2: #(1 if simple and turn==1 else 2):
+      if (score&3)>=(1 if simple and turn==1 else 2):
         break
     elif (options[0][0]&3)==(score&3):
       options.append((score,next))
