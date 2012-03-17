@@ -61,7 +61,7 @@ enum table_type_t {blank_table,normal_table,simple_table} table_type;
 void init_table(int bits) {
   if (bits<1 || bits>30)
     throw ValueError(format("expected 1<=bits<=30, got bits = %d",bits));
-  if (64-bits+10>64)
+  if (64-bits+score_bits>64)
     throw ValueError(format("bits = %d is too small, the high order hash bits won't fit",bits));
   free(table);
   table_bits = bits;
