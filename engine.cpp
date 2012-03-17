@@ -18,7 +18,7 @@
 #include <other/core/python/module.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
-#include "distance.h"
+#include "gen/tables.h"
 namespace pentago {
 
 using std::max;
@@ -85,12 +85,6 @@ inline int popcount(uint64_t n) {
   return __builtin_popcountl(n);
 }
 
-// Pull in win contribution tables
-// static const uint64_t win_contributions[4][1<<9] = {...};
-#include "gen/win.h"
-// static const uint64_t rotated_win_contribution_deltas[4][1<<9] = {...};
-#include "gen/rotated_win.h"
-
 // Determine if one side has 5 in a row
 inline bool won(side_t side) {
   /* To test whether a position is a win for a given player, we note that
@@ -132,9 +126,7 @@ inline bool rotated_won(side_t side) {
 }
 
 inline quadrant_t pack(quadrant_t side0, quadrant_t side1) {
-  // static const uint16_t pack[1<<9] = {...};
-  #include "gen/pack.h"
-  return pack[side0]+2*pack[side1];
+  return pack_table[side0]+2*pack_table[side1];
 }
 
 inline board_t pack(side_t side0, side_t side1) {
@@ -146,9 +138,7 @@ inline board_t pack(side_t side0, side_t side1) {
 
 inline quadrant_t unpack(quadrant_t state, int s) {
   assert(0<=s && s<2);
-  // static const uint16_t unpack[3**9][2] = {...};
-  #include "gen/unpack.h"
-  return unpack[state][s];
+  return unpack_table[state][s];
 }
 
 inline side_t unpack(board_t board, int s) {
@@ -209,7 +199,7 @@ score_t lookup(board_t board) {
 void store(board_t board, score_t score) {
   uint64_t h = hash(board);
   uint64_t& entry = table[h&table_mask];
-  if (entry>>score_bits==h>>table_bits || (entry&score_mask)>>2 <= score>>2)
+  if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
 }
 
@@ -230,13 +220,6 @@ inline int status(board_t board) {
             won1 = won(side1);
   return won0|won1<<1;
 }
-
-// Import precomputed move and rotation tables
-// static const uint16_t rotations[512][2] = {...};
-#include "gen/rotate.h"
-// static const uint16_t move_offsets[(1<<9)+1] = {...};
-// static const uint16_t move_flat[move_offsets[1<<9]] = {...};
-#include "gen/move.h"
 
 // We declare the move listing code as a huge macro in order to use it in multiple functions while taking advantage of gcc's variable size arrays.
 // To use, invoke MOVES(board) to fill a board_t moves[total] array.
@@ -641,7 +624,6 @@ board_t standardize(board_t board) {
       for (int q=0;q<4;q++)
         for (int s=0;s<2;s++) {
           // static const quadrant_t reflections[512][2] = {...};
-          #include "gen/reflect.h"
           sides[q][s] = reflections[sides[q][s]][0];
         }
       for (int qy=0;qy<2;qy++)

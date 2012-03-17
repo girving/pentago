@@ -1,6 +1,6 @@
 Import('env Library')
 
-generated = ['gen/%s.h'%h for h in 'win rotate reflect pack unpack move rotated_win distance'.split()]
+generated = ['gen/%s'%f for f in 'tables.h tables.cpp'.split()]
 env.Command(generated,'precompute','./precompute --prefix ${TARGET.dir}')
 
 env = env.Clone()
