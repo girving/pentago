@@ -3,6 +3,7 @@
 #include "board.h"
 #include "score.h"
 #include "moves.h"
+#include "stat.h"
 #include <other/core/python/module.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
@@ -15,24 +16,6 @@ using std::swap;
 using namespace other;
 
 namespace {
-
-/***************** Statistics ****************/
-
-#define STAT(...) __VA_ARGS__
-
-uint64_t expanded_nodes;
-uint64_t total_lookups;
-uint64_t successful_lookups;
-uint64_t distance_prunes;
-
-void clear_stats() {
-  expanded_nodes = 0;
-  total_lookups = 0;
-  successful_lookups = 0;
-  distance_prunes = 0;
-}
-
-/***************** Engine ****************/
 
 inline uint64_t hash(board_t key) {
   // Invertible hash function from http://www.concentric.net/~ttwang/tech/inthash.htm
@@ -290,16 +273,6 @@ score_t simple_evaluate(int depth, board_t board) {
               :simple_evaluate_recurse<false>(depth,side0,side1);
 }
 
-PyObject* stats() {
-  PyObject* stats = PyDict_New();
-  #define ST(stat) PyDict_SetItemString(stats,#stat,PyInt_FromLong(stat));
-  ST(expanded_nodes)
-  ST(total_lookups)
-  ST(successful_lookups)
-  ST(distance_prunes)
-  return stats;
-}
-
 }
 }
 using namespace pentago;
@@ -309,9 +282,8 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(board)
   OTHER_WRAP(score)
   OTHER_WRAP(moves)
+  OTHER_WRAP(stat)
   OTHER_FUNCTION(evaluate)
   OTHER_FUNCTION(simple_evaluate)
   OTHER_FUNCTION(init_table)
-  OTHER_FUNCTION(clear_stats)
-  OTHER_FUNCTION(stats)
 }
