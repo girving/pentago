@@ -2,9 +2,7 @@
 
 #include "board.h"
 #include "score.h"
-#include <other/core/array/Array.h>
-#include <other/core/array/NdArray.h>
-#include <other/core/math/popcount.h>
+#include "moves.h"
 #include <other/core/python/module.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
@@ -89,70 +87,6 @@ void store(board_t board, score_t score) {
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
 }
-
-// We declare the move listing code as a huge macro in order to use it in multiple functions while taking advantage of gcc's variable size arrays.
-// To use, invoke MOVES(board) to fill a board_t moves[total] array.
-#define QR0(s,q,dir) rotations[quadrant(side##s,q)][dir]
-#define QR1(s,q) {QR0(s,q,0),QR0(s,q,1)}
-#define QR2(s) {QR1(s,0),QR1(s,1),QR1(s,2),QR1(s,3)}
-#define COUNT_MOVES(stride,q,qpp) \
-  const int offset##q  = move_offsets[quadrant(filled,q)]; \
-  const int count##q   = move_offsets[quadrant(filled,q)+1]-offset##q; \
-  const int total##qpp = total##q + stride*count##q;
-#define MOVE_QUAD(q,qr,dir,i) \
-  quadrant_t side0_quad##i, side1_quad##i; \
-  if (qr!=i) { \
-    side0_quad##i = quadrant(side1,i); \
-    side1_quad##i = q==i?changed:quadrant(side0,i); \
-  } else { \
-    side0_quad##i = rotated[1][i][dir]; \
-    side1_quad##i = q==i?rotations[changed][dir]:rotated[0][i][dir]; \
-  } \
-  const quadrant_t both##i = pack(side0_quad##i,side1_quad##i);
-#define MOVE(q,qr,dir) { \
-  MOVE_QUAD(q,qr,dir,0) \
-  MOVE_QUAD(q,qr,dir,1) \
-  MOVE_QUAD(q,qr,dir,2) \
-  MOVE_QUAD(q,qr,dir,3) \
-  moves[total##q+8*i+2*qr+dir] = quadrants(both0,both1,both2,both3); \
-}
-#define COLLECT_MOVES(q) \
-  for (int i=0;i<count##q;i++) { \
-    const quadrant_t changed = quadrant(side0,q)|move_flat[offset##q+i]; \
-    MOVE(q,0,0) MOVE(q,0,1) \
-    MOVE(q,1,0) MOVE(q,1,1) \
-    MOVE(q,2,0) MOVE(q,2,1) \
-    MOVE(q,3,0) MOVE(q,3,1) \
-  }
-#define MOVES(board) \
-  /* Unpack sides */ \
-  const side_t side0 = unpack(board,0), \
-               side1 = unpack(board,1); \
-  /* Rotate all four quadrants left and right in preparation for move generation */ \
-  const quadrant_t rotated[2][4][2] = {QR2(0),QR2(1)}; \
-  /* Count the number of moves in each quadrant */ \
-  const side_t filled = side0|side1; \
-  const int total0 = 0; \
-  COUNT_MOVES(8,0,1) COUNT_MOVES(8,1,2) COUNT_MOVES(8,2,3) COUNT_MOVES(8,3,4) \
-  int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
-  /* Collect the list of all possible moves.  Note that we repack with the sides */ \
-  /* flipped so that it's still player 0's turn. */ \
-  board_t moves[total]; \
-  COLLECT_MOVES(0) COLLECT_MOVES(1) COLLECT_MOVES(2) COLLECT_MOVES(3)
-
-// Same as MOVES, but ignores rotations and operates in unpacked mode
-#define SIMPLE_COLLECT_MOVES(q) \
-  for (int i=0;i<count##q;i++) \
-    moves[total##q+i] = side0|(side_t)move_flat[offset##q+i]<<16*q;
-#define SIMPLE_MOVES(side0,side1) \
-  /* Count the number of moves in each quadrant */ \
-  const side_t filled = side0|side1; \
-  const int total0 = 0; \
-  COUNT_MOVES(1,0,1) COUNT_MOVES(1,1,2) COUNT_MOVES(1,2,3) COUNT_MOVES(1,3,4) \
-  int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
-  /* Collect the list of possible moves.  Note that only side0 changes */ \
-  side_t moves[total]; \
-  SIMPLE_COLLECT_MOVES(0) SIMPLE_COLLECT_MOVES(1) SIMPLE_COLLECT_MOVES(2) SIMPLE_COLLECT_MOVES(3)
 
 // Evaluate position based only on current state and transposition table
 inline score_t quick_evaluate(board_t board) {
@@ -356,25 +290,6 @@ score_t simple_evaluate(int depth, board_t board) {
               :simple_evaluate_recurse<false>(depth,side0,side1);
 }
 
-Array<board_t> moves(board_t board) {
-  check_board(board);
-  // const board_t moves[total] = {...};
-  MOVES(board)
-  return RawArray<board_t>(total,moves).copy();
-}
-
-Array<board_t> simple_moves(board_t board) {
-  check_board(board);
-  const side_t side0 = unpack(board,0),
-               side1 = unpack(board,1);
-  // const side_t moves[total] = {...};
-  SIMPLE_MOVES(side0,side1)
-  Array<board_t> result(total,false);
-  for (int i=0;i<total;i++)
-    result[i] = pack(side1,moves[i]);
-  return result;
-}
-
 PyObject* stats() {
   PyObject* stats = PyDict_New();
   #define ST(stat) PyDict_SetItemString(stats,#stat,PyInt_FromLong(stat));
@@ -393,10 +308,9 @@ using namespace other::python;
 OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(board)
   OTHER_WRAP(score)
+  OTHER_WRAP(moves)
   OTHER_FUNCTION(evaluate)
   OTHER_FUNCTION(simple_evaluate)
-  OTHER_FUNCTION(moves)
-  OTHER_FUNCTION(simple_moves)
   OTHER_FUNCTION(init_table)
   OTHER_FUNCTION(clear_stats)
   OTHER_FUNCTION(stats)
