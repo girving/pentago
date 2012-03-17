@@ -1,24 +1,12 @@
-// A pentago player
+// Core tree search engine
 
-/* Notes:
- *
- * 1. For rules, see http://en.wikipedia.org/wiki/Pentago
- *
- * 2. Pentago has an inconvenient number of spaces, namely 36 instead
- *    of 32.  We could potentially dodge this problem by templatizing
- *    over the value of the center space in each quadrant.  This is
- *    almost surely a win, but I'll stick to 2 64-bit integers for now
- *    and revisit that trick later.  It would be easy if I knew that
- *    the first four optimal moves were center moves, but I don't have
- *    a proof of that.
- */
-
+#include "board.h"
 #include <other/core/array/Array.h>
 #include <other/core/array/NdArray.h>
+#include <other/core/math/popcount.h>
 #include <other/core/python/module.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
-#include "gen/tables.h"
 namespace pentago {
 
 using std::max;
@@ -47,18 +35,6 @@ void clear_stats() {
 
 /***************** Engine ****************/
 
-// Each board is divided into 4 quadrants, and each quadrant is stored
-// in one of the 16-bit quarters of a 64-bit int.  Within a quadrant,
-// the state is packed in radix 3, which works since 3**9 < 2**16.
-typedef uint64_t board_t;
-
-// A side (i.e., the set of stones occupied by one player) is similarly
-// broken into 4 quadrants, but each quadrant is packed in radix 2.
-typedef uint64_t side_t;
-
-// A single quadrant always fits into uint16_t, whether in radix 2 or 3.
-typedef uint16_t quadrant_t;
-
 // The two low bits of the score are the result: loss 0, tie 1, win 2.
 // Above these are 8 bits giving the depth of the result, e.g., >=36 for known and 0 for completely unknown.
 typedef uint16_t score_t;
@@ -69,20 +45,6 @@ inline score_t score(int depth, int value) {
 
 inline score_t exact_score(int value) {
   return score(36,value);
-}
-
-inline quadrant_t quadrant(uint64_t state, int q) {
-  assert(0<=q && q<4);
-  return (state>>16*q)&0xffff;
-}
-
-inline uint64_t quadrants(quadrant_t q0, quadrant_t q1, quadrant_t q2, quadrant_t q3) {
-  return q0|(uint64_t)q1<<16|(uint64_t)q2<<32|(uint64_t)q3<<48;
-}
-
-inline int popcount(uint64_t n) {
-  BOOST_STATIC_ASSERT(sizeof(long)==sizeof(uint64_t));
-  return __builtin_popcountl(n);
 }
 
 // Determine if one side has 5 in a row
@@ -123,29 +85,6 @@ inline bool rotated_won(side_t side) {
   // Check if we won
   return (c0|c1|c2|c3)&(0xaaaaaaaaaaaaaaaa<<8) // The last remaining 28 ways of winning require contributions two quadrants
       || ((c0&(c0>>1))|(c1&(c1>>1))|(c2&(c2>>1))|(c3&(c3>>1)))&0x55; // The first four require contributions from three
-}
-
-inline quadrant_t pack(quadrant_t side0, quadrant_t side1) {
-  return pack_table[side0]+2*pack_table[side1];
-}
-
-inline board_t pack(side_t side0, side_t side1) {
-  return quadrants(pack(quadrant(side0,0),quadrant(side1,0)),
-                   pack(quadrant(side0,1),quadrant(side1,1)),
-                   pack(quadrant(side0,2),quadrant(side1,2)),
-                   pack(quadrant(side0,3),quadrant(side1,3)));
-}
-
-inline quadrant_t unpack(quadrant_t state, int s) {
-  assert(0<=s && s<2);
-  return unpack_table[state][s];
-}
-
-inline side_t unpack(board_t board, int s) {
-  return quadrants(unpack(quadrant(board,0),s),
-                   unpack(quadrant(board,1),s),
-                   unpack(quadrant(board,2),s),
-                   unpack(quadrant(board,3),s));
 }
 
 inline uint64_t hash(board_t key) {
@@ -201,13 +140,6 @@ void store(board_t board, score_t score) {
   uint64_t& entry = table[h&table_mask];
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
-}
-
-void check_board(board_t board) {
-  #define CHECK(q) \
-    if (!(quadrant(board,q)<(int)pow(3.,9.))) \
-      throw ValueError(format("quadrant %d has invalid value %d",q,quadrant(board,q)));
-  CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 
 // Evaluate the current status of a board, returning one bit for whether each player has 5 in a row.
@@ -525,16 +457,6 @@ template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, si
   return best;
 }
 
-bool black_to_move(board_t board) {
-  check_board(board);
-  const side_t side0 = unpack(board,0),
-               side1 = unpack(board,1);
-  const int count0 = popcount(side0),
-            count1 = popcount(side1);
-  OTHER_ASSERT(count0==count1 || count1==count0+1);
-  return count0==count1;
-}
-
 // Evaluate a position down to a certain game tree depth, ignoring rotations and white wins.
 score_t simple_evaluate(int depth, board_t board) {
   // We can afford error detection here since recursion happens into a different function
@@ -560,93 +482,6 @@ score_t simple_evaluate(int depth, board_t board) {
   // Otherwise, recurse into children
   return black?simple_evaluate_recurse<true >(depth,side0,side1)
               :simple_evaluate_recurse<false>(depth,side0,side1);
-}
-
-NdArray<int> unpack_py(NdArray<const board_t> boards) {
-  for (int b=0;b<boards.flat.size();b++)
-    check_board(boards[b]);
-  Array<int> shape = boards.shape.copy();
-  shape.append(6);
-  shape.append(6);
-  NdArray<int> tables(shape,false);
-  for (int b=0;b<boards.flat.size();b++) {
-    for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
-      quadrant_t q = quadrant(boards.flat[b],2*qx+qy); \
-      side_t s0 = unpack(q,0), \
-             s1 = unpack(q,1); \
-      for (int x=0;x<3;x++) for (int y=0;y<3;y++) \
-        tables.flat[36*b+6*(3*qx+x)+3*qy+y] = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1); \
-    }
-  }
-  return tables;
-}
-
-NdArray<board_t> pack_py(NdArray<const int> tables) {
-  OTHER_ASSERT(tables.rank()>=2);
-  int r = tables.rank();
-  OTHER_ASSERT(tables.shape[r-2]==6 && tables.shape[r-1]==6);
-  NdArray<board_t> boards(tables.shape.slice(0,r-2).copy(),false);
-  for (int b=0;b<boards.flat.size();b++) {
-    quadrant_t q[4];
-    for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
-      quadrant_t s0=0,s1=0;
-      for (int x=0;x<3;x++) for (int y=0;y<3;y++) {
-        quadrant_t bit = 1<<(3*x+y);
-        switch (tables.flat[36*b+6*(3*qx+x)+3*qy+y]) {
-          case 1: s0 |= bit; break;
-          case 2: s1 |= bit; break;
-        }
-      }
-      q[2*qx+qy] = pack(s0,s1);
-    }
-    boards.flat[b] = quadrants(q[0],q[1],q[2],q[3]);
-  }
-  return boards;
-}
-
-inline board_t pack(const Vector<Vector<quadrant_t,2>,4>& sides) {
-    return quadrants(pack(sides[0][0],sides[0][1]),
-                     pack(sides[1][0],sides[1][1]),
-                     pack(sides[2][0],sides[2][1]),
-                     pack(sides[3][0],sides[3][1]));
-}
-
-// Rotate and reflect a board to minimize its value
-board_t standardize(board_t board) {
-  Vector<Vector<quadrant_t,2>,4> sides;
-  for (int q=0;q<4;q++) for (int s=0;s<2;s++)
-    sides[q][s] = unpack(quadrant(board,q),s);
-  board_t transformed[8];
-  for (int rotation=0;rotation<4;rotation++) {
-    for (int reflection=0;reflection<2;reflection++) {
-      transformed[2*rotation+reflection] = pack(sides);
-      // Reflect about y axis
-      for (int q=0;q<4;q++)
-        for (int s=0;s<2;s++) {
-          // static const quadrant_t reflections[512][2] = {...};
-          sides[q][s] = reflections[sides[q][s]][0];
-        }
-      for (int qy=0;qy<2;qy++)
-        swap(sides[qy],sides[2+qy]);
-    }
-    // Rotate left
-    for (int q=0;q<4;q++)
-      for (int s=0;s<2;s++)
-        sides[q][s] = rotations[sides[q][s]][0];
-    Vector<Vector<quadrant_t,2>,4> prev = sides;
-    sides[0] = prev[1];
-    sides[1] = prev[3];
-    sides[2] = prev[0];
-    sides[3] = prev[2];
-  }
-  return RawArray<board_t>(8,transformed).min();
-}
-
-NdArray<board_t> standardize_py(NdArray<const board_t> boards) {
-  NdArray<board_t> transformed(boards.shape,false);
-  for (int b=0;b<boards.flat.size();b++)
-    transformed.flat[b] = standardize(boards.flat[b]);
-  return transformed;
 }
 
 int status_py(board_t board) {
@@ -702,9 +537,6 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_FUNCTION(init_table)
   OTHER_FUNCTION(clear_stats)
   OTHER_FUNCTION(stats)
-  OTHER_FUNCTION(black_to_move)
   OTHER_FUNCTION(simple_status)
-  function("unpack",unpack_py);
-  function("pack",pack_py);
-  function("standardize",standardize_py);
+  OTHER_WRAP(board)
 }

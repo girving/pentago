@@ -10,26 +10,23 @@ For the rules of pentago, see http://en.wikipedia.org/wiki/Pentago.
 ### Dependencies
 
 The core engine is written in C++ and exposed to Python as an extension module.
-The rest of the code (tests, interface, etc.) is in Python.  The dependencies are
-
-* [python](http://python.org)
-* [numpy](http://numpy.scipy.org)
-* The Otherlab code base
-
-On a Mac, the first two can be obtained through [MacPorts](http://www.macports.org) via
-
-    sudo port install py26-numpy
-
-Unfortunately, while the used portion of the Otherlab code base may be open source at
-some point, it's not publically available at this time.
+The rest of the code (tests, interface, etc.) is in Python.  The single direct
+dependency is on the Otherlab core libraries (`other`).  Unfortunately, while the
+used portion of `other may be open source at some point, it is not publically
+available at this time.
 
 ### Usage
 
-To build the engine, run
+To configure, simply symlink the build system over from `other`:
 
-    make
+    cd pentago
+    ln -s $OTHER/SConstruct
+    ln -s $OTHER/SConstruct.options # optional
 
-Currently the Makefile is specific to Mac OS X, but this can easily be fixed.
+To build, run
+
+    scons
+
 To run the unit tests, instead [py.test](http://pytest.org) and run
 
     py.test
@@ -39,3 +36,13 @@ To run a fully automated game (computer vs. itself), run
     ./pentago
 
 More to follow.
+
+### Algorithm notes
+
+1. Pentago has an inconvenient number of spaces, namely 36 instead
+   of 32.  We could potentially dodge this problem by templatizing
+   over the value of the center space in each quadrant.  This is
+   almost surely a win, but I'll stick to 2 64-bit integers for now
+   and revisit that trick later.  It would be easy if I knew that
+   the first four optimal moves were center moves, but I don't have
+   a proof of that.
