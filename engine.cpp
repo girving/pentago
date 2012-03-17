@@ -1,6 +1,7 @@
 // Core tree search engine
 
 #include "board.h"
+#include "score.h"
 #include <other/core/array/Array.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/math/popcount.h>
@@ -35,58 +36,6 @@ void clear_stats() {
 
 /***************** Engine ****************/
 
-// The two low bits of the score are the result: loss 0, tie 1, win 2.
-// Above these are 8 bits giving the depth of the result, e.g., >=36 for known and 0 for completely unknown.
-typedef uint16_t score_t;
-
-inline score_t score(int depth, int value) {
-  return depth<<2|value;
-}
-
-inline score_t exact_score(int value) {
-  return score(36,value);
-}
-
-// Determine if one side has 5 in a row
-inline bool won(side_t side) {
-  /* To test whether a position is a win for a given player, we note that
-   * there are 3*4*2+4+4 = 32 different ways of getting 5 in a row on the
-   * board.  Thus, a 64-bit int can store a 2 bit field for each possible
-   * method.  We then precompute a lookup table mapping each quadrant state
-   * to the number of win-possibilities it contributes to.  28 of the ways
-   * of winning occur between two boards, and 4 occur between 4, so a sum
-   * and a few bit twiddling checks are sufficient to test whether 5 in a
-   * row exists.  See helper for the precomputation code. */
-
-  uint64_t c = win_contributions[0][quadrant(side,0)]
-             + win_contributions[1][quadrant(side,1)]
-             + win_contributions[2][quadrant(side,2)]
-             + win_contributions[3][quadrant(side,3)];
-  return c&(c>>1)&0x55 // The first four ways of winning require contributions from three quadrants
-      || c&(0xaaaaaaaaaaaaaaaa<<8); // The remaining 28 ways require contributions from only two
-}
-
-// Determine if one side can win by rotating a quadrant
-inline bool rotated_won(side_t side) {
-  quadrant_t q0 = quadrant(side,0),
-             q1 = quadrant(side,1),
-             q2 = quadrant(side,2),
-             q3 = quadrant(side,3);
-  // First see how far we get without rotations
-  uint64_t c = win_contributions[0][q0]
-             + win_contributions[1][q1]
-             + win_contributions[2][q2]
-             + win_contributions[3][q3];
-  // We win if we only need to rotate a single quadrant
-  uint64_t c0 = c+rotated_win_contribution_deltas[0][q0],
-           c1 = c+rotated_win_contribution_deltas[1][q1],
-           c2 = c+rotated_win_contribution_deltas[2][q2],
-           c3 = c+rotated_win_contribution_deltas[3][q3];
-  // Check if we won
-  return (c0|c1|c2|c3)&(0xaaaaaaaaaaaaaaaa<<8) // The last remaining 28 ways of winning require contributions two quadrants
-      || ((c0&(c0>>1))|(c1&(c1>>1))|(c2&(c2>>1))|(c3&(c3>>1)))&0x55; // The first four require contributions from three
-}
-
 inline uint64_t hash(board_t key) {
   // Invertible hash function from http://www.concentric.net/~ttwang/tech/inthash.htm
   key = (~key) + (key << 21); // key = (key << 21) - key - 1;
@@ -105,7 +54,6 @@ inline uint64_t hash(board_t key) {
  * 1. Collisions are resolved simply: the entry with greater depth wins.
  * 2. Since our hash is bijective, we store only the high order bits of the hash to detect collisions.
  */
-const int score_bits = 10;
 const int score_mask = (1<<score_bits)-1;
 int table_bits = 0;
 uint64_t table_mask = 0;
@@ -140,17 +88,6 @@ void store(board_t board, score_t score) {
   uint64_t& entry = table[h&table_mask];
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
-}
-
-// Evaluate the current status of a board, returning one bit for whether each player has 5 in a row.
-inline int status(board_t board) {
-  const side_t side0 = unpack(board,0),
-               side1 = unpack(board,1);
-  if ((side0|side1)==0x1ff01ff01ff01ff)
-    return 3; // The board is full, so immediate tie
-  const int won0 = won(side0),
-            won1 = won(side1);
-  return won0|won1<<1;
 }
 
 // We declare the move listing code as a huge macro in order to use it in multiple functions while taking advantage of gcc's variable size arrays.
@@ -225,11 +162,6 @@ inline score_t quick_evaluate(board_t board) {
     return exact_score(1+(st&1)-(st>>1));
   // Did we already compute this value?
   return lookup(board);
-}
-
-// Flip a score and increment its depth by one
-inline score_t lift(score_t sc) {
-  return score(1+(sc>>2),2-(sc&3));
 }
 
 // Same as evaluate, but assume board status and transposition table have supplied no information.
@@ -307,66 +239,6 @@ template<bool black> inline score_t simple_quick_evaluate(side_t side0, side_t s
     return exact_score(0);
   // Did we already compute this value?
   return lookup(pack(side0,side1));
-}
-
-// Compute the minimum number of black moves required for a win, together with the number of different
-// ways that minimum can be achieved.  Returns ((6-min_distance)<<16)+count, so that a higher number means
-// closer to a black win.  If winning is impossible, the return value is 0.
-int simple_win_closeness(side_t black, side_t white) {
-  // Transpose into packed quadrants
-  const quadrant_t q0 = pack(quadrant(black,0),quadrant(white,0)),
-                   q1 = pack(quadrant(black,1),quadrant(white,1)),
-                   q2 = pack(quadrant(black,2),quadrant(white,2)),
-                   q3 = pack(quadrant(black,3),quadrant(white,3));
-  // Compute all distances
-  const uint64_t each = 321685687669321; // sum_{i<17} 1<<3*i
-  #define DISTANCES(i) ({ \
-    const uint64_t d0 = simple_win_distances[0][q0][i], \
-                   d1 = simple_win_distances[1][q1][i], \
-                   d2 = simple_win_distances[2][q2][i], \
-                   d3 = simple_win_distances[3][q3][i], \
-                   blocks = (d0|d1|d2|d3)&4*each, \
-                   blocked = blocks|blocks>>1|blocks>>2, \
-                   unblocked = ~blocked; \
-    (d0&unblocked)+(d1&unblocked)+(d2&unblocked)+(d3&unblocked)+(6*each&blocked); })
-  const uint64_t d0 = DISTANCES(0), // Each of these contains 17 3-bit distances in [0,6]
-                 d1 = DISTANCES(1),
-                 d2 = DISTANCES(2),
-                 d3 = DISTANCES(3);
-  #undef DISTANCES
-  // Determine minimum distance
-  const bool min_under_1 = (~((d0|d0>>1|d0>>2)&(d1|d1>>1|d1>>2)&(d2|d2>>1|d2>>2)&(d3|d3>>1|d3>>2))&each)!=0, // abc < 1 iff ~(a|b|c)
-             min_under_2 = (~((d0|d0>>1)&(d1|d1>>1)&(d2|d2>>1)&(d3|d3>>1))&2*each)!=0, // abc < 2 iff ~a&~b = ~(a|b)
-             min_under_3 = (~((d0>>2|(d0>>1&d0))&(d1>>2|(d1>>1&d1))&(d2>>2|(d2>>1&d2))&(d3>>2|(d3>>1&d3)))&each)!=0, // abc < 3 iff ~a&(~b|~c) = ~a&~(b&c) = ~(a|(b&c))
-             min_under_4 = (~(d0&d1&d2&d3)&4*each)!=0, // abc < 4 iff ~a
-             min_under_5 = (~((d0>>2&(d0>>1|d0))&(d1>>2&(d1>>1|d1))&(d2>>2&(d2>>1|d2))&(d3>>2&(d3>>1|d3)))&each)!=0, // abc < 5 iff ~a|(~b&~c) = ~a|~(b|c) = ~(a&(b|c))
-             min_under_6 = (~((d0&d0>>1)&(d1&d1>>1)&(d2&d2>>1)&(d3&d3>>1))&2*each)!=0; // abc < 6 iff ~a|~b = ~(a&b)
-  const int min_distance = min_under_4
-                             ?min_under_2
-                               ?min_under_1?0:1
-                               :min_under_3?2:3
-                             :min_under_5
-                               ?4
-                               :min_under_6?5:6;
-  // If we're in debug mode, check against the slow way
-#ifndef NDEBUG
-  #define SLOW_MIN_DISTANCE(d) ({ \
-    int md = 6; \
-    for (int i=0;i<17;i++) \
-      md = min(md,int(d>>3*i)&7); \
-    md; })
-  const int slow_min_distance = min(SLOW_MIN_DISTANCE(d0),SLOW_MIN_DISTANCE(d1),SLOW_MIN_DISTANCE(d2),SLOW_MIN_DISTANCE(d3));
-  OTHER_ASSERT(slow_min_distance==min_distance);
-#endif
-  // If the minimum distance is 6, a black win is impossible, so no need to count the ways
-  if (min_distance==6)
-    return 0;
-  // Count number of times min_distance occurs
-  const uint64_t mins = min_distance*each;
-  #define MATCHES(d) (~((d^mins)|(d^mins)>>1|(d^mins)>>2)&each)
-  const int count = popcount(MATCHES(d0))+popcount(MATCHES(d1)|MATCHES(d2)<<1|MATCHES(d3)<<2);
-  #undef MATCHES
-  return ((6-min_distance)<<16)+count;
 }
 
 // Evaluate position ignoring rotations and white five-in-a-row
@@ -484,16 +356,6 @@ score_t simple_evaluate(int depth, board_t board) {
               :simple_evaluate_recurse<false>(depth,side0,side1);
 }
 
-int status_py(board_t board) {
-  check_board(board);
-  return status(board);
-}
-
-int simple_status(board_t board) {
-  check_board(board);
-  return rotated_won(unpack(board,0))?1:0;
-}
-
 Array<board_t> moves(board_t board) {
   check_board(board);
   // const board_t moves[total] = {...};
@@ -526,10 +388,11 @@ PyObject* stats() {
 }
 }
 using namespace pentago;
+using namespace other::python;
 
 OTHER_PYTHON_MODULE(pentago) {
-  using namespace python;
-  function("status",status_py);
+  OTHER_WRAP(board)
+  OTHER_WRAP(score)
   OTHER_FUNCTION(evaluate)
   OTHER_FUNCTION(simple_evaluate)
   OTHER_FUNCTION(moves)
@@ -537,6 +400,4 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_FUNCTION(init_table)
   OTHER_FUNCTION(clear_stats)
   OTHER_FUNCTION(stats)
-  OTHER_FUNCTION(simple_status)
-  OTHER_WRAP(board)
 }

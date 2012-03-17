@@ -1,4 +1,5 @@
 // Board definitions and utility functions
+#pragma once
 
 #include "gen/tables.h"
 #include <cassert>
