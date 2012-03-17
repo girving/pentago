@@ -19,6 +19,8 @@ parser.add_option('--start',type=str,default='0,0',help='comma separated startin
 parser.add_option('-m','--manual',type=int,default=-1,help='play the given side manually')
 options,args = parser.parse_args()
 
+print 'command = %s'%' '.join(sys.argv)
+
 engine.init_table(options.bits)
 print 'random seed = %d'%options.seed
 random.seed(abs(options.seed))
