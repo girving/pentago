@@ -122,5 +122,6 @@ void wrap_board() {
   function("unpack",unpack_py);
   function("pack",pack_py);
   function("standardize",standardize_py);
+  OTHER_FUNCTION(check_board)
   OTHER_FUNCTION(black_to_move)
 }

@@ -55,3 +55,15 @@ def test_moves():
       except ValueError:
         pass
     assert sorted(mv)==sorted(mv2) 
+
+def test_hash():
+  # Verify that hash_board and inverse_hash_board are inverses
+  keys = randint(1<<16,size=100*4).astype(uint16).view(uint64)
+  for i in xrange(len(keys)):
+    assert keys[i]==inverse_hash_board(hash_board(keys[i]))
+  # Verify that no valid board maps to 0
+  try:
+    check_board(inverse_hash_board(0))
+    assert False
+  except ValueError:
+    pass

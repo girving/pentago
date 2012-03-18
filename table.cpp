@@ -11,7 +11,7 @@ namespace pentago {
 using namespace other;
 using std::ostream;
 
-static inline uint64_t hash(board_t key) {
+static inline uint64_t hash_board(board_t key) {
   // Invertible hash function from http://www.concentric.net/~ttwang/tech/inthash.htm
   key = (~key) + (key << 21); // key = (key << 21) - key - 1;
   key = key ^ (key >> 24);
@@ -20,6 +20,57 @@ static inline uint64_t hash(board_t key) {
   key = (key + (key << 2)) + (key << 4); // key * 21
   key = key ^ (key >> 28);
   key = key + (key << 31);
+  return key;
+}
+
+// A mask of the given number of low bits
+static inline uint64_t low_mask(int bits) {
+  return ((uint64_t)1<<bits)-1;
+}
+
+// A mask of the given number of high bits
+static inline uint64_t high_mask(int bits) {
+  return ~(~(uint64_t)0>>bits);
+}
+
+// The inverse of hash_board (for testing purposes)
+static inline uint64_t inverse_hash_board(uint64_t key) {
+  uint64_t tmp;
+
+  // Invert key = key + (key << 31)
+  tmp = key&low_mask(31);
+  tmp = (key-(tmp<<31))&low_mask(62);
+  key =  key-(tmp<<31);
+
+  // Invert key = key ^ (key >> 28)
+  tmp = key&high_mask(28);
+  tmp = (key^tmp>>28)&high_mask(56);
+  key =  key^tmp>>28;
+
+  // Invert key *= 21
+  key *= 14933078535860113213u;
+
+  // Invert key = key ^ (key >> 14)
+  tmp = key&high_mask(14);
+  tmp = (key^tmp>>14)&high_mask(28);
+  tmp = (key^tmp>>14)&high_mask(42);
+  tmp = (key^tmp>>14)&high_mask(56);
+  key =  key^tmp>>14;
+
+  // Invert key *= 265
+  key *= 15244667743933553977u;
+
+  // Invert key = key ^ (key >> 24)
+  tmp = key&high_mask(24);
+  tmp = (key^tmp>>24)&high_mask(48);
+  key =  key^tmp>>24;
+
+  // Invert key = (~key) + (key << 21)
+  tmp = ~key&low_mask(21);
+  tmp = ~(key-(tmp<<21))&low_mask(42);
+  tmp = ~(key-(tmp<<21))&low_mask(63);
+  key = ~(key-(tmp<<21));
+
   return key;
 }
 
@@ -56,7 +107,7 @@ void set_table_type(table_type_t type) {
 
 score_t lookup(board_t board) {
   STAT(total_lookups++);
-  uint64_t h = hash(board);
+  uint64_t h = hash_board(board);
   uint64_t entry = table[h&((1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits) {
     STAT(successful_lookups++);
@@ -66,7 +117,7 @@ score_t lookup(board_t board) {
 }
 
 void store(board_t board, score_t score) {
-  uint64_t h = hash(board);
+  uint64_t h = hash_board(board);
   uint64_t& entry = table[h&((1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
@@ -77,5 +128,7 @@ using namespace pentago;
 using namespace other::python;
 
 void wrap_table() {
+  OTHER_FUNCTION(hash_board)
+  OTHER_FUNCTION(inverse_hash_board)
   OTHER_FUNCTION(init_table)
 }
