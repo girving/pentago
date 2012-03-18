@@ -18,6 +18,10 @@ def popcount(x):
     count += 1
   return count
 
+@cache
+def small_popcounts():
+  return asarray([popcount(i) for i in xrange(512)])
+
 def bits(x):
   if not x:
     return '0b0'
@@ -65,6 +69,7 @@ def win_patterns():
       for i in xrange(5):
         p |= bit(i+x,i+x,rotate=rotate)
       wins.append(p)
+  wins = asarray(wins)
 
   # Check that 5 bits are set in each
   for w in wins:
@@ -131,6 +136,32 @@ def if_(c,a,b):
   return c*a+(1-c)*b
 
 @cache
+def unrotated_win_distances():
+  # Work out the various ways of winning, allowing no rotations
+  patterns = win_patterns().reshape(2,16)
+
+  # Precompute small popcounts
+  count = small_popcounts()
+
+  # Generate a distance table giving the total number of moves required for player 0 (black) to
+  # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
+  # has 3 bits (for 0,1,2,3 or 4=infinity) plus an extra 0 bit to stop carries at runtime, so we
+  # fit 16 patterns into each of 2 64-bit ints
+  table = zeros((4,3**9,2),int64) # indexed by quadrant,position,word
+  unpack_ = unpack()
+  rotations_ = rotations()
+  for i,pats in enumerate(patterns):
+    for j,pat in enumerate(pats):
+      for q in xrange(4):
+        b = arange(3**9)
+        s0,s1 = unpack_[b].T
+        qp = (pat>>16*q)&0x1ff
+        d = if_(s1&qp,4,count[qp&~s0])
+        table[q,b,i] |= d<<4*j
+  assert ahash(table)==8251429364477897294
+  return [('uint64_t','unrotated_win_distances','0x%xL',table)]
+
+@cache
 def rotated_win_distances():
   # Work out the various ways of winning, allowing at most one quadrant to rotate
   patterns = win_patterns()
@@ -144,7 +175,7 @@ def rotated_win_distances():
   rotated_patterns = asarray(rotated_patterns,object).reshape(4,17,2)
 
   # Precompute small popcounts
-  count = asarray([popcount(i) for i in xrange(512)])
+  count = small_popcounts()
 
   # Generate a distance table giving the total number of moves required for player 0 (black) to
   # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
@@ -281,6 +312,7 @@ if __name__=='__main__':
     os.makedirs(prefix())
   save('tables',show_win_contributions()
                +rotated_win_contributions()
+               +unrotated_win_distances()
                +rotated_win_distances()
                +show_rotations()
                +reflections()

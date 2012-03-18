@@ -7,7 +7,7 @@ from interface import *
 randint = random.randint
 
 def randboard():
-  return sum(randint(3**9,size=4)<<16*arange(4)) 
+  return sum(randint(3**9,size=4)<<16*arange(4))
 
 def test_misc():
   random.seed(73120)
@@ -54,9 +54,9 @@ def test_moves():
         mv2.append(parse_move(board,turn,m))
       except ValueError:
         pass
-    assert sorted(mv)==sorted(mv2) 
+    assert sorted(mv)==sorted(mv2)
 
-def test_rotated_win():
+def win_test(rotated):
   verbose = 0
   random.seed(81383)
   def distance(closeness):
@@ -64,45 +64,62 @@ def test_rotated_win():
   def choose(options):
     assert len(options)
     return options[randint(len(options))]
+  if verbose:
+    def log(name):
+      print '%s: closeness %d, distance %d, count %d'%(name,close,dist,close&0xffff)
+  else:
+    def log(name):
+      pass
+  closeness = rotated_win_closeness if rotated else unrotated_win_closeness
   # In some cases, black can win by rotating the same quadrant in either direction.  Closeness computation
   # counts this as a single "way", even though it is really two, which may make it impossible to white to reduce closeness.
   special = set([3936710634889235564,8924889845,53214872776869257,616430895238742070,45599372358462108,1194863002822977710,
-                 3559298137047367680,2485989107724386484,1176595961439925315])
+                 3559298137047367680,2485989107724386484,1176595961439925315]) if rotated else ()
   wins = ties = 0
   for i in xrange(100): # (256):
     # Start with an empty board
     board = 0
-    closeness = rotated_win_closeness(board)
-    d = distance(closeness)
-    assert d==5
-    if verbose:
-      print '\nstart: closeness %d, distance %d, count %d'%(closeness,d,closeness&0xffff)
-    while 1:
-      # Verify that a well-placed white stone reduces closeness 
+    close = closeness(board)
+    dist = distance(close)
+    assert dist==5
+    log('\nstart')
+    if not rotated:
+      # Give black several free moves to even the odds
+      for _ in xrange(randint(15)):
+        board = choose(moves(board,turn=0,simple=1))
+      close = closeness(board)
+      dist = distance(close)
+      log('seeds')
+    while dist:
+      # Verify that a well-placed white stone reduces closeness
       try:
-        board,closeness = choose([(b,c) for b in moves(board,turn=1,simple=1) for c in [rotated_win_closeness(b)] if c<closeness])
+        board,close = choose([(b,c) for b in moves(board,turn=1,simple=1) for c in [closeness(b)] if c<close])
+        dist = distance(close)
       except AssertionError:
         if int(board) not in special:
           print 'i %d, board %d\n%s'%(i,board,show_board(board))
           raise
-      d = distance(closeness)
-      if verbose:
-        print 'after white: closeness %d, distance %d, count %d'%(closeness,d,closeness&0xffff)
-      if d==6:
+      log('after white')
+      if dist==6:
         ties += 1
         break
       # Verify that a well-placed black stone reduces distance
-      board,closeness = choose([(b,c) for b in moves(board,turn=0,simple=1) for c in [rotated_win_closeness(b)] if distance(c)<d])
-      d = distance(closeness)
-      if verbose:
-        print 'after black: closeness %d, distance %d, count %d'%(closeness,d,closeness&0xffff)
+      board,close,dist = choose([(b,c,d) for b in moves(board,turn=0,simple=1) for c in [closeness(b)] for d in [distance(c)] if d<dist])
+      log('after black')
       # Verify that we've won iff distance==0
-      assert (d==0)==(rotated_status(board)&1)
-      assert (d==0)==(len([() for qx in 0,1 for qy in 0,1 for count in -1,1 if status(rotate(board,qx,qy,count))&1])!=0)
-      if d==0:
+      assert (dist==0)==((rotated_status if rotated else status)(board)&1)
+      if rotated:
+        assert (dist==0)==(len([() for qx in 0,1 for qy in 0,1 for count in -1,1 if status(rotate(board,qx,qy,count))&1])!=0)
+      if dist==0:
         wins += 1
         break
   print 'wins %d, ties %d'%(wins,ties)
+
+def test_rotated_win():
+  win_test(rotated=1)
+
+def test_unrotated_win():
+  win_test(rotated=0)
 
 def test_hash():
   # Verify that hash_board and inverse_hash_board are inverses

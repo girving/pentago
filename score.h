@@ -83,4 +83,7 @@ static inline int status(board_t board) {
 // If winning is impossible, the return value is 0.
 extern int rotated_win_closeness(side_t black, side_t white);
 
+// Same as above, except allowing no rotations whatsoever.
+extern int unrotated_win_closeness(side_t black, side_t white);
+
 }
