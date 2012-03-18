@@ -23,52 +23,38 @@ static inline uint64_t hash_board(board_t key) {
   return key;
 }
 
-// A mask of the given number of low bits
-static inline uint64_t low_mask(int bits) {
-  return ((uint64_t)1<<bits)-1;
-}
-
-// A mask of the given number of high bits
-static inline uint64_t high_mask(int bits) {
-  return ~(~(uint64_t)0>>bits);
-}
-
 // The inverse of hash_board (for testing purposes)
 static inline uint64_t inverse_hash_board(uint64_t key) {
   uint64_t tmp;
 
   // Invert key = key + (key << 31)
-  tmp = key&low_mask(31);
-  tmp = (key-(tmp<<31))&low_mask(62);
-  key =  key-(tmp<<31);
+  tmp = key-(key<<31);
+  key = key-(tmp<<31);
 
   // Invert key = key ^ (key >> 28)
-  tmp = key&high_mask(28);
-  tmp = (key^tmp>>28)&high_mask(56);
-  key =  key^tmp>>28;
+  tmp = key^key>>28;
+  key = key^tmp>>28;
 
   // Invert key *= 21
   key *= 14933078535860113213u;
 
   // Invert key = key ^ (key >> 14)
-  tmp = key&high_mask(14);
-  tmp = (key^tmp>>14)&high_mask(28);
-  tmp = (key^tmp>>14)&high_mask(42);
-  tmp = (key^tmp>>14)&high_mask(56);
-  key =  key^tmp>>14;
+  tmp = key^key>>14;
+  tmp = key^tmp>>14;
+  tmp = key^tmp>>14;
+  key = key^tmp>>14;
 
   // Invert key *= 265
   key *= 15244667743933553977u;
 
   // Invert key = key ^ (key >> 24)
-  tmp = key&high_mask(24);
-  tmp = (key^tmp>>24)&high_mask(48);
-  key =  key^tmp>>24;
+  tmp = key^key>>24;
+  key = key^tmp>>24;
 
   // Invert key = (~key) + (key << 21)
-  tmp = ~key&low_mask(21);
-  tmp = ~(key-(tmp<<21))&low_mask(42);
-  tmp = ~(key-(tmp<<21))&low_mask(63);
+  tmp = ~key;
+  tmp = ~(key-(tmp<<21));
+  tmp = ~(key-(tmp<<21));
   key = ~(key-(tmp<<21));
 
   return key;
