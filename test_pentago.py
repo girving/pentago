@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from __future__ import division
-from numpy import *
+from other.core import *
 from interface import *
 
 randint = random.randint
@@ -132,3 +132,17 @@ def test_hash():
     assert False
   except ValueError:
     pass
+
+def test_all_boards():
+  print
+  sizes = [1,6,165,2715,44481,471870,4871510,36527160,264802788]
+  hashes = [8,-6878000688188254263,-2173867943958208377,-4633991874873228126,-683072618870330000,4414072784886068265,-713043673212511325,535474690767935483,5651753791106627528]
+  for n in xrange(6):
+    boards = all_boards(n)
+    if 0 and n<3:
+      print '\n\n-------------------------------- %d: %d ---------------------------------\n'%(n,len(boards))
+      for b in boards:
+        print show_board(b)
+    print 'n = %d, count = %d, hash = %d'%(n,len(boards),ahash(boards))
+    assert sizes[n]==len(boards)
+    assert hashes[n]==ahash(boards)
