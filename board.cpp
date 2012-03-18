@@ -28,7 +28,7 @@ void check_board(board_t board) {
 
 static NdArray<int> unpack_py(NdArray<const board_t> boards) {
   for (int b=0;b<boards.flat.size();b++)
-    check_board(boards[b]);
+    check_board(boards.flat[b]);
   Array<int> shape = boards.shape.copy();
   shape.append(6);
   shape.append(6);
