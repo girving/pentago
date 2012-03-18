@@ -1,6 +1,7 @@
 // Score definitions and immediately evaluation functions
 
 #include "score.h"
+#include <other/core/math/min.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>
 namespace pentago {
@@ -10,7 +11,7 @@ using namespace other;
 // Compute the minimum number of black moves required for a win, together with the number of different
 // ways that minimum can be achieved.  Returns ((6-min_distance)<<16)+count, so that a higher number means
 // closer to a black win.  If winning is impossible, the return value is 0.
-int simple_win_closeness(side_t black, side_t white) {
+int rotated_win_closeness(side_t black, side_t white) {
   // Transpose into packed quadrants
   const quadrant_t q0 = pack(quadrant(black,0),quadrant(white,0)),
                    q1 = pack(quadrant(black,1),quadrant(white,1)),
@@ -19,10 +20,10 @@ int simple_win_closeness(side_t black, side_t white) {
   // Compute all distances
   const uint64_t each = 321685687669321; // sum_{i<17} 1<<3*i
   #define DISTANCES(i) ({ \
-    const uint64_t d0 = simple_win_distances[0][q0][i], \
-                   d1 = simple_win_distances[1][q1][i], \
-                   d2 = simple_win_distances[2][q2][i], \
-                   d3 = simple_win_distances[3][q3][i], \
+    const uint64_t d0 = rotated_win_distances[0][q0][i], \
+                   d1 = rotated_win_distances[1][q1][i], \
+                   d2 = rotated_win_distances[2][q2][i], \
+                   d3 = rotated_win_distances[3][q3][i], \
                    blocks = (d0|d1|d2|d3)&4*each, \
                    blocked = blocks|blocks>>1|blocks>>2, \
                    unblocked = ~blocked; \
@@ -67,12 +68,17 @@ int simple_win_closeness(side_t black, side_t white) {
   return ((6-min_distance)<<16)+count;
 }
 
+static int rotated_win_closeness_py(board_t board) {
+  check_board(board);
+  return rotated_win_closeness(unpack(board,0),unpack(board,1));
+}
+
 static int status_py(board_t board) {
   check_board(board);
   return status(board);
 }
 
-static int simple_status(board_t board) {
+static int rotated_status(board_t board) {
   check_board(board);
   return rotated_won(unpack(board,0))?1:0;
 }
@@ -84,5 +90,6 @@ using namespace other::python;
 
 void wrap_score() {
   function("status",status_py);
-  OTHER_FUNCTION(simple_status)
+  function("rotated_win_closeness",rotated_win_closeness_py);
+  OTHER_FUNCTION(rotated_status)
 }

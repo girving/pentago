@@ -131,7 +131,7 @@ def if_(c,a,b):
   return c*a+(1-c)*b
 
 @cache
-def win_distances():
+def rotated_win_distances():
   # Work out the various ways of winning, allowing at most one quadrant to rotate
   patterns = win_patterns()
   assert len(patterns)==32
@@ -164,7 +164,7 @@ def win_distances():
             d = minimum(d,if_(rotations_[s1,r]&qp,4,count[qp&~rotations_[s0,r]]))
         table[q,b,i] |= d<<3*j
   assert ahash(table)==-1851827180569519993
-  return [('uint64_t','simple_win_distances','0x%xL',table)]
+  return [('uint64_t','rotated_win_distances','0x%xL',table)]
 
 @cache
 def reflections():
@@ -281,7 +281,7 @@ if __name__=='__main__':
     os.makedirs(prefix())
   save('tables',show_win_contributions()
                +rotated_win_contributions()
-               +win_distances()
+               +rotated_win_distances()
                +show_rotations()
                +reflections()
                +show_pack()

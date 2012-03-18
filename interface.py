@@ -98,7 +98,7 @@ def play(board,turn,sides,depth,early_exit=False,simple=False):
     header = 'board = %d, turn = %d'%(board,turn)
     print '\n%s\n%s'%('-'*len(header),header)
     print '\n'+show_board(board)
-    s = (simple_status if simple else status)(board)
+    s = (rotated_status if simple else status)(board)
     if s:
       print {1:'win for 0',2:'win for 1',3:'simultaneous win (tie)'}[s]
       if simple and not status(board):

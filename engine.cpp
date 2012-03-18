@@ -132,8 +132,8 @@ template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, si
   // Compute how close we are to a black win
   int order[total]; // We'll sort moves in ascending order of this array
   for (int i=total-1;i>=0;i--) {
-    int closeness = black?simple_win_closeness(moves[i],side1)
-                         :simple_win_closeness(side1,moves[i]);
+    int closeness = black?rotated_win_closeness(moves[i],side1)
+                         :rotated_win_closeness(side1,moves[i]);
     int distance = 6-(closeness>>16);
     if (distance==6 || distance>(depth-black)/2) { // We can't reach a black win within the given search depth
       if (!black) {
