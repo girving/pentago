@@ -12,6 +12,7 @@ namespace pentago {
 // means that with perfect play, neither player can force a win or loss within depth plys.
 typedef uint16_t score_t;
 static const int score_bits = 9;
+static const int score_mask = (1<<score_bits)-1;
 
 // Combine depth and value fields into a score
 static inline score_t score(int depth, int value) {

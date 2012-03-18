@@ -4,8 +4,8 @@
 #include "score.h"
 #include "moves.h"
 #include "stat.h"
+#include "table.h"
 #include <other/core/python/module.h>
-#include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
 namespace pentago {
 
@@ -16,60 +16,6 @@ using std::swap;
 using namespace other;
 
 namespace {
-
-inline uint64_t hash(board_t key) {
-  // Invertible hash function from http://www.concentric.net/~ttwang/tech/inthash.htm
-  key = (~key) + (key << 21); // key = (key << 21) - key - 1;
-  key = key ^ (key >> 24);
-  key = (key + (key << 3)) + (key << 8); // key * 265
-  key = key ^ (key >> 14);
-  key = (key + (key << 2)) + (key << 4); // key * 21
-  key = key ^ (key >> 28);
-  key = key + (key << 31);
-  return key;
-}
-
-/* Hashed transposition table.
- *
- * Notes:
- * 1. Collisions are resolved simply: the entry with greater depth wins.
- * 2. Since our hash is bijective, we store only the high order bits of the hash to detect collisions.
- */
-const int score_mask = (1<<score_bits)-1;
-int table_bits = 0;
-uint64_t table_mask = 0;
-uint64_t* table = 0;
-enum table_type_t {blank_table,normal_table,simple_table} table_type;
-
-void init_table(int bits) {
-  if (bits<1 || bits>30)
-    throw ValueError(format("expected 1<=bits<=30, got bits = %d",bits));
-  if (64-bits+score_bits>64)
-    throw ValueError(format("bits = %d is too small, the high order hash bits won't fit",bits));
-  free(table);
-  table_bits = bits;
-  table_mask = (1<<table_bits)-1;
-  table = (uint64_t*)calloc(1L<<bits,sizeof(uint64_t));
-  table_type = blank_table;
-}
-
-score_t lookup(board_t board) {
-  STAT(total_lookups++);
-  uint64_t h = hash(board);
-  uint64_t entry = table[h&table_mask];
-  if (entry>>score_bits==h>>table_bits) {
-    STAT(successful_lookups++);
-    return entry&score_mask;
-  }
-  return score(0,1);
-}
-
-void store(board_t board, score_t score) {
-  uint64_t h = hash(board);
-  uint64_t& entry = table[h&table_mask];
-  if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
-    entry = h>>table_bits<<score_bits|score;
-}
 
 // Evaluate position based only on current state and transposition table
 inline score_t quick_evaluate(board_t board) {
@@ -134,11 +80,7 @@ score_t evaluate(int depth, board_t board) {
   // We can afford error detection here since recursion happens into a different function
   OTHER_ASSERT(depth>=0);
   check_board(board);
-  if (table_bits<10)
-    throw AssertionError(format("transposition table not initialized: table_bits = %d",table_bits));
-  if (table_type==blank_table)
-    table_type = normal_table;
-  OTHER_ASSERT(table_type==normal_table);
+  set_table_type(normal_table);
 
   // Exit immediately if possible
   score_t sc = quick_evaluate(board);
@@ -251,11 +193,7 @@ score_t simple_evaluate(int depth, board_t board) {
   // We can afford error detection here since recursion happens into a different function
   OTHER_ASSERT(depth>=0);
   check_board(board);
-  if (table_bits<10)
-    throw AssertionError(format("transposition table not initialized: table_bits = %d",table_bits));
-  if (table_type==blank_table)
-    table_type = simple_table;
-  OTHER_ASSERT(table_type==simple_table);
+  set_table_type(simple_table);
 
   // Determine whether player 0 is black (first to move) or white (second to move)
   const side_t side0 = unpack(board,0),
@@ -278,12 +216,7 @@ score_t simple_evaluate(int depth, board_t board) {
 using namespace pentago;
 using namespace other::python;
 
-OTHER_PYTHON_MODULE(pentago) {
-  OTHER_WRAP(board)
-  OTHER_WRAP(score)
-  OTHER_WRAP(moves)
-  OTHER_WRAP(stat)
+void wrap_engine() {
   OTHER_FUNCTION(evaluate)
   OTHER_FUNCTION(simple_evaluate)
-  OTHER_FUNCTION(init_table)
 }
