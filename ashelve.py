@@ -14,6 +14,11 @@ __all__ = ['ashelf','Locked']
 keyers = {}
 for t in int,long,int64,uint64,ulonglong,str:
   keyers[t] = repr
+def key_ndarray(x):
+  if x.ndim==0:
+    return repr(x[()])
+  assert False
+keyers[ndarray] = key_ndarray
 
 class Locked(RuntimeError):
   pass
@@ -111,17 +116,20 @@ class ashelf(object):
           d[key] = pickle.loads(str(row['value']))
       return d
 
-  def keys(self,strict=True):
+  def keys_list(self,strict=True):
     with self.db:
-      s = set()
+      keys = []
       for row in self.db.execute('select key,state from shelf'):
         key = eval(row['key'])
         if row['state']&LOCKED:
           if strict:
             raise Locked(key)
         else:
-          s.add(key)
-      return s
+          keys.append(key)
+      return keys
+
+  def keys(self,strict=True):
+    return set(self.keys_list(strict))
 
   def impl_keys(self):
     with self.db:
@@ -131,3 +139,11 @@ class ashelf(object):
     print '\ndump: %s'%s
     for line in self.db.iterdump():
       print '  '+line
+
+  def delete_locked(self):
+    with self.db:
+      self.db.execute('delete from shelf where state = ? or state = ?',(LOCKED,SET|LOCKED))
+
+  def delete_if_skey_like(self,pattern):
+    with self.db:
+      self.db.execute('delete from shelf where key like ?',(pattern,))

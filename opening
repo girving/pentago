@@ -15,7 +15,8 @@ game = PropManager.add('game','defense').set_allowed('defense'.split())
 jobs = PropManager.add('jobs',1).set_abbrev('j')
 stones = PropManager.add('stones',6).set_abbrev('n')
 bits = PropManager.add('bits',26).set_abbrev('b')
-action = PropManager.add('action','list').set_allowed('gen list'.split())
+verbose = PropManager.add('verbose',True).set_abbrev('v')
+action = PropManager.add('action','list').set_allowed('gen list missing cleanup dump'.split())
 parser.parse('Opening book generator',positional=[action])
 
 # Fork if desired
@@ -34,7 +35,7 @@ def count(boards):
   return sum(unpack(boards).reshape(*(boards.shape+(36,)))!=0,axis=-1)
 
 def show_result(moves):
-  return 'black wins (possibly in %d moves)'%moves if moves<36 else 'tie'
+  return 'black wins (possibly in %d moves)'%moves if moves<=36 else 'tie'
 
 def list_book():
   entries = book.dict(strict=False)
@@ -43,7 +44,17 @@ def list_book():
   for n in xrange(stones()+1):
     for board in sort(keys[counts==n]):
       print 'board %d, stones %d, %s'%(board,count(board),show_result(entries[board]))
-      print show_board(board),'\n'
+      if verbose():
+        print show_board(board),'\n'
+
+def list_missing():
+  keys = book.keys(strict=False)
+  for n in xrange(stones()+1):
+    for board in all_boards(n):
+      if board not in keys: 
+        print 'board %d, stones %d'%(board,n)
+        if verbose():
+          print show_board(board),'\n'
 
 def solve_board(board):
   # Since we don't clear the table each time, the depth estimate is approximate only
@@ -59,6 +70,27 @@ def solve_board(board):
       print 'solved %d: depth %d, %s'%(board,depth,show_result(result))
       return result
 
+def scrape_table():
+  boards,scores = read_table(stones(),36)
+  boards = standardize(boards)
+  print 'found %d interesting table entries'%len(boards)
+  for board,score in zip(boards,scores):
+    turn = count(board)&1
+    board = flipto(board,turn)
+    d,v = divmod(score,4) 
+    v = (-1)**turn*(v-1)
+    assert d>=36 and v>=0
+    try:
+      with book.lock(board) as entry:
+        if entry:
+          assert (entry()<=36)==(v>0)
+        else:
+          result = 0 if v>0 else 40
+          print 'quick solved %d: count %d, %s'%(board,count(board),show_result(result))
+          entry.set(result)
+    except Locked:
+      pass
+
 def gen_book():
   engine.init_table(bits())
   for n in xrange(stones()+1):
@@ -68,12 +100,22 @@ def gen_book():
           if not entry:
             print 'solving board %d, stones %d'%(board,n)
             print show_board(board)
-            depth = solve_board(board)
-            entry.set(depth)
+            entry.set(solve_board(board))
+            scrape_table()
       except Locked:
         pass
 
+def cleanup():
+  book.delete_locked()
+  book.delete_if_skey_like('array%')
+
 if action()=='list':
   list_book()
+elif action()=='missing':
+  list_missing()
 elif action()=='gen':
   gen_book()
+elif action()=='cleanup':
+  cleanup()
+elif action()=='dump':
+  book.dump()
