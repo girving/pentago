@@ -28,9 +28,9 @@ LOCKED = 1
 SET = 2
 
 class ashelf(object):
-  def __init__(self,filename):
+  def __init__(self,filename,timeout=30):
     # Open the database
-    db = self.db = sqlite3.connect(filename)
+    db = self.db = sqlite3.connect(filename,timeout=timeout)
     db.row_factory = sqlite3.Row
     # Create the table if it doesn't already exist
     try:
