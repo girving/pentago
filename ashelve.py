@@ -12,7 +12,7 @@ __all__ = ['ashelf','Locked']
 
 # All keys are mapped to strings
 keyers = {}
-for t in int,long,int64,uint64,str:
+for t in int,long,int64,uint64,ulonglong,str:
   keyers[t] = repr
 
 class Locked(RuntimeError):
@@ -48,6 +48,14 @@ class ashelf(object):
         for row in self.db.execute('select value from shelf where key = ? and state = ?',(self.skey,LOCKED|SET)):
           return pickle.loads(str(row['value']))
         raise KeyError(self.key)
+
+    def __nonzero__(self):
+      if self.closed:
+        raise ReferenceError()
+      with self.db:
+        for row in self.db.execute('select state from shelf where key = ? and state = ?',(self.skey,LOCKED|SET)):
+          return True
+        return False
 
     def set(self,value):
       if self.closed:
@@ -87,24 +95,32 @@ class ashelf(object):
     with self.lock(key) as entry:
       entry.set(value)
 
-  def dict(self):
+  def __contains__(self,key):
+    with self.lock(key) as entry:
+      return bool(entry)
+
+  def dict(self,strict=True):
     with self.db:
       d = {}
       for row in self.db.execute('select key,state,value from shelf'):
         key = eval(row['key'])
         if row['state']&LOCKED:
-          raise Locked(key)
-        d[key] = pickle.loads(str(row['value']))
+          if strict:
+            raise Locked(key)
+        else:
+          d[key] = pickle.loads(str(row['value']))
       return d
 
-  def keys(self):
+  def keys(self,strict=True):
     with self.db:
       s = set()
       for row in self.db.execute('select key,state from shelf'):
         key = eval(row['key'])
         if row['state']&LOCKED:
-          raise Locked(key)
-        s.add(key)
+          if strict:
+            raise Locked(key)
+        else:
+          s.add(key)
       return s
 
   def impl_keys(self):

@@ -3,6 +3,7 @@
 from __future__ import division
 import tempfile
 import contextlib
+from numpy import *
 from ashelve import *
 
 @contextlib.contextmanager
@@ -29,6 +30,8 @@ def test_ashelf():
   alias['b'] = 'c'
   for s in shelf,alias:
     assert s['a']=='b'
+    assert 'a' in s
+    assert 'c' not in s
     assert s.dict()=={'a':'b','b':'c'}
     assert s.keys()==set('ab')
     assert s.impl_keys()==set('ab')
@@ -45,7 +48,9 @@ def test_ashelf():
             assert False
       if key=='a':
         assert entry()=='b'
+        assert bool(entry)
       else:
+        assert not bool(entry)
         with expect_error(KeyError):
           entry()
       entry.set('d')
@@ -71,6 +76,10 @@ def test_ashelf():
       assert s.impl_keys()==set('abc')
   for s in shelf,alias:
     assert s.dict()=={'a':'d','b':'c','c':'d'}
+
+  # Test different kind types
+  for key in 0,long(1),int64(2),uint64(3):
+    shelf[key] = 4
 
 if __name__=='__main__':
   test_ashelf()

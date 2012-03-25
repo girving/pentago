@@ -46,3 +46,27 @@ More to follow.
    and revisit that trick later.  It would be easy if I knew that
    the first four optimal moves were center moves, but I don't have
    a proof of that.
+
+2. We consider two types of simplified games:
+
+   a. Boring defense: White always chooses to undo black's last rotation,
+      and 5-in-a-rows by white are ignored.  Under these rules, rotations
+      can be ignored when generating moves, except that we have allow black
+      one rotation when checking for a win.
+
+   b. Boring offense: Black always chooses to under white's last rotation,
+      and 5-in-a-rows are considered on both sides.  However, black 5-in-a-rows
+      are ignored if they occur as a consequence of a white rotation.  As before,
+      this allows rotations to be ignored, except that we have to allow white
+      (but not black) one rotation when checking for a win.
+
+   Starting from any position, a tie for white under "boring defense" rules
+   guarantees a tie for white under normal rules.  Similarly, a win for black
+   under "boring offense" rules guarantees a win for black under normal rules.
+   Therefore, we can use either set of rules to prune away hopefully large
+   branches of the tree, taking advantage of the reduced branching factor
+   of the simplified games.
+
+   I had originally hoped that boring defense would succeed starting from an
+   empty board, but that turns out not to be the case: if white plays boring
+   defense, black wins in 15 ply.
