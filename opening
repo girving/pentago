@@ -39,7 +39,7 @@ def show_result(moves):
 
 def list_book():
   entries = book.dict(strict=False)
-  keys = asarray(list(book.keys(strict=False)),dtype=uint64)
+  keys = asarray(list(entries.keys()),dtype=uint64)
   counts = count(keys)
   for n in xrange(stones()+1):
     for board in sort(keys[counts==n]):
