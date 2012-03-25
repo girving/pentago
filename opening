@@ -13,9 +13,9 @@ from ashelve import *
 # Properties
 game = PropManager.add('game','defense').set_allowed('defense'.split())
 jobs = PropManager.add('jobs',1).set_abbrev('j')
-stones = PropManager.add('stones',6)
+stones = PropManager.add('stones',6).set_abbrev('n')
 bits = PropManager.add('bits',26).set_abbrev('b')
-action = PropManager.add('action','gen').set_allowed('gen list'.split()).set_required(True)
+action = PropManager.add('action','list').set_allowed('gen list'.split())
 parser.parse('Opening book generator',positional=[action])
 
 # Fork if desired
@@ -33,25 +33,31 @@ def count(boards):
   boards = asarray(boards)
   return sum(unpack(boards).reshape(*(boards.shape+(36,)))!=0,axis=-1)
 
+def show_result(moves):
+  return 'black wins (possibly in %d moves)'%moves if moves<36 else 'tie'
+
 def list_book():
   entries = book.dict(strict=False)
   keys = asarray(list(book.keys(strict=False)),dtype=uint64)
   counts = count(keys)
   for n in xrange(stones()+1):
     for board in sort(keys[counts==n]):
-      moves = entries[board]
-      print 'board %d, stones %d, %s'%(board,count(board),('black wins (possibly in %d moves)'%moves if moves<36 else 'tie'))
+      print 'board %d, stones %d, %s'%(board,count(board),show_result(entries[board]))
       print show_board(board),'\n'
 
 def solve_board(board):
   # Since we don't clear the table each time, the depth estimate is approximate only
-  black = black_to_move(board)
-  for depth in xrange(black,40,2):
-    print 'searching to depth %d'%depth
-    d,v = divmod(engine.simple_evaluate(depth,board),4)
+  turn = count(board)&1
+  flipboard = flipto(board,turn)
+  for depth in xrange(1-turn,40,2):
+    print 'searching %d to depth %d'%(board,depth)
+    d,v = divmod(engine.simple_evaluate(depth,flipboard),4)
+    v = (-1)**turn*(v-1)
+    assert v>=0
     if d>=36:
-      assert v>0
-      return depth if v==2 else 40
+      result = depth if v>0 else 40
+      print 'solved %d: depth %d, %s'%(board,depth,show_result(result))
+      return result
 
 def gen_book():
   engine.init_table(bits())

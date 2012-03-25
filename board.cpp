@@ -21,7 +21,7 @@ bool black_to_move(board_t board) {
                side1 = unpack(board,1);
   const int count0 = popcount(side0),
             count1 = popcount(side1);
-  OTHER_ASSERT(count0==count1 || count0==count1+1);
+  OTHER_ASSERT(count0==count1 || count1==count0+1);
   return count0==count1;
 }
 
