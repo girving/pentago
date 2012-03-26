@@ -82,9 +82,9 @@ static inline int status(board_t board) {
 // ways that minimum can be achieved, assuming no rotations except possibly a single rotation right at
 // the end.  Returns ((6-min_distance)<<16)+count, so that a higher number means closer to a black win.
 // If winning is impossible, the return value is 0.
-extern int rotated_win_closeness(side_t black, side_t white) OTHER_PURE;
+extern int rotated_win_closeness(side_t black, side_t white) OTHER_CONST;
 
 // Same as above, except allowing no rotations whatsoever.
-extern int unrotated_win_closeness(side_t black, side_t white) OTHER_PURE;
+extern int unrotated_win_closeness(side_t black, side_t white) OTHER_CONST;
 
 }
