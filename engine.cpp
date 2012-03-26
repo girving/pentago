@@ -129,47 +129,49 @@ template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, si
     goto done;
   }
 
-  // Compute how close we are to a black win
-  int order[total]; // We'll sort moves in ascending order of this array
-  for (int i=total-1;i>=0;i--) {
-    int closeness = black?rotated_win_closeness(moves[i],side1)
-                         :rotated_win_closeness(side1,moves[i]);
-    int distance = 6-(closeness>>16);
-    if (distance==6 || distance>(depth-black)/2) { // We can't reach a black win within the given search depth
-      if (!black) {
-        STAT(distance_prunes++);
-        best = score(distance==6?36:2*distance-1+black,1);
-        goto done;
-      } else {
-        swap(moves[i],moves[total-1]);
-        swap(order[i],order[--total]);
+  {
+    // Compute how close we are to a black win
+    int order[total]; // We'll sort moves in ascending order of this array
+    for (int i=total-1;i>=0;i--) {
+      int closeness = black?rotated_win_closeness(moves[i],side1)
+                           :rotated_win_closeness(side1,moves[i]);
+      int distance = 6-(closeness>>16);
+      if (distance==6 || distance>(depth-black)/2) { // We can't reach a black win within the given search depth
+        if (!black) {
+          STAT(distance_prunes++);
+          best = score(distance==6?36:2*distance-1+black,1);
+          goto done;
+        } else {
+          swap(moves[i],moves[total-1]);
+          swap(order[i],order[--total]);
+        }
       }
+      order[i] = black?-closeness:closeness;
     }
-    order[i] = black?-closeness:closeness;
-  }
 
-  // Insertion sort moves based on order
-  for (int i=1;i<total;i++) {
-    const side_t move = moves[i];
-    const int key = order[i];
-    int j = i-1;
-    while (j>=0 && order[j]>key) {
-      moves[j+1] = moves[j];
-      order[j+1] = order[j];
-      j--;
+    // Insertion sort moves based on order
+    for (int i=1;i<total;i++) {
+      const side_t move = moves[i];
+      const int key = order[i];
+      int j = i-1;
+      while (j>=0 && order[j]>key) {
+        moves[j+1] = moves[j];
+        order[j+1] = order[j];
+        j--;
+      }
+      moves[j+1] = move;
+      order[j+1] = key;
     }
-    moves[j+1] = move;
-    order[j+1] = key;
-  }
 
-  // Optionally print out move ordering information
-  if (0) {
-    cout << (black?"order black =":"order white =");
-    for (int i=0;i<total;i++) {
-      int o = black?-order[i]:order[i];
-      cout << ' '<<(6-(o>>16))<<','<<(o&0xffff);
+    // Optionally print out move ordering information
+    if (0) {
+      cout << (black?"order black =":"order white =");
+      for (int i=0;i<total;i++) {
+        int o = black?-order[i]:order[i];
+        cout << ' '<<(6-(o>>16))<<','<<(o&0xffff);
+      }
+      cout<<endl;
     }
-    cout<<endl;
   }
 
   // Recurse
