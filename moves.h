@@ -2,6 +2,8 @@
 #pragma once
 
 #include "board.h"
+#include <other/core/math/integer_log.h>
+#include <other/core/math/popcount.h>
 namespace pentago {
 
 // We declare the move listing code as a huge macro in order to use it in multiple functions while taking advantage of gcc's variable size arrays.
@@ -9,10 +11,10 @@ namespace pentago {
 #define QR0(s,q,dir) rotations[quadrant(side##s,q)][dir]
 #define QR1(s,q) {QR0(s,q,0),QR0(s,q,1)}
 #define QR2(s) {QR1(s,0),QR1(s,1),QR1(s,2),QR1(s,3)}
-#define COUNT_MOVES(stride,q,qpp) \
+#define COUNT_MOVES(q,qpp) \
   const int offset##q  = move_offsets[quadrant(filled,q)]; \
   const int count##q   = move_offsets[quadrant(filled,q)+1]-offset##q; \
-  const int total##qpp = total##q + stride*count##q;
+  const int total##qpp = total##q + 8*count##q;
 #define MOVE_QUAD(q,qr,dir,i) \
   quadrant_t side0_quad##i, side1_quad##i; \
   if (qr!=i) { \
@@ -47,7 +49,7 @@ namespace pentago {
   /* Count the number of moves in each quadrant */ \
   const side_t filled = side0|side1; \
   const int total0 = 0; \
-  COUNT_MOVES(8,0,1) COUNT_MOVES(8,1,2) COUNT_MOVES(8,2,3) COUNT_MOVES(8,3,4) \
+  COUNT_MOVES(0,1) COUNT_MOVES(1,2) COUNT_MOVES(2,3) COUNT_MOVES(3,4) \
   int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
   /* Collect the list of all possible moves.  Note that we repack with the sides */ \
   /* flipped so that it's still player 0's turn. */ \
@@ -55,17 +57,15 @@ namespace pentago {
   COLLECT_MOVES(0) COLLECT_MOVES(1) COLLECT_MOVES(2) COLLECT_MOVES(3)
 
 // Same as MOVES, but ignores rotations and operates in unpacked mode
-#define SIMPLE_COLLECT_MOVES(q) \
-  for (int i=0;i<count##q;i++) \
-    moves[total##q+i] = side0|(side_t)move_flat[offset##q+i]<<16*q;
 #define SIMPLE_MOVES(side0,side1) \
-  /* Count the number of moves in each quadrant */ \
-  const side_t filled = side0|side1; \
-  const int total0 = 0; \
-  COUNT_MOVES(1,0,1) COUNT_MOVES(1,1,2) COUNT_MOVES(1,2,3) COUNT_MOVES(1,3,4) \
-  int total = total4; /* Leave mutable to allow in-place pruning of the list */ \
+  side_t _move_mask = 0x01ff01ff01ff01ff^(side0|side1); \
+  int total = popcount(_move_mask); \
   /* Collect the list of possible moves.  Note that only side0 changes */ \
   side_t moves[total]; \
-  SIMPLE_COLLECT_MOVES(0) SIMPLE_COLLECT_MOVES(1) SIMPLE_COLLECT_MOVES(2) SIMPLE_COLLECT_MOVES(3)
+  for (int i=0;i<total;i++) { \
+    side_t move = min_bit(_move_mask); \
+    moves[i] = side0|move; \
+    _move_mask ^= move; \
+  }
 
 }

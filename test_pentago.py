@@ -41,20 +41,27 @@ def test_known():
     if i==0:
       assert inv_parse_move(before,turn,after)==move
 
-def test_moves():
-  assert len(all_moves)==36*8
+def move_test(simple):
   random.seed(73120)
   for _ in xrange(2):
     board = randboard()
     turn = randint(2)
-    mv = moves(board,turn)
+    mv = moves(board,turn,simple=simple)
     mv2 = []
-    for m in all_moves:
+    for m in all_simple_moves if simple else all_moves:
       try:
-        mv2.append(parse_move(board,turn,m))
+        mv2.append(parse_move(board,turn,m,simple=simple))
       except ValueError:
         pass
     assert sorted(mv)==sorted(mv2)
+
+def test_moves():
+  assert len(all_moves)==36*8
+  move_test(0)
+
+def test_simple_moves():
+  assert len(all_simple_moves)==36
+  move_test(1)
 
 def win_test(rotated):
   verbose = 0
