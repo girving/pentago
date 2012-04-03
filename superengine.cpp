@@ -24,6 +24,7 @@ namespace {
 // is an immediate win for either player.
 template<bool black> super_t super_evaluate_recurse(int depth, side_t side0, side_t side1, super_t important) {
   STAT(expanded_nodes++);
+  PRINT_STATS(24);
 
   // Pretend we automatically win for all unimportant moves
   super_t wins = ~important;

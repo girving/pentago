@@ -161,7 +161,7 @@ def play(board,turn,sides,depth,early_exit=False,simple=False):
       ms = inv_parse_move(board,turn,next,simple=simple)
       d,value = divmod(result,4)
       print "move '%s', depth %d, score %d (%s)"%(ms,d,value-1,('win for '+'01'[turn^(value<1)] if value!=1 else 'tie'))
-      print ', '.join('%s = %d'%(k,v) for k,v in engine.stats().items())
+      engine.print_stats()
       print 'total moves = %d'%sum(unpack(reduce_board(next))!=0)
       fr = (-1)**turn*(value-1)
       if final_result is not None:
