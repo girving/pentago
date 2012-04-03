@@ -8,15 +8,40 @@ from numpy import *
 import libpentago as engine
 from libpentago import *
 
+def is_super(board):
+  try:
+    board,rotation = board
+    return True
+  except:
+    return False
+
 def flip(board):
-  return pack((2*unpack(board))%3)
+  if is_super(board):
+    board,rotation = board 
+    return flip(board),rotation
+  return pack(unpack(board)^3)
 
 def flipto(board,turn):
   return flip(board) if turn else board
 
-def show_board(board):
-  table = unpack(board)
-  return '\n'.join('abcdef'[i]+'  '+''.join('_01'[table[j,5-i]] for j in xrange(6)) for i in xrange(6)) + '\n\n   123456'
+def reduce_board(board):
+  return rotate(*board) if is_super(board) else board
+
+def show_board(board,brief=False):
+  if is_super(board):
+    if brief:
+      board,rotation = board
+      return '%d,%d,%d,%d,%d'%((board,)+tuple(rotation))
+    else:
+      return show_board(rotate(*board))
+  elif brief:
+    return str(board)
+  else:
+    table = unpack(board)
+    return '\n'.join('abcdef'[i]+'  '+''.join('_01'[table[j,5-i]] for j in xrange(6)) for i in xrange(6)) + '\n\n   123456'
+
+def show_side(side):
+  return '\n'.join('abcdef'[5-y]+'  '+''.join('_0'[bool(side&1<<16*(x//3*2+y//3)+x%3*3+y%3)] for x in xrange(6)) for y in reversed(xrange(6))) + '\n\n   123456'
 
 def moves(board,turn,simple=False):
   return [flipto(m,1-turn) for m in (engine.simple_moves if simple else engine.moves)(flipto(board,turn))]
@@ -26,16 +51,24 @@ def lift(score):
   assert depth>=0 and 0<=value<=2, 'invalid score: depth %d, value %d'%(depth,value)
   return 4*(depth+1)+2-value
 
-def rotate(board,qx,qy,count):
-  count = (count%4+4)%4
-  table = unpack(board)
-  for i in xrange(count):
-    copy = table.copy()
-    for x in xrange(3):
-      for y in xrange(3):
-        copy[3*qx+x,3*qy+y] = table[3*qx+y,3*qy+2-x]
-    table = copy
-  return pack(table)
+def rotate(board,*args):
+  '''Usage: either rotate(board,qx,qy,count) or rotate(board,tuple)'''
+  if len(args)==1:
+    for x in 0,1:
+      for y in 0,1:
+        board = rotate(board,x,y,args[0][2*x+y])
+    return board
+  else:
+    qx,qy,count = args
+    count = (count%4+4)%4
+    table = unpack(board)
+    for i in xrange(count):
+      copy = table.copy()
+      for x in xrange(3):
+        for y in xrange(3):
+          copy[3*qx+x,3*qy+y] = table[3*qx+y,3*qy+2-x]
+      table = copy
+    return pack(table)
 
 move_pattern = re.compile(r'^\s*([abcdef])([123456])\s*([ul])([lr])\s*([lr])\s*$')
 simple_move_pattern = re.compile(r'^\s*([abcdef])([123456])\s*$')
@@ -64,6 +97,8 @@ def parse_move(board,turn,move,simple=False):
 all_moves = ['%s%s %s%s %s'%(i,j,qi,qj,d) for i in 'abcdef' for j in '123456' for qi in 'ul' for qj in 'lr' for d in 'lr']
 all_simple_moves = ['%s%s'%(i,j) for i in 'abcdef' for j in '123456']
 def inv_parse_move(board,turn,next,simple=False):
+  board = reduce_board(board)
+  next = reduce_board(next)
   for m in all_simple_moves if simple else all_moves:
     try:
       if parse_move(board,turn,m,simple)==next:
@@ -74,11 +109,15 @@ def inv_parse_move(board,turn,next,simple=False):
 
 def move(board,turn,depth,rand=True,simple=False):
   '''Returns (next,score), where next is the board position moved to and score = depth<<2 | 0 (loss), 1 (tie), or 2 (win).'''
-  nexts = (engine.simple_moves if simple else engine.moves)(flipto(board,turn))
+  if is_super(board):
+    results = engine.super_evaluate_children(depth,*flipto(board,turn))
+    nexts = results.keys()
+  else:
+    nexts = (engine.simple_moves if simple else engine.moves)(flipto(board,turn))
   assert len(nexts)
   options = []
   for next in nexts:
-    score = lift((engine.simple_evaluate if simple else engine.evaluate)(depth-1,next))
+    score = results[next] if is_super(board) else lift((engine.simple_evaluate if simple else engine.evaluate)(depth-1,next))
     assert score//4>=depth, 'unexpected evaluation: depth %d, value %d, expected depth %d'%(score//4,score&3,depth)
     if not options or (options[0][0]&3)<(score&3):
       options = [(score,next)]
@@ -88,17 +127,17 @@ def move(board,turn,depth,rand=True,simple=False):
       options.append((score,next))
   score,next = options[random.randint(len(options)) if rand else 0]
   return flipto(next,1-turn),score
- 
+
 def play(board,turn,sides,depth,early_exit=False,simple=False):
   first = turn
   positions = []
   final_result = None
   while 1:
     positions.append(board)
-    header = 'board = %d, turn = %d'%(board,turn)
+    header = 'board = %s, turn = %d'%(show_board(board,brief=1),turn)
     print '\n%s\n%s'%('-'*len(header),header)
     print '\n'+show_board(board)
-    s = (rotated_status if simple else status)(board)
+    s = (rotated_status if simple else status)(reduce_board(board))
     if s:
       print {1:'win for 0',2:'win for 1',3:'simultaneous win (tie)'}[s]
       if simple and not status(board):
@@ -117,12 +156,13 @@ def play(board,turn,sides,depth,early_exit=False,simple=False):
       break
     if turn in sides:
       engine.clear_stats()
+      print 'search depth %d'%depth
       next,result = move(board,turn,depth,simple=simple)
       ms = inv_parse_move(board,turn,next,simple=simple)
       d,value = divmod(result,4)
       print "move '%s', depth %d, score %d (%s)"%(ms,d,value-1,('win for '+'01'[turn^(value<1)] if value!=1 else 'tie'))
       print ', '.join('%s = %d'%(k,v) for k,v in engine.stats().items())
-      print 'total moves = %d'%sum(unpack(next)!=0)
+      print 'total moves = %d'%sum(unpack(reduce_board(next))!=0)
       fr = (-1)**turn*(value-1)
       if final_result is not None:
         assert final_result==fr

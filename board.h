@@ -66,4 +66,6 @@ extern bool black_to_move(board_t board);
 // Throw ValueError if a board is invalid
 extern void check_board(board_t board);
 
+extern board_t standardize(board_t board);
+
 }
