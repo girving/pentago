@@ -1,6 +1,7 @@
 // Core tree search engine abstracted over rotations
 
 #include "score.h"
+#include "sort.h"
 #include "stat.h"
 #include "moves.h"
 #include "superscore.h"
@@ -56,6 +57,28 @@ template<bool black> super_t super_evaluate_recurse(int depth, side_t side0, sid
       if (!~wins) // If we always win, we're done
         goto done;
     }
+
+    // Check how close we are to do a black win, pretending that black gets to choose the rotation arbitrarily
+    int order[total]; // We'll sort moves in ascending order of this array
+    for (int i=total-1;i>=0;i--) {
+      int closeness = black?arbitrarily_rotated_win_closeness(moves[i],side1)
+                           :arbitrarily_rotated_win_closeness(side1,moves[i]);
+      int distance = 6-(closeness>>16);
+      if (distance==6 || distance>(depth-black)/2) { // We can't reach a black win within the given search depth
+        if (!black) {
+          STAT(distance_prunes++);
+          wins = ~super_t(0);
+          goto done;
+        } else {
+          swap(moves[i],moves[total-1]);
+          swap(order[i],order[--total]);
+        }
+      }
+      order[i] = black?-closeness:closeness;
+    }
+
+    // Sort moves based on order
+    insertion_sort(moves,order,total);
 
     // Are we out of recursion depth?
     if (depth==1)

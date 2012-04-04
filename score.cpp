@@ -20,6 +20,7 @@ using namespace other;
 
 #define ROTATED_DISTANCES(i) DISTANCES(rotated_win_distances,i)
 #define UNROTATED_DISTANCES(i) DISTANCES(unrotated_win_distances,i)
+#define ARBITRARILY_ROTATED_DISTANCES(i) DISTANCES(arbitrarily_rotated_win_distances,i)
 
 #define SLOW_MIN_DISTANCE(d,fields,width) ({ \
   int md = 6; \
@@ -72,8 +73,9 @@ int rotated_win_closeness(side_t black, side_t white) {
   return ((6-min_distance)<<16)+count;
 }
 
-// Same as above, except using unrotated_win_distances instead of rotated_win_distances (and therefore using 2 subfields instead of 4)
-int unrotated_win_closeness(side_t black, side_t white) {
+// Same as above, except using unrotated_win_distances or arbitrarily_rotated instead of rotated_win_distances (and therefore using 2 subfields instead of 4)
+template<bool rotated> static int win_closeness(side_t black, side_t white) OTHER_ALWAYS_INLINE;
+template<bool rotated> static int win_closeness(side_t black, side_t white) {
   // Transpose into packed quadrants
   const quadrant_t q0 = pack(quadrant(black,0),quadrant(white,0)),
                    q1 = pack(quadrant(black,1),quadrant(white,1)),
@@ -81,8 +83,8 @@ int unrotated_win_closeness(side_t black, side_t white) {
                    q3 = pack(quadrant(black,3),quadrant(white,3));
   // Compute all distances
   const uint64_t each = 0x1111111111111111; // sum_{i<16} 1<<4*i
-  const uint64_t d0 = UNROTATED_DISTANCES(0), // Each of these contains 16 4-bit distances in [0,6]
-                 d1 = UNROTATED_DISTANCES(1);
+  const uint64_t d0 = rotated?ARBITRARILY_ROTATED_DISTANCES(0):UNROTATED_DISTANCES(0), // Each of these contains 16 4-bit distances in [0,6]
+                 d1 = rotated?ARBITRARILY_ROTATED_DISTANCES(1):UNROTATED_DISTANCES(1);
   #undef DISTANCES
   // Determine minimum distance
   #define FIELDWISE_MIN(d0,d1) ({ \
@@ -112,6 +114,14 @@ int unrotated_win_closeness(side_t black, side_t white) {
   return ((6-min_distance)<<16)+count;
 }
 
+int unrotated_win_closeness(side_t black, side_t white) {
+  return win_closeness<false>(black,white);
+}
+
+int arbitrarily_rotated_win_closeness(side_t black, side_t white) {
+  return win_closeness<true>(black,white);
+}
+
 static int rotated_win_closeness_py(board_t board) {
   check_board(board);
   return rotated_win_closeness(unpack(board,0),unpack(board,1));
@@ -120,6 +130,11 @@ static int rotated_win_closeness_py(board_t board) {
 static int unrotated_win_closeness_py(board_t board) {
   check_board(board);
   return unrotated_win_closeness(unpack(board,0),unpack(board,1));
+}
+
+static int arbitrarily_rotated_win_closeness_py(board_t board) {
+  check_board(board);
+  return arbitrarily_rotated_win_closeness(unpack(board,0),unpack(board,1));
 }
 
 static int status_py(board_t board) {
@@ -132,6 +147,23 @@ static int rotated_status(board_t board) {
   return rotated_won(unpack(board,0))?1:0;
 }
 
+// For testing purposes only: extremely slow, and checks only one side
+static int arbitrarily_rotated_status(board_t board) {
+  check_board(board);
+  const side_t side = unpack(board,0);
+  quadrant_t rotated[4][4];
+  for (int q=0;q<4;q++) {
+    rotated[q][0] = quadrant(side,q);
+    for (int i=0;i<3;i++)
+      rotated[q][i+1] = rotations[rotated[q][i]][0];
+  }
+  for (int r0=0;r0<4;r0++) for (int r1=0;r1<4;r1++) for (int r2=0;r2<4;r2++) for (int r3=0;r3<4;r3++) {
+    side_t rside = quadrants(rotated[0][r0],rotated[1][r1],rotated[2][r2],rotated[3][r3]);
+    if (won(rside))
+      return 1;
+  }
+  return 0;
+}
 
 }
 using namespace pentago;
@@ -141,5 +173,7 @@ void wrap_score() {
   function("status",status_py);
   function("rotated_win_closeness",rotated_win_closeness_py);
   function("unrotated_win_closeness",unrotated_win_closeness_py);
+  function("arbitrarily_rotated_win_closeness",arbitrarily_rotated_win_closeness_py);
   OTHER_FUNCTION(rotated_status)
+  OTHER_FUNCTION(arbitrarily_rotated_status)
 }

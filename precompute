@@ -137,7 +137,7 @@ def if_(c,a,b):
 
 @cache
 def unrotated_win_distances():
-  # Work out the various ways of winning, allowing no rotations
+  # Work out the various ways of winning
   patterns = win_patterns().reshape(2,16)
 
   # Precompute small popcounts
@@ -149,7 +149,6 @@ def unrotated_win_distances():
   # fit 16 patterns into each of 2 64-bit ints
   table = zeros((4,3**9,2),int64) # indexed by quadrant,position,word
   unpack_ = unpack()
-  rotations_ = rotations()
   for i,pats in enumerate(patterns):
     for j,pat in enumerate(pats):
       for q in xrange(4):
@@ -160,6 +159,39 @@ def unrotated_win_distances():
         table[q,b,i] |= d<<4*j
   assert ahash(table)==8251429364477897294
   return [('uint64_t','unrotated_win_distances','0x%xL',table)]
+
+@cache
+def arbitrarily_rotated_win_distances():
+  # Work out the various ways of winning, allowing arbitrarily many rotations
+  patterns = win_patterns().reshape(2,16)
+
+  # Precompute table of multistep rotations
+  rotate = empty((512,4),int16)
+  rotate[:,0] = arange(512)
+  for i in xrange(3):
+    rotate[:,i+1] = rotations()[rotate[:,i],0]
+
+  # Precompute small popcounts
+  count = small_popcounts()
+
+  # Generate a distance table giving the total number of moves required for player 0 (black) to
+  # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
+  # has 3 bits (for 0,1,2,3 or 4=infinity) plus an extra 0 bit to stop carries at runtime, so we
+  # fit 16 patterns into each of 2 64-bit ints
+  table = zeros((4,3**9,2),int64) # indexed by quadrant,position,word
+  unpack_ = unpack()
+  for i,pats in enumerate(patterns):
+    for j,pat in enumerate(pats):
+      for q in xrange(4):
+        b = arange(3**9)
+        s0,s1 = unpack_[b].T
+        s0 = rotate[s0,:]
+        s1 = rotate[s1,:]
+        qp = (pat>>16*q)&0x1ff
+        d = (if_(s1&qp,4,count[qp&~s0])).min(axis=-1)
+        table[q,b,i] |= d<<4*j
+  assert ahash(table)==-3594567715319576186
+  return [('uint64_t','arbitrarily_rotated_win_distances','0x%xL',table)]
 
 @cache
 def rotated_win_distances():
@@ -358,6 +390,7 @@ if __name__=='__main__':
                +show_win_contributions()
                +rotated_win_contributions()
                +unrotated_win_distances()
+               +arbitrarily_rotated_win_distances()
                +rotated_win_distances()
                +show_rotations()
                +reflections()

@@ -87,4 +87,7 @@ extern int rotated_win_closeness(side_t black, side_t white) OTHER_CONST;
 // Same as above, except allowing no rotations whatsoever.
 extern int unrotated_win_closeness(side_t black, side_t white) OTHER_CONST;
 
+// Same as above, but allow arbitrarily many rotations
+extern int arbitrarily_rotated_win_closeness(side_t black, side_t white) OTHER_CONST;
+
 }

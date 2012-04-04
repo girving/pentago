@@ -27,12 +27,11 @@ static void clear_stats() {
 
 void print_stats() {
   double time = get_current_time();
-  cout << "expanded nodes = "<<expanded_nodes
-       << ", total_lookups = "<<total_lookups
-       << ", successful_lookups = "<<successful_lookups
-       << ", distance_prunes = "<<distance_prunes
-       << ", nodes/second = "<<expanded_nodes/(time-start_time)
-       << endl;
+  cout << "expanded nodes = "<<expanded_nodes;
+  if (total_lookups) cout << ", total lookups = "<<total_lookups;
+  if (successful_lookups) cout << ", successful lookups = "<<successful_lookups;
+  if (distance_prunes) cout << ", distance prunes = "<<distance_prunes;
+  cout << ", nodes/second = "<<uint64_t(expanded_nodes/(time-start_time))<<endl;
 }
 
 static unordered_map<string,Ref<> > stats() {
@@ -43,7 +42,7 @@ static unordered_map<string,Ref<> > stats() {
   ST(total_lookups)
   ST(successful_lookups)
   ST(distance_prunes)
-  stats.insert(make_pair(string("nodes/second"),steal_ref_check(to_python(expanded_nodes/(time-start_time)))));
+  stats.insert(make_pair(string("nodes/second"),steal_ref_check(to_python(uint64_t(expanded_nodes/(time-start_time))))));
   return stats;
 }
 

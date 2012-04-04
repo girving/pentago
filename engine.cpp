@@ -3,6 +3,7 @@
 #include "board.h"
 #include "score.h"
 #include "moves.h"
+#include "sort.h"
 #include "stat.h"
 #include "table.h"
 #include <other/core/python/module.h>
@@ -149,19 +150,8 @@ template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, si
       order[i] = black?-closeness:closeness;
     }
 
-    // Insertion sort moves based on order
-    for (int i=1;i<total;i++) {
-      const side_t move = moves[i];
-      const int key = order[i];
-      int j = i-1;
-      while (j>=0 && order[j]>key) {
-        moves[j+1] = moves[j];
-        order[j+1] = order[j];
-        j--;
-      }
-      moves[j+1] = move;
-      order[j+1] = key;
-    }
+    // Sort moves based on order
+    insertion_sort(moves,order,total);
 
     // Optionally print out move ordering information
     if (0) {

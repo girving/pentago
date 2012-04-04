@@ -5,6 +5,7 @@
 #include <other/core/array/Array.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
+#include <other/core/utility/interrupts.h>
 #include <cmath>
 namespace pentago {
 
@@ -104,6 +105,10 @@ void super_win_test(int steps) {
         if (won(rside)!=wins(r0,r1,r2,r3))
           throw AssertionError(format("side %lld, rside %lld, r %d %d %d %d, correct %d, incorrect %d",side,rside,r0,r1,r2,r3,won(rside),wins(r0,r1,r2,r3)));
       }
+
+      // Is the user impatient?
+      if (!(step&1023))
+        check_interrupts();
     }
   }
 }
@@ -128,6 +133,10 @@ void super_rmax_test(int steps) {
         o |= s(vec(r0,r1,r2,r3)+r);
       OTHER_ASSERT(rs(r0,r1,r2,r3)==o);
     }
+
+    // Is the user impatient?
+    if (!(step&1023))
+      check_interrupts();
   }
 }
 
