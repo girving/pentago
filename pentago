@@ -16,6 +16,7 @@ seed = PropManager.add('seed',711170497).set_help('random seed (default %default
 record = PropManager.add('record','').set_help('append random game records to the given file')
 start = PropManager.add('start','0,0').set_help('comma separated starting board (and optional rotation vector) and turn')
 manual = PropManager.add('manual',-1).set_abbrev('m').set_help('play the given side manually')
+limit = PropManager.add('limit',36).set_help('limit black\' choices to the given number of moves')
 engine_type = PropManager.add('engine','normal').set_allowed('normal simple super'.split()).set_help('engine variant')
 parser.parse('Pentago solver',positional=[engine_type])
 
@@ -40,6 +41,7 @@ else:
   rotation = start[1:5] if len(start)==6 else zeros(4,int32)
   if engine_type()=='super':
     board = board,rotation
+    engine.set_super_move_limit(limit()) 
   else:
     board = rotate(board,rotation)
   assert turn in (0,1)

@@ -20,6 +20,14 @@ using namespace other;
 
 namespace {
 
+// Limit blacks options to the given number of moves (chosen after move ordering)
+int super_move_limit = 36;
+
+void set_super_move_limit(int limit) {
+  OTHER_ASSERT(limit>0);
+  super_move_limit = limit;
+}
+
 // Evaluate a position for all important rotations, returning the set of rotations in which we win.
 // Note that a "win" for white includes ties.  We maintain the invariant that no important rotation
 // is an immediate win for either player.
@@ -77,12 +85,16 @@ template<bool black> super_t super_evaluate_recurse(int depth, side_t side0, sid
       order[i] = black?-closeness:closeness;
     }
 
-    // Sort moves based on order
-    insertion_sort(moves,order,total);
-
     // Are we out of recursion depth?
     if (depth==1)
       goto done;
+
+    // Sort moves based on order
+    insertion_sort(moves,order,total);
+
+    // Optionally limit black's choices
+    if (black)
+      total = min(total,super_move_limit);
 
     // Recurse
     for (int i=0;i<total;i++) {
@@ -186,4 +198,5 @@ using namespace other::python;
 void wrap_superengine() {
   OTHER_FUNCTION(super_evaluate)
   OTHER_FUNCTION(super_evaluate_children)
+  OTHER_FUNCTION(set_super_move_limit)
 }
