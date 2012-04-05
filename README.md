@@ -12,7 +12,7 @@ For the rules of pentago, see http://en.wikipedia.org/wiki/Pentago.
 The core engine is written in C++ and exposed to Python as an extension module.
 The rest of the code (tests, interface, etc.) is in Python.  The single direct
 dependency is on the Otherlab core libraries (`other`).  Unfortunately, while the
-used portion of `other may be open source at some point, it is not publically
+used portion of `other` may be open source at some point, it is not publically
 available at this time.
 
 ### Usage
