@@ -142,7 +142,7 @@ struct super_t {
   static super_t singleton(uint8_t r) {
     uint8_t hi = r>>6;
     uint64_t chunk = (uint64_t)1<<(r&63);
-    return super_t(other::pack(hi==0?chunk:0,hi==1?chunk:0),other::pack(hi==2?chunk:0,hi==3?chunk:0));
+    return super_t(hi==0?chunk:0,hi==1?chunk:0,hi==2?chunk:0,hi==3?chunk:0);
   }
 
   static super_t singleton(int i0,int i1,int i2,int i3) {
