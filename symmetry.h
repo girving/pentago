@@ -46,6 +46,10 @@ struct symmetry_t {
     return symmetry_t(gi,commute_global_local_symmetries[gi][li]);
   }
 
+  operator SafeBool() const {
+    return safe_bool(global||local);
+  }
+
   bool operator==(symmetry_t s) const {
     return global==s.global && local==s.local;
   }
@@ -66,10 +70,10 @@ side_t transform_side(symmetry_t s, side_t side) OTHER_CONST;
 board_t transform_board(symmetry_t s, board_t board) OTHER_CONST;
 
 // Let B be the set of boards, and A \subset B a subset of boards invariant to global transforms
-// (b in A iff g(b) in A for g in D_4).  Define the super operator SA : B -> 2^L by
-// SA(b) = {x in L | x(b) in A}.  We want symmetries to act on 2^L s.t. s(SA(b)) = SA(s(b)).
-// let s = gy for g in D_4, y in L.  Given C in 2^L s.t. C = SA(b), we have 
-//   x in s(C) iff x in s(SA(b)) = SA(s(b))
+// (b in A iff g(b) in A for g in D_4).  Define the super operator f : B -> 2^L by
+// f(b) = {x in L | x(b) in A}.  We want symmetries to act on 2^L s.t. s(f(b)) = f(s(b)).
+// let s = gy for g in D_4, y in L.  Given C in 2^L s.t. C = f(b), we have 
+//   x in s(C) iff x in s(f(b)) = f(s(b))
 //             iff x(s(b)) = (xgy)(b) = g(g'xg)y(b) in A iff (g'xgy)(b) in A
 //             iff g'xgy in C
 // Thus, we define
