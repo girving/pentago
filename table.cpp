@@ -15,18 +15,6 @@ using std::ostream;
 using std::cout;
 using std::endl;
 
-static inline uint64_t hash_board(board_t key) {
-  // Invertible hash function from http://www.concentric.net/~ttwang/tech/inthash.htm
-  key = (~key) + (key << 21); // key = (key << 21) - key - 1;
-  key = key ^ (key >> 24);
-  key = (key + (key << 3)) + (key << 8); // key * 265
-  key = key ^ (key >> 14);
-  key = (key + (key << 2)) + (key << 4); // key * 21
-  key = key ^ (key >> 28);
-  key = key + (key << 31);
-  return key;
-}
-
 // The inverse of hash_board (for testing purposes)
 static inline uint64_t inverse_hash_board(uint64_t key) {
   uint64_t tmp;
@@ -76,7 +64,7 @@ void init_table(int bits) {
     throw ValueError(format("bits = %d is too small, the high order hash bits won't fit",bits));
   table_bits = bits;
   cout << "initializing table: bits = "<<bits<<", size = "<<pow(2.,double(bits-20+3))<<"MB"<<endl;
-  Array<uint64_t>((uint64_t)1<<bits).swap(table);
+  table = Array<uint64_t>(); // Allocate memory lazily in set_table_type
   table_type = blank_table;
 }
 
@@ -94,9 +82,15 @@ void set_table_type(table_type_t type) {
     table_type = type;
   if (table_type!=type)
     throw RuntimeError(format("transposition table already set to type %s, must reinitialize before changing to type %s",str(table_type),str(type)));
+
+  // Allocate table if we haven't already
+  OTHER_ASSERT(!table.size() || table.size()==(uint64_t)1<<table_bits);
+  if (!table.size())
+    table = Array<uint64_t>((uint64_t)1<<table_bits);
 }
 
 score_t lookup(board_t board) {
+  assert(table_type!=blank_table);
   STAT(total_lookups++);
   uint64_t h = hash_board(board);
   uint64_t entry = table[h&((1<<table_bits)-1)];
@@ -108,6 +102,7 @@ score_t lookup(board_t board) {
 }
 
 void store(board_t board, score_t score) {
+  assert(table_type!=blank_table);
   uint64_t h = hash_board(board);
   uint64_t& entry = table[h&((1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
@@ -115,8 +110,9 @@ void store(board_t board, score_t score) {
 }
 
 Tuple<Array<board_t>,Array<score_t> > read_table(int max_count, int min_depth) {
-  OTHER_ASSERT(table_bits>=10);
+  OTHER_ASSERT(table_bits>=10 && table_type!=blank_table);
   const uint64_t size = (1<<table_bits)-1;
+  OTHER_ASSERT(table.size()==size);
   Array<board_t> boards;
   Array<score_t> scores;
   for (uint64_t h=0;h<size;h++) {
