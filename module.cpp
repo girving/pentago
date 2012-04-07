@@ -11,4 +11,6 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(engine)
   OTHER_WRAP(superengine)
   OTHER_WRAP(superscore)
+  OTHER_WRAP(symmetry)
+  OTHER_WRAP(all_boards)
 }

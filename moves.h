@@ -58,7 +58,7 @@ namespace pentago {
 
 // Same as MOVES, but ignores rotations and operates in unpacked mode
 #define SIMPLE_MOVES(side0,side1) \
-  side_t _move_mask = 0x01ff01ff01ff01ff^(side0|side1); \
+  side_t _move_mask = side_mask^(side0|side1); \
   int total = popcount(_move_mask); \
   /* Collect the list of possible moves.  Note that only side0 changes */ \
   side_t moves[total]; \

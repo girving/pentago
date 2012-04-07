@@ -231,17 +231,16 @@ def rotated_win_distances():
 
 @cache
 def reflections():
-  table = zeros((512,2),dtype=int16)
+  table = zeros(512,dtype=int16)
   for v in xrange(512):
-    rx,ry = 0,0
+    r = 0
     for x in xrange(3):
       for y in xrange(3):
         if v&qbit(x,y):
-          rx |= qbit(2-x,y)
-          ry |= qbit(x,2-y)
-    assert popcount(v)==popcount(rx)==popcount(ry)
-    table[v] = rx,ry
-  assert ahash(table)==5787381149236214080
+          r |= qbit(2-y,2-x) # Reflect about x = y line
+    assert popcount(v)==popcount(r)
+    table[v] = r
+  assert ahash(table)==-2942482400364239360
   return [('uint16_t','reflections','0x%x',table)]
 
 '''There are 3**9 = 19683 possible states in each quadrant.  3**9 < 2**16, so we can store
@@ -322,7 +321,7 @@ def superwin_info():
   patterns = [p.split() for p in patterns.split('|')]
   info = zeros((4,512,5,4,4,4,4),bool)
   for pattern in patterns:
-    debug = pattern=='- dh dh da'.split()
+    debug = False # pattern=='- dh dh da'.split()
     if debug: b = [0,136,50,64]
     assert len(pattern)==4
     used   = [i for i in xrange(4) if pattern[i]!='-']
@@ -353,6 +352,101 @@ def superwin_info():
   info = packbits(info.astype(int8).swapaxes(-4,-1).swapaxes(-3,-2).reshape(-1,8)[:,::-1]).view(uint64).reshape(4,512,5,4)
   assert ahash(info)==-6962575331390442688
   return [('uint64_t','superwin_info','0x%xL',info)]
+
+@cache
+def commute_global_local_symmetries():
+  # Represent the various symmetries as subgroups of S_{6*6}
+  n = arange(6)
+  identity = empty((6,6,2),int8)
+  identity[:,:,0] = n.reshape(-1,1)
+  identity[:,:,1] = n.reshape(1,-1)
+  reflect = identity[n[::-1].reshape(1,-1),n[::-1].reshape(-1,1)]
+  assert all(reflect[0,0]==[5,5])
+  assert all(reflect[5,0]==[5,0])
+  gr = identity[n[::-1].reshape(1,-1),n.reshape(-1,1)]
+  assert all(gr[0,0]==[5,0])
+  assert all(gr[5,0]==[5,5])
+  lr = asarray([identity.copy() for q in xrange(4)])
+  n = arange(3)
+  for qx in 0,1:
+    for qy in 0,1:
+      q = 2*qx+qy
+      lq = lr[q,3*qx:,3*qy:][:3,:3]
+      lq[:] = lq[n[::-1].reshape(1,-1),n.reshape(-1,1)]
+      assert all(lr[q,3*qx,3*qy]==[3*qx+2,3*qy])
+      assert all(lr[q,3*qx+2,3*qy]==[3*qx+2,3*qy+2])
+
+  # Flattten everything from S_{6*6} to S_36
+  def flatten(p):
+    return (6*p[...,0]+p[...,1]).reshape(*(p.shape[:-3]+(36,)))
+  identity = flatten(identity)
+  reflect = flatten(reflect)
+  gr = flatten(gr)
+  lr = flatten(lr)
+  for f in identity,reflect:
+    assert all(f[f]==identity)
+  for r in (gr,)+tuple(lr):
+    assert all(r[r[r[r]]]==identity)
+
+  # Construct local rotation group
+  def powers(g):
+    p = empty((4,36),int)
+    p[0] = identity
+    for i in xrange(3):
+      p[i+1] = g[p[i]]
+    return p
+  plr = asarray(map(powers,lr))
+  local = empty((4,4,4,4,36),int)
+  for i0 in xrange(4):
+    for i1 in xrange(4):
+      for i2 in xrange(4):
+        for i3 in xrange(4):
+          local[i0,i1,i2,i3] = plr[0,i0,plr[1,i1,plr[2,i2,plr[3,i3]]]]
+  local = local.reshape(256,36)
+  # Verify commutativity
+  prod = local[:,local]
+  assert all(prod==prod.swapaxes(0,1))
+
+  # Construct global rotation group
+  globe = empty((2,4,36),int)
+  globe[0] = powers(gr)
+  for i in xrange(4):
+    globe[1,i] = reflect[globe[0,i]]
+  globe = globe.reshape(8,36)
+  inv_globe = empty_like(globe)
+  for i in xrange(8):
+    inv_globe[i,globe[i]] = identity
+
+  # Compute conjugations
+  def inv(p):
+    ip = empty_like(p)
+    ip[p] = identity
+    return ip
+  i = arange(8).reshape(-1,1)
+  j = arange(256).reshape(1,-1)
+  conjugations = asarray([inv(g)[local[:,g]] for g in globe])
+
+  # Generate lookup table
+  table = all(conjugations==local.reshape(-1,1,1,36),axis=-1).argmax(axis=0)
+  assert table.shape==(8,256)
+  assert ahash(table)==4955614325833109504
+  return [('uint8_t','commute_global_local_symmetries','%d',table)]
+
+@cache
+def superstandardize_table():
+  # Given the relative rankings of the four quadrants, determine the global rotation that minimizes the board value
+  rotate = empty((4,4),int) 
+  rotate[0] = arange(4)
+  rotate[1] = [2,0,3,1]
+  rotate[2] = rotate[1,rotate[1]]
+  rotate[3] = rotate[2,rotate[1]]
+  def v(i):
+    shape = ones(5,int)
+    shape[i] = 4
+    return arange(4).reshape(*shape)
+  table = sum([v(i)*4**rotate[v(4),i] for i in xrange(4)]).argmin(axis=-1).T.ravel()
+  assert ahash(table)==-1406557380251171136
+  return [('uint8_t','superstandardize_table','%d',table)]
 
 def cpp_sizes(data):
   return ''.join('[%d]'%n for n in data.shape)
@@ -387,6 +481,8 @@ if __name__=='__main__':
   if not os.path.exists(prefix()):
     os.makedirs(prefix())
   save('tables',superwin_info()
+               +superstandardize_table()
+               +commute_global_local_symmetries()
                +show_win_contributions()
                +rotated_win_contributions()
                +unrotated_win_distances()

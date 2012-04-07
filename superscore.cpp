@@ -65,7 +65,7 @@ super_t super_wins(side_t side) {
 }
 
 // Written in C++ so that we can be more exhaustive without being annoyingly slow
-void super_win_test(int steps) {
+static void super_win_test(int steps) {
   // Determine the expected number of stones if we pick k stones with replacement
   Array<double> expected(32,false);
   for (int k=0;k<expected.size();k++)
@@ -90,7 +90,7 @@ void super_win_test(int steps) {
         side |= (side_t)1<<(16*(p%4)+p/4);
       }
       if (flip)
-        side ^= 0x01ff01ff01ff01ff;
+        side ^= side_mask;
 
       // Compare super_wins to won
       super_t wins = super_wins(side);
@@ -115,15 +115,19 @@ void super_win_test(int steps) {
 
 const Vector<int,4> single_rotations[8] = {vec(1,0,0,0),vec(-1,0,0,0),vec(0,1,0,0),vec(0,-1,0,0),vec(0,0,1,0),vec(0,0,-1,0),vec(0,0,0,1),vec(0,0,0,-1)};
 
-void super_rmax_test(int steps) {
+super_t random_super(Random& random) {
+  uint64_t r0 = random.bits<uint64_t>(),
+           r1 = random.bits<uint64_t>(),
+           r2 = random.bits<uint64_t>(),
+           r3 = random.bits<uint64_t>();
+  return super_t(other::pack(r0,r1),other::pack(r2,r3));
+}
+
+static void super_rmax_test(int steps) {
   Ref<Random> random = new_<Random>(1740291);
   for (int step=0;step<steps;step++) {
     // Generate a random super_t
-    uint32_t bits[4];
-    for (int i=0;i<4;i++)
-      bits[i] = random->bits();
-    super_t s; 
-    memcpy(&s,bits,sizeof(s));
+    super_t s = random_super(random);
 
     // Compare rmax with manual version
     super_t rs = rmax(s);
@@ -140,13 +144,29 @@ void super_rmax_test(int steps) {
   }
 }
 
-void super_bool_test() {
+static void super_bool_test() {
   OTHER_ASSERT(!super_t(0));
   for (int i0=0;i0<4;i0++) for (int i1=0;i1<4;i1++) for (int i2=0;i2<4;i2++) for (int i3=0;i3<4;i3++) {
     OTHER_ASSERT(super_t::singleton(i0,i1,i2,i3));
     for (int j0=0;j0<4;j0++) for (int j1=0;j1<4;j1++) for (int j2=0;j2<4;j2++) for (int j3=0;j3<4;j3++)
       OTHER_ASSERT(super_t::singleton(i0,i1,i2,i3)|super_t::singleton(j0,j1,j2,j3));
   }
+}
+
+ostream& operator<<(ostream& output, super_t s) {
+  for (int r3=0;r3<4;r3++) {
+    for (int r1=0;r1<4;r1++) {
+      output << (r1||r3?' ':'[');
+      for (int r2=0;r2<4;r2++) {
+        if (r2) output << ' ';
+        for (int r0=0;r0<4;r0++)
+          output << s(r0,r1,r2,r3);
+      }
+      output << (r1==3&&r3==3?']':'\n');
+      if (r1==3) output << '\n';
+    }
+  }
+  return output;
 }
 
 }

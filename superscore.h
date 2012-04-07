@@ -46,12 +46,14 @@ Given a state (u,a) in A*G,
 
 #include "board.h"
 #include <other/core/math/sse.h>
+#include <other/core/random/forward.h>
 #include <other/core/vector/Vector.h>
-#include <other/core/utility/config.h>
+#include <other/core/utility/safe_bool.h>
 #include <other/core/utility/safe_bool.h>
 namespace pentago {
 
 using namespace other;
+using std::ostream;
 
 // A subset of the rotation group Z_4^4 represented as a 256 bit mask.
 // A rotation by (i0,i1,i2,i3) of quadrants 0,1,2,3 corresponds to bit i0+4*(i1+4*(i2+4*i3))
@@ -70,12 +72,23 @@ struct super_t {
   super_t(__m128i x, __m128i y)
     : x(x), y(y) {}
 
+  super_t(uint64_t x0, uint64_t x1, uint64_t y0, uint64_t y1)
+    : x(other::pack(x0,x1)), y(other::pack(y0,y1)) {}
+
   static super_t identity() {
     return super_t(_mm_set1_epi32(1),_mm_set1_epi32(0));
   }
 
   operator SafeBool() const {
     return safe_bool(_mm_movemask_epi8(~_mm_cmpeq_epi32(x|y,_mm_setzero_si128()))!=0);
+  }
+
+  bool operator==(super_t s) const {
+    return !(*this^s);
+  }
+
+  bool operator!=(super_t s) const {
+    return *this^s;
   }
 
   super_t operator~() const {
@@ -90,6 +103,10 @@ struct super_t {
     return super_t(x&s.x,y&s.y);
   }
 
+  super_t operator^(super_t s) const {
+    return super_t(x^s.x,y^s.y);
+  }
+
   super_t operator|=(super_t s) {
     x |= s.x;
     y |= s.y;
@@ -102,22 +119,34 @@ struct super_t {
     return *this;
   }
 
-  // Do not use in performance critical code
+  super_t operator^=(super_t s) {
+    x ^= s.x;
+    y ^= s.y;
+    return *this;
+  }
+
+  // Do not use the following functions in performance critical code
+
+  bool operator()(uint8_t r) const {
+    return _mm_movemask_epi8(_mm_slli_epi16(r&128?y:x,7-(r&7)))>>(r>>3&15)&1;
+  }
+
   bool operator()(int i0,int i1,int i2,int i3) const {
-    const int r = (i0&3)+4*((i1&3)+4*((i2&3)+4*(i3&3)));
-    return (((const char*)this)[r>>3]>>(r&7))&1;
+    return (*this)((i0&3)+4*((i1&3)+4*((i2&3)+4*(i3&3))));
   }
 
   bool operator()(const Vector<int,4>& r) const {
     return (*this)(r.x,r.y,r.z,r.w);
   }
 
-  // Do not use in performance critical code
+  static super_t singleton(uint8_t r) {
+    uint8_t hi = r>>6;
+    uint64_t chunk = (uint64_t)1<<(r&63);
+    return super_t(other::pack(hi==0?chunk:0,hi==1?chunk:0),other::pack(hi==2?chunk:0,hi==3?chunk:0));
+  }
+
   static super_t singleton(int i0,int i1,int i2,int i3) {
-    const int r = (i0&3)+4*((i1&3)+4*((i2&3)+4*(i3&3)));
-    super_t s = 0;
-    ((char*)&s)[r>>3] |= 1<<(r&7);
-    return s;
+    return singleton((i0&3)+4*((i1&3)+4*((i2&3)+4*(i3&3))));
   }
 
   static super_t singleton(Vector<int,4> r) {
@@ -158,5 +187,9 @@ extern super_t super_wins(side_t side) OTHER_CONST;
 
 // Do not use in performance critical code
 extern const Vector<int,4> single_rotations[8];
+
+extern super_t random_super(Random& random);
+
+extern ostream& operator<<(ostream& output, super_t s);
 
 }

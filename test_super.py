@@ -21,7 +21,23 @@ def test_rmax():
 def test_bool():
   engine.super_bool_test()
 
+def test_group():
+  engine.group_test()
+
+def test_action():
+  engine.action_test(100000)
+
+def test_standardize():
+  engine.superstandardize_test(10000)
+
+def test_super_action():
+  engine.super_action_test(10000)
+
 if __name__=='__main__':
+  test_super_action()
+  test_standardize()
+  test_action()
+  test_group()
   test_wins()
   test_rmax()
   test_bool()

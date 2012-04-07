@@ -50,7 +50,7 @@ def list_book():
 def list_missing():
   keys = book.keys(strict=False)
   for n in xrange(stones()+1):
-    for board in all_boards(n):
+    for board in all_boards(n,False):
       if board not in keys: 
         print 'board %d, stones %d'%(board,n)
         if verbose():

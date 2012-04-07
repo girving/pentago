@@ -19,6 +19,9 @@ typedef uint64_t board_t;
 // broken into 4 quadrants, but each quadrant is packed in radix 2.
 typedef uint64_t side_t;
 
+// Bits that can be set in a valid side
+const side_t side_mask = 0x01ff01ff01ff01ff;
+
 // A single quadrant always fits into uint16_t, whether in radix 2 or 3.
 typedef uint16_t quadrant_t;
 
