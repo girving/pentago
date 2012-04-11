@@ -6,6 +6,7 @@
 #include "sort.h"
 #include "stat.h"
 #include "table.h"
+#include <other/core/math/min.h>
 #include <other/core/python/module.h>
 #include <other/core/utility/interrupts.h>
 namespace pentago {
@@ -30,7 +31,8 @@ inline score_t quick_evaluate(board_t board) {
 
 // Same as evaluate, but assume board status and transposition table have supplied no information.
 score_t evaluate_recurse(int depth, board_t board) {
-  STAT(expanded_nodes++);
+  STAT(total_expanded_nodes++);
+  STAT(expanded_nodes[depth]++);
   // Collect possible moves
   // board_t moves[total] = {...};
   MOVES(board)
@@ -83,6 +85,9 @@ score_t evaluate(int depth, board_t board) {
   check_board(board);
   set_table_type(normal_table);
 
+  // We don't need to search past the end of the game
+  depth = min(depth,36-popcount(unpack(board,0)|unpack(board,1)));
+
   // Exit immediately if possible
   score_t sc = quick_evaluate(board);
   if (sc>>2 >= depth)
@@ -103,7 +108,8 @@ template<bool black> inline score_t simple_quick_evaluate(side_t side0, side_t s
 
 // Evaluate position ignoring rotations and white five-in-a-row
 template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, side_t side1) {
-  STAT(expanded_nodes++);
+  STAT(total_expanded_nodes++);
+  STAT(expanded_nodes[depth]++);
 
   // Collect possible moves
   SIMPLE_MOVES(side0,side1)
@@ -191,6 +197,9 @@ score_t simple_evaluate(int depth, board_t board) {
   const side_t side0 = unpack(board,0),
                side1 = unpack(board,1);
   bool black = black_to_move(board);
+
+  // We don't need to search past the end of the game
+  depth = min(depth,36-popcount(side0|side1));
 
   // Exit immediately if possible
   score_t sc = black?simple_quick_evaluate<true>(side0,side1)

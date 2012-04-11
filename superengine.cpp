@@ -127,7 +127,8 @@ template<> struct results_t<true> {
 // Note that a "win" for white includes ties.  The returned set of known rotations definitely includes
 // all important rotations, but may include others as well.
 template<bool remember,bool black,bool debug> typename results_t<remember>::type super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important) {
-  STAT(expanded_nodes++);
+  STAT(total_expanded_nodes++);
+  STAT(expanded_nodes[depth]++);
   PRINT_STATS(24);
   superinfo_t& info = data.lookup.info;
   super_t possible = 0; // Keep track of possible wins that we might have missed
