@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "symmetry.h"
+#include "table.h"
 #include <other/core/array/NdArray.h>
 #include <other/core/math/popcount.h>
 #include <other/core/math/uint128.h>
@@ -38,9 +39,14 @@ static uint64_t count_boards(int n) {
   return choose(36,n)*choose(n,n/2);
 }
 
+template<int symmetries> static inline board_t maybe_standardize(board_t board);
+template<> inline board_t maybe_standardize<1>(board_t board) { return board; }
+template<> inline board_t maybe_standardize<8>(board_t board) { return standardize(board); }
+template<> inline board_t maybe_standardize<2048>(board_t board) { return superstandardize(board).x; }
+
 // List all standardized boards with n stones, assuming black plays first.
-// Symmetries are accounted for: global only if !super, global plus local if super.
-static Array<board_t> all_boards(int n, bool super) {
+// The symmetries are controls how many symmetries are taken into account: 1 for none, 8 for global, 2048 for super.
+template<int symmetries> static Array<board_t> all_boards_helper(int n) {
   OTHER_ASSERT(0<=n && n<=36);
   const uint32_t batch = 1000000;
   const bool verbose = false;
@@ -62,7 +68,7 @@ static Array<board_t> all_boards(int n, bool super) {
     for (int depth=0,next=0;;) {
       if (depth==n) {
         count++;
-        board_t standard = super?superstandardize(board).x:standardize(board);
+        board_t standard = maybe_standardize<symmetries>(board);
         if (black_board_set.set(standard)) {
           black_boards.append(standard);
           if (verbose && black_boards.size()%batch==0)
@@ -139,7 +145,7 @@ static Array<board_t> all_boards(int n, bool super) {
         for (int i=0;i<n;i++)
           if (subset&(uint64_t)1<<i)
             board += occupied[i];
-        board = super?superstandardize(board).x:standardize(board);
+        board = maybe_standardize<symmetries>(board);
         if (board_set.set(board)) {
           OTHER_ASSERT(   popcount(unpack(board,0))==n-white
                        && popcount(unpack(board,1))==white);
@@ -152,9 +158,29 @@ static Array<board_t> all_boards(int n, bool super) {
     }
   }
   const uint64_t count = count_boards(n);
-  const int symmetries = super?2048:8;
   OTHER_ASSERT((count+symmetries-1)/symmetries<=boards.size() && boards.size()<=count);
   return boards;
+}
+
+static Array<board_t> all_boards(int n, int symmetries) {
+  OTHER_ASSERT(symmetries==1 || symmetries==8 || symmetries==2048);
+  return symmetries==1?all_boards_helper<1>(n)
+        :symmetries==8?all_boards_helper<8>(n)
+          /* 2048 */  :all_boards_helper<2048>(n);
+}
+
+// Determine how many bits are needed to distinguish all the given boards
+static int distinguishing_hash_bits(RawArray<const board_t> boards) {
+  for (int bits=0;bits<=64;bits++) {
+    const uint64_t mask = bits==64?(uint64_t)-1:((uint64_t)1<<bits)-1;
+    Hashtable<uint64_t> hashes;
+    for (board_t board : boards)
+      if (!hashes.set(hash_board(board)&mask))
+        goto collision; 
+    return bits;
+    collision:;
+  }
+  throw ValueError("distinguishing_hash_bits: the set of boards contains duplicates");
 }
 
 }
@@ -163,4 +189,5 @@ using namespace other::python;
 
 void wrap_all_boards() {
   OTHER_FUNCTION(all_boards)
+  OTHER_FUNCTION(distinguishing_hash_bits)
 }

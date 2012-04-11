@@ -3,7 +3,10 @@
 
 #include "gen/tables.h"
 #include <cassert>
+#include <other/core/random/forward.h>
 namespace pentago {
+
+using namespace other;
 
 // Each board is divided into 4 quadrants, and each quadrant is stored
 // in one of the 16-bit quarters of a 64-bit int.  Within a quadrant,
@@ -70,5 +73,9 @@ extern bool black_to_move(board_t board);
 extern void check_board(board_t board);
 
 extern board_t standardize(board_t board);
+
+// Random board and side generation
+extern side_t random_side(Random& random);
+extern board_t random_board(Random& random);
 
 }

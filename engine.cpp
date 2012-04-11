@@ -151,7 +151,7 @@ template<bool black> score_t simple_evaluate_recurse(int depth, side_t side0, si
     }
 
     // Sort moves based on order
-    insertion_sort(moves,order,total);
+    insertion_sort(total,order,moves);
 
     // Optionally print out move ordering information
     if (0) {

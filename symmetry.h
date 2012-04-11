@@ -24,7 +24,9 @@ struct symmetry_t {
    // 4 2-bit counterclockwise rotation fields, one per quadrant
   unsigned local : 8;
 
-  symmetry_t()
+  symmetry_t() {}
+
+  symmetry_t(zero*)
     : global(0), local(0) {}
 
   symmetry_t(uint8_t global, uint8_t local)
@@ -82,7 +84,13 @@ super_t transform_super(symmetry_t s, super_t super) OTHER_CONST;
 
 // Given b, find s minimizing s(b), and return s(b),s
 Tuple<board_t,symmetry_t> superstandardize(board_t board) OTHER_CONST;
+Tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) OTHER_CONST;
+
+// A meaningless function invariant to global board transformations.  Extremely slow.
+bool meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
+super_t super_meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 
 ostream& operator<<(ostream& output, symmetry_t s) OTHER_EXPORT;
+symmetry_t random_symmetry(Random& random);
 
 }

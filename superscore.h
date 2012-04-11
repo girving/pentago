@@ -45,6 +45,7 @@ Given a state (u,a) in A*G,
 */
 
 #include "board.h"
+#include <other/core/math/popcount.h>
 #include <other/core/math/sse.h>
 #include <other/core/random/forward.h>
 #include <other/core/vector/Vector.h>
@@ -55,12 +56,12 @@ namespace pentago {
 using namespace other;
 using std::ostream;
 
+struct zero {};
+
 // A subset of the rotation group Z_4^4 represented as a 256 bit mask.
 // A rotation by (i0,i1,i2,i3) of quadrants 0,1,2,3 corresponds to bit i0+4*(i1+4*(i2+4*i3))
 struct super_t {
   __m128i x,y; // little endian order
-
-  struct zero{};
 
   super_t() {}
 
@@ -152,6 +153,26 @@ struct super_t {
   static super_t singleton(Vector<int,4> r) {
     return singleton(r.x,r.y,r.z,r.w);
   }
+
+  bool parity() {
+    __m128i p = x^y;
+    p ^= _mm_slli_epi16(p,4);
+    p ^= _mm_slli_epi16(p,2);
+    p ^= _mm_slli_epi16(p,1);
+    return popcount((uint16_t)_mm_movemask_epi8(p))&1;
+  }
+};
+
+// Which rotations we know about, and whether each is a win or loss.
+struct superinfo_t {
+  super_t known; // Which rotations we know about
+  super_t wins; // The set of known wins.  We require that !(wins&~known)
+
+  superinfo_t() {}
+
+  // Zero-only constructor
+  superinfo_t(zero*)
+    : known(0), wins(0) {}
 };
 
 // Version of shuffle with arguments in expected little endian order

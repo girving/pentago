@@ -2,21 +2,24 @@
 
 #pragma once
 
+#include <other/core/structure/Tuple.h>
 namespace pentago {
 
+using namespace other;
+
 // Insertion sort values by keys
-template<class T,class K> static inline void insertion_sort(T* values, K* keys, const int n) {
+template<class Key,class... Values> static inline void insertion_sort(const int n, Key* keys, Values*... values) {
   for (int i=1;i<n;i++) {
-    const T value = values[i];
-    const K key = keys[i];
+    const Key key = keys[i];
+    const Tuple<Values...> value(values[i]...);
     int j = i-1;
     while (j>=0 && keys[j]>key) {
-      values[j+1] = values[j];
       keys[j+1] = keys[j];
+      OTHER_PASS(values[j+1] = values[j]);
       j--;
     }
-    values[j+1] = value;
     keys[j+1] = key;
+    value.get(values[j+1]...);
   }
 }
 

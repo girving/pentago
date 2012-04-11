@@ -10,21 +10,29 @@ from other.core import *
 from other.core.value import parser
 
 # Properties
-bits = PropManager.add('bits',24).set_abbrev('b').set_help('size of transposition table in bits (default %default)')
+bits = PropManager.add('bits',-1).set_abbrev('b').set_help('size of transposition table in bits (default 21 for super, 24 otherwise)')
 depth = PropManager.add('depth',3).set_abbrev('d').set_help('search depth (default %default)')
 seed = PropManager.add('seed',711170497).set_help('random seed (default %default)')
 record = PropManager.add('record','').set_help('append random game records to the given file')
 start = PropManager.add('start','0,0').set_help('comma separated starting board (and optional rotation vector) and turn')
 manual = PropManager.add('manual',-1).set_abbrev('m').set_help('play the given side manually')
 limit = PropManager.add('limit',36).set_help('limit black\' choices to the given number of moves')
+debug = PropManager.add('debug',False).set_help('turn on debugging (may cause massive slowdowns)')
+brief = PropManager.add('brief',36).set_help('stop after the given number of moves')
 engine_type = PropManager.add('engine','normal').set_allowed('normal simple super'.split()).set_help('engine variant')
 parser.parse('Pentago solver',positional=[engine_type])
 
 print 'command = %s'%parser.command()
 
-engine.init_table(bits())
+if engine_type()=='super':
+  engine.init_supertable(bits() if bits()>0 else 21)
+else:
+  engine.init_table(bits() if bits()>0 else 24)
 print 'random seed = %d'%seed()
 random.seed(abs(seed()))
+
+if debug():
+  engine.set_super_debug()
 
 if record():
   file = open(record(),'a')
@@ -46,4 +54,4 @@ else:
     board = rotate(board,rotation)
   assert turn in (0,1)
   sides = [0,1] if manual()<0 else [1-manual()]
-  play(board,turn,sides,depth(),simple=engine_type()=='simple')
+  play(board,turn,sides,depth(),simple=engine_type()=='simple',brief=brief())

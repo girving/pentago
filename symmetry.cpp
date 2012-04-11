@@ -37,7 +37,7 @@ const symmetries_t symmetries;
 
 static void group_test() {
   // Test identity and inverses
-  const symmetry_t e;
+  const symmetry_t e = 0;
   for (auto g : symmetries) {
     OTHER_ASSERT(g*e==g);
     OTHER_ASSERT(e*g==g);
@@ -139,13 +139,9 @@ board_t transform_board(symmetry_t s, board_t board) {
   return quadrants(pack(qr[0][0],qr[0][1]),pack(qr[1][0],qr[1][1]),pack(qr[2][0],qr[2][1]),pack(qr[3][0],qr[3][1]));
 }
 
-static symmetry_t random_symmetry(Random& random) {
+symmetry_t random_symmetry(Random& random) {
   const int g = random.uniform<int>(0,symmetries.size());
   return symmetry_t(g>>8,g&255);
-}
-
-static side_t random_side(Random& random) {
-  return random.bits<uint64_t>()&side_mask;
 }
 
 static void action_test(int steps) {
@@ -161,13 +157,17 @@ static void action_test(int steps) {
 }
 
 Tuple<board_t,symmetry_t> superstandardize(board_t board) {
+  return superstandardize(unpack(board,0),unpack(board,1));
+}
+
+Tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) {
   // Decompose into quadrants, and compute all rotated and reflected versions
   quadrant_t versions[4][8]; // indexed by quadrant, reflection, rotation
   for (int i=0;i<4;i++) {
-    const quadrant_t q = quadrant(board,i);
     quadrant_t s[2][8]; // indexed by side, reflection, rotation
+    s[0][0] = quadrant(side0,i);
+    s[1][0] = quadrant(side1,i);
     for (int j=0;j<2;j++) {
-      s[j][0] = unpack(q,j);
       s[j][1] = rotations[s[j][0]][0];
       s[j][2] = rotations[s[j][1]][0];
       s[j][3] = rotations[s[j][0]][1];
@@ -331,17 +331,17 @@ super_t transform_super(symmetry_t s, super_t C) {
 }
 
 // A meaningless function invariant to global board transformations
-static bool meaningless(board_t board) {
+bool meaningless(board_t board, uint64_t salt) {
   bool result = 0;
   for (int g=0;g<8;g++)
-    result ^= hash(transform_board(symmetry_t(g,0),board))&1;
+    result ^= hash(transform_board(symmetry_t(g,0),board)^salt)&1;
   return result;
 }
 
-static super_t super_meaningless(board_t board) {
+super_t super_meaningless(board_t board, uint64_t salt) {
   super_t result = 0;
   for (int r=0;r<256;r++)
-    if (meaningless(transform_board(symmetry_t(0,r),board)))
+    if (meaningless(transform_board(symmetry_t(0,r),board),salt))
       result |= super_t::singleton(r);
   return result;
 }

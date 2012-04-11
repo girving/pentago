@@ -4,6 +4,7 @@
 #include <other/core/array/NdArray.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>
+#include <other/core/random/Random.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>
 namespace pentago {
@@ -111,6 +112,16 @@ static NdArray<board_t> standardize_py(NdArray<const board_t> boards) {
   for (int b=0;b<boards.flat.size();b++)
     transformed.flat[b] = standardize(boards.flat[b]);
   return transformed;
+}
+
+side_t random_side(Random& random) {
+  return random.bits<uint64_t>()&side_mask;
+}
+
+board_t random_board(Random& random) {
+  side_t filled = random_side(random);
+  side_t black = random.bits<uint64_t>()&filled;
+  return pack(black,filled^black);
 }
 
 }

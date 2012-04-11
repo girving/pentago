@@ -22,7 +22,7 @@ static inline uint64_t hash_board(board_t key) {
   return key;
 }
 
-// Initialize a empty table of size 1<<bits
+// Initialize a empty table with size 1<<bits entries
 extern void init_table(int bits);
 
 // Different kinds of tables

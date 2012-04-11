@@ -111,7 +111,8 @@ def move(board,turn,depth,rand=True,simple=False):
   '''Returns (next,score), where next is the board position moved to and score = depth<<2 | 0 (loss), 1 (tie), or 2 (win).'''
   if is_super(board):
     results = engine.super_evaluate_children(depth,*flipto(board,turn))
-    nexts = results.keys()
+    nexts = [r[0] for r in results]
+    results = dict(results)
   else:
     nexts = (engine.simple_moves if simple else engine.moves)(flipto(board,turn))
   assert len(nexts)
@@ -128,7 +129,8 @@ def move(board,turn,depth,rand=True,simple=False):
   score,next = options[random.randint(len(options)) if rand else 0]
   return flipto(next,1-turn),score
 
-def play(board,turn,sides,depth,early_exit=False,simple=False):
+def play(board,turn,sides,depth,early_exit=False,simple=False,brief=36):
+  assert brief
   first = turn
   positions = []
   final_result = None
@@ -154,6 +156,9 @@ def play(board,turn,sides,depth,early_exit=False,simple=False):
           raise RuntimeError('not a rotated win for black')
       value = (s&1)-(s>>1)
       break
+    if not brief:
+      break 
+    brief -= 1
     if turn in sides:
       engine.clear_stats()
       print 'search depth %d'%depth

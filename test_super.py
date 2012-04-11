@@ -33,7 +33,11 @@ def test_standardize():
 def test_super_action():
   engine.super_action_test(10000)
 
+def test_table():
+  engine.supertable_test(10)
+
 if __name__=='__main__':
+  test_table()
   test_super_action()
   test_standardize()
   test_action()
