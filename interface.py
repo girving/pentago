@@ -135,8 +135,8 @@ def play(board,turn,sides,depth,early_exit=False,simple=False,brief=36):
   positions = []
   final_result = None
   while 1:
-    positions.append(board)
-    header = 'board = %s, turn = %d'%(show_board(board,brief=1),turn)
+    positions.append(int(reduce_board(board)))
+    header = 'board = %s, turn = %d'%(show_board(reduce_board(board),brief=1),turn)
     print '\n%s\n%s'%('-'*len(header),header)
     print '\n'+show_board(board)
     s = (rotated_status if simple else status)(reduce_board(board))
@@ -191,3 +191,17 @@ def play(board,turn,sides,depth,early_exit=False,simple=False,brief=36):
     if final_result is not None:
       depth -= 1
   return first,value,positions
+
+def factorial(n):
+  assert n>=0
+  f = 1
+  for i in xrange(2,n+1):
+    f *= i
+  return f
+
+def choose(n,k):
+  if k<0 or k>n: return 0
+  return factorial(n)//(factorial(k)*factorial(n-k))
+
+def count_boards(n):
+  return choose(36,n)*choose(n,n//2)
