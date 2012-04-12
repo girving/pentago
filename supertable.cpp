@@ -102,7 +102,9 @@ template<bool black> void super_store(int depth, const superlookup_t& data) {
         info.known &= black?info.wins:~info.wins;
       if (entry.depth<max_depth)
         existing.known &= black?existing.wins:~existing.wins;
-      // Common knowledge should match
+      // Common knowledge should match.  Unfortunately, this assertion can generate false positives in cases where the table is
+      // "polluted" with information with higher than reported depth.  However, I'm going to leave it in, since the false positives
+      // never occur if the table depth always increases, and it's important to have validity checks wherever possible.
       OTHER_ASSERT(!((info.wins^existing.wins)&info.known&existing.known));
       // Merge information
       entry.depth = max_depth;
@@ -197,6 +199,7 @@ using namespace other::python;
 
 void wrap_supertable() {
   OTHER_FUNCTION(init_supertable)
+  OTHER_FUNCTION(clear_supertable)
   OTHER_FUNCTION(supertable_bits)
   OTHER_FUNCTION(supertable_test)
 }
