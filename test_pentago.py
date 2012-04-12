@@ -14,6 +14,7 @@ def test_misc():
   for _ in xrange(100):
     board = randboard()
     assert pack(unpack(board))==board
+    assert from_table(to_table(board))==board
     assert flip(flip(board))==board
     move = '%s%s %s%s %s'%('abcdef'[randint(6)],'123456'[randint(6)],'ul'[randint(2)],'lr'[randint(2)],'lr'[randint(2)])
     turn = randint(2)

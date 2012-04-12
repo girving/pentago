@@ -32,7 +32,7 @@ book = ashelf('opening-%s.db'%game())
 
 def count(boards):
   boards = asarray(boards)
-  return sum(unpack(boards).reshape(*(boards.shape+(36,)))!=0,axis=-1)
+  return sum(to_table(boards).reshape(*(boards.shape+(36,)))!=0,axis=-1)
 
 def show_result(moves):
   return 'black wins (possibly in %d moves)'%moves if moves<=36 else 'tie'

@@ -29,14 +29,14 @@ for name,k in [('wins',1),('ties',0),('losses',-1)]:
 
 # Sort possibly starting moves by expected result
 everything = unique(hstack(positions.values()))
-starts = everything[sum(unpack(everything).reshape(-1,36),axis=1)==1]
+starts = everything[sum(to_table(everything).reshape(-1,36),axis=1)==1]
 for start in starts:
   counts = dict((k,sum(positions[k]==start)) for k in (-1,0,1))
   print '\nstart: wins %d, ties %d, losses %d, expectation %g'%(counts[1],counts[0],counts[-1],sum(k*v for k,v in counts.items())/sum(counts.values()))
-  print unpack(start)
+  print to_table(start)
 
 # Count number of unique positions in the database for each number of stones
-counts = sum(unpack(everything).reshape(-1,36)!=0,axis=1)
+counts = sum(to_table(everything).reshape(-1,36)!=0,axis=1)
 print '\ntotals:'
 for t in xrange(1,37):
   print '  %d stones, %d positions'%(t,sum(counts==t))

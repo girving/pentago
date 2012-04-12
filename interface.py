@@ -19,7 +19,7 @@ def flip(board):
   if is_super(board):
     board,rotation = board 
     return flip(board),rotation
-  return pack(unpack(board)^3)
+  return pack(ascontiguousarray(unpack(board)[::-1]))
 
 def flipto(board,turn):
   return flip(board) if turn else board
@@ -37,7 +37,7 @@ def show_board(board,brief=False):
   elif brief:
     return str(board)
   else:
-    table = unpack(board)
+    table = to_table(board)
     return '\n'.join('abcdef'[i]+'  '+''.join('_01'[table[j,5-i]] for j in xrange(6)) for i in xrange(6)) + '\n\n   123456'
 
 def show_side(side):
@@ -61,14 +61,14 @@ def rotate(board,*args):
   else:
     qx,qy,count = args
     count = (count%4+4)%4
-    table = unpack(board)
+    table = to_table(board)
     for i in xrange(count):
       copy = table.copy()
       for x in xrange(3):
         for y in xrange(3):
           copy[3*qx+x,3*qy+y] = table[3*qx+y,3*qy+2-x]
       table = copy
-    return pack(table)
+    return from_table(table)
 
 move_pattern = re.compile(r'^\s*([abcdef])([123456])\s*([ul])([lr])\s*([lr])\s*$')
 simple_move_pattern = re.compile(r'^\s*([abcdef])([123456])\s*$')
@@ -85,14 +85,14 @@ def parse_move(board,turn,move,simple=False):
     qx = 'lr'.find(m.group(4))
     qy = 'lu'.find(m.group(3))
     dir = m.group(5)
-  table = unpack(board)
+  table = to_table(board)
   if table[x,y]:
     raise ValueError("illegal move '%s', position is already occupied"%move.strip())
   table[x,y] = 1+turn
   if simple:
-    return pack(table)
+    return from_table(table)
   else:
-    return rotate(pack(table),qx,qy,{'l':1,'r':-1}[dir])
+    return rotate(from_table(table),qx,qy,{'l':1,'r':-1}[dir])
 
 all_moves = ['%s%s %s%s %s'%(i,j,qi,qj,d) for i in 'abcdef' for j in '123456' for qi in 'ul' for qj in 'lr' for d in 'lr']
 all_simple_moves = ['%s%s'%(i,j) for i in 'abcdef' for j in '123456']
@@ -167,7 +167,7 @@ def play(board,turn,sides,depth,early_exit=False,simple=False,brief=36):
       d,value = divmod(result,4)
       print "move '%s', depth %d, score %d (%s)"%(ms,d,value-1,('win for '+'01'[turn^(value<1)] if value!=1 else 'tie'))
       engine.print_stats()
-      print 'total moves = %d'%sum(unpack(reduce_board(next))!=0)
+      print 'total moves = %d'%sum(to_table(reduce_board(next))!=0)
       fr = (-1)**turn*(value-1)
       if final_result is not None:
         assert final_result==fr

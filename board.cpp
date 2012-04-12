@@ -30,7 +30,31 @@ void check_board(board_t board) {
   CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 
-static NdArray<int> unpack_py(NdArray<const board_t> boards) {
+static NdArray<board_t> pack_py(NdArray<const side_t> sides) {
+  OTHER_ASSERT(sides.rank()>=1 && sides.shape.last()==2);
+  NdArray<board_t> boards(sides.shape.slice(0,sides.rank()-1).copy(),false);
+  for (int b=0;b<boards.flat.size();b++) {
+    const side_t side0 = sides.flat[2*b],
+                 side1 = sides.flat[2*b+1];
+    OTHER_ASSERT(!(side0&side1) && !((side0|side1)&~side_mask));
+    boards.flat[b] = pack(side0,side1);
+  }
+  return boards;
+}
+
+static NdArray<side_t> unpack_py(NdArray<const board_t> boards) {
+  for (int b=0;b<boards.flat.size();b++)
+    check_board(boards.flat[b]);
+  Array<int> shape = boards.shape.copy(); 
+  shape.append(2);
+  NdArray<side_t> sides(shape,false);
+  for (int b=0;b<boards.flat.size();b++)
+    for (int i=0;i<2;i++)
+      sides.flat[2*b+i] = unpack(boards.flat[b],i);
+  return sides;
+}
+
+static NdArray<int> to_table(NdArray<const board_t> boards) {
   for (int b=0;b<boards.flat.size();b++)
     check_board(boards.flat[b]);
   Array<int> shape = boards.shape.copy();
@@ -49,7 +73,7 @@ static NdArray<int> unpack_py(NdArray<const board_t> boards) {
   return tables;
 }
 
-static NdArray<board_t> pack_py(NdArray<const int> tables) {
+static NdArray<board_t> from_table(NdArray<const int> tables) {
   OTHER_ASSERT(tables.rank()>=2);
   int r = tables.rank();
   OTHER_ASSERT(tables.shape[r-2]==6 && tables.shape[r-1]==6);
@@ -132,6 +156,8 @@ void wrap_board() {
   function("unpack",unpack_py);
   function("pack",pack_py);
   function("standardize",standardize_py);
+  OTHER_FUNCTION(to_table)
+  OTHER_FUNCTION(from_table)
   OTHER_FUNCTION(check_board)
   OTHER_FUNCTION(black_to_move)
 }
