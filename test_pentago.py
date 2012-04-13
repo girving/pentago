@@ -180,9 +180,8 @@ def all_boards_test(symmetries):
       for b in boards:
         print show_board(b)
     print 'n = %d, count = %d, hash = %d'%(n,len(boards),ahash(boards))
-    if 0:
-      assert sizes[n]==len(boards)
-      assert hashes[n]==ahash(boards)
+    assert sizes[n]==len(boards)
+    assert hashes[n]==ahash(boards)
 
 def test_all_boards_raw():
   all_boards_test(1)
