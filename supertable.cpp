@@ -98,10 +98,16 @@ template<bool black> void super_store(int depth, const superlookup_t& data) {
     if (entry.hash==data.hash>>table_bits) {
       // Discard low depth information
       int max_depth = max(depth,(int)entry.depth); 
-      if (depth<max_depth)
-        info.known &= black?info.wins:~info.wins;
-      if (entry.depth<max_depth)
-        existing.known &= black?existing.wins:~existing.wins;
+      if (depth<max_depth) {
+        super_t mask = black?info.wins:~info.wins;
+        info.known &= mask;
+        info.wins &= mask;
+      }
+      if (entry.depth<max_depth) {
+        super_t mask = black?existing.wins:~existing.wins;
+        existing.known &= mask;
+        existing.wins &= mask;
+      }
       // Common knowledge should match.  Unfortunately, this assertion can generate false positives in cases where the table is
       // "polluted" with information with higher than reported depth.  However, I'm going to leave it in, since the false positives
       // never occur if the table depth always increases, and it's important to have validity checks wherever possible.
