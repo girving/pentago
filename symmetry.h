@@ -93,4 +93,20 @@ super_t super_meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 ostream& operator<<(ostream& output, symmetry_t s) OTHER_EXPORT;
 symmetry_t random_symmetry(Random& random);
 
+// Convenient enumeration of all symmetries
+struct symmetries_t {
+  struct iter {
+    int g;
+    iter(int g) : g(g) {}
+    void operator++() { g++; }
+    bool operator!=(iter it) const { return g!=it.g; }
+    symmetry_t operator*() const { return symmetry_t(g>>8,g&255); }
+  };
+  symmetries_t() {}
+  int size() const { return 8*256; }
+  iter begin() const { return iter(0); }
+  iter end() const { return iter(size()); }
+};
+extern const symmetries_t symmetries;
+
 }

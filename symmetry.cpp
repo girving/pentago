@@ -12,27 +12,10 @@ namespace pentago {
 using std::cout;
 using std::endl;
 
-ostream& operator<<(ostream& output, symmetry_t s) {
-  return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
-}
-
-namespace {
-
-struct symmetries_t {
-  struct iter {
-    int g;
-    iter(int g) : g(g) {}
-    void operator++() { g++; }
-    bool operator!=(iter it) const { return g!=it.g; }
-    symmetry_t operator*() const { return symmetry_t(g>>8,g&255); }
-  };
-  symmetries_t() {}
-  int size() const { return 8*256; }
-  iter begin() const { return iter(0); }
-  iter end() const { return iter(size()); }
-};
 const symmetries_t symmetries;
 
+ostream& operator<<(ostream& output, symmetry_t s) {
+  return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
 
 static void group_test() {

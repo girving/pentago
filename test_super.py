@@ -36,7 +36,14 @@ def test_super_action():
 def test_table():
   engine.supertable_test(10)
 
+def test_count():
+  counts = [1,3,30,227,2013,13065,90641,493844,2746022,12420352,56322888]
+  for n,count in enumerate(counts):
+    print 'n %d, correct %d, computed %d'%(n,count,supercount_boards(n))
+    assert supercount_boards(n)==count
+
 if __name__=='__main__':
+  test_count()
   test_table()
   test_super_action()
   test_standardize()

@@ -14,4 +14,5 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(supertable)
   OTHER_WRAP(symmetry)
   OTHER_WRAP(all_boards)
+  OTHER_WRAP(count)
 }
