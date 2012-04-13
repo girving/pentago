@@ -28,8 +28,9 @@ if engine_type()=='super':
   engine.init_supertable(bits() if bits()>0 else 21)
 else:
   engine.init_table(bits() if bits()>0 else 24)
-print 'random seed = %d'%seed()
-random.seed(abs(seed()))
+seed = abs(seed())
+print 'random seed = %d'%seed
+random.seed(seed)
 
 if debug():
   engine.set_super_debug()
