@@ -28,6 +28,10 @@ bool traced(board_t board) {
 
 static int trace_verbose_depth = 0;
 
+string trace_verbose_prefix() {
+  return format("%*strace verbose: ",trace_verbose_depth,"");
+}
+
 Array<uint8_t> trace_verbose_start(int depth, board_t board) {
   symmetry_t symmetry;
   superstandardize(board).get(board,symmetry);
@@ -51,10 +55,6 @@ Array<uint8_t> trace_verbose_start(int depth, board_t board) {
     w = s.local;
   }
   return watch;
-}
-
-string trace_verbose_prefix() {
-  return format("%*strace verbose: ",trace_verbose_depth,"");
 }
 
 void trace_verbose_end() {

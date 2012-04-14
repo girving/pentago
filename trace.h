@@ -7,12 +7,23 @@
 #include <other/core/utility/config.h>
 namespace pentago {
 
-// Switch comments to disable tracing
-//#define TRACE(...) ((void)0)
+// Uncomment to enable tracing
+//#define TRACING_ON
+
+// Run a line of code only in tracing mode
+#ifdef TRACING_ON
 #define TRACE(...) __VA_ARGS__
+#else
+#define TRACE(...) ((void)0)
+#endif
 
 // Mark that the transposition table is clear
 extern void trace_restart();
+
+// Record that the value of board is computed inconsistently
+extern void OTHER_NORETURN(trace_error(int depth, board_t board, const char* context));
+
+#ifdef TRACING_ON
 
 // Is tracing active for this position?
 extern bool traced(board_t board);
@@ -27,11 +38,6 @@ struct TraceVerbose {
   TraceVerbose(bool active) : active(active) {}
   ~TraceVerbose() { if (active) trace_verbose_end(); }
 };
-#define TRACE_VERBOSE_START(depth,board) TRACE(const Array<const uint8_t> verbose = trace_verbose_start(depth,board); TraceVerbose ender(verbose.size()>0))
-#define TRACE_VERBOSE(...) TRACE(if (verbose.size()) std::cout << trace_verbose_prefix() << format(__VA_ARGS__) << std::endl)
-
-// Record that the value of board is computed inconsistently
-extern void OTHER_NORETURN(trace_error(int depth, board_t board, const char* context));
 
 // Record that the value of parent depends on the given value of child
 extern void trace_dependency(int parent_depth, board_t parent, int child_depth, board_t child, superinfo_t child_info);
@@ -41,5 +47,10 @@ extern void trace_check(int depth, board_t board, superinfo_t info, const char* 
 
 // Turn a subset of a super into a string
 extern string subset(super_t s, RawArray<const uint8_t> w);
+
+#endif
+
+#define TRACE_VERBOSE_START(depth,board) TRACE(const Array<const uint8_t> verbose = trace_verbose_start(depth,board); TraceVerbose ender(verbose.size()>0))
+#define TRACE_VERBOSE(...) TRACE(if (verbose.size()) std::cout << trace_verbose_prefix() << format(__VA_ARGS__) << std::endl)
 
 }
