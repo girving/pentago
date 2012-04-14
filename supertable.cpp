@@ -72,7 +72,7 @@ template<bool black> superlookup_t super_lookup(int depth, side_t side0, side_t 
       info.known &= black?info.wins:~info.wins;
       TRACE(trace_dependency(depth,pack(side0,side1),entry.depth,pack(side0,side1),superinfo_t(info.known,black?info.known:~info.known)));
       info.known = transform_super(si,info.known); // In this case we get away with only one transform call
-      info.wins = black?info.known:~info.known;
+      info.wins = black?info.known:super_t(0);
     } else {
       STAT(successful_lookups++);
       info.known = transform_super(si,info.known);
