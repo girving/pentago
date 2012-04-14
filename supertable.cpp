@@ -3,6 +3,7 @@
 #include "supertable.h"
 #include "stat.h"
 #include "symmetry.h"
+#include "trace.h"
 #include <other/core/array/Array.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
@@ -45,6 +46,7 @@ void init_supertable(int bits) {
 
 void clear_supertable() {
   memset(table.data(),0,sizeof(superentry_t)*table.size());
+  TRACE(trace_restart());
 }
 
 int supertable_bits() {
@@ -68,6 +70,7 @@ template<bool black> superlookup_t super_lookup(int depth, side_t side0, side_t 
     // If we don't have enough depth, we can only use wins for black or losses for white
     if (depth>entry.depth) {
       info.known &= black?info.wins:~info.wins;
+      TRACE(trace_dependency(depth,pack(side0,side1),entry.depth,pack(side0,side1),superinfo_t(info.known,black?info.known:~info.known)));
       info.known = transform_super(si,info.known); // In this case we get away with only one transform call
       info.wins = black?info.known:~info.known;
     } else {
@@ -84,6 +87,18 @@ template<bool black> superlookup_t super_lookup(int depth, side_t side0, side_t 
 
 template superlookup_t super_lookup<true>(int,side_t,side_t);
 template superlookup_t super_lookup<false>(int,side_t,side_t);
+
+OTHER_NEVER_INLINE static void store_error(int depth, const superlookup_t& data, const superinfo_t& info) {
+  const board_t board = inverse_hash_board(data.hash);
+  const bool black = black_to_move(board);
+  const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
+  const superinfo_t& existing = entry.info;
+  const super_t errors = (info.wins^existing.wins)&info.known&existing.known;
+  const uint8_t r = first(errors);
+  cout << format("inconsistency detected in super_store:\n  standard %lld, rotation %d, transformed %lld, black %d\n  existing depth %d, existing value %d\n  new depth %d, new value %d",
+    board,r,transform_board(symmetry_t(0,r),board),black,entry.depth,existing.wins(r),depth,info.wins(r))<<endl;
+  trace_error(depth,board,"super_store");
+}
 
 template<bool black> void super_store(int depth, const superlookup_t& data) {
   OTHER_ASSERT(data.hash);
@@ -102,16 +117,21 @@ template<bool black> void super_store(int depth, const superlookup_t& data) {
         super_t mask = black?info.wins:~info.wins;
         info.known &= mask;
         info.wins &= mask;
+        TRACE(trace_dependency(max_depth,inverse_hash_board(data.hash),depth,inverse_hash_board(data.hash),info));
+        TRACE(trace_check(max_depth,inverse_hash_board(data.hash),info,"super_store.new"));
       }
       if (entry.depth<max_depth) {
         super_t mask = black?existing.wins:~existing.wins;
         existing.known &= mask;
         existing.wins &= mask;
+        TRACE(trace_dependency(max_depth,inverse_hash_board(data.hash),entry.depth,inverse_hash_board(data.hash),existing));
+        TRACE(trace_check(max_depth,inverse_hash_board(data.hash),existing,"super_store.existing"));
       }
       // Common knowledge should match.  Unfortunately, this assertion can generate false positives in cases where the table is
       // "polluted" with information with higher than reported depth.  However, I'm going to leave it in, since the false positives
       // never occur if the table depth always increases, and it's important to have validity checks wherever possible.
-      OTHER_ASSERT(!((info.wins^existing.wins)&info.known&existing.known));
+      if ((info.wins^existing.wins)&info.known&existing.known)
+        store_error(depth,data,info);
       // Merge information
       entry.depth = max_depth;
       existing.known |= info.known;

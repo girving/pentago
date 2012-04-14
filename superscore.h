@@ -166,13 +166,21 @@ struct super_t {
 // Which rotations we know about, and whether each is a win or loss.
 struct superinfo_t {
   super_t known; // Which rotations we know about
-  super_t wins; // The set of known wins.  We require that !(wins&~known)
+  super_t wins; // The set of known wins.  We maintain the invariant that !(wins&~known)
 
   superinfo_t() {}
 
   // Zero-only constructor
   superinfo_t(zero*)
     : known(0), wins(0) {}
+
+  superinfo_t(super_t known, super_t wins)
+    : known(known), wins(wins) {}
+
+  // Check the invariant
+  bool valid() {
+    return !(wins&~known);
+  }
 };
 
 // Version of shuffle with arguments in expected little endian order
@@ -208,6 +216,8 @@ extern super_t super_wins(side_t side) OTHER_CONST;
 
 // Do not use in performance critical code
 extern const Vector<int,4> single_rotations[8];
+
+extern uint8_t first(super_t s);
 
 extern super_t random_super(Random& random);
 

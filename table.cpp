@@ -15,8 +15,7 @@ using std::ostream;
 using std::cout;
 using std::endl;
 
-// The inverse of hash_board (for testing purposes)
-static inline uint64_t inverse_hash_board(uint64_t key) {
+uint64_t inverse_hash_board(uint64_t key) {
   uint64_t tmp;
 
   // Invert key = key + (key << 31)
@@ -123,7 +122,7 @@ Tuple<Array<board_t>,Array<score_t> > read_table(int max_count, int min_depth) {
     if (score>>2 < min_depth)
       continue;
     board_t board = inverse_hash_board(entry>>score_bits<<table_bits|h);
-    if (popcount(unpack(board,0))+popcount(unpack(board,1)) > max_count)
+    if (count_stones(board) > max_count)
       continue;
     boards.append(board);
     scores.append(score);

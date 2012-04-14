@@ -1,11 +1,13 @@
 // Core tree search engine abstracted over rotations
 
+#include "superengine.h"
 #include "score.h"
 #include "sort.h"
 #include "stat.h"
 #include "moves.h"
 #include "superscore.h"
 #include "supertable.h"
+#include "trace.h"
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
 #include <other/core/structure/HashtableIterator.h>
@@ -20,10 +22,8 @@ using std::endl;
 using std::swap;
 using namespace other;
 
-namespace {
-
 // Limit blacks options to the given number of moves (chosen after move ordering)
-int super_move_limit = 36;
+static int super_move_limit = 36;
 
 void set_super_move_limit(int limit) {
   OTHER_ASSERT(limit>0);
@@ -31,22 +31,14 @@ void set_super_move_limit(int limit) {
 }
 
 // Turn on debug mode
-bool debug = false;
+static bool debug = false;
 
-void set_super_debug() {
-  debug = true;
+void set_super_debug(bool on) {
+  debug = on;
 }
 
-// Current knowledge about a board position.  This is computed during shallow evaluation and
-// passed down to super_evaluate_recurse if the node is expanded.  It also sucks up rather a
-// lot stack space, which may turn into an issue if we ever port to a weird platform.
-struct superdata_t {
-  superlookup_t lookup;
-  super_t wins1; // super_wins(side1)
-};
-
 // Evaluate everything we can about a position without recursing into children.
-template<bool black,bool debug> inline superdata_t OTHER_ALWAYS_INLINE super_shallow_evaluate(const int depth, const side_t side0, const side_t side1, const super_t wins0, const super_t wins1, const super_t interesting) {
+template<bool black,bool debug> static inline superdata_t OTHER_ALWAYS_INLINE super_shallow_evaluate(const int depth, const side_t side0, const side_t side1, const super_t wins0, const super_t wins1, const super_t interesting) {
   // Check whether the current state is a win for either player
   superinfo_t info;
   info.known = wins0|wins1;
@@ -104,15 +96,6 @@ superdata_t super_shallow_evaluate(const int depth, const side_t side0, const si
   return shallow(depth,side0,side1,super_wins(side0),super_wins(side1),interesting);
 }
 
-// For most of the tree we care only about the value of a node, but at the top we may want at least one optimal move as well.  In order to
-// avoid two separate routines with a bunch of duplicate logic, we use the following templatized helper.
-template<bool remember> struct results_t;
-template<> struct results_t<false> {
-  typedef superinfo_t type;
-  void immediate_win(side_t move, super_t immediate) {}
-  void child(side_t move, superinfo_t info) {}
-  superinfo_t return_(superinfo_t info) const { return info; }
-};
 template<> struct results_t<true> {
   typedef results_t type;
   Array<side_t> moves; // list of moves we know about
@@ -126,13 +109,18 @@ template<> struct results_t<true> {
 // Evaluate a position for all important rotations, returning the set of rotations in which we win.
 // Note that a "win" for white includes ties.  The returned set of known rotations definitely includes
 // all important rotations, but may include others as well.
-template<bool remember,bool black,bool debug> typename results_t<remember>::type super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important) {
+template<bool remember,bool black,bool debug> static typename results_t<remember>::type super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important) {
   STAT(total_expanded_nodes++);
   STAT(expanded_nodes[depth]++);
   PRINT_STATS(24);
   superinfo_t& info = data.lookup.info;
   super_t possible = 0; // Keep track of possible wins that we might have missed
   results_t<remember> results; // Optionally keep track of results about children 
+
+  // Be verbose if desired
+  TRACE_VERBOSE_START(depth,pack(side0,side1));
+  TRACE_VERBOSE("input %s %s",subset(info.known,verbose),subset(info.wins,verbose));
+  TRACE(OTHER_ASSERT(info.valid()));
 
   // Collect possible moves
   SIMPLE_MOVES(side0,side1)
@@ -148,27 +136,31 @@ template<bool remember,bool black,bool debug> typename results_t<remember>::type
   const super_t theirs = data.wins1;
   superdata_t* children = (superdata_t*)alloca(total*sizeof(superdata_t));
   for (int i=total-1;i>=0;i--) {
+    const side_t move = moves[i];
     // Do we win without a rotation?  If we're white, it's safe to wait until after the rotation to check.
-    const super_t ours = super_wins(moves[i]);
+    const super_t ours = super_wins(move);
     if (black) {
       super_t immediate = ours&~theirs;
       info.wins |= immediate&~info.known;
       info.known |= immediate;
-      results.immediate_win(moves[i],immediate);
+      results.immediate_win(move,immediate);
     }
 
     // Do a shallow evaluation of the child position
     const super_t mask = rmax(important&~info.known);
-    children[i] = super_shallow_evaluate<!black,debug>(depth-1,side1,moves[i],theirs,ours,mask);
+    children[i] = super_shallow_evaluate<!black,debug>(depth-1,side1,move,theirs,ours,mask);
     const superinfo_t& child = children[i].lookup.info;
+    TRACE(trace_dependency(depth,pack(side0,side1),depth-1,pack(side1,move),child));
     const super_t wins = rmax(~child.wins&child.known);
     info.wins |= wins&~info.known;
     info.known |= wins;
-    results.child(moves[i],child);
+    results.child(move,child);
 
     // Exit early if possible
-    if (!(important&~info.known))
+    if (!(important&~info.known)) {
+      TRACE_VERBOSE("early exit, move %lld, result %s",move,subset(info.wins,verbose));
       goto done;
+    }
 
     // Discard the move if we already know enough about it
     if (!(mask&~child.known)) {
@@ -191,6 +183,7 @@ template<bool remember,bool black,bool debug> typename results_t<remember>::type
           if (!black) {
             STAT(distance_prunes++);
             info.wins = info.known = ~super_t(0);
+            TRACE_VERBOSE("distance prune, depth %d, distance %d",depth,distance);
             goto done;
           } else {
             swap(moves[i],moves[total-1]);
@@ -204,8 +197,10 @@ template<bool remember,bool black,bool debug> typename results_t<remember>::type
     }
 
     // Are we out of recursion depth?
-    if (depth==1 && total)
+    if (depth==1 && total) {
+      TRACE_VERBOSE("out of recursion depth");
       goto done;
+    }
 
     // Sort moves and children arrays based on order
     insertion_sort(total,order,moves,children);
@@ -216,23 +211,29 @@ template<bool remember,bool black,bool debug> typename results_t<remember>::type
 
     // Recurse
     for (int i=0;i<total;i++) {
+      const side_t move = moves[i];
       super_t mask = rmax(important&~info.known);
-      superinfo_t child = super_evaluate_recurse<false,!black,debug>(depth-1,side1,moves[i],children[i],mask);
+      superinfo_t child = super_evaluate_recurse<false,!black,debug>(depth-1,side1,move,children[i],mask);
       super_t wins = rmax(~child.wins&child.known);
       info.wins |= wins&~info.known;
       info.known |= wins;
-      results.child(moves[i],child);
-      if (!(important&~info.known))
+      results.child(move,child);
+      if (!(important&~info.known)) {
+        TRACE_VERBOSE("pruned, move %lld, result %s",move,subset(info.wins,verbose));
         goto done;
+      }
       possible |= rmax(~child.known);
     }
 
     // If we've analyzed all children, any move that isn't a possible win is a loss
+    TRACE_VERBOSE("analyzed all children: wins %s, possible %s",subset(info.wins,verbose),subset(possible,verbose));
     info.known |= ~possible;
   }
 
   // Store results and finish
   done:
+  TRACE_VERBOSE("storing depth %d, board %lld, result %s",depth,superstandardize(pack(side0,side1)).x,subset(info.wins,verbose));
+  TRACE(trace_check(depth,pack(side0,side1),info,"super_evaluate_recurse"));
   if (data.lookup.hash)
     super_store<black>(depth,data.lookup);
   check_interrupts();
@@ -281,8 +282,6 @@ score_t super_evaluate(int depth, const board_t board, const Vector<int,4> rotat
   return to_score(black,depth,info.wins(rotation));
 }
 
-typedef Tuple<board_t,Tuple<int,int,int,int>> rotated_board_t;
-
 // Evaluate enough children to determine who wins, and return the results
 vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const int depth, const board_t board, const Vector<int,4> rotation) {
   // We can afford error detection here since recursion happens into a different function
@@ -325,7 +324,6 @@ vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const int depth, 
   return children;
 }
 
-}
 }
 using namespace pentago;
 using namespace other::python;

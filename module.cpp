@@ -15,4 +15,5 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(symmetry)
   OTHER_WRAP(all_boards)
   OTHER_WRAP(count)
+  OTHER_WRAP(trace)
 }

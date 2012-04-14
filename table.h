@@ -22,6 +22,9 @@ static inline uint64_t hash_board(board_t key) {
   return key;
 }
 
+// The inverse of hash_board (for testing and error reporting purposes)
+extern uint64_t inverse_hash_board(uint64_t key);
+
 // Initialize a empty table with size 1<<bits entries
 extern void init_table(int bits);
 

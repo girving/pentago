@@ -2,11 +2,15 @@
 #pragma once
 
 #include "gen/tables.h"
-#include <cassert>
+#include <other/core/math/popcount.h>
 #include <other/core/random/forward.h>
+#include <other/core/utility/config.h>
+#include <cassert>
+#include <string>
 namespace pentago {
 
 using namespace other;
+using std::string;
 
 // Each board is divided into 4 quadrants, and each quadrant is stored
 // in one of the 16-bit quarters of a 64-bit int.  Within a quadrant,
@@ -66,6 +70,11 @@ static inline side_t unpack(board_t board, int s) {
                    unpack(quadrant(board,3),s));
 }
 
+// Count the stones on a board
+static inline int count_stones(board_t board) {
+  return popcount(unpack(board,0)|unpack(board,1));
+}
+
 // Check whose turn it is (assuming black moved first)
 extern bool black_to_move(board_t board);
 
@@ -77,5 +86,7 @@ extern board_t standardize(board_t board);
 // Random board and side generation
 extern side_t random_side(Random& random);
 extern board_t random_board(Random& random);
+
+extern string str_board(board_t board);
 
 }

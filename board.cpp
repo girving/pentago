@@ -148,6 +148,23 @@ board_t random_board(Random& random) {
   return pack(black,filled^black);
 }
 
+string str_board(board_t board) {
+  string s;
+  s += format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));
+  NdArray<board_t> boards((Array<int>()));
+  boards.flat[0] = board;
+  NdArray<int> table = to_table(boards);
+  for (int i=0;i<6;i++) {
+    int y = 5-i;
+    s += "abcdef"[i];
+    s += "  ";
+    for (int x=0;x<6;x++)
+      s += "_01"[table(x,y)];
+    s += '\n';
+  }
+  return s+"\n   123456";
+}
+
 }
 using namespace pentago;
 using namespace other::python;

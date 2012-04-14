@@ -169,6 +169,13 @@ ostream& operator<<(ostream& output, super_t s) {
   return output;
 }
 
+uint8_t first(super_t s) {
+  for (int r=0;r<256;r++)
+    if (s(r))
+      return r;
+  throw ValueError("zero passed to super_t first");
+}
+
 }
 using namespace pentago;
 using namespace other::python;

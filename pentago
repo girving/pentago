@@ -19,6 +19,7 @@ manual = PropManager.add('manual',-1).set_abbrev('m').set_help('play the given s
 limit = PropManager.add('limit',36).set_help('limit black\' choices to the given number of moves')
 debug = PropManager.add('debug',False).set_help('turn on debugging (may cause massive slowdowns)')
 brief = PropManager.add('brief',36).set_help('stop after the given number of moves')
+trace = PropManager.add('trace',False).set_help('diagnose tree evaluation errors using iterated tracing')
 engine_type = PropManager.add('engine','normal').set_allowed('normal simple super'.split()).set_help('engine variant')
 parser.parse('Pentago solver',positional=[engine_type])
 
@@ -32,8 +33,7 @@ seed = abs(seed())
 print 'random seed = %d'%seed
 random.seed(seed)
 
-if debug():
-  engine.set_super_debug()
+engine.set_super_debug(debug())
 
 if record():
   file = open(record(),'a')
@@ -60,4 +60,17 @@ else:
     board = rotate(board,rotation)
   assert turn in (0,1)
   sides = [0,1] if manual()<0 else [1-manual()]
-  play(board,turn,sides,depth(),simple=engine_type()=='simple',brief=brief())
+  while 1:
+    try:
+      play(board,turn,sides,depth(),simple=engine_type()=='simple',brief=brief())
+    except RuntimeError,e:
+      if not trace():
+        raise
+      print 'error: %s'%str(e)
+      if not engine.trace_learn():
+        break
+      # Try again with more trace knowledge
+      engine.clear_supertable()
+      random.seed(seed)
+    else:
+      break
