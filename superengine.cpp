@@ -117,10 +117,12 @@ template<bool remember,bool black,bool debug> static typename results_t<remember
   super_t possible = 0; // Keep track of possible wins that we might have missed
   results_t<remember> results; // Optionally keep track of results about children 
 
+  // Consistency check
+  OTHER_ASSERT(info.valid());
+
   // Be verbose if desired
   TRACE_VERBOSE_START(depth,pack(side0,side1));
   TRACE_VERBOSE("input %s %s",subset(info.known,verbose),subset(info.wins,verbose));
-  TRACE(OTHER_ASSERT(info.valid()));
 
   // Collect possible moves
   SIMPLE_MOVES(side0,side1)
