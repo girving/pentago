@@ -3,6 +3,7 @@
 #include "superscore.h"
 #include "score.h"
 #include <other/core/array/Array.h>
+#include <other/core/array/NdArray.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/interrupts.h>
@@ -176,11 +177,24 @@ uint8_t first(super_t s) {
   throw ValueError("zero passed to super_t first");
 }
 
+static NdArray<uint64_t> super_wins_py(NdArray<const board_t> sides) {
+  Array<int> shape = sides.shape.copy();
+  shape.append(4);
+  NdArray<uint64_t> wins(shape,false);
+  super_t* w = (super_t*)wins.flat.data();
+  for (int i=0;i<sides.flat.size();i++) {
+    OTHER_ASSERT(!(sides.flat[i]&~side_mask));
+    w[i] = super_wins(sides.flat[i]);
+  }
+  return wins;
+}
+
 }
 using namespace pentago;
 using namespace other::python;
 
 void wrap_superscore() {
+  OTHER_FUNCTION_2(super_wins,super_wins_py)
   OTHER_FUNCTION(super_win_test)
   OTHER_FUNCTION(super_rmax_test)
   OTHER_FUNCTION(super_bool_test)
