@@ -20,6 +20,7 @@ limit = PropManager.add('limit',36).set_help('limit black\' choices to the given
 debug = PropManager.add('debug',False).set_help('turn on debugging (may cause massive slowdowns)')
 brief = PropManager.add('brief',36).set_help('stop after the given number of moves')
 trace = PropManager.add('trace',False).set_help('diagnose tree evaluation errors using iterated tracing')
+full = PropManager.add('full',False).set_help('play to the end even in record mode')
 engine_type = PropManager.add('engine','normal').set_allowed('normal simple super'.split()).set_help('engine variant')
 parser.parse('Pentago solver',positional=[engine_type])
 
@@ -41,7 +42,7 @@ if record():
     # Play a game
     board = 0,(0,0,0,0) if engine_type()=='super' else 0
     engine.clear_supertable()
-    game = play(board,0,[0,1],depth(),early_exit=True,simple=engine_type()=='simple')
+    game = play(board,0,[0,1],depth(),early_exit=not full(),simple=engine_type()=='simple')
     print>>file,seed,repr(game)
     file.flush()
     # Choose a new seed
