@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+from __future__ import division
+import precompute
+from other.core import *
+from other.core.value import parser
+from interface import *
+
+def random_board(n):
+  s = hstack([16*q+arange(9) for q in xrange(4)])
+  random.shuffle(s)
+  return pack((sum(1<<s[:(n+1)//2]),sum(1<<s[(n+1)//2:][:n//2])))
+
+commands = {}
+def command(f):
+  commands[f.__name__] = f
+  return f
+
+@command
+def patterns():
+  random.seed(91131)
+  board = 2001290911234536713
+  wins = precompute.win_patterns()
+  for i in xrange(100):
+    board = random_board(24)
+    #print show_board(board)
+    min_ds = 6*ones(32,int)
+    for r0 in xrange(4):
+      for r1 in xrange(4):
+        for r2 in xrange(4):
+          for r3 in xrange(4):
+            b = rotate(board,(r0,r1,r2,r3))
+            s0,s1 = unpack(b).astype(int64)
+            ds = asarray([6 if s1&w else precompute.popcount(w&~s0) for w in wins])
+            min_ds = minimum(min_ds,ds)
+            #print '%d %d %d %d : %s'%(r0,r1,r2,r3,' '.join('%d'%d for d in ds if d<6))
+    print 'min ds : %s'%(' '.join('%d'%d for d in min_ds if d<6))
+
+@command
+def estimate():
+  random.seed(91131)
+  total = 1000000
+  close = 0
+  wins = precompute.win_patterns()
+  for i in xrange(total):
+    board = random_board(24)
+    s0,s1 = unpack(board).astype(int64)
+    d = min([6 if s1&w else precompute.popcount(w&~s0) for w in wins])
+    if d<=3:
+      close += 1
+      if not (close&1023):
+        print 'i %d, close %d, fraction %g'%(i,close,close/i)
+
+@command
+def counts():
+  def large(n):
+    s = str(n)
+    return ''.join((',' if i and i%3==0 else '')+c for i,c in enumerate(reversed(s)))[::-1]
+  counts = [large(supercount_boards(n)) for n in xrange(37)]
+  width = max(len(s) for s in counts)
+  print 'counts:'
+  for n,s in enumerate(counts):
+    print '  %2d:  %*s'%(n,width,s)
+
+@command
+def final():
+  boards = all_boards(36,2048)
+  print 'generated %d boards'%len(boards)
+  sides = unpack(boards)[:,0].copy()
+  print 'unpacked sides'
+  wins = super_wins(sides)
+  print 'computed wins'
+  open('super-wins-36.raw','w').write(wins)
+  print 'write complete'
+
+if __name__=='__main__':
+  command = PropManager.add('command','patterns').set_allowed(commands.keys())
+  parser.parse('Endgame related stuff',positional=[command])
+  commands[command()]()
