@@ -4,3 +4,4 @@ SConstruct.options
 site_scons
 build
 *.pyc
+.DS_Store
