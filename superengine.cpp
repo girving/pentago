@@ -315,12 +315,18 @@ vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const int depth, 
   // Analyze results
   vector<Tuple<rotated_board_t,score_t>> children;
   for (const side_t move : results.moves) {
-    const superinfo_t& info = results.children.get(move);
-    const bool immediate = results.immediate_wins.get_default(move,super_t(0))(rotation);
-    for (Vector<int,4> r : single_rotations)
-      if (immediate || info.known(rotation+r)) {
-        children.push_back(tuple(tuple(pack(side1,move),as_tuple(rotation+r)),to_score(black,report_depth,immediate||!info.wins(rotation+r))));
-      }
+    const board_t after = pack(side1,move);
+    // If there's an immediate win, generate a move with no rotation.  Such moves are legal only in this case.
+    if (results.immediate_wins.get_default(move,super_t(0))(rotation))
+      children.push_back(tuple(tuple(after,as_tuple(rotation)),to_score(black,report_depth,true)));
+    else {
+      // Otherwise, report results for all known children
+      const superinfo_t& info = results.children.get(move);
+      for (Vector<int,4> r : single_rotations)
+        if (info.known(rotation+r)) {
+          children.push_back(tuple(tuple(after,as_tuple(rotation+r)),to_score(black,report_depth,!info.wins(rotation+r))));
+        }
+    }
   }
   OTHER_ASSERT(children.size());
   return children;
