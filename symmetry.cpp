@@ -2,6 +2,7 @@
 
 #include "symmetry.h"
 #include <other/core/array/Array.h>
+#include <other/core/array/NdArray.h>
 #include <other/core/math/integer_log.h>
 #include <other/core/random/Random.h>
 #include <other/core/structure/Hashtable.h>
@@ -141,6 +142,13 @@ static void action_test(int steps) {
 
 Tuple<board_t,symmetry_t> superstandardize(board_t board) {
   return superstandardize(unpack(board,0),unpack(board,1));
+}
+
+NdArray<board_t> superstandardize_py(NdArray<const board_t> boards) {
+  NdArray<board_t> standard(boards.shape,false);
+  for (int b=0;b<boards.flat.size();b++)
+    standard.flat[b] = superstandardize(boards.flat[b]).x;
+  return standard;
 }
 
 Tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) {
@@ -364,4 +372,5 @@ void wrap_symmetry() {
   OTHER_FUNCTION(action_test)
   OTHER_FUNCTION(superstandardize_test)
   OTHER_FUNCTION(super_action_test)
+  OTHER_FUNCTION_2(superstandardize,superstandardize_py)
 }

@@ -63,6 +63,14 @@ def counts():
     print '  %2d:  %*s'%(n,width,s)
 
 @command
+def estimates():
+  tol = .01
+  for n in xrange(0,37):
+    count = supercount_boards(n)
+    estimate = estimate_supercount_boards(n,tol)
+    print 'n %d, count %d, estimate %g, estimate/count %g'%(n,count,estimate,estimate/count)
+
+@command
 def final():
   boards = all_boards(36,2048)
   print 'generated %d boards'%len(boards)
@@ -72,6 +80,11 @@ def final():
   print 'computed wins'
   open('super-wins-36.raw','w').write(wins)
   print 'write complete'
+
+@command
+def quadrants():
+  mins = minimal_quadrants()
+  print 'minimal quadrants = %d'%len(mins)
 
 @command
 def probability():
@@ -90,6 +103,16 @@ def probability():
     if score%4!=1:
       wins += 1
     print 'total %d, black wins %d, fraction %g'%(total,wins,wins/total)
+
+@command
+def approx():
+  gen = ApproximateBoards()
+  total = 0
+  raw_total = 0
+  for n in xrange(37):
+    total += gen.simple_stats(n)
+    raw_total += supercount_boards(n)
+  print 'grand total = %d, grand ratio = %g'%(total,total/raw_total)
 
 if __name__=='__main__':
   command = PropManager.add('command','patterns').set_allowed(commands.keys())

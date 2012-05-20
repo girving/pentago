@@ -148,6 +148,37 @@ board_t random_board(Random& random) {
   return pack(black,filled^black);
 }
 
+static side_t add_random_stone(Random& random, side_t filled) {
+  for (;;) {
+    int j = random.uniform<int>(0,36);
+    side_t stone = (side_t)1<<(16*(j&3)+j/4);
+    if (!(stone&filled)) {
+      OTHER_ASSERT(popcount(filled)+1==popcount(stone|filled));
+      return stone|filled;
+    }
+  }
+}
+
+// Generate a random board with n stones
+board_t random_board(Random& random, int n) {
+  const int nw = n/2, nb = n-nw, ne = 36-n;
+  // Randomly place white stones
+  side_t white = 0;
+  for (int i=0;i<nw;i++)
+    white = add_random_stone(random,white);
+  // Random place either black stones or empty
+  const int no = min(nb,ne);
+  side_t other = white;
+  for (int i=0;i<no;i++)
+    other = add_random_stone(random,other);
+  // Construct board
+  const side_t black = no==nb?other&~white:side_mask&~other;
+  OTHER_ASSERT(popcount(white)==nw);
+  OTHER_ASSERT(popcount(black)==nb);
+  OTHER_ASSERT(popcount(white|black)==n);
+  return pack(black,white);
+}
+
 string str_board(board_t board) {
   string s;
   s += format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));

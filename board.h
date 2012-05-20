@@ -31,6 +31,7 @@ const side_t side_mask = 0x01ff01ff01ff01ff;
 
 // A single quadrant always fits into uint16_t, whether in radix 2 or 3.
 typedef uint16_t quadrant_t;
+const uint16_t quadrant_count = 19683; // 3**9
 
 // Extract one quadrant from either board_t or side_t
 static inline quadrant_t quadrant(uint64_t state, int q) {
@@ -86,6 +87,9 @@ extern board_t standardize(board_t board);
 // Random board and side generation
 extern side_t random_side(Random& random);
 extern board_t random_board(Random& random);
+
+// Generate a random board with n stones
+extern board_t random_board(Random& random, int n);
 
 extern string str_board(board_t board);
 

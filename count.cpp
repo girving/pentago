@@ -4,6 +4,7 @@
 #include <other/core/array/sort.h>
 #include <other/core/math/uint128.h>
 #include <other/core/python/module.h>
+#include <other/core/random/Random.h>
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/remove_const_reference.h>
 #include <tr1/unordered_map>
@@ -27,7 +28,7 @@ template<int d_> struct Polynomial {
   unordered_map<Vector<int,d>,uint128_t,Hasher> x;
 
   Polynomial() {}
-  
+
   Polynomial(uint128_t a) {
     x[Vector<int,d>()] = a;
   }
@@ -54,7 +55,7 @@ template<int d> Polynomial<d>& operator*=(Polynomial<d>& f, const Polynomial<d>&
 
 template<int d> Polynomial<d>& operator+=(Polynomial<d>& f, const Polynomial<d>& g) {
   for (auto& m : g.x)
-    f.x[m.first] += m.second; 
+    f.x[m.first] += m.second;
   return f;
 }
 
@@ -69,10 +70,10 @@ template<int fd,class Gs> auto compose(const Polynomial<fd>& f, const Gs& g)
     for (int i=0;i<fd;i++)
       if (fm.first[i]) {
         while (gp[i].size()<fm.first[i])
-          gp[i].push_back(gp[i].size()?g[i]*gp[i].back():g[i]); 
+          gp[i].push_back(gp[i].size()?g[i]*gp[i].back():g[i]);
         m *= gp[i][fm.first[i]-1];
       }
-    fg += m; 
+    fg += m;
   }
   return fg;
 }
@@ -159,7 +160,9 @@ Polynomial<2> count_generator() {
   return F;
 }
 
-static uint128_t supercount_boards(int n) {
+}
+
+uint64_t supercount_boards(int n) {
   static Polynomial<2> F;
   if (!F.x.size())
     F = count_generator();
@@ -168,10 +171,57 @@ static uint128_t supercount_boards(int n) {
   return it!=F.x.end()?it->second:0;
 }
 
+static uint64_t safe_mul(uint64_t a, uint64_t b) {
+  uint128_t ab = uint128_t(a)*b;
+  OTHER_ASSERT(!(ab>>64));
+  return uint64_t(ab);
 }
+
+uint64_t choose(int n, int k) {
+  if (n<0 || k<0 || k>n)
+    return 0;
+  k = max(k,n-k);
+  uint64_t result = 1;
+  for (int i=n;i>k;i--)
+    result = safe_mul(result,i);
+  for (int i=2;i<=n-k;i++)
+    result /= i;
+  return result;
+}
+
+double estimate_choose(int n, int k) {
+  return exp(lgamma(n+1)-lgamma(k+1)-lgamma(n-k+1));
+}
+
+// List all unstandardized boards with n stones, assuming black plays first
+uint64_t count_boards(int n) {
+  OTHER_ASSERT(0<=n && n<=36);
+  return choose(36,n)*choose(n,n/2);
+}
+
+double estimate_count_boards(int n) {
+  OTHER_ASSERT(0<=n && n<=36);
+  return estimate_choose(36,n)*estimate_choose(n,n/2);
+}
+
+double estimate_supercount_boards(int n, double tol) {
+  OTHER_ASSERT(0<=n && n<=36);
+  int steps = ceil(2048/sqr(tol));
+  OTHER_ASSERT(steps*sqr(tol)>=2048);
+  int hits = 0;
+  Ref<Random> random = new_<Random>(283111);
+  for (int s=0;s<steps;s++) {
+    const board_t board = random_board(random,n);
+    if (board==superstandardize(board).x)
+      hits++;
+  }
+  return (double)hits/steps*estimate_count_boards(n);
+}
+
 }
 using namespace pentago;
 
 void wrap_count() {
-  OTHER_FUNCTION(supercount_boards)  
+  OTHER_FUNCTION(supercount_boards)
+  OTHER_FUNCTION(estimate_supercount_boards)
 }
