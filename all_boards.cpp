@@ -22,8 +22,6 @@ using std::cout;
 using std::endl;
 using std::vector;
 
-OTHER_DEFINE_TYPE(AllBoards)
-
 template<int symmetries> static inline board_t maybe_standardize(board_t board);
 template<> inline board_t maybe_standardize<1>(board_t board) { return board; }
 template<> inline board_t maybe_standardize<8>(board_t board) { return standardize(board); }
@@ -212,29 +210,7 @@ Tuple<Section,uint8_t> Section::standardize() const {
   return tuple(best,best_g);
 }
 
-AllBoards::AllBoards() {
-  // Sort quadrants minimal w.r.t. rotation only by the superstandardized value
-  Array<quadrant_t> all_rmins;
-  for (quadrant_t q=0;q<quadrant_count;q++)
-    if (rotation_standardize_quadrant(q)==q)
-      all_rmins.append(q);
-
-  // Partition all_rmins based on the number of black and white stones
-  Array<int> counts(buckets);
-  for (auto q : all_rmins)
-    counts[tri(count(q))]++;
-  NestedArray<quadrant_t> rmins(counts,false);
-  counts.zero();
-  for (auto q : all_rmins) {
-    int i = tri(count(q));
-    rmins(i,counts[i]++) = q;
-  }
-  const_cast_(this->rmins) = rmins;
-}
-
-AllBoards::~AllBoards() {}
-
-Array<Section> AllBoards::sections(int n, bool standardized) const {
+Array<Section> all_boards_sections(int n, bool standardized) {
   OTHER_ASSERT(0<=n && n<=36);
   const int white = n/2, black = n-white;
   Array<Section> sections;
@@ -271,14 +247,14 @@ Array<Section> AllBoards::sections(int n, bool standardized) const {
   return sections;
 }
 
-uint64_t AllBoards::stats(int n) const {
-  Array<Section> sections = this->sections(n,false);
+uint64_t all_boards_stats(int n) {
+  Array<Section> sections = all_boards_sections(n,false);
   int reduced_sections = 0;
   uint64_t max_section = 0;
   uint64_t total = 0;
   uint64_t reduced_total = 0;
   for (Section s : sections) {
-    const uint64_t size = this->size(s);
+    const uint64_t size = s.size();
     max_section = max(max_section,size);
     total += size;
     if (s.standardize().x==s) {
@@ -293,13 +269,13 @@ uint64_t AllBoards::stats(int n) const {
   return reduced_total;
 }
 
-Array<board_t> AllBoards::list(int n) const {
-  Array<Section> sections = this->sections(n,true);
+Array<board_t> all_boards_list(int n) {
+  Array<Section> sections = all_boards_sections(n,true);
 
   // Make sure we fit into Array
   uint64_t large_count = 0;
   for (Section s : sections)
-    large_count += size(s);
+    large_count += s.size();
   const int small_count = large_count;
   OTHER_ASSERT(small_count>0 && small_count==large_count);
 
@@ -308,10 +284,10 @@ Array<board_t> AllBoards::list(int n) const {
   list.preallocate(small_count);
   for (Section s : sections) {
     check_interrupts();
-    RawArray<const quadrant_t> bucket0 = rmins[tri(s.counts[0])],
-                               bucket1 = rmins[tri(s.counts[1])],
-                               bucket2 = rmins[tri(s.counts[2])],
-                               bucket3 = rmins[tri(s.counts[3])];
+    RawArray<const quadrant_t> bucket0 = rotation_minimal_quadrants(s.counts[0]),
+                               bucket1 = rotation_minimal_quadrants(s.counts[1]),
+                               bucket2 = rotation_minimal_quadrants(s.counts[2]),
+                               bucket3 = rotation_minimal_quadrants(s.counts[3]);
     for (auto q0 : bucket0)
       for (auto q1 : bucket1)
         for (auto q2 : bucket2)
@@ -321,8 +297,8 @@ Array<board_t> AllBoards::list(int n) const {
   return list;
 }
 
-void AllBoards::test(int n, int steps) const {
-  Array<Section> sections = this->sections(n,true);
+void all_boards_sample_test(int n, int steps) {
+  Array<Section> sections = all_boards_sections(n,true);
 
   // Generate a bunch of random boards, and check that each one occurs in a section
   Ref<Random> random = new_<Random>(175131);
@@ -340,14 +316,14 @@ void AllBoards::test(int n, int steps) const {
     // Does the board occur in the section?
     const board_t sboard = transform_board(symmetry_t(g,0),board);
     for (int i=0;i<4;i++) {
-      RawArray<const quadrant_t> bucket = rmins[tri(ss.counts[i])]; 
+      RawArray<const quadrant_t> bucket = rotation_minimal_quadrants(ss.counts[i]); 
       const quadrant_t q = quadrant(sboard,i);
       OTHER_ASSERT(std::binary_search(bucket.begin(),bucket.end(),rotation_standardize_quadrant(q)));
     }
   }
 }
 
-bool AllBoards::is_subset(RawArray<const board_t> boards0, RawArray<const board_t> boards1) {
+bool sorted_array_is_subset(RawArray<const board_t> boards0, RawArray<const board_t> boards1) {
   if (boards0.size()>boards1.size())
     return false;
   int i1 = 0;
@@ -375,13 +351,8 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards)
   OTHER_FUNCTION(distinguishing_hash_bits)
   OTHER_FUNCTION(minimal_quadrants)
-
-  typedef AllBoards Self;
-  Class<AllBoards>("AllBoards")
-    .OTHER_INIT()
-    .OTHER_METHOD(stats)
-    .OTHER_METHOD(list)
-    .OTHER_METHOD(test)
-    .OTHER_METHOD(is_subset)
-    ;
+  OTHER_FUNCTION(all_boards_stats)
+  OTHER_FUNCTION(all_boards_list)
+  OTHER_FUNCTION(all_boards_sample_test)
+  OTHER_FUNCTION(sorted_array_is_subset)
 }

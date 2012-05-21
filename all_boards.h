@@ -5,6 +5,23 @@
 #include <other/core/array/NestedArray.h>
 namespace pentago {
 
+// Count stones in a quadrant
+static inline Vector<uint8_t,2> count(quadrant_t q) {
+  return vec((uint8_t)popcount(unpack(q,0)),(uint8_t)popcount(unpack(q,1)));
+}
+
+// All rotation minimal quadrants with the given numbers of stones
+static inline RawArray<const quadrant_t> rotation_minimal_quadrants(int black, int white) {
+  assert(0<=black && 0<=white && black+white<=9);
+  const int i = ((black*(21-black))>>1)+white;
+  const uint16_t lo = rotation_minimal_quadrants_offsets[i],
+                 hi = rotation_minimal_quadrants_offsets[i+1];
+  return RawArray<const quadrant_t>(hi-lo,rotation_minimal_quadrants_flat+lo);
+}
+static inline RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8_t,2> counts) {
+  return rotation_minimal_quadrants(counts.x,counts.y);
+}
+
 struct Section {
   Vector<Vector<uint8_t,2>,4> counts;
 
@@ -31,58 +48,30 @@ struct Section {
     return sig()>s.sig();
   }
 
+  uint64_t size() const {
+    return (uint64_t)rotation_minimal_quadrants(counts[0]).size()
+                    *rotation_minimal_quadrants(counts[1]).size()
+                    *rotation_minimal_quadrants(counts[2]).size()
+                    *rotation_minimal_quadrants(counts[3]).size();
+  }
+
   Section transform(uint8_t global) const;
   Tuple<Section,uint8_t> standardize() const;
 };
 
-class AllBoards : public Object {
-public:
-  OTHER_DECLARE_TYPE
+// Enumerate the different ways n stones can be distributed into the four quadrants
+Array<Section> all_boards_sections(int n, bool standardized);
 
-  // Sorted lists of quadrants minimal w.r.t. rotations but *not* reflections.
-  // The outer nested array dimension is indexed by tri(b,w), where b and w are the counts of black and white stones.
-  // rmins partitioned by the number of black and white stones.
-  const NestedArray<const quadrant_t> rmins;
+// Print statistics about the set of n stone positions, and return the total number including redundancies
+uint64_t all_boards_stats(int n);
 
-  static const int buckets = 10*(10+1)/2; // rmins.size()
+// Enumerate all supersymmetric n stone positions, with some redundancy
+Array<board_t> all_boards_list(int n);
 
-protected:
-  AllBoards();
-public:
-  ~AllBoards();
+// Test our enumeration
+void all_boards_sample_test(int n, int steps);
 
-  // Index into rmins
-  static int tri(int b, int w) {
-    assert(0<=b && 0<=w && b+w<=9);
-    return ((b*(21-b))>>1)+w;
-  }
+// Given two sorted lists of boards, check that the first is contained in the second
+bool sorted_array_is_subset(RawArray<const board_t> boards0, RawArray<const board_t> boards1);
 
-  static int tri(Vector<uint8_t,2> bw) {
-    return tri(bw.x,bw.y);
-  }
-
-  // Count stones in a quadrant
-  static Vector<uint8_t,2> count(quadrant_t q) {
-    return vec((uint8_t)popcount(unpack(q,0)),(uint8_t)popcount(unpack(q,1)));
-  }
-
-  uint64_t size(Section s) const {
-    return (uint64_t)rmins.size(tri(s.counts[0]))*rmins.size(tri(s.counts[1]))*rmins.size(tri(s.counts[2]))*rmins.size(tri(s.counts[3]));
-  }
-
-  // Enumerate the different ways n stones can be distributed into the four quadrants
-  Array<Section> sections(int n, bool standardized) const;
-
-  // Print statistics about the set of n stone positions, and return the total number including redundancies
-  uint64_t stats(int n) const;
-
-  // Enumerate all n stone positions
-  Array<board_t> list(int n) const;
-
-  // Test our enumeration
-  void test(int n, int steps) const;
-
-  // Given two sorted lists of boards, check that the first is contained in the second
-  static bool is_subset(RawArray<const board_t> boards0, RawArray<const board_t> boards1);
-};
 }

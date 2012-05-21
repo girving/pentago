@@ -456,6 +456,33 @@ def superstandardize_table():
   assert ahash(table)==-1406557380251171136
   return [('uint8_t','superstandardize_table','%d',table)]
 
+@remember
+def rotation_minimal_quadrants():
+  # Find quadrants minimal w.r.t. rotations but not necessarily reflections 
+  q = arange(3**9)
+  s0,s1 = unpack().T
+  rot = rotations()[:,0]
+  pack_ = pack()
+  for r in 1,2,3:
+    s0 = rot[s0]
+    s1 = rot[s1]
+    q = minimum(q,pack_[s0]+2*pack_[s1])
+  all_rmins, = nonzero(q==arange(3**9))   
+  # Partition quadrants by stone counts
+  s0,s1 = unpack()[all_rmins].T
+  b = small_popcounts()[s0]
+  w = small_popcounts()[s1]
+  i = ((b*(21-b))//2)+w
+  rmins = [all_rmins[nonzero(i==k)[0]] for k in xrange(10*(10+1)//2)]
+  assert sum(map(len,rmins))==len(all_rmins)
+  # Save as a nested array
+  offsets = cumsum(hstack([0,map(len,rmins)]))
+  flat = hstack(rmins)
+  assert ahash(offsets)==4726690024650118399
+  assert ahash(flat)==-7853050755204583428
+  return [('uint16_t','rotation_minimal_quadrants_offsets','%d',offsets)
+         ,('uint16_t','rotation_minimal_quadrants_flat','%d',hstack(rmins))]
+
 def cpp_sizes(data):
   return ''.join('[%d]'%n for n in data.shape)
 

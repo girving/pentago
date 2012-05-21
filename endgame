@@ -106,11 +106,10 @@ def probability():
 
 @command
 def approx():
-  gen = AllBoards()
   total = 0
   raw_total = 0
   for n in xrange(37):
-    total += gen.stats(n)
+    total += all_boards_stats(n)
     raw_total += supercount_boards(n)
   print 'grand total = %d, grand ratio = %g'%(total,total/raw_total)
 
