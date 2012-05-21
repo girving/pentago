@@ -8,6 +8,13 @@ from numpy import *
 from other.core import *
 from other.core.value import parser
 
+# Decorator for tables we want to save
+remembered = []
+def remember(f):
+  f = cache(f)
+  remembered.append(f)
+  return f
+
 def qbit(x,y):
   return 1<<(3*x+y)
 
@@ -99,7 +106,7 @@ def win_contributions():
   assert ahash(table)==5134745501271341312
   return table
 
-@cache
+@remember
 def show_win_contributions():
   return [('uint64_t','win_contributions','0x%xL',win_contributions())]
 
@@ -119,11 +126,11 @@ def rotations():
   assert ahash(table)==-631278374917950784
   return table
 
-@cache
+@remember
 def show_rotations():
   return [('uint16_t','rotations','0x%x',rotations())]
 
-@cache
+@remember
 def rotated_win_contributions():
   wins = win_contributions()
   rot = rotations()
@@ -135,7 +142,7 @@ def if_(c,a,b):
   c = c!=0
   return c*a+(1-c)*b
 
-@cache
+@remember
 def unrotated_win_distances():
   # Work out the various ways of winning
   patterns = win_patterns().reshape(2,16)
@@ -160,7 +167,7 @@ def unrotated_win_distances():
   assert ahash(table)==8251429364477897294
   return [('uint64_t','unrotated_win_distances','0x%xL',table)]
 
-@cache
+@remember
 def arbitrarily_rotated_win_distances():
   # Work out the various ways of winning, allowing arbitrarily many rotations
   patterns = win_patterns().reshape(2,16)
@@ -193,7 +200,7 @@ def arbitrarily_rotated_win_distances():
   assert ahash(table)==-3594567715319576186
   return [('uint64_t','arbitrarily_rotated_win_distances','0x%xL',table)]
 
-@cache
+@remember
 def rotated_win_distances():
   # Work out the various ways of winning, allowing at most one quadrant to rotate
   patterns = win_patterns()
@@ -229,7 +236,7 @@ def rotated_win_distances():
   assert ahash(table)==-1851827180569519993
   return [('uint64_t','rotated_win_distances','0x%xL',table)]
 
-@cache
+@remember
 def reflections():
   table = zeros(512,dtype=int16)
   for v in xrange(512):
@@ -258,7 +265,7 @@ def pack():
   assert ahash(pack)==3488108636539942373
   return pack
 
-@cache
+@remember
 def show_pack():
   return [('uint16_t','pack_table','%d',pack())]
 
@@ -279,13 +286,14 @@ def unpack():
   assert ahash(unpack)==-3185216453998868236
   return unpack
 
+@remember
 def show_unpack():
   return [('uint16_t','unpack_table','0x%x',unpack())]
 
 # pack and unpack should be inverses
 assert all(pack()[unpack()[:,0]]+2*pack()[unpack()[:,1]]==arange(3**9))
 
-@cache
+@remember
 def moves():
   '''Given a quadrant, compute all possible moves by player 0 as a function of the set of filled spaces, stored as a nested array.'''
   moves = []
@@ -309,7 +317,7 @@ def moves():
   return [('uint16_t','move_offsets','%d',offsets)
          ,('uint16_t','move_flat','%d',flat)]
 
-@cache
+@remember
 def superwin_info():
   all_rotations = empty((512,4),int16)
   all_rotations[:,0] = arange(512)
@@ -353,7 +361,7 @@ def superwin_info():
   assert ahash(info)==-6962575331390442688
   return [('uint64_t','superwin_info','0x%xL',info)]
 
-@cache
+@remember
 def commute_global_local_symmetries():
   # Represent the various symmetries as subgroups of S_{6*6}
   n = arange(6)
@@ -432,10 +440,10 @@ def commute_global_local_symmetries():
   assert ahash(table)==4955614325833109504
   return [('uint8_t','commute_global_local_symmetries','%d',table)]
 
-@cache
+@remember
 def superstandardize_table():
   # Given the relative rankings of the four quadrants, determine the global rotation that minimizes the board value
-  rotate = empty((4,4),int) 
+  rotate = empty((4,4),int)
   rotate[0] = arange(4)
   rotate[1] = [2,0,3,1]
   rotate[2] = rotate[1,rotate[1]]
@@ -480,16 +488,4 @@ if __name__=='__main__':
   parser.parse('Pentago precomputation script',positional=[prefix])
   if not os.path.exists(prefix()):
     os.makedirs(prefix())
-  save('tables',superwin_info()
-               +superstandardize_table()
-               +commute_global_local_symmetries()
-               +show_win_contributions()
-               +rotated_win_contributions()
-               +unrotated_win_distances()
-               +arbitrarily_rotated_win_distances()
-               +rotated_win_distances()
-               +show_rotations()
-               +reflections()
-               +show_pack()
-               +show_unpack()
-               +moves())
+  save('tables',[t for f in remembered for t in f()])
