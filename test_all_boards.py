@@ -15,11 +15,9 @@ def all_boards_test(symmetries):
   elif symmetries==2048:
     sizes = [1,3,30,227,2013,13065,90641,493844,2746022,12420352,56322888]
     hashes = [8,410212465185018089,-5518763455213967035,4939794567825530384,4040790906611107384,1937332596658284469,-6778473604366810076,4708544786165225203,6204346775015887223,-1601224996803759779,-5782498499478641186]
-    approx_sizes = [1,9,108,777,6114,35515,221421,1106982,5720853,24387986,104415100]
-    approx_hashes = [8,1242124013316135169,4596365112089932754,3766756570253749938,-5385124322950766719,-8464112590199284450,-2549407299935802811,441659361128612490,2377047564873664112,157682083666922903,4533891953974912788]
-    simple_sizes = [1,3,36,286,2816,15772,105628,565020]
-    simple_hashes = [8,410212465185018089,3750615323228832946,4453299882991147388,831431775888651986,-4529085327117717784,4461946080405445225,-2486816462738686179,-7520427304258638725,-3660154264915719466,-9135464216135215359]
-    generator = ApproximateBoards()
+    approx_sizes = [1,3,36,286,2816,15772,105628,565020]
+    approx_hashes = [8,410212465185018089,-1662608180067154078,-7047827481926299996,2843504063880042090,6662376299248310788,-5638710477457538887,6279152328712157581,34579930516338039,259199675726595994,-4927414379464215279]
+    generator = AllBoards()
   assert len(sizes)==len(hashes)
   for n in xrange(5 if symmetries==1 else 6):
     boards = all_boards(n,symmetries)
@@ -35,20 +33,11 @@ def all_boards_test(symmetries):
       boards.sort()
       assert len(boards)==supercount_boards(n)
       assert len(unique(boards))==len(boards)
-      # Nonsimple
       approx = generator.list(n)
       h = ahash(approx)
       print 'approx: count = %d, hash = %d, ratio %g'%(len(approx),h,len(approx)/sizes[n])
       assert sizes[n]<=len(approx)==approx_sizes[n]
       assert approx_hashes[n]==h
-      approx.sort()
-      assert generator.is_subset(boards,approx)
-      # Simple
-      approx = generator.simple_list(n)
-      h = ahash(approx)
-      print 'simple: count = %d, hash = %d, ratio %g'%(len(approx),h,len(approx)/sizes[n])
-      assert sizes[n]<=len(approx)==simple_sizes[n]
-      assert simple_hashes[n]==h
       approx = superstandardize(approx)
       approx.sort()
       assert generator.is_subset(boards,approx)
@@ -70,11 +59,11 @@ def test_small_hashes():
   assert distinguishing_hash_bits(boards)==9
 
 def test_approx():
-  approx = ApproximateBoards()
+  approx = AllBoards()
   for n in xrange(0,37):
     steps = min(100000,supercount_boards(n))
-    print 'simple_test: n = %d, steps = %d'%(n,steps)
-    approx.simple_test(n,steps)
+    print 'approx test: n = %d, steps = %d'%(n,steps)
+    approx.test(n,steps)
 
 if __name__=='__main__':
   test_approx()
