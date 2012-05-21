@@ -248,6 +248,10 @@ Array<Section> all_boards_sections(int n, bool standardized) {
 }
 
 uint64_t all_boards_stats(int n) {
+  if (n==0) {
+    RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
+    cout << "maximum rmin bucket size = "<<(offsets.slice(1,offsets.size())-offsets.slice(0,offsets.size()-1)).max()<<endl;
+  }
   Array<Section> sections = all_boards_sections(n,false);
   int reduced_sections = 0;
   uint64_t max_section = 0;
