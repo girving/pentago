@@ -60,7 +60,7 @@ struct Section {
 };
 
 // Enumerate the different ways n stones can be distributed into the four quadrants
-Array<Section> all_boards_sections(int n, bool standardized);
+Array<Section> all_boards_sections(int n, bool standardized=true);
 
 // Print statistics about the set of n stone positions, and return the total number including redundancies
 uint64_t all_boards_stats(int n);

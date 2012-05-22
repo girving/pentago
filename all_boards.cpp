@@ -247,6 +247,13 @@ Array<Section> all_boards_sections(int n, bool standardized) {
   return sections;
 }
 
+Array<uint64_t> all_boards_section_sizes(int n) {
+  Array<uint64_t> sizes;
+  for (Section s : all_boards_sections(n))
+    sizes.append(s.size());
+  return sizes;
+}
+
 uint64_t all_boards_stats(int n) {
   if (n==0) {
     RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
@@ -274,7 +281,7 @@ uint64_t all_boards_stats(int n) {
 }
 
 Array<board_t> all_boards_list(int n) {
-  Array<Section> sections = all_boards_sections(n,true);
+  Array<Section> sections = all_boards_sections(n);
 
   // Make sure we fit into Array
   uint64_t large_count = 0;
@@ -302,7 +309,7 @@ Array<board_t> all_boards_list(int n) {
 }
 
 void all_boards_sample_test(int n, int steps) {
-  Array<Section> sections = all_boards_sections(n,true);
+  Array<Section> sections = all_boards_sections(n);
 
   // Generate a bunch of random boards, and check that each one occurs in a section
   Ref<Random> random = new_<Random>(175131);
@@ -358,5 +365,6 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards_stats)
   OTHER_FUNCTION(all_boards_list)
   OTHER_FUNCTION(all_boards_sample_test)
+  OTHER_FUNCTION(all_boards_section_sizes)
   OTHER_FUNCTION(sorted_array_is_subset)
 }

@@ -113,6 +113,15 @@ def approx():
     raw_total += supercount_boards(n)
   print 'grand total = %d, grand ratio = %g'%(total,total/raw_total)
 
+@command
+def sections():
+  sizes = sort(hstack([all_boards_section_sizes(n) for n in xrange(37)])).astype(double)
+  totals = cumsum(sizes)
+  fractions = totals/totals[-1]
+  import pylab 
+  pylab.plot(sizes,fractions) 
+  pylab.show()
+
 if __name__=='__main__':
   command = PropManager.add('command','patterns').set_allowed(commands.keys())
   parser.parse('Endgame related stuff',positional=[command])
