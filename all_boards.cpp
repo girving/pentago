@@ -188,20 +188,20 @@ static quadrant_t rotation_standardize_quadrant(quadrant_t q) {
   return minq;
 }
 
-Section Section::transform(uint8_t global) const {
+section_t section_t::transform(uint8_t global) const {
   const int r = global&3;
   static uint8_t source[4][4] = {{0,1,2,3},{1,3,0,2},{3,2,1,0},{2,0,3,1}};
-  Section t(vec(counts[source[r][0]],counts[source[r][1]],counts[source[r][2]],counts[source[r][3]]));
+  section_t t(vec(counts[source[r][0]],counts[source[r][1]],counts[source[r][2]],counts[source[r][3]]));
   if (global&4)
     swap(t.counts[0],t.counts[3]);
   return t;
 }
 
-Tuple<Section,uint8_t> Section::standardize() const {
-  Section best = *this;
+Tuple<section_t,uint8_t> section_t::standardize() const {
+  section_t best = *this;
   uint8_t best_g = 0;
   for (int g=1;g<8;g++) {
-    Section t = transform(g);
+    section_t t = transform(g);
     if (best > t) {
       best = t;
       best_g = g;
@@ -210,10 +210,14 @@ Tuple<Section,uint8_t> Section::standardize() const {
   return tuple(best,best_g);
 }
 
-Array<Section> all_boards_sections(int n, bool standardized) {
+ostream& operator<<(ostream& output, section_t section) {
+  return output<<section.counts;
+}
+
+Array<section_t> all_boards_sections(int n, bool standardized) {
   OTHER_ASSERT(0<=n && n<=36);
   const int white = n/2, black = n-white;
-  Array<Section> sections;
+  Array<section_t> sections;
 
   // Loop over possible counts in quadrant 3
   for (int b3=0;b3<=min(black,9);b3++) {
@@ -234,7 +238,7 @@ Array<Section> all_boards_sections(int n, bool standardized) {
               // Quadrant 0's counts are now uniquely determined
               const int b0 = left1.x, w0 = left1.y;
               // We've found a section!
-              Section s(vec(Vector<uint8_t,2>(b0,w0),Vector<uint8_t,2>(b1,w1),Vector<uint8_t,2>(b2,w2),Vector<uint8_t,2>(b3,w3)));
+              section_t s(vec(Vector<uint8_t,2>(b0,w0),Vector<uint8_t,2>(b1,w1),Vector<uint8_t,2>(b2,w2),Vector<uint8_t,2>(b3,w3)));
               if (!standardized || s.standardize().x==s)
                 sections.append(s);
             }
@@ -249,7 +253,7 @@ Array<Section> all_boards_sections(int n, bool standardized) {
 
 Array<uint64_t> all_boards_section_sizes(int n) {
   Array<uint64_t> sizes;
-  for (Section s : all_boards_sections(n))
+  for (section_t s : all_boards_sections(n))
     sizes.append(s.size());
   return sizes;
 }
@@ -259,12 +263,12 @@ uint64_t all_boards_stats(int n) {
     RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
     cout << "maximum rmin bucket size = "<<(offsets.slice(1,offsets.size())-offsets.slice(0,offsets.size()-1)).max()<<endl;
   }
-  Array<Section> sections = all_boards_sections(n,false);
+  Array<section_t> sections = all_boards_sections(n,false);
   int reduced_sections = 0;
   uint64_t max_section = 0;
   uint64_t total = 0;
   uint64_t reduced_total = 0;
-  for (Section s : sections) {
+  for (section_t s : sections) {
     const uint64_t size = s.size();
     max_section = max(max_section,size);
     total += size;
@@ -281,11 +285,11 @@ uint64_t all_boards_stats(int n) {
 }
 
 Array<board_t> all_boards_list(int n) {
-  Array<Section> sections = all_boards_sections(n);
+  Array<section_t> sections = all_boards_sections(n);
 
   // Make sure we fit into Array
   uint64_t large_count = 0;
-  for (Section s : sections)
+  for (section_t s : sections)
     large_count += s.size();
   const int small_count = large_count;
   OTHER_ASSERT(small_count>0 && small_count==large_count);
@@ -293,7 +297,7 @@ Array<board_t> all_boards_list(int n) {
   // Collect boards
   Array<board_t> list;
   list.preallocate(small_count);
-  for (Section s : sections) {
+  for (section_t s : sections) {
     check_interrupts();
     RawArray<const quadrant_t> bucket0 = rotation_minimal_quadrants(s.counts[0]),
                                bucket1 = rotation_minimal_quadrants(s.counts[1]),
@@ -309,14 +313,14 @@ Array<board_t> all_boards_list(int n) {
 }
 
 void all_boards_sample_test(int n, int steps) {
-  Array<Section> sections = all_boards_sections(n);
+  Array<section_t> sections = all_boards_sections(n);
 
   // Generate a bunch of random boards, and check that each one occurs in a section
   Ref<Random> random = new_<Random>(175131);
   for (int step=0;step<steps;step++) {
     const board_t board = random_board(random,n);
-    const Section s(vec(count(quadrant(board,0)),count(quadrant(board,1)),count(quadrant(board,2)),count(quadrant(board,3))));
-    Section ss;uint8_t g;s.standardize().get(ss,g);
+    const section_t s(vec(count(quadrant(board,0)),count(quadrant(board,1)),count(quadrant(board,2)),count(quadrant(board,3))));
+    section_t ss;uint8_t g;s.standardize().get(ss,g);
     // Does this section exist?
     int si = std::lower_bound(sections.begin(),sections.end(),ss)-sections.begin();
     if (!(sections.valid(si) && sections[si]==ss)) {

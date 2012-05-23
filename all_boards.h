@@ -5,6 +5,8 @@
 #include <other/core/array/NestedArray.h>
 namespace pentago {
 
+using std::ostream;
+
 // Count stones in a quadrant
 static inline Vector<uint8_t,2> count(quadrant_t q) {
   return vec((uint8_t)popcount(unpack(q,0)),(uint8_t)popcount(unpack(q,1)));
@@ -22,12 +24,12 @@ static inline RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8
   return rotation_minimal_quadrants(counts.x,counts.y);
 }
 
-struct Section {
+struct section_t {
   Vector<Vector<uint8_t,2>,4> counts;
 
-  Section() {}
+  section_t() {}
 
-  Section(const Vector<Vector<uint8_t,2>,4>& counts)
+  section_t(const Vector<Vector<uint8_t,2>,4>& counts)
     : counts(counts) {}
 
   uint64_t sig() const {
@@ -36,31 +38,38 @@ struct Section {
     return s;
   }
 
-  bool operator==(const Section& s) const {
+  bool operator==(const section_t& s) const {
     return counts==s.counts;
   }
 
-  bool operator<(const Section& s) const {
+  bool operator<(const section_t& s) const {
     return sig()<s.sig();
   }
 
-  bool operator>(const Section& s) const {
+  bool operator>(const section_t& s) const {
     return sig()>s.sig();
   }
 
-  uint64_t size() const {
-    return (uint64_t)rotation_minimal_quadrants(counts[0]).size()
-                    *rotation_minimal_quadrants(counts[1]).size()
-                    *rotation_minimal_quadrants(counts[2]).size()
-                    *rotation_minimal_quadrants(counts[3]).size();
+  Vector<int,4> shape() const {
+    return vec(rotation_minimal_quadrants(counts[0]).size(),
+               rotation_minimal_quadrants(counts[1]).size(),
+               rotation_minimal_quadrants(counts[2]).size(),
+               rotation_minimal_quadrants(counts[3]).size());
   }
 
-  Section transform(uint8_t global) const;
-  Tuple<Section,uint8_t> standardize() const;
+  uint64_t size() const {
+    const auto s = shape();
+    return (uint64_t)s[0]*s[1]*s[2]*s[3];
+  }
+
+  section_t transform(uint8_t global) const;
+  Tuple<section_t,uint8_t> standardize() const;
 };
 
+ostream& operator<<(ostream& output, section_t section);
+
 // Enumerate the different ways n stones can be distributed into the four quadrants
-Array<Section> all_boards_sections(int n, bool standardized=true);
+Array<section_t> all_boards_sections(int n, bool standardized=true);
 
 // Print statistics about the set of n stone positions, and return the total number including redundancies
 uint64_t all_boards_stats(int n);
