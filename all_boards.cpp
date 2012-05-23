@@ -258,6 +258,18 @@ Array<uint64_t> all_boards_section_sizes(int n) {
   return sizes;
 }
 
+static string large(uint64_t x) {
+  string s = format("%llu",x);
+  int n = s.size(); 
+  string r;
+  for (int i=0;i<n;i++) {
+    if (i && (n-i)%3==0)
+      r.push_back(',');
+    r.push_back(s[i]);
+  }
+  return r;
+}
+
 uint64_t all_boards_stats(int n) {
   if (n==0) {
     RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
@@ -278,8 +290,8 @@ uint64_t all_boards_stats(int n) {
     }
   }
   const uint64_t exact = supercount_boards(n);
-  cout <<"n = "<<n<<", simple count = "<<reduced_total<<", ratio = "<<(double)reduced_total/exact<<", unreduced ratio = "<<(double)total/exact
-       <<", reduced sections = "<<reduced_sections<<", unreduced sections = "<<sections.size()<<", max section = "<<max_section<<", average section = "<<(double)total/sections.size()<<endl;
+  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %4d, unreduced sections = %5d, max section = %14s, average section = %g",
+    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,reduced_sections,sections.size(),large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;
 }
