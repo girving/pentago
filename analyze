@@ -111,7 +111,8 @@ def approx():
   for n in xrange(37):
     total += all_boards_stats(n)
     raw_total += supercount_boards(n)
-  print 'grand total = %d, grand ratio = %g'%(total,total/raw_total)
+  sections = sum(len(all_boards_sections(n,True)) for n in xrange(37))
+  print 'grand total = %d, grand ratio = %g, total sections = %d'%(total,total/raw_total,sections)
 
 @command
 def sections():
