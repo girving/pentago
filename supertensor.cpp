@@ -1,7 +1,8 @@
 // In memory and out-of-core operations on large four dimensional arrays of superscores
 
 #include "supertensor.h"
-#include <other/core/python/module.h>
+#include <other/core/python/Class.h>
+#include <other/core/python/to_python.h>
 #include <other/core/random/Random.h>
 #include <other/core/structure/HashtableIterator.h>
 #include <other/core/utility/const_cast.h>
@@ -13,6 +14,21 @@ namespace pentago {
 using std::cout;
 using std::cerr;
 using std::endl;
+
+struct supertensor_header_py : public Object, public supertensor_header_t {
+  OTHER_DECLARE_TYPE
+protected:
+  supertensor_header_py(supertensor_header_t h)
+    : supertensor_header_t(h) {}
+};
+
+OTHER_DEFINE_TYPE(supertensor_header_py)
+OTHER_DEFINE_TYPE(supertensor_reader_t)
+OTHER_DEFINE_TYPE(supertensor_writer_t)
+
+static PyObject* to_python(const supertensor_header_t& h) {
+  return to_python(new_<supertensor_header_py>(h));
+}
 
 Vector<int,4> supertensor_header_t::block_shape(Vector<int,4> block) const {
   OTHER_ASSERT((Vector<int,4>(blocks)-block).min()>=0);
@@ -286,61 +302,36 @@ void supertensor_writer_t::finalize() {
   fd.close();
 }
 
-static void supertensor_test(const string& path) {
-  // Choose tiny parameters
-  section_t section;
-  section.counts[0] = section.counts[1] = section.counts[3] = Vector<uint8_t,2>(2,0);
-  section.counts[2] = Vector<uint8_t,2>(1,1);
-  const bool wins_ties = 1;
-  const int block_size = 7;
-  const int filter = 0;
-  const int level = 6;
-
-  // Prepare for writing
-  supertensor_writer_t writer(path,wins_ties,section,block_size,filter,level);
-  OTHER_ASSERT((writer.header.blocks==Vector<uint16_t,4>(2,2,3,2)));
-
-  // Generate random data
-  Ref<Random> random = new_<Random>(631314);
-  Hashtable<Vector<int,4>,Array<super_t>> data;
-  for (int i=0;i<writer.header.blocks[0];i++)
-    for (int j=0;j<writer.header.blocks[1];j++)
-      for (int k=0;k<writer.header.blocks[2];k++)
-        for (int l=0;l<writer.header.blocks[3];l++) {
-          auto b = vec(i,j,k,l);
-          Array<super_t> block(writer.header.block_shape(b).product(),false);
-          for (super_t& s : block)
-            s = random_super(random); 
-          data.set(b,block);
-        }
-
-  // Write blocks out of arbitrary (hashed) order
-  for (HashtableIterator<Vector<int,4>,const Array<super_t>> it(data);it.valid();it.next())
-    writer.write_block(it.key(),it.data());
-  writer.finalize();
-
-  // Prepare for reading
-  supertensor_reader_t reader(path);
-  OTHER_ASSERT(reader.header.wins_ties==wins_ties);
-  OTHER_ASSERT(reader.header.section==section);
-  OTHER_ASSERT(reader.header.block_size==block_size);
-  OTHER_ASSERT(reader.header.filter==filter);
-
-  // Read and verify data in a different order than we wrote it
-  for (int l=0;l<writer.header.blocks[3];l++)
-    for (int i=0;i<writer.header.blocks[0];i++)
-      for (int k=0;k<writer.header.blocks[2];k++)
-        for (int j=0;j<writer.header.blocks[1];j++) {
-          auto b = vec(i,j,k,l);
-          Array<super_t> block(reader.header.block_shape(b).product(),false);
-          reader.read_block(b,block);
-          OTHER_ASSERT(block==data.get(b));
-        }
-}
-
 }
 using namespace pentago;
 
 void wrap_supertensor() {
-  OTHER_FUNCTION(supertensor_test)
+  {typedef supertensor_header_py Self;
+  Class<Self>("supertensor_header_t")
+    .OTHER_FIELD(version)
+    .OTHER_FIELD(valid)
+    .OTHER_FIELD(wins_ties)
+    .OTHER_FIELD(stones)
+    .OTHER_FIELD(section)
+    .OTHER_FIELD(shape)
+    .OTHER_FIELD(block_size)
+    .OTHER_FIELD(blocks)
+    .OTHER_FIELD(filter)
+    .OTHER_METHOD(block_shape)
+    ;}
+
+  {typedef supertensor_reader_t Self;
+  Class<Self>("supertensor_reader_t")
+    .OTHER_INIT(const string&)
+    .OTHER_FIELD(header)
+    .OTHER_METHOD(read_block)
+    ;}
+
+  {typedef supertensor_writer_t Self;
+  Class<Self>("supertensor_writer_t")
+    .OTHER_INIT(const string&,bool,section_t,int,int,int)
+    .OTHER_CONST_FIELD(header)
+    .OTHER_METHOD(write_block)
+    .OTHER_METHOD(finalize)
+    ;}
 }

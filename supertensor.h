@@ -50,15 +50,15 @@ struct supertensor_blob_t {
 
 struct supertensor_header_t {
   char magic[20]; // = "pentago supertensor\n"
-  int version; // 0 for now
+  uint32_t version; // 0 for now
   bool valid; // was the file finished?
   bool wins_ties; // the player who wins ties: 0 for black, 1 for white
-  uint8_t stones; // total number of stones
+  uint32_t stones; // total number of stones
   section_t section; // counts of black and white stones in each quadrant
   Vector<uint16_t,4> shape; // 4D shape of the entire array
   uint32_t block_size; // dimensions of each block (except for blocks at the ends, which may be smaller)
   Vector<uint16_t,4> blocks; // shape of the block array: ceil(shape/block_size)
-  int filter; // algorithm used to preprocess superscore data before zlib compression (0 for none)
+  uint32_t filter; // algorithm used to preprocess superscore data before zlib compression (0 for none)
   supertensor_blob_t index; // size and location of the compressed block index
 
   Vector<int,4> block_shape(Vector<int,4> block) const;
@@ -74,25 +74,33 @@ struct fildes_t : public boost::noncopyable {
   void close(); 
 };
 
-struct supertensor_reader_t : public boost::noncopyable {
+struct supertensor_reader_t : public Object {
+  OTHER_DECLARE_TYPE
+
   const fildes_t fd;
   const supertensor_header_t header;
   const NdArray<const supertensor_blob_t> index; // 4D
 
+protected:
   supertensor_reader_t(const string& path);
+public:
   ~supertensor_reader_t();
 
   void read_block(Vector<int,4> block, RawArray<super_t> data) const;
 };
 
-struct supertensor_writer_t : public boost::noncopyable {
+struct supertensor_writer_t : public Object {
+  OTHER_DECLARE_TYPE
+
   const string path;
   fildes_t fd;
   supertensor_header_t header; // incomplete until the destructor fires
   const int level; // zlib compression level
   const NdArray<supertensor_blob_t> index; // 4D
 
+protected:
   supertensor_writer_t(const string& path, bool wins_ties, section_t section, int block_size, int filter, int level);
+public:
   ~supertensor_writer_t();
 
   void write_block(Vector<int,4> block, RawArray<const super_t> data);

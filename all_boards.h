@@ -67,6 +67,10 @@ struct section_t {
 };
 
 ostream& operator<<(ostream& output, section_t section);
+PyObject* to_python(const section_t& section);
+} namespace other {
+template<> struct FromPython<pentago::section_t>{static pentago::section_t convert(PyObject* object);};
+} namespace pentago {
 
 // Enumerate the different ways n stones can be distributed into the four quadrants
 Array<section_t> all_boards_sections(int n, bool standardized=true);

@@ -214,6 +214,16 @@ ostream& operator<<(ostream& output, section_t section) {
   return output<<section.counts;
 }
 
+PyObject* to_python(const section_t& section) {
+  return to_python(section.counts);
+}
+
+} namespace other {
+pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
+  return pentago::section_t(from_python<Vector<Vector<uint8_t,2>,4>>(object));
+}
+} namespace pentago {
+
 Array<section_t> all_boards_sections(int n, bool standardized) {
   OTHER_ASSERT(0<=n && n<=36);
   const int white = n/2, black = n-white;
@@ -378,6 +388,7 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards)
   OTHER_FUNCTION(distinguishing_hash_bits)
   OTHER_FUNCTION(minimal_quadrants)
+  OTHER_FUNCTION(all_boards_sections)
   OTHER_FUNCTION(all_boards_stats)
   OTHER_FUNCTION(all_boards_list)
   OTHER_FUNCTION(all_boards_sample_test)
