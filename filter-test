@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+from __future__ import division
+from other.core import *
+from interface import *
+import time
+
+#def analyze(data):
+#  data = unpackbits(data.view(uint8)).reshape(*(data.shape+(4,4,4,4)))
+  
+def driver():
+  Log.configure('filter test',0,0,100)
+
+  # Choose parameters
+  section = (5,4),(4,5),(5,4),(4,5)
+  wins_ties = True 
+  block_size = 420
+  filter = 0
+  level = 6
+
+  # Prepare for writing
+  file = 'test-%d%d-%d%d-%d%d-%d%d.pentago'%tuple(ravel(section))
+  writer = supertensor_writer_t(file,wins_ties,section,block_size,filter,level)
+
+  # Compute the single block
+  data = empty(hstack([writer.header.block_shape(0),4]),uint64)
+  with Log.scope('compute'):
+    final_endgame_slice(wins_ties,section,0,data)
+    Log.write('nodes = %d'%product(data.shape[:4]))
+    Log.write('uncompressed size = %d'%data.view(uint8).size)
+
+  # Write
+  with Log.scope('write'):
+    writer.write_block(0,data)
+    writer.finalize()
+    Log.write('compressed size = %d'%writer.compressed_size(0))
+
+if __name__=='__main__':
+  driver()

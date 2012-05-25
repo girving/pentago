@@ -17,4 +17,5 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(count)
   OTHER_WRAP(trace)
   OTHER_WRAP(supertensor)
+  OTHER_WRAP(endgame)
 }

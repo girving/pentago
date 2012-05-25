@@ -27,7 +27,8 @@ def test_supertensor():
       for k in xrange(blocks[2]):
         for l in xrange(blocks[3]):
           b = i,j,k,l
-          data[b] = fromstring(random.bytes(32*product(writer.header.block_shape(b))),uint64).reshape(-1,4)
+          shape = writer.header.block_shape(b)
+          data[b] = fromstring(random.bytes(32*product(shape)),uint64).reshape(*hstack([shape,4]))
 
   # Write blocks out in arbitrary (hashed) order
   for b,block in data.iteritems():
@@ -48,7 +49,7 @@ def test_supertensor():
       for k in xrange(blocks[2]):
         for l in xrange(blocks[3]):
           b = i,j,k,l
-          block = empty((product(reader.header.block_shape(b)),4),uint64)
+          block = empty((tuple(reader.header.block_shape(b))+(4,)),uint64)
           reader.read_block(b,block)
           assert all(block==data[b])
 

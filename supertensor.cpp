@@ -1,11 +1,13 @@
 // In memory and out-of-core operations on large four dimensional arrays of superscores
 
 #include "supertensor.h"
+#include <other/core/array/IndirectArray.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/to_python.h>
 #include <other/core/random/Random.h>
 #include <other/core/structure/HashtableIterator.h>
 #include <other/core/utility/const_cast.h>
+#include <other/core/utility/Log.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -31,7 +33,7 @@ static PyObject* to_python(const supertensor_header_t& h) {
 }
 
 Vector<int,4> supertensor_header_t::block_shape(Vector<int,4> block) const {
-  OTHER_ASSERT((Vector<int,4>(blocks)-block).min()>=0);
+  OTHER_ASSERT(block.min()>=0 && (Vector<int,4>(blocks)-block).min()>=0);
   Vector<int,4> bs;
   for (int i=0;i<4;i++)
     bs[i] = block[i]+1<blocks[i]?block_size:shape[i]-block_size*(blocks[i]-1);
@@ -73,7 +75,7 @@ static void read_and_uncompress(int fd, RawArray<unsigned char> data, supertenso
     throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",blob.uncompressed_size,dest_size));
 }
 
-static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned char> data, int level) {
+static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned char> data, int level, bool verbose) {
   // Initialize blob
   supertensor_blob_t blob;
   blob.uncompressed_size = data.size();
@@ -87,6 +89,8 @@ static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned cha
   blob.offset = offset;
 
   // Compress
+  if (verbose)
+    Log::time("compress");
   unsigned long dest_size = compressBound(blob.uncompressed_size);
   Array<unsigned char> compressed(dest_size,false);
   int z = compress2(compressed.data(),&dest_size,(unsigned char*)data.data(),blob.uncompressed_size,level);
@@ -96,7 +100,11 @@ static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned cha
   blob.compressed_size = dest_size;
 
   // Write
+  if (verbose)
+    Log::time("write");
   ssize_t w = write(fd,compressed.data(),dest_size);
+  if (verbose)
+    Log::stop_time();
   if (w < 0 || w < (ssize_t)dest_size)
     throw IOError(format("failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
   return blob;
@@ -212,9 +220,10 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
 
 supertensor_reader_t::~supertensor_reader_t() {}
 
-void supertensor_reader_t::read_block(Vector<int,4> block, RawArray<super_t> data) const {
-  OTHER_ASSERT(data.size()==header.block_shape(block).product());
-  read_and_uncompress(fd.fd,char_view(data),index[block]);
+void supertensor_reader_t::read_block(Vector<int,4> block, NdArray<super_t> data) const {
+  OTHER_ASSERT(data.rank()==4);
+  OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
+  read_and_uncompress(fd.fd,char_view(data.flat),index[block]);
   if (header.filter)
     OTHER_ASSERT(false); 
 }
@@ -266,17 +275,18 @@ supertensor_writer_t::~supertensor_writer_t() {
   if (!header.valid) {
     // File wasn't finished (due to an error or a failure to call finalize), so delete it
     int r = unlink(path.c_str());
-    if (r < 0)
+    if (r < 0 && errno != ENOENT)
       cerr << format("failed to remove incomplete supertensor file \"%s\": %s",path,strerror(errno)) << endl;
   }
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<const super_t> data) {
-  OTHER_ASSERT(data.size()==header.block_shape(block).product());
+void supertensor_writer_t::write_block(Vector<int,4> block, NdArray<const super_t> data) {
+  OTHER_ASSERT(data.rank()==4);
+  OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
   if (header.filter)
     OTHER_ASSERT(false); 
-  index[block] = compress_and_write(fd.fd,char_view(data),level);
+  index[block] = compress_and_write(fd.fd,char_view(data.flat),level,true);
 }
 
 void supertensor_writer_t::finalize() {
@@ -290,7 +300,7 @@ void supertensor_writer_t::finalize() {
 
   // Write index
   supertensor_header_t h = header;
-  h.index = compress_and_write(fd.fd,char_view(index.flat),level);
+  h.index = compress_and_write(fd.fd,char_view(index.flat),level,false);
 
   // Finalize header
   h.valid = true;
@@ -300,6 +310,11 @@ void supertensor_writer_t::finalize() {
   write_header(fd.fd,h);
   header = h;
   fd.close();
+}
+
+uint64_t supertensor_writer_t::compressed_size(Vector<int,4> block) const {
+  header.block_shape(block); // check validity
+  return index[block].compressed_size; 
 }
 
 }
@@ -333,5 +348,6 @@ void wrap_supertensor() {
     .OTHER_CONST_FIELD(header)
     .OTHER_METHOD(write_block)
     .OTHER_METHOD(finalize)
+    .OTHER_METHOD(compressed_size)
     ;}
 }

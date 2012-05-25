@@ -35,6 +35,10 @@ namespace pentago {
  *       super_t block_data[][][][]; // each bit is true if the player to move wins
  *
  * All data is little endian.
+ *
+ * File version history:
+ *
+ * 0 - Initial unstable version
  */
 
 struct supertensor_blob_t {
@@ -50,7 +54,7 @@ struct supertensor_blob_t {
 
 struct supertensor_header_t {
   char magic[20]; // = "pentago supertensor\n"
-  uint32_t version; // 0 for now
+  uint32_t version; // see version history above
   bool valid; // was the file finished?
   bool wins_ties; // the player who wins ties: 0 for black, 1 for white
   uint32_t stones; // total number of stones
@@ -86,7 +90,7 @@ protected:
 public:
   ~supertensor_reader_t();
 
-  void read_block(Vector<int,4> block, RawArray<super_t> data) const;
+  void read_block(Vector<int,4> block, NdArray<super_t> data) const;
 };
 
 struct supertensor_writer_t : public Object {
@@ -103,8 +107,10 @@ protected:
 public:
   ~supertensor_writer_t();
 
-  void write_block(Vector<int,4> block, RawArray<const super_t> data);
+  void write_block(Vector<int,4> block, NdArray<const super_t> data);
   void finalize();
+
+  uint64_t compressed_size(Vector<int,4> block) const;
 };
 
 }
