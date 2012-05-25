@@ -8,6 +8,8 @@ namespace other {
 
 using namespace pentago;
 
+namespace {
+
 // Since there's no 256 bit dtype, map super_t to 4 uint64_t's
 template<> struct NumpyDescr<super_t> : public NumpyDescr<uint64_t> {};
 template<> struct NumpyIsStatic<super_t> : public mpl::true_ {};
@@ -22,6 +24,8 @@ template<> struct NumpyDescr<section_t> : public NumpyDescr<CV> {};
 template<> struct NumpyIsStatic<section_t> : public NumpyIsStatic<CV> {};
 template<> struct NumpyRank<section_t> : public NumpyRank<CV> {};
 template<> struct NumpyInfo<section_t> : public NumpyInfo<CV> {};
+
+}
 
 VECTOR_CONVERSIONS(2,uint8_t)
 VECTOR_CONVERSIONS(4,uint16_t)

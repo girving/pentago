@@ -69,7 +69,7 @@ template<int fd,class Gs> auto compose(const Polynomial<fd>& f, const Gs& g)
     Polynomial<gd> m = fm.second;
     for (int i=0;i<fd;i++)
       if (fm.first[i]) {
-        while (gp[i].size()<fm.first[i])
+        while ((int)gp[i].size()<fm.first[i])
           gp[i].push_back(gp[i].size()?g[i]*gp[i].back():g[i]);
         m *= gp[i][fm.first[i]-1];
       }

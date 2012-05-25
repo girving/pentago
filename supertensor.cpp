@@ -49,7 +49,7 @@ const char* zlib_error(int z) {
 static void read_and_uncompress(int fd, RawArray<unsigned char> data, supertensor_blob_t blob) {
   // Check consistency
   OTHER_ASSERT(blob.compressed_size<(uint64_t)1<<31);
-  OTHER_ASSERT(blob.uncompressed_size==data.size());
+  OTHER_ASSERT(blob.uncompressed_size==(uint64_t)data.size());
   OTHER_ASSERT(!blob.uncompressed_size || blob.offset);
   if (!blob.uncompressed_size)
     return;
@@ -58,11 +58,11 @@ static void read_and_uncompress(int fd, RawArray<unsigned char> data, supertenso
   off_t o = lseek(fd,blob.offset,SEEK_SET);
   if (o < 0)
     throw IOError(format("read_and_uncompress: lseek failed, %s",strerror(errno)));
-  OTHER_ASSERT(o==blob.offset);
+  OTHER_ASSERT(o==(off_t)blob.offset);
 
   // Read
   Array<unsigned char> compressed(blob.compressed_size,false);
-  OTHER_ASSERT(read(fd,compressed.data(),blob.compressed_size)==blob.compressed_size);
+  OTHER_ASSERT(read(fd,compressed.data(),blob.compressed_size)==(ssize_t)blob.compressed_size);
 
   // Decompress
   size_t dest_size = blob.uncompressed_size;
@@ -97,7 +97,7 @@ static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned cha
 
   // Write
   ssize_t w = write(fd,compressed.data(),dest_size);
-  if (w < 0 || w < dest_size)
+  if (w < 0 || w < (ssize_t)dest_size)
     throw IOError(format("failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
   return blob;
 }

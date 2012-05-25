@@ -83,7 +83,7 @@ void set_table_type(table_type_t type) {
     throw RuntimeError(format("transposition table already set to type %s, must reinitialize before changing to type %s",str(table_type),str(type)));
 
   // Allocate table if we haven't already
-  OTHER_ASSERT(!table.size() || table.size()==(uint64_t)1<<table_bits);
+  OTHER_ASSERT(!table.size() || (uint64_t)table.size()==(uint64_t)1<<table_bits);
   if (!table.size())
     table = Array<uint64_t>((uint64_t)1<<table_bits);
 }
@@ -111,7 +111,7 @@ void store(board_t board, score_t score) {
 Tuple<Array<board_t>,Array<score_t> > read_table(int max_count, int min_depth) {
   OTHER_ASSERT(table_bits>=10 && table_type!=blank_table);
   const uint64_t size = (1<<table_bits)-1;
-  OTHER_ASSERT(table.size()==size);
+  OTHER_ASSERT((uint64_t)table.size()==size);
   Array<board_t> boards;
   Array<score_t> scores;
   for (uint64_t h=0;h<size;h++) {

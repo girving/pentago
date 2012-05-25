@@ -48,7 +48,6 @@ static unordered_map<string,Ref<> > stats() {
   double time = get_current_time();
   unordered_map<string,Ref<> > stats;
   #define ST(stat) stats.insert(make_pair(string(#stat),steal_ref_check(to_python(stat))));
-  ST(expanded_nodes)
   ST(total_lookups)
   ST(successful_lookups)
   ST(distance_prunes)

@@ -141,7 +141,7 @@ template<int symmetries> static Array<board_t> all_boards_helper(int n) {
     }
   }
   const uint64_t count = count_boards(n);
-  OTHER_ASSERT((count+symmetries-1)/symmetries<=boards.size() && boards.size()<=count);
+  OTHER_ASSERT((count+symmetries-1)/symmetries<=(uint64_t)boards.size() && (uint64_t)boards.size()<=count);
   return boards;
 }
 
@@ -314,7 +314,7 @@ Array<board_t> all_boards_list(int n) {
   for (section_t s : sections)
     large_count += s.size();
   const int small_count = large_count;
-  OTHER_ASSERT(small_count>0 && small_count==large_count);
+  OTHER_ASSERT(small_count>0 && (uint64_t)small_count==large_count);
 
   // Collect boards
   Array<board_t> list;
