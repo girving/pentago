@@ -48,7 +48,7 @@ const char* zlib_error(int z) {
         :"unknown error";
 }
 
-static void read_and_uncompress(int fd, RawArray<unsigned char> data, supertensor_blob_t blob) {
+static void read_and_uncompress(int fd, RawArray<uint8_t> data, supertensor_blob_t blob) {
   // Check consistency
   OTHER_ASSERT(blob.compressed_size<(uint64_t)1<<31);
   OTHER_ASSERT(blob.uncompressed_size==(uint64_t)data.size());
@@ -63,19 +63,19 @@ static void read_and_uncompress(int fd, RawArray<unsigned char> data, supertenso
   OTHER_ASSERT(o==(off_t)blob.offset);
 
   // Read
-  Array<unsigned char> compressed(blob.compressed_size,false);
+  Array<uint8_t> compressed(blob.compressed_size,false);
   OTHER_ASSERT(read(fd,compressed.data(),blob.compressed_size)==(ssize_t)blob.compressed_size);
 
   // Decompress
   size_t dest_size = blob.uncompressed_size;
-  int z = uncompress((unsigned char*)data.data(),&dest_size,compressed.data(),blob.compressed_size);
+  int z = uncompress((uint8_t*)data.data(),&dest_size,compressed.data(),blob.compressed_size);
   if (z!=Z_OK)
     throw IOError(format("zlib failure in read_and_uncompress: %s",zlib_error(z)));
   if (dest_size != blob.uncompressed_size)
     throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",blob.uncompressed_size,dest_size));
 }
 
-static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned char> data, int level, bool verbose) {
+static supertensor_blob_t compress_and_write(int fd, RawArray<const uint8_t> data, int level, bool verbose) {
   // Initialize blob
   supertensor_blob_t blob;
   blob.uncompressed_size = data.size();
@@ -91,9 +91,9 @@ static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned cha
   // Compress
   if (verbose)
     Log::time("compress");
-  unsigned long dest_size = compressBound(blob.uncompressed_size);
-  Array<unsigned char> compressed(dest_size,false);
-  int z = compress2(compressed.data(),&dest_size,(unsigned char*)data.data(),blob.uncompressed_size,level);
+  size_t dest_size = compressBound(blob.uncompressed_size);
+  Array<uint8_t> compressed(dest_size,false);
+  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),blob.uncompressed_size,level);
   if (z!=Z_OK)
     throw IOError(format("zlib failure in compress_and_write: %s",zlib_error(z)));
   OTHER_ASSERT(dest_size<(uint64_t)1<<31);
@@ -110,10 +110,10 @@ static supertensor_blob_t compress_and_write(int fd, RawArray<const unsigned cha
   return blob;
 }
 
-template<class TA> static RawArray<typename CopyConst<unsigned char,typename TA::Element>::type> char_view(const TA& data) {
+template<class TA> static RawArray<typename CopyConst<uint8_t,typename TA::Element>::type> char_view(const TA& data) {
   uint64_t size = sizeof(typename TA::Element)*(size_t)data.size();
   OTHER_ASSERT(size<(uint64_t)1<<31);
-  typedef typename CopyConst<unsigned char,typename TA::Element>::type C;
+  typedef typename CopyConst<uint8_t,typename TA::Element>::type C;
   return RawArray<C>(size,(C*)data.data());
 }
 
@@ -225,7 +225,7 @@ void supertensor_reader_t::read_block(Vector<int,4> block, NdArray<super_t> data
   OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
   read_and_uncompress(fd.fd,char_view(data.flat),index[block]);
   if (header.filter)
-    OTHER_ASSERT(false); 
+    OTHER_ASSERT(false);
 }
 
 static void write_header(int fd, const supertensor_header_t& h) {
@@ -260,7 +260,7 @@ supertensor_writer_t::supertensor_writer_t(const string& path, bool wins_ties, s
   h.filter = filter;
   // valid and index will be finalized during the destructor
   h.valid = false;
-  const_cast_(header) = h; 
+  const_cast_(header) = h;
 
   // Write preliminary header
   write_header(fd.fd,h);
@@ -285,7 +285,7 @@ void supertensor_writer_t::write_block(Vector<int,4> block, NdArray<const super_
   OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
   if (header.filter)
-    OTHER_ASSERT(false); 
+    OTHER_ASSERT(false);
   index[block] = compress_and_write(fd.fd,char_view(data.flat),level,true);
 }
 
@@ -314,7 +314,7 @@ void supertensor_writer_t::finalize() {
 
 uint64_t supertensor_writer_t::compressed_size(Vector<int,4> block) const {
   header.block_shape(block); // check validity
-  return index[block].compressed_size; 
+  return index[block].compressed_size;
 }
 
 }

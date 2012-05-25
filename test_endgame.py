@@ -6,6 +6,8 @@ from interface import *
 import tempfile
 
 def test_supertensor():
+  Log.configure('test',0,1,0)
+
   # Choose tiny parameters
   section = (2,0),(2,0),(1,1),(2,0)
   wins_ties = True

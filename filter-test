@@ -16,7 +16,7 @@ def driver():
   wins_ties = True 
   block_size = 420
   filter = 0
-  level = 6
+  level = 4
 
   # Prepare for writing
   file = 'test-%d%d-%d%d-%d%d-%d%d.pentago'%tuple(ravel(section))
