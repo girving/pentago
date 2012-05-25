@@ -5,3 +5,4 @@ site_scons
 build
 *.pyc
 .DS_Store
+*.pentago
