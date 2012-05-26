@@ -157,7 +157,6 @@ static Array<const field_t> header_fields() {
   FIELD(magic);
   FIELD(version);
   FIELD(valid);
-  FIELD(wins_ties);
   FIELD(stones);
   FIELD(section);
   FIELD(shape);
@@ -196,11 +195,10 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
   // Verify header
   if (memcmp(h.magic,magic,20))
     throw IOError(format("invalid supertensor file \"%s\": incorrect magic string",path));
-  if (h.version)
+  if (h.version != 1)
     throw IOError(format("supertensor file \"%s\" has unknown version %d",path,h.version));
   if (!h.valid)
     throw IOError(format("supertensor file \"%s\" is marked invalid",path));
-  OTHER_ASSERT(h.wins_ties==(h.wins_ties!=0));
   OTHER_ASSERT(h.stones==h.section.counts.sum().sum());
   for (int i=0;i<4;i++) {
     OTHER_ASSERT(h.section.counts[i].max()<=9);
@@ -220,7 +218,7 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
 
 supertensor_reader_t::~supertensor_reader_t() {}
 
-void supertensor_reader_t::read_block(Vector<int,4> block, NdArray<super_t> data) const {
+void supertensor_reader_t::read_block(Vector<int,4> block, NdArray<Vector<super_t,2>> data) const {
   OTHER_ASSERT(data.rank()==4);
   OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
   read_and_uncompress(fd.fd,char_view(data.flat),index[block]);
@@ -239,7 +237,7 @@ static void write_header(int fd, const supertensor_header_t& h) {
     throw IOError(format("failed to write header to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
 }
 
-supertensor_writer_t::supertensor_writer_t(const string& path, bool wins_ties, section_t section, int block_size, int filter, int level)
+supertensor_writer_t::supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level)
   : path(check_extension(path))
   , fd(path,O_WRONLY|O_CREAT|O_TRUNC,0644)
   , header()
@@ -250,8 +248,7 @@ supertensor_writer_t::supertensor_writer_t(const string& path, bool wins_ties, s
   // Initialize header
   supertensor_header_t h;
   memcpy(h.magic,magic,20);
-  h.version = 0;
-  h.wins_ties = wins_ties;
+  h.version = 1;
   h.stones = section.counts.sum().sum();
   h.section = section;
   h.shape = Vector<uint16_t,4>(section.shape());
@@ -280,7 +277,7 @@ supertensor_writer_t::~supertensor_writer_t() {
   }
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, NdArray<const super_t> data) {
+void supertensor_writer_t::write_block(Vector<int,4> block, NdArray<const Vector<super_t,2>> data) {
   OTHER_ASSERT(data.rank()==4);
   OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
@@ -325,7 +322,6 @@ void wrap_supertensor() {
   Class<Self>("supertensor_header_t")
     .OTHER_FIELD(version)
     .OTHER_FIELD(valid)
-    .OTHER_FIELD(wins_ties)
     .OTHER_FIELD(stones)
     .OTHER_FIELD(section)
     .OTHER_FIELD(shape)
@@ -344,7 +340,7 @@ void wrap_supertensor() {
 
   {typedef supertensor_writer_t Self;
   Class<Self>("supertensor_writer_t")
-    .OTHER_INIT(const string&,bool,section_t,int,int,int)
+    .OTHER_INIT(const string&,section_t,int,int,int)
     .OTHER_CONST_FIELD(header)
     .OTHER_METHOD(write_block)
     .OTHER_METHOD(finalize)

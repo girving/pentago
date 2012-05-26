@@ -10,7 +10,7 @@ namespace pentago {
 using std::cout;
 using std::endl;
 
-template<bool wins_ties> static void final_endgame_slice_helper(section_t section, Vector<int,4> offset, NdArray<super_t> results) {
+static void final_endgame_slice(section_t section, Vector<int,4> offset, NdArray<Vector<super_t,2>> results) {
   // Check input consistency
   OTHER_ASSERT(results.rank()==4);
   OTHER_ASSERT(section.counts.sum().sum()==36);
@@ -45,7 +45,7 @@ template<bool wins_ties> static void final_endgame_slice_helper(section_t sectio
                      s2w = unpack(q2,1);
     const side_t s012b = quadrants(s0b,s1b,s2b,0),
                  s012w = quadrants(s0w,s1w,s2w,0);
-    RawArray<super_t> slice(shape[3],&results(i,j,k,0));
+    RawArray<Vector<super_t,2>> slice(shape[3],&results(i,j,k,0));
     // Do the inner loop in serial to avoid overhead
     for (int l=0;l<shape[3];l++) {
       const quadrant_t q3 = rmin[3][l],
@@ -55,19 +55,10 @@ template<bool wins_ties> static void final_endgame_slice_helper(section_t sectio
                    side_white = s012w|(side_t)s3w<<3*16;
       const super_t wins_black = super_wins(side_black),
                     wins_white = super_wins(side_white);
-      if (wins_ties==0) // black wins ties
-        slice[l] = wins_white&~wins_black;
-      else // white wins ties
-        slice[l] = wins_white|~wins_black;
+      slice[l][0] = wins_black&~wins_white;
+      slice[l][1] = wins_white&~wins_black;
     }
   }
-}
-
-static void final_endgame_slice(bool wins_ties, section_t section, Vector<int,4> offset, NdArray<super_t> results) {
-  if (wins_ties)
-    final_endgame_slice_helper<true >(section,offset,results);
-  else
-    final_endgame_slice_helper<false>(section,offset,results);
 }
 
 }

@@ -10,21 +10,25 @@ def driver():
 
   # Choose parameters
   section = (5,4),(4,5),(5,4),(4,5)
-  wins_ties = True 
   block_size = 420
   filter = 0
   level = 4
 
   # Prepare for writing
   file = 'test-%d%d-%d%d-%d%d-%d%d.pentago'%tuple(ravel(section))
-  writer = supertensor_writer_t(file,wins_ties,section,block_size,filter,level)
+  writer = supertensor_writer_t(file,section,block_size,filter,level)
 
   # Compute the single block
-  data = empty(hstack([writer.header.block_shape(0),4]),uint64)
+  data = empty(hstack([writer.header.block_shape(0),2,4]),uint64)
   with Log.scope('compute'):
-    final_endgame_slice(wins_ties,section,0,data)
+    final_endgame_slice(section,0,data)
     Log.write('nodes = %d'%product(data.shape[:4]))
     Log.write('uncompressed size = %d'%data.view(uint8).size)
+
+  # Filter
+  with Log.scope('filter'):
+    h = ahash(data)
+    interleave(data)
 
   # Write
   with Log.scope('write'):
@@ -32,12 +36,46 @@ def driver():
     writer.finalize()
     Log.write('compressed size = %d'%writer.compressed_size(0))
 
+  # Unfilter
+  with Log.scope('filter'):
+    uninterleave(data)
+    assert ahash(data)==h
+
   # Count
   with Log.scope('count'):
-    counts = count_causal_cases(data)
-    for m,(a,b) in enumerate(counts):
-      bits = (m>>arange(8))&1
-      Log.write('%s : counts %d %d, ratio %g'%(''.join('01'[b] for b in bits),a,b,b/(a+b)))
+    with Log.scope('count causal'):
+      counts = count_causal_cases(data).reshape(3**8,3)
+    with Log.scope('report causal'):
+      totals = sum(counts,axis=0)
+      def prob(p,axis=-1):
+        p = swapaxes(p,axis,-1)
+        p = p/sum(p,-1)[...,None]
+        return swapaxes(p,axis,-1)
+      def entropy(p,axis=-1):
+        p = prob(p,axis)
+        assert allclose(sum(p,-1),1)
+        return -sum(p*log(maximum(p,1e-20)),axis)
+      Log.write('totals = %s'%totals)
+      Log.write('probabilities = %s'%prob(totals))
+      Log.write('entropy = %g'%entropy(totals))
+      prediction = counts.argmax(axis=-1)
+      conditional = asarray([sum(counts*(prediction==n)[:,None],axis=0) for n in 0,1,2])
+      Log.write('conditional counts = \n%s'%conditional)
+      Log.write('conditional probabilities = \n%s'%prob(conditional))
+      Log.write('conditional entropies = %s'%entropy(conditional))
+      Log.write('conditional entropy = %s'%(sum(prob(conditional.sum(axis=-1),axis=0)*entropy(conditional))))
+    with Log.scope('count rotations'):
+      counts = count_rotation_cases(data)
+      assert counts.shape==(4,3**4)
+    with Log.scope('report rotations'):
+      totals = counts.sum(axis=0)
+      for k in argsort(totals)[::-1]:
+        v123,v0 = divmod(k,3)
+        v23,v1 = divmod(v123,3)
+        v3,v2 = divmod(v23,3)
+        Log.write('%d%d%d%d : %7d'%(v0,v1,v2,v3,totals[k]))
+      for i in xrange(4):
+        Log.write('entropy %d = %g'%(i,entropy(counts[i])))
 
 if __name__=='__main__':
   driver()

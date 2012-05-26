@@ -17,8 +17,8 @@ namespace pentago {
  *
  * Notes:
  * 1. The ordering of the block index and different chunks of block data is unspecified.
- * 2. Given a memory budget of M, the maximum possible block size is floor(sqrt(M/(32*420*420))).
- *    This is 13 for 1G, 19 for 2G.
+ * 2. Given a memory budget of M, the maximum possible block size is floor(sqrt(M/(64*420*420))).
+ *    This is 9 for 1G, 13 for 2G.
  *
  * On disk, the file format is
  *
@@ -31,14 +31,15 @@ namespace pentago {
  *
  *   // elsewhere
  *   char compressed_block_data[]; // zlib compressed block data, representing
- *     super_t filtered_block_data[][][][]; // filtered superscores, representing
- *       super_t block_data[][][][]; // each bit is true if the player to move wins
+ *     super_t filtered_block_data[][][][][2]; // filtered superscores, representing
+ *       super_t block_data[][][][][2]; // sequence of (black win, white win) pairs
  *
  * All data is little endian.
  *
  * File version history:
  *
  * 0 - Initial unstable version
+ * 1 - Switch to storing both black and white wins
  */
 
 struct supertensor_blob_t {
@@ -56,7 +57,6 @@ struct supertensor_header_t {
   char magic[20]; // = "pentago supertensor\n"
   uint32_t version; // see version history above
   bool valid; // was the file finished?
-  bool wins_ties; // the player who wins ties: 0 for black, 1 for white
   uint32_t stones; // total number of stones
   section_t section; // counts of black and white stones in each quadrant
   Vector<uint16_t,4> shape; // 4D shape of the entire array
@@ -90,7 +90,7 @@ protected:
 public:
   ~supertensor_reader_t();
 
-  void read_block(Vector<int,4> block, NdArray<super_t> data) const;
+  void read_block(Vector<int,4> block, NdArray<Vector<super_t,2>> data) const;
 };
 
 struct supertensor_writer_t : public Object {
@@ -103,11 +103,11 @@ struct supertensor_writer_t : public Object {
   const NdArray<supertensor_blob_t> index; // 4D
 
 protected:
-  supertensor_writer_t(const string& path, bool wins_ties, section_t section, int block_size, int filter, int level);
+  supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level);
 public:
   ~supertensor_writer_t();
 
-  void write_block(Vector<int,4> block, NdArray<const super_t> data);
+  void write_block(Vector<int,4> block, NdArray<const Vector<super_t,2>> data);
   void finalize();
 
   uint64_t compressed_size(Vector<int,4> block) const;
