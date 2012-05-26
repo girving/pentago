@@ -5,6 +5,13 @@ from other.core import *
 from interface import *
 import time
 
+# Results:
+# 
+# uncompressed = 85525504
+# no filter    = 17895159
+# interleaved  = 14365735
+# 
+
 def driver():
   Log.configure('filter test',0,0,100)
 
@@ -44,11 +51,15 @@ def driver():
   # Count
   with Log.scope('count'):
     with Log.scope('count causal'):
-      counts = count_causal_cases(data).reshape(3**8,3)
+      if 0:
+        counts = count_causal_cases(data).reshape(3**8,3)
+      else:
+        counts = count_outer_causal_cases(data).reshape(3**4,3)
     with Log.scope('report causal'):
       totals = sum(counts,axis=0)
       def prob(p,axis=-1):
         p = swapaxes(p,axis,-1)
+        p = maximum(1e-20,p)
         p = p/sum(p,-1)[...,None]
         return swapaxes(p,axis,-1)
       def entropy(p,axis=-1):
@@ -64,6 +75,8 @@ def driver():
       Log.write('conditional probabilities = \n%s'%prob(conditional))
       Log.write('conditional entropies = %s'%entropy(conditional))
       Log.write('conditional entropy = %s'%(sum(prob(conditional.sum(axis=-1),axis=0)*entropy(conditional))))
+      Log.write('better entropy = %g'%(dot(prob(counts.sum(axis=-1)),entropy(counts))))
+    return
     with Log.scope('count rotations'):
       counts = count_rotation_cases(data)
       assert counts.shape==(4,3**4)

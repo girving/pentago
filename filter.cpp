@@ -27,6 +27,36 @@ static inline int val(const Vector<super_t,2>& s, int r0, int r1, int r2, int r3
   return s[1](r0,r1,r2,r3)-s[0](r0,r1,r2,r3)+1;
 }
 
+static inline void set_val(Vector<super_t,2>& s, int r0, int r1, int r2, int r3, int new_) {
+  int old = val(s,r0,r1,r2,r3);
+  super_t bit = super_t::singleton(r0,r1,r2,r3);
+  if ((old<0)!=(new_<0))
+    s[0] ^= bit;
+  if ((old>0)!=(new_>0))
+    s[1] ^= bit;
+}
+
+static Array<Vector<int,3>> count_outer_causal_cases(NdArray<const Vector<super_t,2>> data) {
+  OTHER_ASSERT(data.rank()==4);
+  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+
+  // Count everything
+  Array<Vector<int,3>> counts(81);
+  for (int i0=1;i0<shape[0];i0++)
+  for (int i1=1;i1<shape[1];i1++)
+  for (int i2=1;i2<shape[2];i2++)
+  for (int i3=1;i3<shape[3];i3++)
+    for (int r0=1;r0<4;r0++)
+    for (int r1=1;r1<4;r1++)
+    for (int r2=1;r2<4;r2++)
+    for (int r3=1;r3<4;r3++)
+      counts[ternary(val(data(i0-1,i1,i2,i3),r0,r1,r2,r3),
+                     val(data(i0,i1-1,i2,i3),r0,r1,r2,r3),
+                     val(data(i0,i1,i2-1,i3),r0,r1,r2,r3),
+                     val(data(i0,i1,i2,i3-1),r0,r1,r2,r3))][val(data(i0,i1,i2,i3),r0,r1,r2,r3)]++;
+  return counts;
+}
+
 static Array<Vector<int,3>> count_causal_cases(NdArray<const Vector<super_t,2>> data) {
   OTHER_ASSERT(data.rank()==4);
   const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
@@ -50,6 +80,98 @@ static Array<Vector<int,3>> count_causal_cases(NdArray<const Vector<super_t,2>> 
                      val(data(i0,i1,i2,i3),r0,r1,r2-1,r3),
                      val(data(i0,i1,i2,i3),r0,r1,r2,r3-1))][val(data(i0,i1,i2,i3),r0,r1,r2,r3)]++;
   return counts;
+}
+
+static void outer_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
+  OTHER_ASSERT(data.rank()==4);
+  OTHER_ASSERT(table.size()==81);
+  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  for (int i0=shape[0]-1;i0>0;i0--)
+  for (int i1=shape[1]-1;i1>0;i1--)
+  for (int i2=shape[2]-1;i2>0;i2--)
+  for (int i3=shape[3]-1;i3>0;i3--) {
+    auto& s = data(i0,i1,i2,i3);
+    for (int r0=3;r0>0;r0--) 
+    for (int r1=3;r1>0;r1--) 
+    for (int r2=3;r2>0;r2--) 
+    for (int r3=3;r3>0;r3--)
+      set_val(s,r0,r1,r2,r3,table[ternary(val(data(i0-1,i1,i2,i3),r0,r1,r2,r3),
+                                          val(data(i0,i1-1,i2,i3),r0,r1,r2,r3),
+                                          val(data(i0,i1,i2-1,i3),r0,r1,r2,r3),
+                                          val(data(i0,i1,i2,i3-1),r0,r1,r2,r3))][val(s,r0,r1,r2,r3)]);
+  }
+}
+
+static void inverse_outer_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
+  OTHER_ASSERT(data.rank()==4);
+  OTHER_ASSERT(table.size()==81);
+  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  for (int i0=1;i0<shape[0];i0++)
+  for (int i1=1;i1<shape[1];i1++)
+  for (int i2=1;i2<shape[2];i2++)
+  for (int i3=1;i3<shape[3];i3++) {
+    auto& s = data(i0,i1,i2,i3);
+    for (int r0=1;r0<4;r0++)
+    for (int r1=1;r1<4;r1++)
+    for (int r2=1;r2<4;r2++)
+    for (int r3=1;r3<4;r3++) {
+      const Vector<int,3>& t = table[ternary(val(data(i0-1,i1,i2,i3),r0,r1,r2,r3),
+                                             val(data(i0,i1-1,i2,i3),r0,r1,r2,r3),
+                                             val(data(i0,i1,i2-1,i3),r0,r1,r2,r3),
+                                             val(data(i0,i1,i2,i3-1),r0,r1,r2,r3))];
+      set_val(s,r0,r1,r2,r3,t.find(val(s,r0,r1,r2,r3)));
+    }
+  }
+}
+
+static void arbitrary_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
+  OTHER_ASSERT(data.rank()==4);
+  OTHER_ASSERT(table.size()==6561);
+  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  for (int i0=shape[0]-1;i0>0;i0--)
+  for (int i1=shape[1]-1;i1>0;i1--)
+  for (int i2=shape[2]-1;i2>0;i2--)
+  for (int i3=shape[3]-1;i3>0;i3--) {
+    auto& s = data(i0,i1,i2,i3);
+    for (int r0=3;r0>0;r0--) 
+    for (int r1=3;r1>0;r1--) 
+    for (int r2=3;r2>0;r2--) 
+    for (int r3=3;r3>0;r3--)
+      set_val(s,r0,r1,r2,r3,table[ternary(val(data(i0-1,i1,i2,i3),r0,r1,r2,r3),
+                                          val(data(i0,i1-1,i2,i3),r0,r1,r2,r3),
+                                          val(data(i0,i1,i2-1,i3),r0,r1,r2,r3),
+                                          val(data(i0,i1,i2,i3-1),r0,r1,r2,r3),
+                                          val(data(i0,i1,i2,i3),r0-1,r1,r2,r3),
+                                          val(data(i0,i1,i2,i3),r0,r1-1,r2,r3),
+                                          val(data(i0,i1,i2,i3),r0,r1,r2-1,r3),
+                                          val(data(i0,i1,i2,i3),r0,r1,r2,r3-1))][val(s,r0,r1,r2,r3)]);
+  }
+}
+
+static void inverse_arbitrary_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
+  OTHER_ASSERT(data.rank()==4);
+  OTHER_ASSERT(table.size()==6561);
+  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  for (int i0=1;i0<shape[0];i0++)
+  for (int i1=1;i1<shape[1];i1++)
+  for (int i2=1;i2<shape[2];i2++)
+  for (int i3=1;i3<shape[3];i3++) {
+    auto& s = data(i0,i1,i2,i3);
+    for (int r0=1;r0<4;r0++)
+    for (int r1=1;r1<4;r1++)
+    for (int r2=1;r2<4;r2++)
+    for (int r3=1;r3<4;r3++) {
+      const Vector<int,3>& t = table[ternary(val(data(i0-1,i1,i2,i3),r0,r1,r2,r3),
+                                             val(data(i0,i1-1,i2,i3),r0,r1,r2,r3),
+                                             val(data(i0,i1,i2-1,i3),r0,r1,r2,r3),
+                                             val(data(i0,i1,i2,i3-1),r0,r1,r2,r3),
+                                             val(data(i0,i1,i2,i3),r0-1,r1,r2,r3),
+                                             val(data(i0,i1,i2,i3),r0,r1-1,r2,r3),
+                                             val(data(i0,i1,i2,i3),r0,r1,r2-1,r3),
+                                             val(data(i0,i1,i2,i3),r0,r1,r2,r3-1))];
+      set_val(s,r0,r1,r2,r3,t.find(val(s,r0,r1,r2,r3)));
+    }
+  }
 }
 
 static Array<int,2> count_rotation_cases(NdArray<const Vector<super_t,2>> data) {
@@ -126,7 +248,12 @@ using namespace pentago;
 
 void wrap_filter() {
   OTHER_FUNCTION(count_causal_cases)
+  OTHER_FUNCTION(count_outer_causal_cases)
   OTHER_FUNCTION(count_rotation_cases)
   python::function("interleave",static_cast<void(*)(NdArray<Vector<super_t,2>>)>(interleave));
   python::function("uninterleave",static_cast<void(*)(NdArray<Vector<super_t,2>>)>(uninterleave));
+  OTHER_FUNCTION(arbitrary_causal_filter)
+  OTHER_FUNCTION(inverse_arbitrary_causal_filter)
+  OTHER_FUNCTION(outer_causal_filter)
+  OTHER_FUNCTION(inverse_outer_causal_filter)
 }
