@@ -140,8 +140,7 @@ template<int symmetries> static Array<board_t> all_boards_helper(int n) {
       }
     }
   }
-  const uint64_t count = count_boards(n);
-  OTHER_ASSERT((count+symmetries-1)/symmetries<=(uint64_t)boards.size() && (uint64_t)boards.size()<=count);
+  OTHER_ASSERT(count_boards(n,symmetries)==(uint64_t)boards.size());
   return boards;
 }
 
@@ -299,7 +298,7 @@ uint64_t all_boards_stats(int n) {
       reduced_total += size;
     }
   }
-  const uint64_t exact = supercount_boards(n);
+  const uint64_t exact = count_boards(n,2048);
   cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %4d, unreduced sections = %5d, max section = %14s, average section = %g",
     n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,reduced_sections,sections.size(),large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());

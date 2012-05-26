@@ -30,7 +30,7 @@ def helper(symmetries):
     assert hashes[n]==h
     if symmetries==2048:
       boards.sort()
-      assert len(boards)==supercount_boards(n)
+      assert len(boards)==count_boards(n,2048)
       assert len(unique(boards))==len(boards)
       approx = all_boards_list(n)
       h = ahash(approx)
@@ -59,7 +59,7 @@ def test_small_hashes():
 
 def test_sample():
   for n in xrange(0,37):
-    steps = min(100000,supercount_boards(n))
+    steps = min(100000,count_boards(n,2048))
     print 'sample test: n = %d, steps = %d'%(n,steps)
     all_boards_sample_test(n,steps)
 

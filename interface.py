@@ -202,6 +202,3 @@ def factorial(n):
 def choose(n,k):
   if k<0 or k>n: return 0
   return factorial(n)//(factorial(k)*factorial(n-k))
-
-def count_boards(n):
-  return choose(36,n)*choose(n,n//2)

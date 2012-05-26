@@ -39,8 +39,8 @@ def test_table():
 def test_count():
   counts = [1,3,30,227,2013,13065,90641,493844,2746022,12420352,56322888]
   for n,count in enumerate(counts):
-    print 'n %d, correct %d, computed %d'%(n,count,supercount_boards(n))
-    assert supercount_boards(n)==count
+    print 'n %d, correct %d, computed %d'%(n,count,count_boards(n,2048))
+    assert count_boards(n,2048)==count
 
 if __name__=='__main__':
   test_count()

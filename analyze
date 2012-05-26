@@ -56,7 +56,7 @@ def counts():
   def large(n):
     s = str(n)
     return ''.join((',' if i and i%3==0 else '')+c for i,c in enumerate(reversed(s)))[::-1]
-  counts = [large(supercount_boards(n)) for n in xrange(37)]
+  counts = [large(count_boards(n,2048)) for n in xrange(37)]
   width = max(len(s) for s in counts)
   print 'counts:'
   for n,s in enumerate(counts):
@@ -66,7 +66,7 @@ def counts():
 def estimates():
   tol = .01
   for n in xrange(0,37):
-    count = supercount_boards(n)
+    count = count_boards(n,2048)
     estimate = estimate_supercount_boards(n,tol)
     print 'n %d, count %d, estimate %g, estimate/count %g'%(n,count,estimate,estimate/count)
 
@@ -110,9 +110,10 @@ def approx():
   raw_total = 0
   for n in xrange(37):
     total += all_boards_stats(n)
-    raw_total += supercount_boards(n)
+    raw_total += count_boards(n,2048)
   sections = sum(len(all_boards_sections(n,True)) for n in xrange(37))
   print 'grand total = %d, grand ratio = %g, total sections = %d'%(total,total/raw_total,sections)
+  print 'super ratio = %g'%(256*total/sum(count_boards(n,8) for n in xrange(37)))
 
 @command
 def sections():

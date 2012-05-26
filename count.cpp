@@ -117,16 +117,29 @@ template<int d> string str(const Polynomial<d>& f, const char* names) {
   return s;
 }
 
-Polynomial<2> count_generator() {
+Polynomial<2> count_generator(int symmetries) {
   // Make the color generating function
   Polynomial<2> f;
   f.x[vec(0,0)]++;
   f.x[vec(1,0)]++;
   f.x[vec(0,1)]++;
 
+  // List symmetries
+  Array<symmetry_t> group;
+  if (symmetries==1)
+    group.append(symmetry_t(0)); 
+  else if (symmetries==8)
+    for (int g=0;g<8;g++)
+      group.append(symmetry_t(g,0));
+  else if (symmetries==2048)
+    for (symmetry_t s : pentago::symmetries)
+      group.append(s);
+  else
+    OTHER_ASSERT(false);
+
   // Generate the cycle index
   Polynomial<36> Z;
-  for (symmetry_t s : symmetries) {
+  for (symmetry_t s : group) {
     Vector<int,36> cycles;
     for (int i=0;i<4;i++) for (int j=0;j<9;j++) {
       side_t start = (side_t)1<<(16*i+j);
@@ -154,21 +167,12 @@ Polynomial<2> count_generator() {
   // Compose Zg and fk to get F
   auto F = compose(Z,fk);
   for (auto& m : F.x) {
-    OTHER_ASSERT(!(m.second&2047));
-    m.second >>= 11;
+    OTHER_ASSERT(m.second%symmetries==0);
+    m.second /= symmetries;
   }
   return F;
 }
 
-}
-
-uint64_t supercount_boards(int n) {
-  static Polynomial<2> F;
-  if (!F.x.size())
-    F = count_generator();
-  const int b = (n+1)/2;
-  auto it = F.x.find(vec(b,n-b));
-  return it!=F.x.end()?it->second:0;
 }
 
 static uint64_t safe_mul(uint64_t a, uint64_t b) {
@@ -189,14 +193,20 @@ uint64_t choose(int n, int k) {
   return result;
 }
 
-double estimate_choose(int n, int k) {
-  return exp(lgamma(n+1)-lgamma(k+1)-lgamma(n-k+1));
+uint64_t count_boards(int n, int symmetries) {
+  OTHER_ASSERT(0<=n && n<=36);
+  OTHER_ASSERT(symmetries==1 || symmetries==8 || symmetries==2048);
+  static Polynomial<2> Fs[3]; // 1, 8, and 2048 symmetries
+  Polynomial<2>& F = Fs[symmetries==1?0:symmetries==8?1:2]; 
+  if (!F.x.size())
+    F = count_generator(symmetries);
+  const int b = (n+1)/2;
+  auto it = F.x.find(vec(b,n-b));
+  return it!=F.x.end()?it->second:0;
 }
 
-// List all unstandardized boards with n stones, assuming black plays first
-uint64_t count_boards(int n) {
-  OTHER_ASSERT(0<=n && n<=36);
-  return choose(36,n)*choose(n,n/2);
+double estimate_choose(int n, int k) {
+  return exp(lgamma(n+1)-lgamma(k+1)-lgamma(n-k+1));
 }
 
 double estimate_count_boards(int n) {
@@ -222,6 +232,6 @@ double estimate_supercount_boards(int n, double tol) {
 using namespace pentago;
 
 void wrap_count() {
-  OTHER_FUNCTION(supercount_boards)
+  OTHER_FUNCTION(count_boards)
   OTHER_FUNCTION(estimate_supercount_boards)
 }
