@@ -5,9 +5,6 @@ from other.core import *
 from interface import *
 import time
 
-#def analyze(data):
-#  data = unpackbits(data.view(uint8)).reshape(*(data.shape+(4,4,4,4)))
-  
 def driver():
   Log.configure('filter test',0,0,100)
 
@@ -34,6 +31,13 @@ def driver():
     writer.write_block(0,data)
     writer.finalize()
     Log.write('compressed size = %d'%writer.compressed_size(0))
+
+  # Count
+  with Log.scope('count'):
+    counts = count_causal_cases(data)
+    for m,(a,b) in enumerate(counts):
+      bits = (m>>arange(8))&1
+      Log.write('%s : counts %d %d, ratio %g'%(''.join('01'[b] for b in bits),a,b,b/(a+b)))
 
 if __name__=='__main__':
   driver()
