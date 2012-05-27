@@ -209,6 +209,11 @@ Tuple<section_t,uint8_t> section_t::standardize() const {
   return tuple(best,best_g);
 }
 
+// For python exposure
+static section_t standardize_section(section_t s) {
+  return s.standardize().x;
+}
+
 bool section_t::valid() const {
   for (int i=0;i<4;i++)
     if (!(0<=counts[i].x && 0<=counts[i].y && counts[i].sum()<=9))
@@ -402,4 +407,5 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards_sample_test)
   OTHER_FUNCTION(all_boards_section_sizes)
   OTHER_FUNCTION(sorted_array_is_subset)
+  OTHER_FUNCTION(standardize_section)
 }
