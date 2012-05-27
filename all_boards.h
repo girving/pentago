@@ -62,6 +62,11 @@ struct section_t {
     return (uint64_t)s[0]*s[1]*s[2]*s[3];
   }
 
+  int sum() const {
+    return counts.sum().sum();
+  }
+
+  bool valid() const;
   section_t transform(uint8_t global) const;
   Tuple<section_t,uint8_t> standardize() const;
 };

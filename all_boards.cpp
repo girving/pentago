@@ -209,6 +209,13 @@ Tuple<section_t,uint8_t> section_t::standardize() const {
   return tuple(best,best_g);
 }
 
+bool section_t::valid() const {
+  for (int i=0;i<4;i++)
+    if (!(0<=counts[i].x && 0<=counts[i].y && counts[i].sum()<=9))
+      return false;
+  return true;
+}
+
 ostream& operator<<(ostream& output, section_t section) {
   return output<<section.counts;
 }
@@ -219,7 +226,9 @@ PyObject* to_python(const section_t& section) {
 
 } namespace other {
 pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
-  return pentago::section_t(from_python<Vector<Vector<uint8_t,2>,4>>(object));
+  pentago::section_t s(from_python<Vector<Vector<uint8_t,2>,4>>(object));
+  OTHER_ASSERT(s.valid());
+  return s;
 }
 } namespace pentago {
 
