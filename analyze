@@ -124,6 +124,15 @@ def sections():
   pylab.plot(sizes,fractions) 
   pylab.show()
 
+@command
+def quick():
+  section = (3,3),(3,3),(3,3),(3,3)
+  random = Random(7523131)
+  steps = 100000
+  counts = sample_immediate_endings(random,section,steps)
+  p = counts/sum(counts)
+  print 'immediate endings: boring %g, black %g, white %g, tie %g'%tuple(p)
+
 if __name__=='__main__':
   command = PropManager.add('command','patterns').set_allowed(commands.keys())
   parser.parse('Endgame related stuff',positional=[command])

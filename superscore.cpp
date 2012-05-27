@@ -14,6 +14,13 @@ using std::abs;
 using std::cout;
 using std::endl;
 
+int popcount(super_t s) {
+  union { __m128i a; uint64_t b[2]; } c[2];
+  c[0].a = s.x;
+  c[1].a = s.y;
+  return popcount(c[0].b[0])+popcount(c[0].b[1])+popcount(c[1].b[0])+popcount(c[1].b[1]);
+}
+
 struct superwin_info_t {
   super_t horizontal, vertical, diagonal_lo, diagonal_hi, diagonal_assist;
 };

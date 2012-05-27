@@ -92,4 +92,7 @@ void all_boards_sample_test(int n, int steps);
 // Given two sorted lists of boards, check that the first is contained in the second
 bool sorted_array_is_subset(RawArray<const board_t> boards0, RawArray<const board_t> boards1);
 
+// Generate a random board within the given section.  Warning: fairly slow.
+extern board_t random_board(Random& random, const section_t& section);
+
 }

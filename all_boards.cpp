@@ -393,6 +393,24 @@ bool sorted_array_is_subset(RawArray<const board_t> boards0, RawArray<const boar
   return true;
 }
 
+board_t random_board(Random& random, const section_t& section) {
+  board_t board = 0;
+  int permutation[9] = {0,1,2,3,4,5,6,7,8};
+  for (int q=0;q<4;q++) {
+    for (int i=0;i<8;i++)
+      swap(permutation[i],permutation[random.uniform<int>(i,9)]);
+    quadrant_t side0 = 0, side1 = 0;
+    int b = section.counts[q][0],
+        w = section.counts[q][1];
+    for (int i=0;i<b;i++)
+      side0 |= 1<<permutation[i];
+    for (int i=b;i<b+w;i++)
+      side1 |= 1<<permutation[i];
+    board |= (uint64_t)pack(side0,side1)<<16*q;
+  }
+  return board;
+}
+
 }
 using namespace pentago;
 using namespace other::python;

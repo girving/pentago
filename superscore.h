@@ -55,6 +55,7 @@ namespace pentago {
 
 using namespace other;
 using std::ostream;
+using other::popcount;
 
 struct zero {};
 
@@ -154,7 +155,7 @@ struct super_t {
     return singleton(r.x,r.y,r.z,r.w);
   }
 
-  bool parity() {
+  bool parity() const {
     __m128i p = x^y;
     p ^= _mm_slli_epi16(p,4);
     p ^= _mm_slli_epi16(p,2);
@@ -222,5 +223,7 @@ extern uint8_t first(super_t s);
 extern super_t random_super(Random& random);
 
 extern ostream& operator<<(ostream& output, super_t s);
+
+extern int popcount(super_t s);
 
 }
