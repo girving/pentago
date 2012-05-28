@@ -22,6 +22,18 @@ using std::cout;
 using std::endl;
 using std::vector;
 
+RawArray<const quadrant_t> rotation_minimal_quadrants(int black, int white) {
+  OTHER_ASSERT(0<=black && 0<=white && black+white<=9);
+  const int i = ((black*(21-black))>>1)+white;
+  const uint16_t lo = rotation_minimal_quadrants_offsets[i],
+                 hi = rotation_minimal_quadrants_offsets[i+1];
+  return RawArray<const quadrant_t>(hi-lo,rotation_minimal_quadrants_flat+lo);
+}
+
+RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8_t,2> counts) {
+  return rotation_minimal_quadrants(counts.x,counts.y);
+}
+
 template<int symmetries> static inline board_t maybe_standardize(board_t board);
 template<> inline board_t maybe_standardize<1>(board_t board) { return board; }
 template<> inline board_t maybe_standardize<8>(board_t board) { return standardize(board); }
@@ -210,6 +222,11 @@ Tuple<section_t,uint8_t> section_t::standardize() const {
 }
 
 // For python exposure
+static Vector<int,4> section_shape(section_t s) {
+  return s.shape();
+}
+
+// For python exposure
 static section_t standardize_section(section_t s) {
   return s.standardize().x;
 }
@@ -232,7 +249,8 @@ PyObject* to_python(const section_t& section) {
 } namespace other {
 pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
   pentago::section_t s(from_python<Vector<Vector<uint8_t,2>,4>>(object));
-  OTHER_ASSERT(s.valid());
+  if (!s.valid())
+    throw ValueError("invalid section");
   return s;
 }
 } namespace pentago {
@@ -425,5 +443,6 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards_sample_test)
   OTHER_FUNCTION(all_boards_section_sizes)
   OTHER_FUNCTION(sorted_array_is_subset)
+  OTHER_FUNCTION(section_shape)
   OTHER_FUNCTION(standardize_section)
 }

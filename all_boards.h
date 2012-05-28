@@ -13,16 +13,8 @@ static inline Vector<uint8_t,2> count(quadrant_t q) {
 }
 
 // All rotation minimal quadrants with the given numbers of stones
-static inline RawArray<const quadrant_t> rotation_minimal_quadrants(int black, int white) {
-  assert(0<=black && 0<=white && black+white<=9);
-  const int i = ((black*(21-black))>>1)+white;
-  const uint16_t lo = rotation_minimal_quadrants_offsets[i],
-                 hi = rotation_minimal_quadrants_offsets[i+1];
-  return RawArray<const quadrant_t>(hi-lo,rotation_minimal_quadrants_flat+lo);
-}
-static inline RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8_t,2> counts) {
-  return rotation_minimal_quadrants(counts.x,counts.y);
-}
+RawArray<const quadrant_t> rotation_minimal_quadrants(int black, int white);
+RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8_t,2> counts);
 
 struct section_t {
   Vector<Vector<uint8_t,2>,4> counts;
