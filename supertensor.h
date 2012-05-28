@@ -3,8 +3,7 @@
 
 #include "superscore.h"
 #include "all_boards.h"
-#include <other/core/array/Array2d.h>
-#include <other/core/array/NdArray.h>
+#include <other/core/array/Array4d.h>
 #include <boost/noncopyable.hpp>
 namespace pentago {
 
@@ -83,14 +82,15 @@ struct supertensor_reader_t : public Object {
 
   const fildes_t fd;
   const supertensor_header_t header;
-  const NdArray<const supertensor_blob_t> index; // 4D
+  const Array<const supertensor_blob_t,4> index;
 
 protected:
   supertensor_reader_t(const string& path);
 public:
   ~supertensor_reader_t();
 
-  void read_block(Vector<int,4> block, NdArray<Vector<super_t,2>> data) const;
+  // Read a block of data from disk, thread safely
+  void read_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data) const;
 };
 
 struct supertensor_writer_t : public Object {
@@ -100,14 +100,18 @@ struct supertensor_writer_t : public Object {
   fildes_t fd;
   supertensor_header_t header; // incomplete until the destructor fires
   const int level; // zlib compression level
-  const NdArray<supertensor_blob_t> index; // 4D
+  const Array<supertensor_blob_t,4> index;
+  uint64_t next_offset;
 
 protected:
   supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level);
 public:
   ~supertensor_writer_t();
 
-  void write_block(Vector<int,4> block, NdArray<const Vector<super_t,2>> data);
+  // Write a block of data to disk, thread safely
+  void write_block(Vector<int,4> block, RawArray<const Vector<super_t,2>,4> data);
+
+  // Write the final index to disk and close the file
   void finalize();
 
   uint64_t compressed_size(Vector<int,4> block) const;

@@ -56,15 +56,11 @@ static void read_and_uncompress(int fd, RawArray<uint8_t> data, supertensor_blob
   if (!blob.uncompressed_size)
     return;
 
-  // Seek
-  off_t o = lseek(fd,blob.offset,SEEK_SET);
-  if (o < 0)
-    throw IOError(format("read_and_uncompress: lseek failed, %s",strerror(errno)));
-  OTHER_ASSERT(o==(off_t)blob.offset);
-
-  // Read
+  // Read using pread for thread safety
   Array<uint8_t> compressed(blob.compressed_size,false);
-  OTHER_ASSERT(read(fd,compressed.data(),blob.compressed_size)==(ssize_t)blob.compressed_size);
+  ssize_t r = pread(fd,compressed.data(),blob.compressed_size,blob.offset);
+  if (r<0 || r!=(ssize_t)blob.compressed_size)
+    throw IOError(format("read_and_uncompress pread failed: %s",r<0?strerror(errno):"incomplete read"));
 
   // Decompress
   size_t dest_size = blob.uncompressed_size;
@@ -75,18 +71,10 @@ static void read_and_uncompress(int fd, RawArray<uint8_t> data, supertensor_blob
     throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",blob.uncompressed_size,dest_size));
 }
 
-static supertensor_blob_t compress_and_write(int fd, RawArray<const uint8_t> data, int level, bool verbose) {
+static supertensor_blob_t compress_and_write(int fd, uint64_t& next_offset, RawArray<const uint8_t> data, int level, bool verbose) {
   // Initialize blob
   supertensor_blob_t blob;
   blob.uncompressed_size = data.size();
-
-  // Remember offset
-  off_t offset = lseek(fd,0,SEEK_CUR);
-  if (offset < 0)
-    throw IOError(format("compress_and_write: lseek failed, %s",strerror(errno)));
-  if (!offset)
-    throw IOError("compress_and_write: writing a compressed block at offset zero is disallowed");
-  blob.offset = offset;
 
   // Compress
   if (verbose)
@@ -99,10 +87,17 @@ static supertensor_blob_t compress_and_write(int fd, RawArray<const uint8_t> dat
   OTHER_ASSERT(dest_size<(uint64_t)1<<31);
   blob.compressed_size = dest_size;
 
+  // Choose offset
+  #pragma omp critical
+  {
+    blob.offset = next_offset;
+    next_offset += blob.compressed_size;
+  }
+
   // Write
   if (verbose)
     Log::time("write");
-  ssize_t w = write(fd,compressed.data(),dest_size);
+  ssize_t w = pwrite(fd,compressed.data(),dest_size,blob.offset);
   if (verbose)
     Log::stop_time();
   if (w < 0 || w < (ssize_t)dest_size)
@@ -182,7 +177,7 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
   const auto fields = header_fields();
   const int header_size = total_size(fields);
   char buffer[header_size];
-  ssize_t r = read(fd.fd,buffer,header_size);
+  ssize_t r = pread(fd.fd,buffer,header_size,0);
   if (r < 0)
     throw IOError(format("invalid supertensor file \"%s\": error reading header, %s",path,strerror(errno)));
   if (r < header_size)
@@ -209,32 +204,31 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
   OTHER_ASSERT(h.blocks==(h.shape+h.block_size-1)/h.block_size);
 
   // Read block index
-  Array<int> index_shape;
-  index_shape.copy(Vector<int,4>(h.blocks));
-  NdArray<supertensor_blob_t> index(index_shape,false);
+  Array<supertensor_blob_t,4> index(Vector<int,4>(h.blocks),false);
   read_and_uncompress(fd.fd,char_view(index.flat),h.index);
   const_cast_(this->index) = index;
 }
 
 supertensor_reader_t::~supertensor_reader_t() {}
 
-void supertensor_reader_t::read_block(Vector<int,4> block, NdArray<Vector<super_t,2>> data) const {
-  OTHER_ASSERT(data.rank()==4);
-  OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
+void supertensor_reader_t::read_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data) const {
+  OTHER_ASSERT(data.shape==header.block_shape(block));
   read_and_uncompress(fd.fd,char_view(data.flat),index[block]);
   if (header.filter)
     OTHER_ASSERT(false);
 }
 
-static void write_header(int fd, const supertensor_header_t& h) {
+// Write header at offset 0, and return the header size
+static uint64_t write_header(int fd, const supertensor_header_t& h) {
   const auto fields = header_fields();
   const int header_size = total_size(fields);
   char buffer[header_size];
   for (auto f : fields)
     memcpy(buffer+f.file_offset,(char*)&h+f.header_offset,f.size);
-  ssize_t w = write(fd,buffer,header_size);
+  ssize_t w = pwrite(fd,buffer,header_size,0);
   if (w < 0 || w < header_size)
     throw IOError(format("failed to write header to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
+  return header_size;
 }
 
 supertensor_writer_t::supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level)
@@ -260,12 +254,10 @@ supertensor_writer_t::supertensor_writer_t(const string& path, section_t section
   const_cast_(header) = h;
 
   // Write preliminary header
-  write_header(fd.fd,h);
+  next_offset = write_header(fd.fd,h);
 
   // Initialize block index to all undefined
-  Array<int> index_shape;
-  index_shape.copy(Vector<int,4>(h.blocks));
-  const_cast_(index) = NdArray<supertensor_blob_t>(index_shape);
+  const_cast_(index) = Array<supertensor_blob_t,4>(Vector<int,4>(h.blocks));
 }
 
 supertensor_writer_t::~supertensor_writer_t() {
@@ -277,13 +269,12 @@ supertensor_writer_t::~supertensor_writer_t() {
   }
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, NdArray<const Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
-  OTHER_ASSERT((Vector<int,4>(data.shape.subset(vec(0,1,2,3)))==header.block_shape(block)));
+void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<const Vector<super_t,2>,4> data) {
+  OTHER_ASSERT(data.shape==header.block_shape(block));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
   if (header.filter)
     OTHER_ASSERT(false);
-  index[block] = compress_and_write(fd.fd,char_view(data.flat),level,true);
+  index[block] = compress_and_write(fd.fd,next_offset,char_view(data.flat),level,true);
 }
 
 void supertensor_writer_t::finalize() {
@@ -297,7 +288,7 @@ void supertensor_writer_t::finalize() {
 
   // Write index
   supertensor_header_t h = header;
-  h.index = compress_and_write(fd.fd,char_view(index.flat),level,false);
+  h.index = compress_and_write(fd.fd,next_offset,char_view(index.flat),level,false);
 
   // Finalize header
   h.valid = true;

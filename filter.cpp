@@ -2,8 +2,8 @@
 
 #include "superscore.h"
 #include <other/core/array/Array2d.h>
+#include <other/core/array/Array4d.h>
 #include <other/core/array/NdArray.h>
-#include <other/core/array/IndirectArray.h>
 #include <other/core/math/sse.h>
 #include <other/core/python/module.h>
 namespace pentago {
@@ -36,12 +36,9 @@ static inline void set_val(Vector<super_t,2>& s, int r0, int r1, int r2, int r3,
     s[1] ^= bit;
 }
 
-static Array<Vector<int,3>> count_outer_causal_cases(NdArray<const Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
-  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
-
-  // Count everything
+static Array<Vector<int,3>> count_outer_causal_cases(Array<const Vector<super_t,2>,4> data) {
   Array<Vector<int,3>> counts(81);
+  const Vector<int,4> shape = data.shape;
   for (int i0=1;i0<shape[0];i0++)
   for (int i1=1;i1<shape[1];i1++)
   for (int i2=1;i2<shape[2];i2++)
@@ -57,12 +54,9 @@ static Array<Vector<int,3>> count_outer_causal_cases(NdArray<const Vector<super_
   return counts;
 }
 
-static Array<Vector<int,3>> count_causal_cases(NdArray<const Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
-  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
-
-  // Count everything
+static Array<Vector<int,3>> count_causal_cases(Array<const Vector<super_t,2>,4> data) {
   Array<Vector<int,3>> counts(6561);
+  const Vector<int,4> shape = data.shape;
   for (int i0=1;i0<shape[0];i0++)
   for (int i1=1;i1<shape[1];i1++)
   for (int i2=1;i2<shape[2];i2++)
@@ -82,10 +76,9 @@ static Array<Vector<int,3>> count_causal_cases(NdArray<const Vector<super_t,2>> 
   return counts;
 }
 
-static void outer_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
+static void outer_causal_filter(Array<const Vector<int,3>> table, Array<Vector<super_t,2>,4> data) {
   OTHER_ASSERT(table.size()==81);
-  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  const Vector<int,4> shape = data.shape;
   for (int i0=shape[0]-1;i0>0;i0--)
   for (int i1=shape[1]-1;i1>0;i1--)
   for (int i2=shape[2]-1;i2>0;i2--)
@@ -102,10 +95,9 @@ static void outer_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector
   }
 }
 
-static void inverse_outer_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
+static void inverse_outer_causal_filter(Array<const Vector<int,3>> table, Array<Vector<super_t,2>,4> data) {
   OTHER_ASSERT(table.size()==81);
-  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  const Vector<int,4> shape = data.shape;
   for (int i0=1;i0<shape[0];i0++)
   for (int i1=1;i1<shape[1];i1++)
   for (int i2=1;i2<shape[2];i2++)
@@ -124,10 +116,9 @@ static void inverse_outer_causal_filter(Array<const Vector<int,3>> table, NdArra
   }
 }
 
-static void arbitrary_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
+static void arbitrary_causal_filter(Array<const Vector<int,3>> table, Array<Vector<super_t,2>,4> data) {
   OTHER_ASSERT(table.size()==6561);
-  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  const Vector<int,4> shape = data.shape;
   for (int i0=shape[0]-1;i0>0;i0--)
   for (int i1=shape[1]-1;i1>0;i1--)
   for (int i2=shape[2]-1;i2>0;i2--)
@@ -148,10 +139,9 @@ static void arbitrary_causal_filter(Array<const Vector<int,3>> table, NdArray<Ve
   }
 }
 
-static void inverse_arbitrary_causal_filter(Array<const Vector<int,3>> table, NdArray<Vector<super_t,2>> data) {
-  OTHER_ASSERT(data.rank()==4);
+static void inverse_arbitrary_causal_filter(Array<const Vector<int,3>> table, Array<Vector<super_t,2>,4> data) {
   OTHER_ASSERT(table.size()==6561);
-  const Vector<int,4> shape(data.shape.subset(vec(0,1,2,3)));
+  const Vector<int,4> shape = data.shape;
   for (int i0=1;i0<shape[0];i0++)
   for (int i1=1;i1<shape[1];i1++)
   for (int i2=1;i2<shape[2];i2++)
@@ -174,7 +164,7 @@ static void inverse_arbitrary_causal_filter(Array<const Vector<int,3>> table, Nd
   }
 }
 
-static Array<int,2> count_rotation_cases(NdArray<const Vector<super_t,2>> data) {
+static Array<int,2> count_rotation_cases(Array<const Vector<super_t,2>,4> data) {
   Array<int,2> counts(4,81);
   for (auto& s : data.flat) {
     for (int r0=1;r0<4;r0++)
