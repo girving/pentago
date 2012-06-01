@@ -53,13 +53,13 @@ int supertable_bits() {
   return table_bits;
 }
 
-template<bool black> superlookup_t super_lookup(int depth, side_t side0, side_t side1) {
+template<bool aggressive> superlookup_t super_lookup(int depth, side_t side0, side_t side1) {
   STAT(total_lookups++);
   // Standardize the board
   superlookup_t data;
   board_t standard;
   superstandardize(side0,side1).get(standard,data.symmetry);
-  data.hash = hash_board(standard);
+  data.hash = hash_board(standard|(uint64_t)aggressive<<aggressive_bit);
   // Lookup entry 
   const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
   if (entry.hash==data.hash>>table_bits) {
@@ -69,10 +69,10 @@ template<bool black> superlookup_t super_lookup(int depth, side_t side0, side_t 
     const symmetry_t si = data.symmetry.inverse();
     // If we don't have enough depth, we can only use wins for black or losses for white
     if (depth>entry.depth) {
-      info.known &= black?info.wins:~info.wins;
-      TRACE(trace_dependency(depth,pack(side0,side1),entry.depth,pack(side0,side1),superinfo_t(info.known,black?info.known:~info.known)));
+      info.known &= aggressive?info.wins:~info.wins;
+      TRACE(trace_dependency(depth,pack(side0,side1),entry.depth,pack(side0,side1),superinfo_t(info.known,aggressive?info.known:~info.known)));
       info.known = transform_super(si,info.known); // In this case we get away with only one transform call
-      info.wins = black?info.known:super_t(0);
+      info.wins = aggressive?info.known:super_t(0);
     } else {
       STAT(successful_lookups++);
       info.known = transform_super(si,info.known);
@@ -89,18 +89,19 @@ template superlookup_t super_lookup<true>(int,side_t,side_t);
 template superlookup_t super_lookup<false>(int,side_t,side_t);
 
 OTHER_NEVER_INLINE static void store_error(int depth, const superlookup_t& data, const superinfo_t& info) {
-  const board_t board = inverse_hash_board(data.hash);
-  const bool black = black_to_move(board);
+  const uint64_t board_flag = inverse_hash_board(data.hash);
+  const board_t board = board_flag&~aggressive_mask;
+  const bool aggressive = board_flag>>aggressive_bit;
   const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
   const superinfo_t& existing = entry.info;
   const super_t errors = (info.wins^existing.wins)&info.known&existing.known;
   const uint8_t r = first(errors);
-  cout << format("inconsistency detected in super_store:\n  standard %lld, rotation %d, transformed %lld, black %d\n  existing depth %d, existing value %d\n  new depth %d, new value %d",
-    board,r,transform_board(symmetry_t(0,r),board),black,entry.depth,existing.wins(r),depth,info.wins(r))<<endl;
-  trace_error(depth,board,"super_store");
+  cout << format("inconsistency detected in super_store:\n  standard %lld, rotation %d, transformed %lld, aggressive %d\n  existing depth %d, existing value %d\n  new depth %d, new value %d",
+    board,r,transform_board(symmetry_t(0,r),board),aggressive,entry.depth,existing.wins(r),depth,info.wins(r))<<endl;
+  trace_error(aggressive,depth,board,"super_store");
 }
 
-template<bool black> void super_store(int depth, const superlookup_t& data) {
+template<bool aggressive> void super_store(int depth, const superlookup_t& data) {
   OTHER_ASSERT(data.hash);
   superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
   if (entry.hash==data.hash>>table_bits || depth>=entry.depth) {
@@ -114,14 +115,14 @@ template<bool black> void super_store(int depth, const superlookup_t& data) {
       // Discard low depth information
       int max_depth = max(depth,(int)entry.depth); 
       if (depth<max_depth) {
-        super_t mask = black?info.wins:~info.wins;
+        super_t mask = aggressive?info.wins:~info.wins;
         info.known &= mask;
         info.wins &= mask;
         TRACE(trace_dependency(max_depth,inverse_hash_board(data.hash),depth,inverse_hash_board(data.hash),info));
         TRACE(trace_check(max_depth,inverse_hash_board(data.hash),info,"super_store.new"));
       }
       if (entry.depth<max_depth) {
-        super_t mask = black?existing.wins:~existing.wins;
+        super_t mask = aggressive?existing.wins:~existing.wins;
         existing.known &= mask;
         existing.wins &= mask;
         TRACE(trace_dependency(max_depth,inverse_hash_board(data.hash),entry.depth,inverse_hash_board(data.hash),existing));
@@ -182,7 +183,7 @@ static void supertable_test(int epochs) {
       const symmetry_t symmetry = random_symmetry(random);
       const board_t board = transform_board(symmetry,boards[b]);
       const side_t side0 = unpack(board,0), side1 = unpack(board,1);
-      const bool black = b&1;
+      const bool aggressive = b&1;
       superinfo_t info;
       info.known = random_super(random);
       info.wins = super_meaningless(board)&info.known;
@@ -191,27 +192,27 @@ static void supertable_test(int epochs) {
       int depth = choice(random);
       if (!depth) {
         const super_t errors = super_meaningless(board,1831);
-        info.wins = (black?info.wins&~errors:info.wins|errors)&info.known;
+        info.wins = (aggressive?info.wins&~errors:info.wins|errors)&info.known;
       }
 
       // Verify that lookup returns consistent results
       total_lookups++;
-      superlookup_t data = black?super_lookup<true >(depth,side0,side1)
-                                :super_lookup<false>(depth,side0,side1);
+      superlookup_t data = aggressive?super_lookup<true >(depth,side0,side1)
+                                     :super_lookup<false>(depth,side0,side1);
       if (data.info.known) {
         OTHER_ASSERT(info.known&data.info.known); // should happen with overwhelming probability
         successful_lookups++;
       }
       super_t diff = (info.wins^data.info.wins)&info.known&data.info.known;
       if (!depth)
-        diff &= black?info.wins:~info.wins;
+        diff &= aggressive?info.wins:~info.wins;
       OTHER_ASSERT(!diff);
 
       // Optionally store
       if (choice(random)) {
         data.info = info;
-        black?super_store<true >(depth,data)
-             :super_store<false>(depth,data);
+        aggressive?super_store<true >(depth,data)
+                  :super_store<false>(depth,data);
       }
     }
     OTHER_ASSERT(successful_lookups>count/16);

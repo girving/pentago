@@ -110,7 +110,8 @@ def inv_parse_move(board,turn,next,simple=False):
 def move(board,turn,depth,rand=True,simple=False):
   '''Returns (next,score), where next is the board position moved to and score = depth<<2 | 0 (loss), 1 (tie), or 2 (win).'''
   if is_super(board):
-    results = engine.super_evaluate_children(depth,*flipto(board,turn))
+    flipped = flipto(board,turn)
+    results = engine.super_evaluate_children(black_to_move(flipped[0]),depth,*flipped)
     nexts = [r[0] for r in results]
     results = dict(results)
   else:

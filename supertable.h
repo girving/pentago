@@ -7,6 +7,10 @@
 #include "symmetry.h"
 namespace pentago {
 
+// We use the high bit to mark whether the player to move is the aggressor (the player trying to win)
+static const int aggressive_bit = 63;
+static const uint64_t aggressive_mask = (uint64_t)1<<aggressive_bit;
+
 // Initialize a empty table with 1<<bits entries
 extern void init_supertable(int bits);
 
@@ -24,10 +28,10 @@ struct superlookup_t {
 };
 
 // Look up an entry in the table to at least the given depth
-template<bool black> extern superlookup_t super_lookup(int depth, side_t side0, side_t side1) OTHER_PURE;
+template<bool aggressive> extern superlookup_t super_lookup(int depth, side_t side0, side_t side1) OTHER_PURE;
 
 // Store new data in the table.  The data structure should be the same structure returned by
 // super_lookup, with possibly more known information in info.
-template<bool black> extern void super_store(int depth, const superlookup_t& data);
+template<bool aggressive> extern void super_store(int depth, const superlookup_t& data);
 
 }

@@ -10,11 +10,24 @@ namespace pentago {
 using std::cout;
 using std::endl;
 
+struct situation_t {
+  bool aggressive;
+  int depth;
+  board_t board;
+
+  situation_t(bool aggressive, int depth, board_t board)
+    : aggressive(aggressive)
+    , depth(depth)
+    , board(board) {
+    check_board(board);
+  }
+};
+
 // Persistent trace information
-static Hashtable<board_t> boards; // Map from traced boards to depth
+static Hashtable<board_t> board_flags; // Map from traced boards to depth
 static Hashtable<Tuple<int,board_t>,superinfo_t> known; // Known information at various depths
-static Array<Tuple<int,board_t>> errors; // Potentially problematic depth,boards pairs
-static Array<Tuple<int,board_t>> dependencies; // 
+static Array<situation_t> errors; // Potentially problematic aggressive,depth,boards triples
+static Array<situation_t> dependencies; // Aggressive,depth,board triples that we depend on
 static int stone_depth; // Current search depth + stone count
 
 void trace_restart() {
@@ -22,8 +35,8 @@ void trace_restart() {
   errors.remove_all();
 }
 
-bool traced(board_t board) {
-  return boards.contains(superstandardize(board).x);
+bool traced(bool aggressive, board_t board) {
+  return board_flags.contains(superstandardize(board).x|(uint64_t)aggressive<<aggressive_bit);
 }
 
 static int trace_verbose_depth = 0;
@@ -68,18 +81,22 @@ string subset(super_t s, RawArray<const uint8_t> w) {
   return result;
 }
 
-void trace_error(int depth, board_t board, const char* context) {
+void trace_error(bool aggressive, int depth, board_t board, const char* context) {
+  check_board(board);
   board = superstandardize(board).x;
-  errors.append(tuple(depth,board));
-  throw RuntimeError(format("trace inconsistency detected in %s: depth %d, board %lld, black %d, stone depth %d",context,depth,board,black_to_move(board),depth+count_stones(board)));
+  errors.append(situation_t(aggressive,depth,board));
+  throw RuntimeError(format("trace inconsistency detected in %s: depth %d, board %lld, aggressive %d, stone depth %d",context,depth,board,aggressive,depth+count_stones(board)));
 }
 
-void trace_dependency(int parent_depth, board_t parent, int child_depth, board_t child, superinfo_t child_info) {
-  if (traced(parent))
-    dependencies.append(tuple(child_depth,superstandardize(child).x));
+void trace_dependency(bool parent_aggressive, int parent_depth, board_t parent, bool child_aggressive, int child_depth, board_t child, superinfo_t child_info) {
+  check_board(parent);
+  check_board(child);
+  if (traced(parent_aggressive,parent))
+    dependencies.append(situation_t(child_aggressive,child_depth,superstandardize(child).x));
 }
 
-void trace_check(int depth, board_t board, superinfo_t info, const char* context) {
+void trace_check(bool aggressive, int depth, board_t board, superinfo_t info, const char* context) {
+  check_board(board);
   // Stone depth should increase monotonically
   OTHER_ASSERT(stone_depth<=depth+count_stones(board));
   stone_depth = depth+count_stones(board);
@@ -93,13 +110,14 @@ void trace_check(int depth, board_t board, superinfo_t info, const char* context
   const super_t errors = known_info?(known_info->wins^info.wins)&known_info->known&info.known:super_t(0);
   if (errors) {
     const uint8_t r = first(errors);
-    cout << format("trace check failed in %s: depth %d, board %lld, black %d, stones %d, rotation %d, correct %d, got %d",
-      context,depth,board,black_to_move(board),count_stones(board),r,known_info->wins(r),info.wins(r))<<endl;
-    trace_error(depth,board,format("%s.trace_check",context).c_str());
+    cout << format("trace check failed in %s: depth %d, board %lld, aggressive %d, stones %d, rotation %d, correct %d, got %d",
+      context,depth,board,aggressive,count_stones(board),r,known_info->wins(r),info.wins(r))<<endl;
+    trace_error(aggressive,depth,board,format("%s.trace_check",context).c_str());
   }
 }
 
-static void clean_evaluate(int depth, board_t board) {
+static void clean_evaluate(bool aggressive, int depth, board_t board) {
+  check_board(board);
   symmetry_t symmetry;
   superstandardize(board).get(board,symmetry);
   if (known.contains(tuple(depth,board)))
@@ -108,15 +126,16 @@ static void clean_evaluate(int depth, board_t board) {
   clear_supertable();
   const super_t all = ~super_t(0);
   const side_t side0 = unpack(board,0), side1 = unpack(board,1);
-  auto data = super_shallow_evaluate(depth,side0,side1,all);
+  auto data = super_shallow_evaluate(aggressive,depth,side0,side1,all);
   superinfo_t info = data.lookup.info;
   if (depth>=1)
-    info = super_evaluate_recurse<false>(depth,side0,side1,data,all);
+    info = super_evaluate_recurse<false>(aggressive,depth,side0,side1,data,all);
   OTHER_ASSERT(info.known==all);
   known.set(tuple(depth,board),info);
 }
 
 static super_t known_wins(int depth, board_t board) {
+  check_board(board);
   symmetry_t symmetry;
   superstandardize(board).get(board,symmetry);
   superinfo_t info = known.get(tuple(depth,board));
@@ -143,24 +162,24 @@ static bool trace_learn() {
   // Learn about each error and each dependency
   int count = known.size();
   for (auto error : errors)
-    clean_evaluate(error.x,error.y);
+    clean_evaluate(error.aggressive,error.depth,error.board);
   for (auto dep : dependencies)
-    clean_evaluate(dep.x,dep.y);
+    clean_evaluate(dep.aggressive,dep.depth,dep.board);
 
   // If we haven't learned anything new, evaluate the children of each error
   if (count<known.size())
     return true;
   for (auto error : errors) {
-    const int depth = error.x;
+    const bool aggressive = error.aggressive;
+    const int depth = error.depth;
     OTHER_ASSERT(depth);
-    const board_t board = error.y;
+    const board_t board = error.board;
     const side_t side0 = unpack(board,0), side1 = unpack(board,1);
-    const bool black = black_to_move(board);
 
     // Evaluate all dependencies
     SIMPLE_MOVES(side0,side1);
     for (int i=0;i<total;i++)
-      clean_evaluate(depth-1,pack(side1,moves[i]));
+      clean_evaluate(!aggressive,depth-1,pack(side1,moves[i]));
 
     // Verify that we're consistent with the child values
     super_t wins = 0;
@@ -176,7 +195,7 @@ static bool trace_learn() {
       if (verbose)
         cout << "status = "<<st<<endl;
       if (st)
-        wins |= (black?st==1:st!=2) ? super_t::singleton(r) : super_t(0);
+        wins |= (aggressive?st==1:st!=2) ? super_t::singleton(r) : super_t(0);
       else
         for (int i=0;i<total;i++) {
           const side_t rmove = transform_side(s,moves[i]);
@@ -213,7 +232,7 @@ static bool trace_learn() {
     super_t errors = wins^parent_wins;
     if (errors) {
       uint8_t r = first(errors);
-      cout << format("trace_learn: inconsistent results for clean evaluation of depth %d, board %lld, black %d: rotation %d, parent %d, children %d",depth,board,black_to_move(board),r,parent_wins(r),wins(r))<<endl;
+      cout << format("trace_learn: inconsistent results for clean evaluation of depth %d, board %lld, aggressive %d: rotation %d, parent %d, children %d",depth,board,aggressive,r,parent_wins(r),wins(r))<<endl;
       return false;
     }
   }
@@ -222,7 +241,7 @@ static bool trace_learn() {
   if (count<known.size())
     return true;
   for (auto error : errors)
-    cout << format("trace_learn: isolated error for depth %d, board %lld, black %d",error.x,error.y,black_to_move(error.y))<<endl;
+    cout << format("trace_learn: isolated error for depth %d, board %lld, aggressive %d",error.depth,error.board,error.aggressive)<<endl;
   return false;
 }
 

@@ -4,9 +4,12 @@
 #include <vector>
 namespace pentago {
 
+// For historical reasons, we call the player who wins ties white, and the other player black,
+// even the code is also capable of computing in the other direction.
+
 using std::vector;
 
-// Limit blacks options to the given number of moves (chosen after move ordering)
+// Limit black's options to the given number of moves (chosen after move ordering)
 void set_super_move_limit(int limit);
 
 // Turn on or off debug mode
@@ -21,7 +24,7 @@ struct superdata_t {
 };
 
 // Evaluate everything we can about a position without recursing into children.
-superdata_t super_shallow_evaluate(const int depth, const side_t side0, const side_t side1, const super_t interesting);
+superdata_t super_shallow_evaluate(const bool aggressive, const int depth, const side_t side0, const side_t side1, const super_t interesting);
 
 // For most of the tree we care only about the value of a node, but at the top we may want at least one optimal move as well.  In order to
 // avoid two separate routines with a bunch of duplicate logic, we use the following templatized helper.
@@ -36,14 +39,14 @@ template<> struct results_t<false> {
 // Evaluate a position for all important rotations, returning the set of rotations in which we win.
 // Note that a "win" for white includes ties.  The returned set of known rotations definitely includes
 // all important rotations, but may include others as well.
-template<bool remember> typename results_t<remember>::type super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important);
+template<bool remember> typename results_t<remember>::type super_evaluate_recurse(const bool aggressive, const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important);
 
 // Driver for evaluation abstracted over rotations
-score_t super_evaluate(int depth, const board_t board, const Vector<int,4> rotation);
+score_t super_evaluate(bool aggressive, int depth, const board_t board, const Vector<int,4> rotation);
 
 typedef Tuple<board_t,Tuple<int,int,int,int>> rotated_board_t;
 
 // Evaluate enough children to determine who wins, and return the results
-vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const int depth, const board_t board, const Vector<int,4> rotation);
+vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const bool aggressive, const int depth, const board_t board, const Vector<int,4> rotation);
 
 }
