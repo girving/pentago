@@ -63,6 +63,10 @@ def test_sample():
     print 'sample test: n = %d, steps = %d'%(n,steps)
     all_boards_sample_test(n,steps)
 
+def test_rmin():
+  rmin_test()
+
 if __name__=='__main__':
+  rmin_test()
   test_sample()
   test_all_boards_super()

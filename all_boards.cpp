@@ -14,6 +14,7 @@
 #include <other/core/structure/Hashtable.h>
 #include <other/core/utility/interrupts.h>
 #include <other/core/utility/const_cast.h>
+#include <other/core/utility/str.h>
 #include <other/core/vector/Interval.h>
 namespace pentago {
 
@@ -186,17 +187,22 @@ static Array<quadrant_t> minimal_quadrants() {
   return mins;
 }
 
-static quadrant_t rotation_standardize_quadrant(quadrant_t q) {
+static Tuple<quadrant_t,uint8_t> rotation_standardize_quadrant(quadrant_t q) {
   quadrant_t minq = q;
+  uint8_t minr = 0;
   side_t s[4][2];
   s[0][0] = unpack(q,0);
   s[0][1] = unpack(q,1);
   for (int r=0;r<3;r++) {
     for (int i=0;i<2;i++)
       s[r+1][i] = rotations[s[r][i]][0];
-    minq = min(minq,pack(s[r+1][0],s[r+1][1]));
+    quadrant_t rq = pack(s[r+1][0],s[r+1][1]);
+    if (minq > rq) {
+      minq = rq;
+      minr = r+1;
+    }
   }
-  return minq;
+  return tuple(minq,minr);
 }
 
 section_t section_t::transform(uint8_t global) const {
@@ -208,10 +214,11 @@ section_t section_t::transform(uint8_t global) const {
   return t;
 }
 
-Tuple<section_t,uint8_t> section_t::standardize() const {
+template<int symmetries> Tuple<section_t,uint8_t> section_t::standardize() const {
+  BOOST_STATIC_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
   section_t best = *this;
   uint8_t best_g = 0;
-  for (int g=1;g<8;g++) {
+  for (int g=1;g<symmetries;g++) {
     section_t t = transform(g);
     if (best > t) {
       best = t;
@@ -227,15 +234,24 @@ static Vector<int,4> section_shape(section_t s) {
 }
 
 // For python exposure
-static section_t standardize_section(section_t s) {
-  return s.standardize().x;
+static section_t standardize_section(section_t s, int symmetries) {
+  OTHER_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
+  return symmetries==1?s:symmetries==4?s.standardize<4>().x:s.standardize<8>().x;
 }
 
 bool section_t::valid() const {
   for (int i=0;i<4;i++)
     if (!(0<=counts[i].x && 0<=counts[i].y && counts[i].sum()<=9))
       return false;
+  const int black = counts[0].x+counts[1].x+counts[2].x+counts[3].x,
+            white = counts[0].y+counts[1].y+counts[2].y+counts[3].y;
+  if (black<white || black>white+1)
+    return false;
   return true;
+}
+
+bool section_valid(Vector<Vector<uint8_t,2>,4> s) {
+  return section_t(s).valid();
 }
 
 ostream& operator<<(ostream& output, section_t section) {
@@ -250,13 +266,14 @@ PyObject* to_python(const section_t& section) {
 pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
   pentago::section_t s(from_python<Vector<Vector<uint8_t,2>,4>>(object));
   if (!s.valid())
-    throw ValueError("invalid section");
+    throw ValueError(format("invalid section %s",str(s)));
   return s;
 }
 } namespace pentago {
 
-Array<section_t> all_boards_sections(int n, bool standardized) {
+Array<section_t> all_boards_sections(int n, int symmetries) {
   OTHER_ASSERT(0<=n && n<=36);
+  OTHER_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
   const int white = n/2, black = n-white;
   Array<section_t> sections;
 
@@ -280,7 +297,7 @@ Array<section_t> all_boards_sections(int n, bool standardized) {
               const int b0 = left1.x, w0 = left1.y;
               // We've found a section!
               section_t s(vec(Vector<uint8_t,2>(b0,w0),Vector<uint8_t,2>(b1,w1),Vector<uint8_t,2>(b2,w2),Vector<uint8_t,2>(b3,w3)));
-              if (!standardized || s.standardize().x==s)
+              if (symmetries==1 || (symmetries==4 && s.standardize<4>().x==s) || (symmetries==8 && s.standardize<8>().x==s))
                 sections.append(s);
             }
           }
@@ -292,9 +309,9 @@ Array<section_t> all_boards_sections(int n, bool standardized) {
   return sections;
 }
 
-Array<uint64_t> all_boards_section_sizes(int n) {
+Array<uint64_t> all_boards_section_sizes(int n, int symmetries) {
   Array<uint64_t> sizes;
-  for (section_t s : all_boards_sections(n))
+  for (section_t s : all_boards_sections(n,symmetries))
     sizes.append(s.size());
   return sizes;
 }
@@ -311,12 +328,12 @@ static string large(uint64_t x) {
   return r;
 }
 
-uint64_t all_boards_stats(int n) {
+uint64_t all_boards_stats(int n, int symmetries) {
   if (n==0) {
     RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
     cout << "maximum rmin bucket size = "<<(offsets.slice(1,offsets.size())-offsets.slice(0,offsets.size()-1)).max()<<endl;
   }
-  Array<section_t> sections = all_boards_sections(n,false);
+  Array<section_t> sections = all_boards_sections(n,1);
   int reduced_sections = 0;
   uint64_t max_section = 0;
   uint64_t total = 0;
@@ -325,14 +342,14 @@ uint64_t all_boards_stats(int n) {
     const uint64_t size = s.size();
     max_section = max(max_section,size);
     total += size;
-    if (s.standardize().x==s) {
+    if (symmetries==1 || (symmetries==4 && s.standardize<4>().x==s) || (symmetries==8 && s.standardize<8>().x==s)) {
       reduced_sections++;
       reduced_total += size;
     }
   }
   const uint64_t exact = count_boards(n,2048);
-  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %4d, unreduced sections = %5d, max section = %14s, average section = %g",
-    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,reduced_sections,sections.size(),large(max_section),(double)reduced_total/reduced_sections) << endl;
+  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %*d, unreduced sections = %5d, max section = %14s, average section = %g",
+    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;
 }
@@ -373,12 +390,12 @@ void all_boards_sample_test(int n, int steps) {
   for (int step=0;step<steps;step++) {
     const board_t board = random_board(random,n);
     const section_t s(vec(count(quadrant(board,0)),count(quadrant(board,1)),count(quadrant(board,2)),count(quadrant(board,3))));
-    section_t ss;uint8_t g;s.standardize().get(ss,g);
+    section_t ss;uint8_t g;s.standardize<8>().get(ss,g);
     // Does this section exist?
     int si = std::lower_bound(sections.begin(),sections.end(),ss)-sections.begin();
     if (!(sections.valid(si) && sections[si]==ss)) {
       cout << "missing section "<<s.counts<<", standard "<<ss.counts<<", n "<<n<<endl;
-      OTHER_ASSERT(ss.standardize().x==ss);
+      OTHER_ASSERT(ss.standardize<8>().x==ss);
       OTHER_ASSERT(false);
     }
     // Does the board occur in the section?
@@ -386,7 +403,7 @@ void all_boards_sample_test(int n, int steps) {
     for (int i=0;i<4;i++) {
       RawArray<const quadrant_t> bucket = rotation_minimal_quadrants(ss.counts[i]); 
       const quadrant_t q = quadrant(sboard,i);
-      OTHER_ASSERT(std::binary_search(bucket.begin(),bucket.end(),rotation_standardize_quadrant(q)));
+      OTHER_ASSERT(std::binary_search(bucket.begin(),bucket.end(),rotation_standardize_quadrant(q).x));
     }
   }
 }
@@ -429,6 +446,16 @@ board_t random_board(Random& random, const section_t& section) {
   return board;
 }
 
+static void rmin_test() {
+  for (quadrant_t q=0;q<quadrant_count;q++) {
+    const auto standard = rotation_standardize_quadrant(q);
+    const int ir = rotation_minimal_quadrants_inverse[q];
+    const auto rmin = rotation_minimal_quadrants(count(q));
+    OTHER_ASSERT(rmin.valid(ir/4) && rmin[ir/4]==standard.x);
+    OTHER_ASSERT(transform_board(symmetry_t(0,ir&3),standard.x)==q);
+  }
+}
+
 }
 using namespace pentago;
 using namespace other::python;
@@ -444,5 +471,7 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards_section_sizes)
   OTHER_FUNCTION(sorted_array_is_subset)
   OTHER_FUNCTION(section_shape)
+  OTHER_FUNCTION(section_valid)
   OTHER_FUNCTION(standardize_section)
+  OTHER_FUNCTION(rmin_test)
 }

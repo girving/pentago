@@ -281,6 +281,32 @@ score_t super_evaluate(bool aggressive, int depth, const board_t board, const Ve
   return to_score(aggressive,depth,info.wins(rotation));
 }
 
+super_t super_evaluate_all(bool aggressive, int depth, const board_t board) {
+  // We can afford error detection here since recursion happens into a different function
+  OTHER_ASSERT(supertable_bits()>=10);
+  OTHER_ASSERT(depth>=0);
+  check_board(board);
+
+  // Unpack board
+  const side_t side0 = unpack(board,0),
+               side1 = unpack(board,1);
+  
+  // We don't need to search past the end of the game
+  depth = min(depth,36-popcount(side0|side1));
+
+  // Exit immediately if possible
+  const superdata_t data = super_shallow_evaluate(aggressive,depth,side0,side1,~super_t(0));
+  if (!~data.lookup.info.known)
+    return data.lookup.info.wins;
+  if (!depth)
+    return aggressive?data.lookup.info.wins:data.lookup.info.wins|~data.lookup.info.known;
+
+  // Otherwise, recurse into children
+  const superinfo_t info = super_evaluate_recurse<false>(aggressive,depth,side0,side1,data,~super_t(0));
+  OTHER_ASSERT(!~info.known);
+  return info.wins;
+}
+
 // Evaluate enough children to determine who wins, and return the results
 vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const bool aggressive, const int depth, const board_t board, const Vector<int,4> rotation) {
   // We can afford error detection here since recursion happens into a different function

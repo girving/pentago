@@ -60,7 +60,9 @@ struct section_t {
 
   bool valid() const;
   section_t transform(uint8_t global) const;
-  Tuple<section_t,uint8_t> standardize() const;
+
+  // Given s, find global symmetry g minimizing g(s) and return g(s),g
+  template<int symmetries> Tuple<section_t,uint8_t> standardize() const;
 };
 
 ostream& operator<<(ostream& output, section_t section);
@@ -70,10 +72,10 @@ template<> struct FromPython<pentago::section_t>{static pentago::section_t conve
 } namespace pentago {
 
 // Enumerate the different ways n stones can be distributed into the four quadrants
-Array<section_t> all_boards_sections(int n, bool standardized=true);
+Array<section_t> all_boards_sections(int n, int symmetries=8);
 
 // Print statistics about the set of n stone positions, and return the total number including redundancies
-uint64_t all_boards_stats(int n);
+uint64_t all_boards_stats(int n, int symmetries);
 
 // Enumerate all supersymmetric n stone positions, with some redundancy
 Array<board_t> all_boards_list(int n);

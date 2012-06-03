@@ -44,6 +44,9 @@ template<bool remember> typename results_t<remember>::type super_evaluate_recurs
 // Driver for evaluation abstracted over rotations
 score_t super_evaluate(bool aggressive, int depth, const board_t board, const Vector<int,4> rotation);
 
+// Evaluate the result of all possible rotations of a position
+super_t super_evaluate_all(bool aggressive, int depth, const board_t board);
+
 typedef Tuple<board_t,Tuple<int,int,int,int>> rotated_board_t;
 
 // Evaluate enough children to determine who wins, and return the results

@@ -8,11 +8,12 @@
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
 #include <other/core/structure/Hashtable.h>
+#include <other/core/utility/Log.h>
 namespace pentago {
 
 using namespace other;
 using std::ostream;
-using std::cout;
+using Log::cout;
 using std::endl;
 
 static const int hash_bits = 54;

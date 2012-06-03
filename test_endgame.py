@@ -9,7 +9,7 @@ def test_supertensor():
   Log.configure('test',0,1,0)
 
   # Choose tiny parameters
-  section = (2,0),(2,0),(1,1),(2,0)
+  section = (2,0),(0,2),(1,1),(1,1)
   block_size = 7
   filter = 0
   level = 6
@@ -18,7 +18,7 @@ def test_supertensor():
   file = tempfile.NamedTemporaryFile(prefix='test',suffix='.pentago')
   writer = supertensor_writer_t(file.name,section,block_size,filter,level)
   blocks = writer.header.blocks
-  assert all(blocks==(2,2,3,2))
+  assert all(blocks==(2,2,3,3))
 
   # Generate random data
   random.seed(873242)
@@ -33,7 +33,7 @@ def test_supertensor():
 
   # Write blocks out in arbitrary (hashed) order
   for b,block in data.iteritems():
-    writer.write_block(b,block)
+    writer.write_block(b,block,False)
   writer.finalize()
 
   # Prepare for reading

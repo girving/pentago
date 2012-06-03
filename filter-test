@@ -39,7 +39,7 @@ def driver():
 
   # Write
   with Log.scope('write'):
-    writer.write_block(0,data)
+    writer.write_block(0,data,True)
     writer.finalize()
     Log.write('compressed size = %d'%writer.compressed_size(0))
 

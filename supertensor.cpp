@@ -269,12 +269,12 @@ supertensor_writer_t::~supertensor_writer_t() {
   }
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<const Vector<super_t,2>,4> data) {
+void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<const Vector<super_t,2>,4> data, bool verbose) {
   OTHER_ASSERT(data.shape==header.block_shape(block));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
   if (header.filter)
     OTHER_ASSERT(false);
-  index[block] = compress_and_write(fd.fd,next_offset,char_view(data.flat),level,true);
+  index[block] = compress_and_write(fd.fd,next_offset,char_view(data.flat),level,verbose);
 }
 
 void supertensor_writer_t::finalize() {

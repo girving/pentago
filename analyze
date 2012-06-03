@@ -51,11 +51,12 @@ def estimate():
       if not (close&1023):
         print 'i %d, close %d, fraction %g'%(i,close,close/i)
 
+def large(n):
+  s = str(n)
+  return ''.join((',' if i and i%3==0 else '')+c for i,c in enumerate(reversed(s)))[::-1]
+
 @command
 def counts():
-  def large(n):
-    s = str(n)
-    return ''.join((',' if i and i%3==0 else '')+c for i,c in enumerate(reversed(s)))[::-1]
   counts = [large(count_boards(n,2048)) for n in xrange(37)]
   width = max(len(s) for s in counts)
   print 'counts:'
@@ -108,16 +109,19 @@ def probability():
 def approx():
   total = 0
   raw_total = 0
+  symmetries = 4
+  print 'symmetries = %d'%symmetries
   for n in xrange(37):
-    total += all_boards_stats(n)
+    total += all_boards_stats(n,symmetries)
     raw_total += count_boards(n,2048)
-  sections = sum(len(all_boards_sections(n,True)) for n in xrange(37))
-  print 'grand total = %d, grand ratio = %g, total sections = %d'%(total,total/raw_total,sections)
+  sections = sum(len(all_boards_sections(n,symmetries)) for n in xrange(37))
+  print 'grand total = %s, grand ratio = %g, total sections = %d'%(large(total),total/raw_total,sections)
   print 'super ratio = %g'%(256*total/sum(count_boards(n,8) for n in xrange(37)))
 
 @command
 def sections():
-  sizes = sort(hstack([all_boards_section_sizes(n) for n in xrange(37)])).astype(double)
+  symmetries = 8
+  sizes = sort(hstack([all_boards_section_sizes(n,symmetries) for n in xrange(37)])).astype(double)
   totals = cumsum(sizes)
   fractions = totals/totals[-1]
   import pylab 
