@@ -180,7 +180,7 @@ def main():
 
   # Configure logging
   Log.configure('endgame',0,0,100)
-  Log.copy_to_file(os.path.join(dir(),'log-%s'%show_section(section)),False)
+  Log.copy_to_file(os.path.join(dir(),'log-%s'%show_section(section)),True)
   Log.write('command = %s'%parser.command())
 
   # Do whatever is necessary
