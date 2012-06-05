@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+from __future__ import division
+from other.core import *
+from other.core.value import parser
+from interface import *
+import os
+
+def block_range(blocks):
+  return mgrid[tuple(map(slice,blocks))].reshape(len(blocks),-1).T
+
+def info(name):
+  print '%s:'%name
+  s = os.stat(name)
+  reader = supertensor_reader_t(name)
+  h = reader.header
+  print '  version = %d'%h.version
+  print '  stones = %d'%h.stones
+  print '  section = %s'%list(map(list,h.section))
+  print '  shape = %s'%h.shape
+  print '  block size = %d'%h.block_size
+  print '  blocks = %s'%h.blocks
+  print '  filter = %d'%h.filter
+  blocks = block_range(h.blocks)
+  compressed = sum(map(reader.compressed_size,blocks))
+  uncompressed = sum(map(reader.uncompressed_size,blocks))
+  n = len(str(max(s.st_size,compressed,uncompressed)))
+  print '  file size         = %*d'%(n,s.st_size)
+  print '  compressed size   = %*d'%(n,compressed)
+  print '  uncompressed size = %*d'%(n,uncompressed)
+  print '  compression ratio = %g'%(compressed/uncompressed)
+  print
+
+files = sys.argv[1:]
+for name in files:
+  info(name)

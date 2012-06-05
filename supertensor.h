@@ -91,6 +91,9 @@ public:
 
   // Read a block of data from disk, thread safely
   void read_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data) const;
+
+  uint64_t compressed_size(Vector<int,4> block) const;
+  uint64_t uncompressed_size(Vector<int,4> block) const;
 };
 
 struct supertensor_writer_t : public Object {
@@ -115,6 +118,7 @@ public:
   void finalize();
 
   uint64_t compressed_size(Vector<int,4> block) const;
+  uint64_t uncompressed_size(Vector<int,4> block) const;
 };
 
 }

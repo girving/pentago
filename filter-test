@@ -12,83 +12,96 @@ import time
 # interleaved  = 14365735
 # 
 
+def count(data):
+  with Log.scope('count causal'):
+    if 0:
+      counts = count_causal_cases(data).reshape(3**8,3)
+    else:
+      counts = count_outer_causal_cases(data).reshape(3**4,3)
+  with Log.scope('report causal'):
+    totals = sum(counts,axis=0)
+    def prob(p,axis=-1):
+      p = swapaxes(p,axis,-1)
+      p = maximum(1e-20,p)
+      p = p/sum(p,-1)[...,None]
+      return swapaxes(p,axis,-1)
+    def entropy(p,axis=-1):
+      p = prob(p,axis)
+      assert allclose(sum(p,-1),1)
+      return -sum(p*log(maximum(p,1e-20)),axis)
+    Log.write('totals = %s'%totals)
+    Log.write('probabilities = %s'%prob(totals))
+    Log.write('entropy = %g'%entropy(totals))
+    prediction = counts.argmax(axis=-1)
+    conditional = asarray([sum(counts*(prediction==n)[:,None],axis=0) for n in 0,1,2])
+    Log.write('conditional counts = \n%s'%conditional)
+    Log.write('conditional probabilities = \n%s'%prob(conditional))
+    Log.write('conditional entropies = %s'%entropy(conditional))
+    Log.write('conditional entropy = %s'%(sum(prob(conditional.sum(axis=-1),axis=0)*entropy(conditional))))
+    Log.write('better entropy = %g'%(dot(prob(counts.sum(axis=-1)),entropy(counts))))
+  with Log.scope('count rotations'):
+    counts = count_rotation_cases(data)
+    assert counts.shape==(4,3**4)
+  with Log.scope('report rotations'):
+    totals = counts.sum(axis=0)
+    for k in argsort(totals)[::-1]:
+      v123,v0 = divmod(k,3)
+      v23,v1 = divmod(v123,3)
+      v3,v2 = divmod(v23,3)
+      Log.write('%d%d%d%d : %7d'%(v0,v1,v2,v3,totals[k]))
+    for i in xrange(4):
+      Log.write('entropy %d = %g'%(i,entropy(counts[i])))
+
 def driver():
   Log.configure('filter test',0,0,100)
-
-  # Choose parameters
-  section = (5,4),(4,5),(5,4),(4,5)
-  block_size = 420
-  filter = 0
+  reader = supertensor_reader_t('data/section-32-44444444.pentago')
+  header = reader.header
   level = 4
+  random.seed(9454242)
 
-  # Prepare for writing
-  file = 'test-%d%d-%d%d-%d%d-%d%d.pentago'%tuple(ravel(section))
-  writer = supertensor_writer_t(file,section,block_size,filter,level)
+  # Define filters
+  filters = [('interleave',interleave,uninterleave)]
 
-  # Compute the single block
-  data = empty(hstack([writer.header.block_shape(0),2,4]),uint64)
-  with Log.scope('compute'):
-    final_endgame_slice(section,0,data)
-    Log.write('nodes = %d'%product(data.shape[:4]))
-    Log.write('uncompressed size = %d'%data.view(uint8).size)
-
-  # Filter
-  with Log.scope('filter'):
-    h = ahash(data)
-    interleave(data)
-
-  # Write
-  with Log.scope('write'):
-    writer.write_block(0,data,True)
-    writer.finalize()
-    Log.write('compressed size = %d'%writer.compressed_size(0))
-
-  # Unfilter
-  with Log.scope('filter'):
-    uninterleave(data)
-    assert ahash(data)==h
-
-  # Count
-  with Log.scope('count'):
-    with Log.scope('count causal'):
+  # Loop through a few random blocks
+  total_uncompressed = 0
+  total_compressed = 0
+  totals = dict((name,0) for name,_,_ in filters)
+  wins = [0,0]
+  total = 0
+  for i in xrange(32):
+    with Log.scope('block'): 
+      b = [random.randint(header.blocks[i]) for i in xrange(4)]
+      Log.write('block shape = %s'%header.block_shape(b))
+      compressed = reader.compressed_size(b)
+      uncompressed = reader.uncompressed_size(b)
+      total_compressed += compressed
+      total_uncompressed += uncompressed
+      Log.write('uncompressed size = %d'%uncompressed)
+      Log.write('compressed size   = %d'%compressed)
+      Log.write('base ratio = %g'%(compressed/uncompressed))
+      data = empty(tuple(header.block_shape(b))+(2,4),uint64)
+      reader.read_block(b,data)
+      total += 64*data.size
+      for a in 0,1:
+        wins[a] += super_popcount(data[:,:,:,:,a,:].copy())
+      for name,filter,inverse in filters:
+        d = data.copy()
+        filter(d)
+        fsize = measure_compression(ravel(d).view(uint8),level)
+        totals[name] += fsize
+        Log.write('%s ratio = %g'%(name,fsize/uncompressed))
+        inverse(d)
+        assert all(data==d)
       if 0:
-        counts = count_causal_cases(data).reshape(3**8,3)
-      else:
-        counts = count_outer_causal_cases(data).reshape(3**4,3)
-    with Log.scope('report causal'):
-      totals = sum(counts,axis=0)
-      def prob(p,axis=-1):
-        p = swapaxes(p,axis,-1)
-        p = maximum(1e-20,p)
-        p = p/sum(p,-1)[...,None]
-        return swapaxes(p,axis,-1)
-      def entropy(p,axis=-1):
-        p = prob(p,axis)
-        assert allclose(sum(p,-1),1)
-        return -sum(p*log(maximum(p,1e-20)),axis)
-      Log.write('totals = %s'%totals)
-      Log.write('probabilities = %s'%prob(totals))
-      Log.write('entropy = %g'%entropy(totals))
-      prediction = counts.argmax(axis=-1)
-      conditional = asarray([sum(counts*(prediction==n)[:,None],axis=0) for n in 0,1,2])
-      Log.write('conditional counts = \n%s'%conditional)
-      Log.write('conditional probabilities = \n%s'%prob(conditional))
-      Log.write('conditional entropies = %s'%entropy(conditional))
-      Log.write('conditional entropy = %s'%(sum(prob(conditional.sum(axis=-1),axis=0)*entropy(conditional))))
-      Log.write('better entropy = %g'%(dot(prob(counts.sum(axis=-1)),entropy(counts))))
-    return
-    with Log.scope('count rotations'):
-      counts = count_rotation_cases(data)
-      assert counts.shape==(4,3**4)
-    with Log.scope('report rotations'):
-      totals = counts.sum(axis=0)
-      for k in argsort(totals)[::-1]:
-        v123,v0 = divmod(k,3)
-        v23,v1 = divmod(v123,3)
-        v3,v2 = divmod(v23,3)
-        Log.write('%d%d%d%d : %7d'%(v0,v1,v2,v3,totals[k]))
-      for i in xrange(4):
-        Log.write('entropy %d = %g'%(i,entropy(counts[i])))
-
+        with Log.scope('count'):
+          count(data)
+  with Log.scope('totals'):
+    Log.write('base ratio = %g'%(total_compressed/total_uncompressed))
+    for name,_,_ in filters:
+      Log.write('%s ratio = %g'%(name,totals[name]/total_uncompressed))
+    outcomes = array([wins[0],total-sum(wins),wins[1]])
+    Log.write('outcomes = %d %d %d'%tuple(outcomes))
+    Log.write('outcomes ratios = %g %g %g'%tuple(outcomes/total))
+       
 if __name__=='__main__':
   driver()

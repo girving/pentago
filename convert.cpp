@@ -30,6 +30,7 @@ template<> struct NumpyInfo<section_t> : public NumpyInfo<CV> {};
 VECTOR_CONVERSIONS(2,uint8_t)
 VECTOR_CONVERSIONS(4,uint16_t)
 VECTOR_CONVERSIONS(4,Vector<uint8_t,2>)
+ARRAY_CONVERSIONS(1,uint8_t)
 ARRAY_CONVERSIONS(1,super_t)
 ARRAY_CONVERSIONS(4,super_t)
 ARRAY_CONVERSIONS(4,Vector<super_t,2>)

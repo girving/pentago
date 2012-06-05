@@ -196,6 +196,13 @@ static NdArray<uint64_t> super_wins_py(NdArray<const board_t> sides) {
   return wins;
 }
 
+static uint64_t super_popcount(NdArray<const super_t> data) {
+  uint64_t sum = 0;
+  for (auto& s : data.flat)
+    sum += popcount(s);
+  return sum;
+}
+
 }
 using namespace pentago;
 using namespace other::python;
@@ -205,4 +212,5 @@ void wrap_superscore() {
   OTHER_FUNCTION(super_win_test)
   OTHER_FUNCTION(super_rmax_test)
   OTHER_FUNCTION(super_bool_test)
+  OTHER_FUNCTION(super_popcount)
 }

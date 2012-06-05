@@ -71,6 +71,15 @@ static void read_and_uncompress(int fd, RawArray<uint8_t> data, supertensor_blob
     throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",blob.uncompressed_size,dest_size));
 }
 
+static uint64_t measure_compression(RawArray<const uint8_t> data, int level) {
+  size_t dest_size = compressBound(data.size());
+  Array<uint8_t> compressed(dest_size,false);
+  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),data.size(),level);
+  if (z!=Z_OK)
+    throw IOError(format("zlib failure in measure_compression: %s",zlib_error(z)));
+  return dest_size;
+}
+
 static supertensor_blob_t compress_and_write(int fd, uint64_t& next_offset, RawArray<const uint8_t> data, int level, bool verbose) {
   // Initialize blob
   supertensor_blob_t blob;
@@ -300,9 +309,24 @@ void supertensor_writer_t::finalize() {
   fd.close();
 }
 
+uint64_t supertensor_reader_t::compressed_size(Vector<int,4> block) const {
+  header.block_shape(block); // check validity
+  return index[block].compressed_size;
+}
+
+uint64_t supertensor_reader_t::uncompressed_size(Vector<int,4> block) const {
+  header.block_shape(block); // check validity
+  return index[block].uncompressed_size;
+}
+
 uint64_t supertensor_writer_t::compressed_size(Vector<int,4> block) const {
   header.block_shape(block); // check validity
   return index[block].compressed_size;
+}
+
+uint64_t supertensor_writer_t::uncompressed_size(Vector<int,4> block) const {
+  header.block_shape(block); // check validity
+  return index[block].uncompressed_size;
 }
 
 }
@@ -327,6 +351,8 @@ void wrap_supertensor() {
     .OTHER_INIT(const string&)
     .OTHER_FIELD(header)
     .OTHER_METHOD(read_block)
+    .OTHER_METHOD(compressed_size)
+    .OTHER_METHOD(uncompressed_size)
     ;}
 
   {typedef supertensor_writer_t Self;
@@ -336,5 +362,8 @@ void wrap_supertensor() {
     .OTHER_METHOD(write_block)
     .OTHER_METHOD(finalize)
     .OTHER_METHOD(compressed_size)
+    .OTHER_METHOD(uncompressed_size)
     ;}
+
+  OTHER_FUNCTION(measure_compression)
 }
