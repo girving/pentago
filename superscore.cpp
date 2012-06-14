@@ -203,6 +203,13 @@ static uint64_t super_popcount(NdArray<const super_t> data) {
   return sum;
 }
 
+static NdArray<int> super_popcounts(NdArray<const super_t> data) {
+  NdArray<int> counts(data.shape,false);
+  for (int i=0;i<data.flat.size();i++)
+    counts.flat[i] = popcount(data.flat[i]);
+  return counts;
+}
+
 }
 using namespace pentago;
 using namespace other::python;
@@ -213,4 +220,5 @@ void wrap_superscore() {
   OTHER_FUNCTION(super_rmax_test)
   OTHER_FUNCTION(super_bool_test)
   OTHER_FUNCTION(super_popcount)
+  OTHER_FUNCTION(super_popcounts)
 }

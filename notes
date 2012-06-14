@@ -1,0 +1,131 @@
+Okay, let's consider the structure of the computation:
+
+We want to compute a given section F_ijkl of values.  If we consider only moves in quadrant 3 (l), each ijk slice depends only a fixed ijk slice of
+the child section G_ijkl.  That is
+
+  F_ijk <- f(G_ijk)
+
+The maximum size of a dimension is 420, so the largest two dimensional slice has size 32*420**2 = 5644800 = 5.6 MB.  I.e., tiny.  So, we can process
+both k and l this way:
+
+  F_ij <- f(G_ij,H_ij)
+
+We then need to process the other dimensions, which means we need to transpose matrices of the form G_(ij)(kl).  This would be really easy uncompressed,
+but seems difficult to impossible uncompressed.  If the compressed version of G_ijkl fits in RAM, it probably suffices to do a multipass version that
+runs n passes if 1/n of the uncompressed matrix fits in RAM.
+
+If G_ijkl does not fit in RAM, we could simply compute its transpose as a separate file on disk.  I need to run the estimate to see how much extra
+data would this would generate...and it's almost twice as much, so that's out of the question.
+
+I think the next step is too see if I can pound on compression to the point where my 1 TB matrix actually fits in RAM.  This would require a compression
+ratio of about 200x.  Perhaps unlikely, but if I do it that way I could use filtering along all 8 dimensions of the bit tensor.  If each dimension
+gave me a factor of two, I'd be good to go.  Rather unlikely, though, and I wouldn't be sure it was going to work until I ran it.
+
+I suppose the RAM algorithm I was thinking of can also be implemented out-of-core.  It's very simplistic, if you can store O(1/n) of the compressed
+data in RAM, it takes O(n) passes.  Not exactly fancy, but it may work well enough.  On the other hand, simply recomputing the transposed matrix
+would only add a factor of two, so maybe that's the better approach.
+
+In any case, the next step is compression.
+
+Update: Jed pointed out that since I can store a large number of rows in RAM, it suffices to compress square tiles instead of rows.  Thus, no need
+for transpose after all, which is extremely awesome.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+I forgot that the sections will come in with arbitrarily permuted dimensions due to the standardization.  Therefore, I need to be able to read a
+block slice along an arbitrary pair of dimensions, which means the blocks must be 4D blocks slicing across all four quadrants. 
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+
+5jun2012
+
+We want to predict section tensors using a lower rank additive approximation.  Let's see.
+Our exact tensor is A : S -> R, R = {-1,0,1}.  Actually, we'll first consider the case where
+ties are excluded, so that R = {-1,1}.  Define a fixed set of approximation tensors
+B_i : S -> {0,1}, together with coefficients c_i in C.  Our approximation will be
+
+    D[s] = sign sum_i c_i B_i[s]
+
+Here C is a suitable range of integers.  Some observations:
+
+    1. D[s] is a monotonically increasing function of c_i for all i.
+    2. The sign function is extremely nonconvex, making this problem terrible.
+       We need some kind of relaxation.  The obvious one would be to replace C by real numbers,
+       and use least squared error.  However, I think this would be an extremely bad
+       assumption, since it ignores the fact that some won positions are stronger than others.
+
+What if we reformulate the problem statistically?  For concreteness, let A_ij be a matrix,
+and u_i and v_j vectors of row/column parameters.  Let s,t be uniform random variables from [0,1],
+and define
+
+    p_ij = P(s u_i + t v_j > 0) = ...
+
+That's going to be a nasty discontinuous function of u_i/v_j together with sign(u_i),sign(v_j).
+Let's go simpler still.  We can compute probabilities p_i and q_j that the given row/column is
+1.  What is a principled way of combining p_i and q_j into a single probability p_ij?  We need
+f(a,b) s.t.
+
+    1. f : [0,1] x [0,1] -> [0,1]
+    2. f(a,b) = f(b,a)
+    3. f(1-a,1-b) = 1-f(a,b)
+    4. f(0,a) = 0
+
+Hmm.  I'm not sure about f, but by symmmetry we should definitely have
+
+    f(a,b) > 1/2 iff 2a-1 + 2b-1 > 0 iff a+b > 1
+
+so the snapped version of f is easy, and even matches the general additive approximation.
+Incidentally, if we had a full f function, we could conceivably apply adaptive Huffman
+encoding based on the probability.
+
+--------------------------------------------------------------------------------------------------
+
+12jun2012
+
+What should f(a,a) look like?  Presumably f(a,a) = a.  I think we need a function g : R -> R s.t.
+
+    f(a,b) = g^{-1}(mean(g(a),g(b)))
+
+Properties of g include
+
+    g : [0,1] -> R
+    g(1-a) = -g(a)
+    g(1) = inf
+
+It'd be nice if g(p) was somehow related to the entropy H(p).  Maybe g = -H'?
+
+    H = -p log p - (1-p) log (1-p)
+    -H = p log p + (1-p) log (1-p)
+    -H' = log p + 1 - log (1-p) - 1 = log p - log (1-p) = log (p / (1-p))
+
+mean(log(x)...) = log(gmean(x...)), so if r(p) = p/(1-p), we have
+
+    r(p) = p/(1-p) = (p-1+1)/(1-p) = 1/(1-p) - 1
+    r(p) - p r(p) = p
+    p (1 + r(p)) = r(p)
+    p = r(p) / (1 + r(p)) = (r(p) + 1 - 1) / (1 + r(p)) = 1 - 1/(1+r(p))
+
+    f(a,b) = ri(gmean(r(a),r(b)))
+
+What does this look like exactly?
+
+    f(a,b) = ri(sqrt(a b / (1-a) / (1-b)) = ri(sqrt(ab/(1-a-b+ab)))
+
+    ri(sqrt(x)) = 1 - 1/(1+sqrt(x))
+
+It doesn't look like any simplifications are in order.
+
+---------------------------------------------------------------------------------------------------
+
+Ug.  There has to be a better way to do this compression.  This data should be incredibly regular,
+if I can just figure out how.
+
+Maybe I need to start taking the actual positions into account.  I.e., come up with some real
+evaluation functions.  It's hard to do this without a good sampling of actual positions, though.
+
+Vague plan: generate a sampling of values for 22 through 36 stones.  Ideally supervalues.  Try to
+find a single evaluation function that handles them all fairly uniformly.  Encode the difference
+between the true value and the estimated value.
+
+Alternative plan: estimate how long the computation would take on Nautilus using just interleave
+filtering.  It would be nice to finish.

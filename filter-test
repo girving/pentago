@@ -2,6 +2,7 @@
 
 from __future__ import division
 from other.core import *
+from other.core.value import parser
 from interface import *
 import time
 
@@ -52,7 +53,85 @@ def count(data):
     for i in xrange(4):
       Log.write('entropy %d = %g'%(i,entropy(counts[i])))
 
+def lowrank(data,plot=False):
+  with Log.scope('lowrank'):
+    # Rearrange data into a bit array
+    shape = data.shape[:4]
+    data = unpackbits(data.view(uint8)).reshape(shape+(2,4,4,4,4))
+    data = data[:,:,:,:,0]
+    data = data.swapaxes(3,6).swapaxes(1,4).swapaxes(2,4).swapaxes(3,5).reshape(*(4*array(shape)))
+    # Measure raw entropy
+    def entropy(p):
+      p = asarray(p)
+      return (-p*log(maximum(p,1e-20))-(1-p)*log(maximum(1-p,1e-20)))/log(2)
+    def prob(axes=(0,1,2,3)):
+      d = data.astype(float)
+      for a in axes:
+        d = d[...,None].swapaxes(a,-1).mean(axis=-1)
+      return d
+    p = prob()
+    Log.write('p = %g, S = %g'%(p,entropy(p)))
+    if plot:
+      import pylab
+    def splot(p,label,color='g'):
+      if plot:
+        p = sort(ravel(p)) 
+        pylab.plot(arange(len(p))/len(p),p,color=color,label=label)
+    entropies = []
+    for i in xrange(4):
+      for j in xrange(i+1,4):
+        p = prob((i,j))
+        entropies.append(entropy(p))
+        Log.write('axes %d %d, p = %g, S = %g'%(i,j,mean(p),mean(entropy(p))))
+        splot(p,label='%d %d'%(i,j),color='r')
+    best_S = reduce(minimum,entropies)
+    Log.write('best 2-axis entropy = %g'%mean(best_S))
+    splot(best_S,label='best 2')
+    if 1:
+      for i in xrange(4):
+        p = prob((i,))
+        entropies.append(entropy(p))
+        Log.write('axes %d, p = %g, S = %g'%(i,mean(p),mean(entropy(p))))
+        splot(p,label='%d'%i,color='b')
+      best_S = reduce(minimum,entropies)
+      Log.write('best 3-axis entropy = %g'%mean(best_S))
+      splot(best_S,label='best 3')
+    if plot:
+      pylab.legend()
+      pylab.show()
+      sys.exit(0)
+
+def identity(data):
+  pass
+
+def shuffle(data):
+  shape = data.shape[:4]
+  data = ravel(data.view(uint8))
+  d = unpackbits(data).reshape(shape+(2,4,4,4,4))
+  d = d.swapaxes(1,5).swapaxes(2,5).swapaxes(3,6).swapaxes(4,5).swapaxes(5,7).swapaxes(7,8)
+  data[:] = packbits(d)
+
+def unshuffle(data):
+  shape = data.shape[:4]
+  data = ravel(data.view(uint8))
+  d = unpackbits(data).reshape(shape[0],4,shape[1],4,shape[2],4,shape[3],4,2)
+  d = d.swapaxes(7,8).swapaxes(5,7).swapaxes(4,5).swapaxes(3,6).swapaxes(2,5).swapaxes(1,5)
+  data[:] = packbits(d)
+
+def popsort(data):
+  data = data.reshape(-1,2,4)
+  counts = super_popcounts(data)
+  counts = counts[:,0] - counts[:,1]
+  order = argsort(counts)
+  data[:] = data[order]
+  interleave(data)
+
 def driver():
+  do_count = PropManager.add('count',False)
+  do_lowrank = PropManager.add('lowrank',False)
+  plot = PropManager.add('plot',0)
+  parser.parse('filter-test')
+
   Log.configure('filter test',0,0,100)
   reader = supertensor_reader_t('data/section-32-44444444.pentago')
   header = reader.header
@@ -60,13 +139,16 @@ def driver():
   random.seed(9454242)
 
   # Define filters
-  filters = [('interleave',interleave,uninterleave)]
+  filters = [('identity',identity,identity)
+            ,('interleave',interleave,uninterleave)
+            ,('shuffle',shuffle,unshuffle)
+            ,('popsort',popsort,None)]
 
   # Loop through a few random blocks
   total_uncompressed = 0
   total_compressed = 0
   totals = dict((name,0) for name,_,_ in filters)
-  wins = [0,0]
+  wins = zeros(2)
   total = 0
   for i in xrange(32):
     with Log.scope('block'): 
@@ -81,27 +163,42 @@ def driver():
       Log.write('base ratio = %g'%(compressed/uncompressed))
       data = empty(tuple(header.block_shape(b))+(2,4),uint64)
       reader.read_block(b,data)
-      total += 64*data.size
+
+      # Compute total wins, losses, and ties
+      ltotal = 32*data.size
+      lwins = zeros(2)
       for a in 0,1:
-        wins[a] += super_popcount(data[:,:,:,:,a,:].copy())
+        lwins[a] += super_popcount(data[:,:,:,:,a,:].copy())
+      outcomes = array([lwins[0],ltotal-sum(lwins),lwins[1]])
+      Log.write('outcomes = %d %d %d, ratios = %g %g %g'%tuple(hstack([outcomes,outcomes/ltotal])))
+      total += ltotal
+      wins += lwins
+
+      # Test the compression after each filter
       for name,filter,inverse in filters:
         d = data.copy()
         filter(d)
         fsize = measure_compression(ravel(d).view(uint8),level)
         totals[name] += fsize
         Log.write('%s ratio = %g'%(name,fsize/uncompressed))
-        inverse(d)
-        assert all(data==d)
-      if 0:
+        if inverse is not None:
+          inverse(d)
+          assert all(data==d)
+
+      # Optionally compute entropies
+      if do_count():
         with Log.scope('count'):
           count(data)
+
+      # More optional stuff
+      if do_lowrank():
+        lowrank(data,plot=plot())
   with Log.scope('totals'):
     Log.write('base ratio = %g'%(total_compressed/total_uncompressed))
     for name,_,_ in filters:
       Log.write('%s ratio = %g'%(name,totals[name]/total_uncompressed))
     outcomes = array([wins[0],total-sum(wins),wins[1]])
-    Log.write('outcomes = %d %d %d'%tuple(outcomes))
-    Log.write('outcomes ratios = %g %g %g'%tuple(outcomes/total))
+    Log.write('outcomes = %d %d %d, ratios = %g %g %g'%tuple(hstack([outcomes,outcomes/total])))
        
 if __name__=='__main__':
   driver()
