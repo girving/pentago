@@ -1,6 +1,7 @@
 // In memory and out-of-core operations on large four dimensional arrays of superscores
 
 #include "supertensor.h"
+#include "filter.h"
 #include <other/core/array/IndirectArray.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/to_python.h>
@@ -224,8 +225,11 @@ supertensor_reader_t::~supertensor_reader_t() {}
 void supertensor_reader_t::read_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data) const {
   OTHER_ASSERT(data.shape==header.block_shape(block));
   read_and_uncompress(fd.fd,char_view(data.flat),index[block]);
-  if (header.filter)
-    OTHER_ASSERT(false);
+  switch (header.filter) {
+    case 0: break;
+    case 1: uninterleave(data.flat); break;
+    default: throw ValueError(format("supertensor_reader_t::read_block: unknown filter %d",header.filter));
+  }
 }
 
 // Write header at offset 0, and return the header size
@@ -281,11 +285,14 @@ supertensor_writer_t::~supertensor_writer_t() {
   }
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<const Vector<super_t,2>,4> data, bool verbose) {
+void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data, bool verbose) {
   OTHER_ASSERT(data.shape==header.block_shape(block));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
-  if (header.filter)
-    OTHER_ASSERT(false);
+  switch (header.filter) {
+    case 0: break;
+    case 1: interleave(data.flat); break;
+    default: throw ValueError(format("supertensor_writer_t::write_block: unknown filter %d",header.filter));
+  }
   index[block] = compress_and_write(fd.fd,next_offset,char_view(data.flat),level,verbose);
 }
 

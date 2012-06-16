@@ -10,7 +10,7 @@ import tempfile
 # Declare properties as global variables
 section = PropManager.add('section','').set_help('numbers of black and white stones in each quadrant (''.join(ravel(section)))').set_required(1)
 block_size = PropManager.add('block_size',8).set_help('block size along all four quadrant dimensions')
-filter = PropManager.add('filter',0).set_help('filter type to precondition zlib compression')
+filter = PropManager.add('filter',1).set_help('filter type to precondition zlib compression')
 level = PropManager.add('level',4).set_help('zlib compression level')
 dir = PropManager.add('dir','data').set_help('top level data directory')
 recurse = PropManager.add('recurse',False).set_help('automatically recurse into child sections')

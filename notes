@@ -129,3 +129,67 @@ between the true value and the estimated value.
 
 Alternative plan: estimate how long the computation would take on Nautilus using just interleave
 filtering.  It would be nice to finish.
+
+-------------------------------------------------------------------------------------------------
+
+Time to speed up I/O a bit.  My test command is
+
+  time ./endgame --force 1 45544444
+
+Here's baseline with no filtering:
+
+  endgame                                            31.2662 s
+    compute                                          31.2321 s
+      pass one                                       14.1867 s
+        slice                                        14.1632 s
+          read                                        0.7950 s
+          compute                                     1.6839 s
+          write                                      11.6389 s
+      pass two                                       17.0446 s
+        slice                                        16.9966 s
+          read                                        0.8160 s
+          compute                                     1.9244 s
+          write                                      14.2085 s
+
+  endgame                                            37.5114 s
+    compute                                          37.4208 s
+      pass one                                       19.6527 s
+        slice                                        19.5406 s
+          read                                        4.8096 s
+          compute                                     1.9386 s
+          write                                      12.7496 s
+      pass two                                       17.6832 s
+        slice                                        17.5865 s
+          read                                        0.7869 s
+          compute                                     1.9387 s
+          write                                      14.6677 s
+
+  endgame                                            32.5353 s
+    compute                                          32.4037 s
+      pass one                                       15.3064 s
+        slice                                        15.2705 s
+          read                                        0.8282 s
+          compute                                     1.8275 s
+          write                                      12.5718 s
+      pass two                                       17.0964 s
+        slice                                        16.8638 s
+          read                                        0.7948 s
+          compute                                     1.9598 s
+          write                                      14.0639 s
+
+And now using interleave filtering (1):
+
+  endgame                                            31.5253 s
+    compute                                          31.4933 s
+      pass one                                       14.6990 s
+        slice                                        14.6759 s
+          read                                        0.8448 s
+          compute                                     1.8619 s
+          write                                      11.9257 s
+      pass two                                       16.7935 s
+        slice                                        16.7264 s
+          read                                        0.7959 s
+          compute                                     1.9793 s
+          write                                      13.9063 s
+
+However, the file size dropped from 429131154 to 354709446, which is evidence for zlib being the bottleneck.

@@ -112,8 +112,8 @@ protected:
 public:
   ~supertensor_writer_t();
 
-  // Write a block of data to disk.  This function is thread safe if !verbose.
-  void write_block(Vector<int,4> block, RawArray<const Vector<super_t,2>,4> data, bool verbose);
+  // Write a block of data to disk, destroying it in the process.  This function is thread safe if !verbose.
+  void write_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data, bool verbose);
 
   // Write the final index to disk and close the file
   void finalize();

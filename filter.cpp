@@ -1,5 +1,6 @@
 // Multidimensional superscore filtering to precondition zlib compression
 
+#include "filter.h"
 #include "superscore.h"
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
@@ -223,6 +224,16 @@ static inline Vector<super_t,2> uninterleave(const Vector<super_t,2>& s) {
                                    CONTRACT(_mm_srli_epi64(s.y.x,1),_mm_srli_epi64(s.y.y,1))));
 }
  
+void interleave(RawArray<Vector<super_t,2>> data) {
+  for (auto& s : data)
+    s = interleave(s);
+}
+
+void uninterleave(RawArray<Vector<super_t,2>> data) {
+  for (auto& s : data)
+    s = uninterleave(s);
+}
+
 static void interleave(NdArray<Vector<super_t,2>> data) {
   for (auto& s : data.flat)
     s = interleave(s);
