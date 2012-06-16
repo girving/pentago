@@ -23,15 +23,16 @@ using std::cout;
 using std::endl;
 using std::vector;
 
-RawArray<const quadrant_t> rotation_minimal_quadrants(int black, int white) {
+Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white) {
   OTHER_ASSERT(0<=black && 0<=white && black+white<=9);
   const int i = ((black*(21-black))>>1)+white;
   const uint16_t lo = rotation_minimal_quadrants_offsets[i],
                  hi = rotation_minimal_quadrants_offsets[i+1];
-  return RawArray<const quadrant_t>(hi-lo,rotation_minimal_quadrants_flat+lo);
+  const int moved = rotation_minimal_quadrants_reflect_moved[i];
+  return tuple(RawArray<const quadrant_t>(hi-lo,rotation_minimal_quadrants_flat+lo),moved);
 }
 
-RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8_t,2> counts) {
+Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,2> counts) {
   return rotation_minimal_quadrants(counts.x,counts.y);
 }
 
@@ -369,10 +370,10 @@ Array<board_t> all_boards_list(int n) {
   list.preallocate(small_count);
   for (section_t s : sections) {
     check_interrupts();
-    RawArray<const quadrant_t> bucket0 = rotation_minimal_quadrants(s.counts[0]),
-                               bucket1 = rotation_minimal_quadrants(s.counts[1]),
-                               bucket2 = rotation_minimal_quadrants(s.counts[2]),
-                               bucket3 = rotation_minimal_quadrants(s.counts[3]);
+    RawArray<const quadrant_t> bucket0 = rotation_minimal_quadrants(s.counts[0]).x,
+                               bucket1 = rotation_minimal_quadrants(s.counts[1]).x,
+                               bucket2 = rotation_minimal_quadrants(s.counts[2]).x,
+                               bucket3 = rotation_minimal_quadrants(s.counts[3]).x;
     for (auto q0 : bucket0)
       for (auto q1 : bucket1)
         for (auto q2 : bucket2)
@@ -384,6 +385,15 @@ Array<board_t> all_boards_list(int n) {
 
 void all_boards_sample_test(int n, int steps) {
   Array<section_t> sections = all_boards_sections(n);
+
+  // Sort buckets in preparation for binary search
+  Hashtable<Vector<uint8_t,2>,Array<quadrant_t>> sorted;
+  for (uint8_t b=0;b<=9;b++)
+    for (uint8_t w=0;w<=9-b;w++) {
+      auto bucket = rotation_minimal_quadrants(b,w).x.copy();
+      sort(bucket);
+      sorted.set(vec(b,w),bucket);
+    }
 
   // Generate a bunch of random boards, and check that each one occurs in a section
   Ref<Random> random = new_<Random>(175131);
@@ -401,7 +411,7 @@ void all_boards_sample_test(int n, int steps) {
     // Does the board occur in the section?
     const board_t sboard = transform_board(symmetry_t(g,0),board);
     for (int i=0;i<4;i++) {
-      RawArray<const quadrant_t> bucket = rotation_minimal_quadrants(ss.counts[i]); 
+      RawArray<const quadrant_t> bucket = sorted.get(ss.counts[i]);
       const quadrant_t q = quadrant(sboard,i);
       OTHER_ASSERT(std::binary_search(bucket.begin(),bucket.end(),rotation_standardize_quadrant(q).x));
     }
@@ -447,13 +457,29 @@ board_t random_board(Random& random, const section_t& section) {
 }
 
 static void rmin_test() {
+  // Check inverse
   for (quadrant_t q=0;q<quadrant_count;q++) {
     const auto standard = rotation_standardize_quadrant(q);
     const int ir = rotation_minimal_quadrants_inverse[q];
-    const auto rmin = rotation_minimal_quadrants(count(q));
+    const auto rmin = rotation_minimal_quadrants(count(q)).x;
     OTHER_ASSERT(rmin.valid(ir/4) && rmin[ir/4]==standard.x);
     OTHER_ASSERT(transform_board(symmetry_t(0,ir&3),standard.x)==q);
   }
+
+  // Check that all quadrants changed by reflection occur in pairs in the first part of the array
+  for (uint8_t b=0;b<=9;b++)
+    for (uint8_t w=0;w<=9-b;w++) {
+      const auto rmin_moved = rotation_minimal_quadrants(vec(b,w));
+      const auto rmin = rmin_moved.x;
+      const int moved = rmin_moved.y;
+      OTHER_ASSERT((moved&1)==0 && (!moved || moved<rmin.size()));
+      for (int i=0;i<rmin.size();i++) {
+        const quadrant_t q = rmin[i];
+        const quadrant_t qr = pack(reflections[unpack(q,0)],reflections[unpack(q,1)]);
+        const int ir = rotation_minimal_quadrants_inverse[qr]/4;
+        OTHER_ASSERT((i^(i<moved))==ir);
+      }
+    }
 }
 
 }

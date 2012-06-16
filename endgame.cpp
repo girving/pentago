@@ -5,6 +5,7 @@
 #include "all_boards.h"
 #include "supertensor.h"
 #include "superengine.h"
+#include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
@@ -22,7 +23,7 @@ using std::endl;
 using std::vector;
 
 static RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int lo, int hi) {
-  RawArray<const quadrant_t> rmin = rotation_minimal_quadrants(counts);
+  RawArray<const quadrant_t> rmin = rotation_minimal_quadrants(counts).x;
   OTHER_ASSERT(0<=lo && lo<=hi && (unsigned)hi<=(unsigned)rmin.size());
   return rmin.slice(lo,hi);
 }
@@ -136,10 +137,10 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
   }
 
   // Look up minimal quadrants
-  const RawArray<const quadrant_t> rmin[4] = {rotation_minimal_quadrants(section.counts[0]),
-                                              rotation_minimal_quadrants(section.counts[1]),
-                                              rotation_minimal_quadrants(section.counts[2]),
-                                              rotation_minimal_quadrants(section.counts[3])};
+  const RawArray<const quadrant_t> rmin[4] = {rotation_minimal_quadrants(section.counts[0]).x,
+                                              rotation_minimal_quadrants(section.counts[1]).x,
+                                              rotation_minimal_quadrants(section.counts[2]).x,
+                                              rotation_minimal_quadrants(section.counts[3]).x};
 
   // Loop over the set of blocks
   ProgressIndicator progress(sample_count,true);
@@ -165,7 +166,7 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
         }
 }
 
-// Given a section s and order o, we define the 4-tensor A(s,o,I) = f(q[s[0],I[oi[0]]],...), where f(q0,q1,q2,q3) is the superoutcome for the board with
+// Given a section s and order o, we define the 4-tensor A(s,o,I) = f(... q[s[k],I[oi[k]]] ...), where f(q0,q1,q2,q3) is the superoutcome for the board with
 // quadrants q0,...,q3, q[c,i] is the ith quadrant with counts c, and oi is the inverse of the permutation o.  Hmm, we may have a serious problem.  If we
 // apply a reflection transform to standardize a section, the resulting per quadrant reflections will screw up the ordering of the quadrants and break the
 // block structure of our file format.  This doesn't apply to a global rotation standardization because we can cancel the global rotation with local rotations.
@@ -176,15 +177,25 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
 // Well, so be it.  I don't see any easy way around this, so for now we lose a factor of two.  Let's proceed.  We need a block section of a section A(s,o),
 // but all we have is A(gs) for some global rotation g.  Adjust g to a global+local symmetry so that each quadrant moves without rotating.  Let g map quadrant
 // k to p[k].  Then we have
-//   A(s,o,I) = f(... q[s[k],I[oi[k]]] ...) = gi f(g(... q[s[k],I[oi[k]]] ...)) = gi f(... q[gs[k],I[oi[pi[k]]]] ...)
+//   A(s,o,I) = f(... q[s[k],I[oi[k]]] ...) = gi f(g(... q[s[k],I[oi[k]]] ...)) = gi f(... q[gs[k],I[oi[pi[k]]]] ...) = gi A(gs, 1, I.oi.pi)
+
+// Update: I figured out the easy way around this.  Rotation minimal quadrants are now ordered so that reflected pairs are adjacent in the ordering, and all
+// quadrants which aren't fixed by reflection come first.  By enforcing an even block size, we ensure that reflections never cross blocks.  Unfortunately,
+// after a board is reflected each quadrant must be rotated to restore minimality, and this rotation can be different per quadrant.  Thus we lose the
+// simplicity of applying the same symmetry to each element.  This is a bit complicated (I hate Z_2).  Again, we seek A(s,o), and we have A(gs) for a global
+// symmetry g factored as g = rw for a reflection r and rotation w, where w moves each quadrant without rotating.  Factor the reflection r as r = rl rq = rq rl,
+// where rl reflects each quadrant locally and rq swaps quadrants 0 and 3.  We have
+//   A(s,o,I) = f(... q[s[k],I[oi[k]]] ...) = gi f(g(... q[s[k],I[oi[k]]] ...)) = gi f(r(... q[ws[k],I[oi[wpi[k]]]] ...)) = gi f(rl(... q[gs[k],I[oi[pi[k]]]] ...))
+// rl does not preserve rotation minimality of each quadrant, so define maps rs and ri s.t. rl[q[c,i]] = rs[c,i]q[c,ri[c,i]].  Let I.oi.pi = Iop.  Then
+//   A(s,o,I) = gi f(... rs[gs[k],Iop[k]] q[gs[k],ri[gs[k],Iop[k]]] ...) = wi rq (... rs[gs[k],Iop[k]] ...) f(... q[gs[k],ri[gs[k],Iop[k]]] ...)
 
 static void endgame_read_block_slice(section_t desired_section, const supertensor_reader_t& reader, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> data) {
-  auto standard = desired_section.standardize<4>();
-  OTHER_ASSERT((unsigned)standard.y<4); // Disallow reflections for now
+  auto standard = desired_section.standardize<8>();
   OTHER_ASSERT(standard.x==reader.header.section);
 
   // Prepare a transform that rotates quadrants locally while preserving their orientation
-  const symmetry_t symmetry((4-standard.y)&3,(1+4+16+64)*standard.y);
+  const int rotation = standard.y&3;
+  const symmetry_t inverse_rotation((4-rotation)&3,(1+4+16+64)*rotation);
 
   // Determine which quadrants are mapped to where, and compose with order
   const Vector<int,4> reorder(quadrant_permutation(standard.y).subset(order));
@@ -198,12 +209,23 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
   for (int a=0;a<4;a++)
     OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[reorder[a]]:reader.header.shape[reorder[a]]));
 
+  // If there's a reflection, prepare to rearrange data accordingly
+  Vector<int,4> moves;
+  if (standard.y>=4)
+    for (int a=0;a<4;a++)
+      moves[a] = rotation_minimal_quadrants(reader.header.section.counts[a]).y;
+  RawArray<const quadrant_t> rmin[4] = {rotation_minimal_quadrants(reader.header.section.counts[0]).x,
+                                        rotation_minimal_quadrants(reader.header.section.counts[1]).x,
+                                        rotation_minimal_quadrants(reader.header.section.counts[2]).x,
+                                        rotation_minimal_quadrants(reader.header.section.counts[3]).x};
+
   // Read blocks in parallel, mainly to accelerate zlib decompression
   ExceptionValue error;
   #pragma omp parallel
   {
     try {
       Array<Vector<super_t,2>> buffer(first_block_shape.product(),false);
+      Array<uint8_t,2> symmetries(4,block_size,false);
       for (const int kl : partition_loop(slice_blocks.product())) {
         if (error)
           break;
@@ -212,6 +234,14 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
         const Vector<int,4> block = in_order(reorder,vec(i,j,k,l));
         const Vector<int,4> block_shape = reader.header.block_shape(block);
         OTHER_ASSERT(block_shape.product()<=buffer.size());
+        const Vector<int,4> block_moves = clamp_min(moves-block_size*block,0);
+        // Compute symmetries needed to restore minimality after reflection (rs in the above derivation)
+        if (standard.y>=4)
+          for (int a=0;a<4;a++)
+            for (int b=0;b<block_shape[a];b++) {
+              const quadrant_t q = rmin[a][block_size*block[a]+b];
+              symmetries(a,b) = rotation_minimal_quadrants_inverse[pack(reflections[unpack(q,0)],reflections[unpack(q,1)])]&3;
+            }
         // Read, uncompress, and unfilter the block
         RawArray<Vector<super_t,2>,4> block_data(block_shape,buffer.data());
         reader.read_block(block,block_data);
@@ -221,8 +251,9 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
           for (int jj=0;jj<block_shape[1];jj++)
             for (int kk=0;kk<block_shape[2];kk++)
               for (int ll=0;ll<block_shape[3];ll++) {
-                const Vector<super_t,2>& src = block_data(ii,jj,kk,ll);
+                const Vector<super_t,2>& src = block_data(ii^(ii<block_moves[0]),jj^(jj<block_moves[1]),kk^(kk<block_moves[2]),ll^(ll<block_moves[3]));
                 Vector<super_t,2>& dst = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
+                const symmetry_t symmetry = standard.y<4?inverse_rotation:inverse_rotation*symmetry_t(4,symmetries(0,ii)+4*symmetries(1,jj)+16*symmetries(2,kk)+64*symmetries(3,ll));
                 for (int a=0;a<2;a++)
                   dst[a] = transform_super(symmetry,src[a]);
               }
@@ -258,10 +289,10 @@ static void in_place_extreme(bool turn, RawArray<Vector<super_t,2>> dst, RawArra
 
 // Do not use in performance critical code
 static board_t section_board(const section_t& section, const Vector<int,4>& I) {
-  return quadrants(rotation_minimal_quadrants(section.counts[0])[I[0]],
-                   rotation_minimal_quadrants(section.counts[1])[I[1]],
-                   rotation_minimal_quadrants(section.counts[2])[I[2]],
-                   rotation_minimal_quadrants(section.counts[3])[I[3]]);
+  return quadrants(rotation_minimal_quadrants(section.counts[0]).x[I[0]],
+                   rotation_minimal_quadrants(section.counts[1]).x[I[1]],
+                   rotation_minimal_quadrants(section.counts[2]).x[I[2]],
+                   rotation_minimal_quadrants(section.counts[3]).x[I[3]]);
 }
 
 static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data) {
@@ -321,15 +352,16 @@ template<bool turn,bool final> static void endgame_compute_block_slice_helper(co
   for (int a=0;a<4;a++)
     OTHER_ASSERT((a==2 || dest.shape[a]==src2.shape[a]) && (a==3 || dest.shape[a]==src3.shape[a]));
   const section_t section = writer.header.section;
+  OTHER_ASSERT(section==section.standardize<8>().x); // Prevent accidental computation of unnecessary data
   const Vector<uint8_t,2> move = Vector<uint8_t,2>::axis_vector(turn);
   const RawArray<const quadrant_t> rmin0 = safe_rmin_slice(section.counts[order[0]],writer.header.block_size*i+range(dest.shape[0])),
                                    rmin1 = safe_rmin_slice(section.counts[order[1]],writer.header.block_size*j+range(dest.shape[1])),
-                                   rmin2 = rotation_minimal_quadrants(section.counts[order[2]]),
-                                   rmin3 = rotation_minimal_quadrants(section.counts[order[3]]);
+                                   rmin2 = rotation_minimal_quadrants(section.counts[order[2]]).x,
+                                   rmin3 = rotation_minimal_quadrants(section.counts[order[3]]).x;
   OTHER_ASSERT(dest.shape[2]==rmin2.size());
   OTHER_ASSERT(dest.shape[3]==rmin3.size());
-  OTHER_ASSERT(section.counts[order[2]].sum()==9 || src2.shape[2]==rotation_minimal_quadrants(section.counts[order[2]]+move).size());
-  OTHER_ASSERT(section.counts[order[3]].sum()==9 || src3.shape[3]==rotation_minimal_quadrants(section.counts[order[3]]+move).size());
+  OTHER_ASSERT(section.counts[order[2]].sum()==9 || src2.shape[2]==rotation_minimal_quadrants(section.counts[order[2]]+move).x.size());
+  OTHER_ASSERT(section.counts[order[3]].sum()==9 || src3.shape[3]==rotation_minimal_quadrants(section.counts[order[3]]+move).x.size());
 
   // Run outer two dimensions in parallel
   const int outer_size = dest.shape[0]*dest.shape[1];

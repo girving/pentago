@@ -199,7 +199,7 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
   // Verify header
   if (memcmp(h.magic,magic,20))
     throw IOError(format("invalid supertensor file \"%s\": incorrect magic string",path));
-  if (h.version != 1)
+  if (h.version != 2)
     throw IOError(format("supertensor file \"%s\" has unknown version %d",path,h.version));
   if (!h.valid)
     throw IOError(format("supertensor file \"%s\" is marked invalid",path));
@@ -210,6 +210,7 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
   }
   OTHER_ASSERT((Vector<int,4>(h.shape)==h.section.shape()));
   OTHER_ASSERT(1<=h.block_size && h.block_size<=27);
+  OTHER_ASSERT((h.block_size&1)==0);
   OTHER_ASSERT(h.blocks==(h.shape+h.block_size-1)/h.block_size);
 
   // Read block index
@@ -247,11 +248,13 @@ supertensor_writer_t::supertensor_writer_t(const string& path, section_t section
   , level(level) {
   if (fd.fd < 0)
     throw IOError(format("can't open supertensor file \"%s\" for writing: %s",path,strerror(errno)));
+  if (block_size&1)
+    throw ValueError(format("supertensor block size must be even (not %d) to support block-wise reflection",block_size));
 
   // Initialize header
   supertensor_header_t h;
   memcpy(h.magic,magic,20);
-  h.version = 1;
+  h.version = 2;
   h.stones = section.counts.sum().sum();
   h.section = section;
   h.shape = Vector<uint16_t,4>(section.shape());

@@ -109,7 +109,7 @@ def probability():
 def approx():
   total = 0
   raw_total = 0
-  symmetries = 4
+  symmetries = 8
   print 'symmetries = %d'%symmetries
   for n in xrange(37):
     total += all_boards_stats(n,symmetries)

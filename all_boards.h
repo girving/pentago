@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include <other/core/array/NestedArray.h>
+#include <other/core/structure/Tuple.h>
 namespace pentago {
 
 using std::ostream;
@@ -12,9 +13,9 @@ static inline Vector<uint8_t,2> count(quadrant_t q) {
   return vec((uint8_t)popcount(unpack(q,0)),(uint8_t)popcount(unpack(q,1)));
 }
 
-// All rotation minimal quadrants with the given numbers of stones
-RawArray<const quadrant_t> rotation_minimal_quadrants(int black, int white);
-RawArray<const quadrant_t> rotation_minimal_quadrants(Vector<uint8_t,2> counts);
+// All rotation minimal quadrants with the given numbers of stones, plus the number moved by reflections
+Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white);
+Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,2> counts);
 
 struct section_t {
   Vector<Vector<uint8_t,2>,4> counts;
@@ -43,10 +44,10 @@ struct section_t {
   }
 
   Vector<int,4> shape() const {
-    return vec(rotation_minimal_quadrants(counts[0]).size(),
-               rotation_minimal_quadrants(counts[1]).size(),
-               rotation_minimal_quadrants(counts[2]).size(),
-               rotation_minimal_quadrants(counts[3]).size());
+    return vec(rotation_minimal_quadrants(counts[0]).x.size(),
+               rotation_minimal_quadrants(counts[1]).x.size(),
+               rotation_minimal_quadrants(counts[2]).x.size(),
+               rotation_minimal_quadrants(counts[3]).x.size());
   }
 
   uint64_t size() const {

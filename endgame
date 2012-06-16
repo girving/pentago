@@ -9,14 +9,15 @@ import tempfile
 
 # Declare properties as global variables
 section = PropManager.add('section','').set_help('numbers of black and white stones in each quadrant (''.join(ravel(section)))').set_required(1)
-block_size = PropManager.add('block_size',9).set_help('block size along all four quadrant dimensions')
+block_size = PropManager.add('block_size',8).set_help('block size along all four quadrant dimensions')
 filter = PropManager.add('filter',0).set_help('filter type to precondition zlib compression')
 level = PropManager.add('level',4).set_help('zlib compression level')
 dir = PropManager.add('dir','data').set_help('top level data directory')
 recurse = PropManager.add('recurse',False).set_help('automatically recurse into child sections')
-symmetries = PropManager.add('symmetries',4).set_help('number of symmetries used to standardize sections')
+symmetries = PropManager.add('symmetries',8).set_help('number of symmetries used to standardize sections')
 force = PropManager.add('force',False).set_help('recompute section even if it already exists')
 verify_samples = PropManager.add('verify',0).set_help('if nonzero, load tensor file and verify rather than computing, using the given number of samples')
+nop = PropManager.add('nop',False).set_help('do nothing')
 
 def show_section(s):
   return '%d-'%sum(s)+''.join(map(str,ravel(s)))
@@ -106,11 +107,15 @@ def section_children(section):
         children.append(child)
   return children
 
+exist_set = set()
+def exists(file):
+  return file in exist_set or os.path.exists(file)
+
 def compute(section):
   '''Compute a single section, optionally recursing down to children'''
 
   # Does the file already exist?
-  if not force() and os.path.exists(section_file(section)):
+  if not force() and exists(section_file(section)):
     Log.write('skipping existing section %s'%show_section(section))
     return
 
@@ -120,38 +125,41 @@ def compute(section):
 
   # Recurse into children if allowed
   for child in children:
-    if not os.path.exists(section_file(child)):
+    if not exists(section_file(child)):
       if not recurse():
         raise RuntimeError('section %s depends on missing section %s, but recursion is not allowed'%(show_section(section),show_section(child)))
       compute(child)
 
   # Compute section
   with Log.scope('compute %s'%show_section(section)):
-    # Prepare to read
-    readers = [supertensor_reader_t(section_file(child)) for child in children]
-    for reader in readers:
-      assert reader.header.block_size==block_size
+    if nop():
+      exist_set.add(section_file(section))
+    else:
+      # Prepare to read
+      readers = [supertensor_reader_t(section_file(child)) for child in children]
+      for reader in readers:
+        assert reader.header.block_size==block_size
 
-    # We need to compute the four dimensional tensor A_ijkl.  The entire tensor cannot fit into RAM, so we do this in two
-    # passes, the first considering moves in quadrants ij, the second considering moves in quadrants kl.  The first pass
-    # writes a temporary tensor file to disk, and the second reads blocks from the temporary file and combines them with
-    # the kl data before writing the final section file.
+      # We need to compute the four dimensional tensor A_ijkl.  The entire tensor cannot fit into RAM, so we do this in two
+      # passes, the first considering moves in quadrants ij, the second considering moves in quadrants kl.  The first pass
+      # writes a temporary tensor file to disk, and the second reads blocks from the temporary file and combines them with
+      # the kl data before writing the final section file.
 
-    # To ensure sufficient parallelism, we first rearrange the block dimensions of A_ijkl so that |i| <= |k| <= |j| <= |l|.
+      # To ensure sufficient parallelism, we first rearrange the block dimensions of A_ijkl so that |i| <= |k| <= |j| <= |l|.
 
-    # Compute and write the first (temporary) pass
-    def open_writer(file):
-      return supertensor_writer_t(file,section,block_size,filter(),level())
-    with Log.scope('pass one'):
-      tmp = tempfile.NamedTemporaryFile(prefix='section-tmp-%s'%show_section(section),suffix='.pentago')
-      writer = open_writer(tmp.name)
-      order = argsort(writer.header.shape)
-      order[1],order[2] = order[2],order[1]
-      compute_pass(writer,None,readers,order)
-    with Log.scope('pass two'):
-      first_pass = supertensor_reader_t(tmp.name)
-      writer = open_writer(section_file(section))
-      compute_pass(writer,first_pass,readers,order[::-1])
+      # Compute and write the first (temporary) pass
+      def open_writer(file):
+        return supertensor_writer_t(file,section,block_size,filter(),level())
+      with Log.scope('pass one'):
+        tmp = tempfile.NamedTemporaryFile(prefix='section-tmp-%s'%show_section(section),suffix='.pentago')
+        writer = open_writer(tmp.name)
+        order = argsort(writer.header.shape)
+        order[1],order[2] = order[2],order[1]
+        compute_pass(writer,None,readers,order)
+      with Log.scope('pass two'):
+        first_pass = supertensor_reader_t(tmp.name)
+        writer = open_writer(section_file(section))
+        compute_pass(writer,first_pass,readers,order[::-1])
 
 def verify(section):
   with Log.scope('verify %s'%show_section(section)):
@@ -169,13 +177,22 @@ def main():
   # Parse properties
   global section,block_size,symmetries
   parser.parse('Pentago endgame database computation',positional=[section])
-  section = asarray(map(int,section())).reshape(4,2)
+  m = re.match('^\D*(?:\d\d-)?(\d{8})\D*$',section())
+  if not m:
+    raise ValueError('bad section %s'%section())
+  section.set(m.group(1))
+  section = asarray(map(int,m.group(1))).reshape(4,2)
   assert section_valid(section)
   block_size = block_size()
   symmetries = symmetries()
 
+  # Verify that section is standardized to prevent accidental computation of unnecessary data
+  standard = standardize_section(section,symmetries)
+  if not all(section==standard):
+    raise ValueError('refusing to compute nonstandard section %s (did you mean %s?)'%(show_section(section),show_section(standard)))
+
   # Make directory if necessary
-  if not os.path.exists(dir()):
+  if not exists(dir()):
     os.mkdir(dir())
 
   # Configure logging

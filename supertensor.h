@@ -39,6 +39,7 @@ namespace pentago {
  *
  * 0 - Initial unstable version
  * 1 - Switch to storing both black and white wins
+ * 2 - Change quadrant ordering to support block-wise reflection
  */
 
 struct supertensor_blob_t {

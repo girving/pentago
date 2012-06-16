@@ -236,7 +236,7 @@ def rotated_win_distances():
   assert ahash(table)==-1851827180569519993
   return [('uint64_t','rotated_win_distances','0x%xL',table)]
 
-@remember
+@cache
 def reflections():
   table = zeros(512,dtype=int16)
   for v in xrange(512):
@@ -248,7 +248,11 @@ def reflections():
     assert popcount(v)==popcount(r)
     table[v] = r
   assert ahash(table)==-2942482400364239360
-  return [('uint16_t','reflections','0x%x',table)]
+  return table
+
+@remember
+def show_reflections():
+  return [('uint16_t','reflections','0x%x',reflections())]
 
 '''There are 3**9 = 19683 possible states in each quadrant.  3**9 < 2**16, so we can store
 a quadrant state in 16 bits using radix 3.  However, radix 3 is inconvenient for computation,
@@ -458,17 +462,27 @@ def superstandardize_table():
 
 @remember
 def rotation_minimal_quadrants():
-  # Find quadrants minimal w.r.t. rotations but not necessarily reflections 
-  q = arange(3**9)
-  unpack_ = unpack()
-  s0,s1 = unpack_.T
-  rot = rotations()[:,0]
   pack_ = pack()
+  unpack_ = unpack()
+  reflect = reflections()
+  rotate = rotations()[:,0]
+
+  # Find quadrants minimal w.r.t. rotations but not necessarily reflections
+  minq = arange(3**9)
+  s0,s1 = unpack_.T
   for r in 1,2,3:
-    s0 = rot[s0]
-    s1 = rot[s1]
-    q = minimum(q,pack_[s0]+2*pack_[s1])
-  all_rmins, = nonzero(q==arange(3**9))   
+    s0 = rotate[s0]
+    s1 = rotate[s1]
+    minq = minimum(minq,pack_[s0]+2*pack_[s1])
+  all_rmins, = nonzero(minq==arange(3**9))
+
+  # Sort quadrants so that reflected versions are consecutive (after rotation minimizing), and all pairs come first
+  s0,s1 = unpack_.T
+  reflected = minq[pack_[reflect[s0]]+2*pack_[reflect[s1]]]
+  all_rmins = all_rmins[argsort(3**9*(all_rmins==reflected[all_rmins])+minimum(all_rmins,reflected[all_rmins]),kind='mergesort')]
+  def ordered(qs):
+    return all(reflected[qs]==qs[arange(len(qs))^(qs!=reflected[qs])])
+  assert ordered(all_rmins)
 
   # Partition quadrants by stone counts
   s0,s1 = unpack_[all_rmins].T
@@ -478,6 +492,12 @@ def rotation_minimal_quadrants():
   rmins = [all_rmins[nonzero(i==k)[0]] for k in xrange(10*(10+1)//2)]
   assert sum(map(len,rmins))==len(all_rmins)
 
+  # Count the number of elements in each bucket not fixed by reflection
+  moved = asarray([sum(reflected[r]!=r) for r in rmins])
+  assert all((moved&1)==0)
+  for r in rmins:
+    assert ordered(r)
+
   # Compute inverse.  inverse[q] = 4*i+r if rmins[?][i] rotated left 90*r degrees is q
   inverse = empty(3**9,int)
   inverse[:] = 4*3**9
@@ -486,19 +506,21 @@ def rotation_minimal_quadrants():
     for i in xrange(4):
       r = pack_[s0]+2*pack_[s1]
       inverse[r] = minimum(inverse[r],4*arange(len(r))+i)
-      s0 = rot[s0]
-      s1 = rot[s1]
+      s0 = rotate[s0]
+      s1 = rotate[s1]
   assert all(inverse<420*4)
 
   # Save as a nested array
   offsets = cumsum(hstack([0,map(len,rmins)]))
   flat = hstack(rmins)
   assert ahash(offsets)==4726690024650118399
-  assert ahash(flat)==-7853050755204583428
-  assert ahash(inverse)==5770587159514373395
+  assert ahash(flat)==6304851227730504324
+  assert ahash(inverse)==-5354860874702610752
+  assert ahash(moved)==-2598296920393596729
   return [('uint16_t','rotation_minimal_quadrants_offsets','%d',offsets)
          ,('uint16_t','rotation_minimal_quadrants_flat','%d',hstack(rmins))
-         ,('uint16_t','rotation_minimal_quadrants_inverse','%d',inverse)]
+         ,('uint16_t','rotation_minimal_quadrants_inverse','%d',inverse)
+         ,('uint16_t','rotation_minimal_quadrants_reflect_moved','%d',moved)]
 
 def cpp_sizes(data):
   return ''.join('[%d]'%n for n in data.shape)

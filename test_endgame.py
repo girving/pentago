@@ -10,7 +10,7 @@ def test_supertensor():
 
   # Choose tiny parameters
   section = (2,0),(0,2),(1,1),(1,1)
-  block_size = 7
+  block_size = 6
   filter = 0
   level = 6
 
