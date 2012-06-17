@@ -18,6 +18,8 @@ symmetries = PropManager.add('symmetries',8).set_help('number of symmetries used
 force = PropManager.add('force',False).set_help('recompute section even if it already exists')
 verify_samples = PropManager.add('verify',0).set_help('if nonzero, load tensor file and verify rather than computing, using the given number of samples')
 nop = PropManager.add('nop',False).set_help('do nothing')
+cpu_threads = PropManager.add('cpu_threads',-1).set_abbrev('j').set_help('number of cpu threads')
+io_threads = PropManager.add('io_threads',-1).set_abbrev('i').set_help('number of io threads')
 
 def show_section(s):
   return '%d-'%sum(s)+''.join(map(str,ravel(s)))
@@ -73,6 +75,7 @@ def compute_pass(writer,first_pass,readers,order):
     return array.reshape(-1,2,4)[:product(shape)].reshape(shape+(2,4))
 
   # Loop over block slices in the first two dimensions, computing two dimensional block slices spanning the last two dimensions
+  clear_thread_times()
   for i in xrange(blocks[order[0]]):
     for j in xrange(blocks[order[1]]):
       with Log.scope('slice %d / %d'%(i*blocks[order[1]]+j,blocks[order[0]]*blocks[order[1]])):
@@ -83,15 +86,13 @@ def compute_pass(writer,first_pass,readers,order):
         src2_part = part(src2,block_shape[order[0]],block_shape[order[1]],shape2[order[2]],shape [order[3]])
         src3_part = part(src3,block_shape[order[0]],block_shape[order[1]],shape [order[2]],shape3[order[3]])
         if reader2 or reader3:
-          with Log.scope('read'):
-            if reader2:
-              endgame_read_block_slice(child_section(section,order[2]),reader2,order,i,j,src2_part)
-            if reader3:
-              endgame_read_block_slice(child_section(section,order[3]),reader3,order,i,j,src3_part)
-        with Log.scope('compute'):
-          endgame_compute_block_slice(writer,order,i,j,dest_part,src2_part,src3_part)
-        with Log.scope('write'):
-          endgame_write_block_slice(writer,first_pass,order,i,j,dest_part)
+          if reader2:
+            endgame_read_block_slice(child_section(section,order[2]),reader2,order,i,j,src2_part)
+          if reader3:
+            endgame_read_block_slice(child_section(section,order[3]),reader3,order,i,j,src3_part)
+        endgame_compute_block_slice(writer,order,i,j,dest_part,src2_part,src3_part)
+        endgame_write_block_slice(writer,first_pass,order,i,j,dest_part)
+        report_thread_times(False)
 
   # Done with this pass!
   writer.finalize()
@@ -201,11 +202,15 @@ def main():
   Log.write('command = %s'%parser.command())
 
   # Do whatever is necessary
+  init_thread_pools(cpu_threads(),io_threads())
   if verify_samples():
     init_supertable(21)
     verify(section)
   else:
-    compute(section)
+    try:
+      compute(section)
+    finally:
+      report_thread_times(True)
 
 if __name__=='__main__':
   main()

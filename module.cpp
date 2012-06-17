@@ -20,4 +20,5 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(endgame)
   OTHER_WRAP(filter)
   OTHER_WRAP(analyze)
+  OTHER_WRAP(thread)
 }

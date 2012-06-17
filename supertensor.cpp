@@ -9,6 +9,8 @@
 #include <other/core/structure/HashtableIterator.h>
 #include <other/core/utility/const_cast.h>
 #include <other/core/utility/Log.h>
+#include <other/core/utility/str.h>
+#include <boost/bind.hpp>
 #include <fcntl.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -49,27 +51,42 @@ const char* zlib_error(int z) {
         :"unknown error";
 }
 
-static void read_and_uncompress(int fd, RawArray<uint8_t> data, supertensor_blob_t blob) {
+static void decompress(supertensor_blob_t blob, Array<const uint8_t> compressed, const function<void(Array<uint8_t>)>& cont) {
+  OTHER_ASSERT(thread_type()==CPU);
+
+  Array<uint8_t> uncompressed;
+  {
+    thread_time_t time("decompress");
+    size_t dest_size = blob.uncompressed_size;
+    uncompressed.resize(dest_size,false,false);
+    int z = uncompress((uint8_t*)uncompressed.data(),&dest_size,compressed.data(),blob.compressed_size);
+    if (z!=Z_OK)
+      throw IOError(format("zlib failure in read_and_uncompress: %s",zlib_error(z)));
+    if (dest_size != blob.uncompressed_size)
+      throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",blob.uncompressed_size,dest_size));
+  }
+
+  cont(uncompressed);
+}
+
+void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Array<uint8_t>)>& cont) {
   // Check consistency
+  OTHER_ASSERT(thread_type()==IO);
   OTHER_ASSERT(blob.compressed_size<(uint64_t)1<<31);
-  OTHER_ASSERT(blob.uncompressed_size==(uint64_t)data.size());
   OTHER_ASSERT(!blob.uncompressed_size || blob.offset);
-  if (!blob.uncompressed_size)
-    return;
 
   // Read using pread for thread safety
-  Array<uint8_t> compressed(blob.compressed_size,false);
-  ssize_t r = pread(fd,compressed.data(),blob.compressed_size,blob.offset);
-  if (r<0 || r!=(ssize_t)blob.compressed_size)
-    throw IOError(format("read_and_uncompress pread failed: %s",r<0?strerror(errno):"incomplete read"));
+  Array<uint8_t> compressed;
+  {
+    thread_time_t time("read");
+    compressed.resize(blob.compressed_size,false,false);
+    ssize_t r = pread(fd,compressed.data(),blob.compressed_size,blob.offset);
+    if (r<0 || r!=(ssize_t)blob.compressed_size)
+      throw IOError(format("read_and_uncompress pread failed: %s",r<0?strerror(errno):"incomplete read"));
+  }
 
-  // Decompress
-  size_t dest_size = blob.uncompressed_size;
-  int z = uncompress((uint8_t*)data.data(),&dest_size,compressed.data(),blob.compressed_size);
-  if (z!=Z_OK)
-    throw IOError(format("zlib failure in read_and_uncompress: %s",zlib_error(z)));
-  if (dest_size != blob.uncompressed_size)
-    throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",blob.uncompressed_size,dest_size));
+  // Schedule decompression
+  schedule(CPU,boost::bind(decompress,blob,compressed,cont));
 }
 
 static uint64_t measure_compression(RawArray<const uint8_t> data, int level) {
@@ -81,38 +98,40 @@ static uint64_t measure_compression(RawArray<const uint8_t> data, int level) {
   return dest_size;
 }
 
-static supertensor_blob_t compress_and_write(int fd, uint64_t& next_offset, RawArray<const uint8_t> data, int level, bool verbose) {
-  // Initialize blob
-  supertensor_blob_t blob;
-  blob.uncompressed_size = data.size();
+void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t> data) {
+  OTHER_ASSERT(thread_type()==IO);
+
+  // Choose offset
+  {
+    lock_t lock(offset_mutex);
+    blob->offset = next_offset;
+    next_offset += data.size();
+  }
+
+  // Write using pwrite for thread safety
+  thread_time_t time("write");
+  ssize_t w = ::pwrite(fd.fd,data.data(),data.size(),blob->offset);
+  if (w < 0 || w < (ssize_t)data.size())
+    throw IOError(format("failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
+}
+
+void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray<const uint8_t> data) {
+  OTHER_ASSERT(thread_type()==CPU);
 
   // Compress
-  if (verbose)
-    Log::time("compress");
-  size_t dest_size = compressBound(blob.uncompressed_size);
+  thread_time_t time("compress");
+  blob->uncompressed_size = data.size();
+  size_t dest_size = compressBound(blob->uncompressed_size);
   Array<uint8_t> compressed(dest_size,false);
-  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),blob.uncompressed_size,level);
+  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),blob->uncompressed_size,level);
   if (z!=Z_OK)
     throw IOError(format("zlib failure in compress_and_write: %s",zlib_error(z)));
   OTHER_ASSERT(dest_size<(uint64_t)1<<31);
-  blob.compressed_size = dest_size;
+  blob->compressed_size = dest_size;
+  compressed.resize(dest_size);
 
-  // Choose offset
-  #pragma omp critical
-  {
-    blob.offset = next_offset;
-    next_offset += blob.compressed_size;
-  }
-
-  // Write
-  if (verbose)
-    Log::time("write");
-  ssize_t w = pwrite(fd,compressed.data(),dest_size,blob.offset);
-  if (verbose)
-    Log::stop_time();
-  if (w < 0 || w < (ssize_t)dest_size)
-    throw IOError(format("failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
-  return blob;
+  // Schedule write
+  schedule(IO,boost::bind(&Self::pwrite,this,blob,compressed));
 }
 
 template<class TA> static RawArray<typename CopyConst<uint8_t,typename TA::Element>::type> char_view(const TA& data) {
@@ -120,6 +139,13 @@ template<class TA> static RawArray<typename CopyConst<uint8_t,typename TA::Eleme
   OTHER_ASSERT(size<(uint64_t)1<<31);
   typedef typename CopyConst<uint8_t,typename TA::Element>::type C;
   return RawArray<C>(size,(C*)data.data());
+}
+
+template<class TA> static Array<typename CopyConst<uint8_t,typename TA::Element>::type> char_view_own(const TA& data) {
+  uint64_t size = sizeof(typename TA::Element)*(size_t)data.size();
+  OTHER_ASSERT(size<(uint64_t)1<<31);
+  typedef typename CopyConst<uint8_t,typename TA::Element>::type C;
+  return Array<C>(size,(C*)data.data(),data.borrow_owner());
 }
 
 static const char magic[21] = "pentago supertensor\n";
@@ -177,6 +203,11 @@ static int total_size(RawArray<const field_t> fields) {
   return fields.project<int,&field_t::size>().sum();
 }
 
+static void save_index(Vector<int,4> blocks, Array<const supertensor_blob_t,4>* dst, Array<const uint8_t> src) {
+  OTHER_ASSERT(src.size()==(int)sizeof(supertensor_blob_t)*blocks.product());
+  *dst = Array<const supertensor_blob_t,4>(blocks,(const supertensor_blob_t*)src.data(),src.borrow_owner());
+}
+
 supertensor_reader_t::supertensor_reader_t(const string& path)
   : fd(check_extension(path),O_RDONLY)
   , header() {
@@ -215,21 +246,42 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
   OTHER_ASSERT(h.blocks==(h.shape+h.block_size-1)/h.block_size);
 
   // Read block index
-  Array<supertensor_blob_t,4> index(Vector<int,4>(h.blocks),false);
-  read_and_uncompress(fd.fd,char_view(index.flat),h.index);
+  Array<const supertensor_blob_t,4> index;
+  schedule(IO,boost::bind(read_and_uncompress,fd.fd,h.index,function<void(Array<uint8_t>)>(boost::bind(save_index,Vector<int,4>(h.blocks),&index,_1))));
+  wait_all();
+  OTHER_ASSERT((index.shape==Vector<int,4>(h.blocks)));
   const_cast_(this->index) = index;
 }
 
 supertensor_reader_t::~supertensor_reader_t() {}
 
-void supertensor_reader_t::read_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data) const {
+static void save(Array<Vector<super_t,2>,4>* dst, Array<Vector<super_t,2>,4> src) {
+  *dst = src;
+}
+
+Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<int,4> block) const {
+  Array<Vector<super_t,2>,4> data;
+  schedule_read_block(block,boost::bind(save,&data,_1));
+  wait_all();
   OTHER_ASSERT(data.shape==header.block_shape(block));
-  read_and_uncompress(fd.fd,char_view(data.flat),index[block]);
-  switch (header.filter) {
+  return data;
+}
+
+static void unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_data, const function<void(Array<Vector<super_t,2>,4>)>& cont) {
+  OTHER_ASSERT(thread_type()==CPU);
+  OTHER_ASSERT(raw_data.size()==(int)sizeof(Vector<super_t,2>)*block_shape.product());
+  Array<Vector<super_t,2>,4> data(block_shape,(Vector<super_t,2>*)raw_data.data(),raw_data.borrow_owner());
+  switch (filter) {
     case 0: break;
     case 1: uninterleave(data.flat); break;
-    default: throw ValueError(format("supertensor_reader_t::read_block: unknown filter %d",header.filter));
+    default: throw ValueError(format("supertensor_reader_t::read_block: unknown filter %d",filter));
   }
+  cont(data);
+}
+
+void supertensor_reader_t::schedule_read_block(Vector<int,4> block, const function<void(Array<Vector<super_t,2>,4>)>& cont) const {
+  OTHER_ASSERT(index.valid(block));
+  schedule(IO,boost::bind(read_and_uncompress,fd.fd,index[block],function<void(Array<uint8_t>)>(boost::bind(unfilter,header.filter,header.block_shape(block),_1,cont))));
 }
 
 // Write header at offset 0, and return the header size
@@ -285,15 +337,25 @@ supertensor_writer_t::~supertensor_writer_t() {
   }
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data, bool verbose) {
-  OTHER_ASSERT(data.shape==header.block_shape(block));
-  OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
-  switch (header.filter) {
+static void filter(int filter, Array<Vector<super_t,2>,4> data, const function<void(Array<uint8_t>)>& cont) {
+  OTHER_ASSERT(thread_type()==CPU);
+  switch (filter) {
     case 0: break;
     case 1: interleave(data.flat); break;
-    default: throw ValueError(format("supertensor_writer_t::write_block: unknown filter %d",header.filter));
+    default: throw ValueError(format("supertensor_writer_t::write_block: unknown filter %d",filter));
   }
-  index[block] = compress_and_write(fd.fd,next_offset,char_view(data.flat),level,verbose);
+  schedule(CPU,boost::bind(cont,char_view_own(data.flat))); 
+}
+
+void supertensor_writer_t::write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data) {
+  schedule_write_block(block,data);
+  wait_all();
+}
+
+void supertensor_writer_t::schedule_write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data) {
+  OTHER_ASSERT(data.shape==header.block_shape(block));
+  OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
+  schedule(CPU,boost::bind(filter,header.filter,data,function<void(Array<uint8_t>)>(boost::bind(&Self::compress_and_write,this,&index[block],_1))));
 }
 
 void supertensor_writer_t::finalize() {
@@ -301,13 +363,15 @@ void supertensor_writer_t::finalize() {
     return;
 
   // Check if all blocks have been written
+  wait_all();
   for (auto blob : index.flat)
     if (!blob.offset)
       throw RuntimeError(format("can't finalize incomplete supertensor file \"%s\"",path));
 
   // Write index
   supertensor_header_t h = header;
-  h.index = compress_and_write(fd.fd,next_offset,char_view(index.flat),level,false);
+  schedule(CPU,boost::bind(&Self::compress_and_write,this,&h.index,char_view_own(index.flat)));
+  wait_all();
 
   // Finalize header
   h.valid = true;

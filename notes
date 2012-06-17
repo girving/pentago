@@ -193,3 +193,24 @@ And now using interleave filtering (1):
           write                                      13.9063 s
 
 However, the file size dropped from 429131154 to 354709446, which is evidence for zlib being the bottleneck.
+
+With thread pools, we get a modest speedup:
+
+  endgame                                            25.0240 s
+    compute                                          24.9961 s
+      pass one                                       11.2359 s
+        slice                                        11.2138 s
+      pass two                                       13.7591 s
+        slice                                        13.7183 s
+  timing
+    cpu-idle              10.2478 s
+    io-idle               48.5583 s
+    master-idle           24.4234 s
+    decompress            17.8923 s
+    read                   0.2405 s
+    copy                   3.4185 s
+    write                  0.8591 s
+    compute               27.6177 s
+    compress             136.4368 s
+    missing: master 0.5920, cpu 4.5102, io 0.3730
+

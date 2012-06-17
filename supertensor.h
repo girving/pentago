@@ -1,12 +1,6 @@
 // In memory and out-of-core operations on large four dimensional arrays of superscores
 #pragma once
 
-#include "superscore.h"
-#include "all_boards.h"
-#include <other/core/array/Array4d.h>
-#include <boost/noncopyable.hpp>
-namespace pentago {
-
 /* A supertensor / .pentago file contains win/loss information for a four dimensional slice of pentago
  * positions, defined by (1) the player attempting to win and (2) the counts of black and white
  * stones in each quadrant.  Each entry in the 4D array is itself a small 4D super_t.  We block the
@@ -41,6 +35,16 @@ namespace pentago {
  * 1 - Switch to storing both black and white wins
  * 2 - Change quadrant ordering to support block-wise reflection
  */
+
+#include "superscore.h"
+#include "all_boards.h"
+#include "thread.h"
+#include <other/core/array/Array4d.h>
+#include <boost/noncopyable.hpp>
+#include <boost/function.hpp>
+namespace pentago {
+
+using boost::function;
 
 struct supertensor_blob_t {
   uint64_t uncompressed_size; // size of the uncompressed data block
@@ -90,8 +94,11 @@ protected:
 public:
   ~supertensor_reader_t();
 
-  // Read a block of data from disk, thread safely
-  void read_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data) const;
+  // Read a block of data from disk
+  Array<Vector<super_t,2>,4> read_block(Vector<int,4> block) const;
+
+  // Read a block eventually, and call a (thread safe) function once the read completes
+  void schedule_read_block(Vector<int,4> block, const function<void(Array<Vector<super_t,2>,4>)>& cont) const;
 
   uint64_t compressed_size(Vector<int,4> block) const;
   uint64_t uncompressed_size(Vector<int,4> block) const;
@@ -99,6 +106,7 @@ public:
 
 struct supertensor_writer_t : public Object {
   OTHER_DECLARE_TYPE
+  typedef supertensor_writer_t Self;
 
   const string path;
   fildes_t fd;
@@ -106,20 +114,29 @@ struct supertensor_writer_t : public Object {
   const int level; // zlib compression level
   const Array<supertensor_blob_t,4> index;
   uint64_t next_offset;
+  mutable mutex_t offset_mutex;
 
 protected:
   supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level);
 public:
   ~supertensor_writer_t();
 
-  // Write a block of data to disk, destroying it in the process.  This function is thread safe if !verbose.
-  void write_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> data, bool verbose);
+  // Write a block of data to disk now
+  void write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data);
+
+  // Write a block of data eventually, destroying it in the process.
+  // The data is not necessarily actually written until finalize is called.
+  void schedule_write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data);
 
   // Write the final index to disk and close the file
   void finalize();
 
   uint64_t compressed_size(Vector<int,4> block) const;
   uint64_t uncompressed_size(Vector<int,4> block) const;
+
+private:
+  void compress_and_write(supertensor_blob_t* blob, RawArray<const uint8_t> data);
+  void pwrite(supertensor_blob_t* blob, Array<const uint8_t> data);
 };
 
 }

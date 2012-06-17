@@ -7,6 +7,7 @@ import tempfile
 
 def test_supertensor():
   Log.configure('test',0,1,0)
+  init_thread_pools(-1,-1)
 
   # Choose tiny parameters
   section = (2,0),(0,2),(1,1),(1,1)
@@ -33,7 +34,7 @@ def test_supertensor():
 
   # Write blocks out in arbitrary (hashed) order
   for b,block in data.iteritems():
-    writer.write_block(b,block,False)
+    writer.write_block(b,block)
   writer.finalize()
 
   # Prepare for reading
@@ -49,9 +50,9 @@ def test_supertensor():
       for k in xrange(blocks[2]):
         for l in xrange(blocks[3]):
           b = i,j,k,l
-          block = empty((tuple(reader.header.block_shape(b))+(2,4)),uint64)
-          reader.read_block(b,block)
+          block = reader.read_block(b)
           assert all(block==data[b])
+  report_thread_times(True)
 
 if __name__=='__main__':
   test_supertensor()

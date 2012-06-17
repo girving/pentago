@@ -14,8 +14,8 @@
 #include <other/core/random/Random.h>
 #include <other/core/utility/interrupts.h>
 #include <other/core/utility/Log.h>
-#include <other/core/utility/openmp.h>
 #include <other/core/utility/ProgressIndicator.h>
+#include <boost/bind.hpp>
 namespace pentago {
 
 using Log::cout;
@@ -30,54 +30,6 @@ static RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int 
 
 static RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, Range<int> range) {
   return safe_rmin_slice(counts,range.lo,range.hi);
-}
-
-static void final_endgame_slice(section_t section, Vector<int,4> offset, RawArray<Vector<super_t,2>,4> results) {
-  // Check input consistency
-  OTHER_ASSERT(section.valid() && section.sum()==36);
-  Vector<int,4> shape = results.shape;
-  RawArray<const quadrant_t> rmin[4] = {safe_rmin_slice(section.counts[0],offset[0]+range(shape[0])),
-                                        safe_rmin_slice(section.counts[1],offset[1]+range(shape[1])),
-                                        safe_rmin_slice(section.counts[2],offset[2]+range(shape[2])),
-                                        safe_rmin_slice(section.counts[3],offset[3]+range(shape[3]))};
-  if (!shape.product())
-    return;
-
-  // Run the outer three dimensional loops in parallel
-  const int first_three = shape[0]*shape[1]*shape[2];
-  #pragma omp parallel for
-  for (int ijk=0;ijk<first_three;ijk++) {
-    if (interrupted())
-      continue;
-    const int ij = ijk/shape[2],
-              k = ijk-ij*shape[2],
-              i = ij/shape[1],
-              j = ij-i*shape[1];
-    const quadrant_t q0 = rmin[0][i],
-                     q1 = rmin[1][j],
-                     q2 = rmin[2][k],
-                     s0b = unpack(q0,0),
-                     s0w = unpack(q0,1),
-                     s1b = unpack(q1,0),
-                     s1w = unpack(q1,1),
-                     s2b = unpack(q2,0),
-                     s2w = unpack(q2,1);
-    const side_t s012b = quadrants(s0b,s1b,s2b,0),
-                 s012w = quadrants(s0w,s1w,s2w,0);
-    RawArray<Vector<super_t,2>> slice(shape[3],&results(i,j,k,0));
-    // Do the inner loop in serial to avoid overhead
-    for (int l=0;l<shape[3];l++) {
-      const quadrant_t q3 = rmin[3][l],
-                       s3b = unpack(q3,0),
-                       s3w = unpack(q3,1);
-      const side_t side_black = s012b|(side_t)s3b<<3*16,
-                   side_white = s012w|(side_t)s3w<<3*16;
-      const super_t wins_black = super_wins(side_black),
-                    wins_white = super_wins(side_white);
-      slice[l][0] = wins_black&~wins_white;
-      slice[l][1] = wins_white&~wins_black;
-    }
-  }
 }
 
 static Vector<int,4> in_order(Vector<int,4> order, Vector<int,4> I) {
@@ -144,18 +96,13 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
 
   // Loop over the set of blocks
   ProgressIndicator progress(sample_count,true);
-  Array<Vector<super_t,2>> buffer(reader.header.block_shape(Vector<int,4>()).product(),false);
   for (int i0 : range(blocks[0]))
     for (int i1 : range(blocks[1]))
       for (int i2 : range(blocks[2]))
         for (int i3 : range(blocks[3])) {
-          // Learn about block
-          const Vector<int,4> block(i0,i1,i2,i3);
-          const Vector<int,4> shape = reader.header.block_shape(block);
           // Read block
-          OTHER_ASSERT(shape.product()<=buffer.size());
-          RawArray<Vector<super_t,2>,4> data(shape,buffer.data());
-          reader.read_block(block,data);
+          const Vector<int,4> block(i0,i1,i2,i3);
+          Array<Vector<super_t,2>,4> data = reader.read_block(block);
           // Verify our chosen set of random samples
           for (Vector<int,4> sample : samples[((block[0]*blocks[1]+block[1])*blocks[2]+block[2])*blocks[3]+block[3]]) {
             const Vector<super_t,2>& result = data[sample-block_size*block];
@@ -189,102 +136,94 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
 // rl does not preserve rotation minimality of each quadrant, so define maps rs and ri s.t. rl[q[c,i]] = rs[c,i]q[c,ri[c,i]].  Let I.oi.pi = Iop.  Then
 //   A(s,o,I) = gi f(... rs[gs[k],Iop[k]] q[gs[k],ri[gs[k],Iop[k]]] ...) = wi rq (... rs[gs[k],Iop[k]] ...) f(... q[gs[k],ri[gs[k],Iop[k]]] ...)
 
-static void endgame_read_block_slice(section_t desired_section, const supertensor_reader_t& reader, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> data) {
-  auto standard = desired_section.standardize<8>();
-  OTHER_ASSERT(standard.x==reader.header.section);
+namespace {
 
-  // Prepare a transform that rotates quadrants locally while preserving their orientation
-  const int rotation = standard.y&3;
-  const symmetry_t inverse_rotation((4-rotation)&3,(1+4+16+64)*rotation);
+struct read_helper_t : public boost::noncopyable {
+  const supertensor_reader_t& reader;
+  const int i, j;
+  RawArray<Vector<super_t,2>,4> data;
+  const Tuple<section_t,uint8_t> standard;
+  const int rotation; 
+  const symmetry_t inverse_rotation;
+  const Vector<int,4> reorder;
+  const int block_size;
+  const Vector<int,4> first_block, first_block_shape, blocks;
+  const Vector<int,2> slice_blocks;
+  const Vector<int,4> strides;
+  const Vector<Tuple<RawArray<const quadrant_t>,int>,4> rmin;
+  const Vector<int,4> moves;
 
-  // Determine which quadrants are mapped to where, and compose with order
-  const Vector<int,4> reorder(quadrant_permutation(standard.y).subset(order));
+  read_helper_t(section_t desired_section, const supertensor_reader_t& reader, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> data)
+    : reader(reader)
+    , i(i), j(j)
+    , data(data)
+    , standard(desired_section.standardize<8>())
 
-  const int block_size = reader.header.block_size;
-  const Vector<int,4> first_block = in_order(reorder,vec(i,j,0,0));
-  const Vector<int,4> first_block_shape = reader.header.block_shape(first_block);
-  const Vector<int,4> blocks(reader.header.blocks);
-  const Vector<int,2> slice_blocks(blocks[reorder[2]],blocks[reorder[3]]);
-  const Vector<int,4> strides = in_order(reorder,pentago::strides(data.shape));
-  for (int a=0;a<4;a++)
-    OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[reorder[a]]:reader.header.shape[reorder[a]]));
+    // Prepare a transform that rotates quadrants locally while preserving their orientation
+    , rotation(standard.y&3)
+    , inverse_rotation((4-rotation)&3,(1+4+16+64)*rotation)
 
-  // If there's a reflection, prepare to rearrange data accordingly
-  Vector<int,4> moves;
-  if (standard.y>=4)
-    for (int a=0;a<4;a++)
-      moves[a] = rotation_minimal_quadrants(reader.header.section.counts[a]).y;
-  RawArray<const quadrant_t> rmin[4] = {rotation_minimal_quadrants(reader.header.section.counts[0]).x,
-                                        rotation_minimal_quadrants(reader.header.section.counts[1]).x,
-                                        rotation_minimal_quadrants(reader.header.section.counts[2]).x,
-                                        rotation_minimal_quadrants(reader.header.section.counts[3]).x};
+    // Determine which quadrants are mapped to where, and compose with order
+    , reorder(quadrant_permutation(standard.y).subset(order))
 
-  // Read blocks in parallel, mainly to accelerate zlib decompression
-  ExceptionValue error;
-  #pragma omp parallel
+    // Gather shape and stride information
+    , block_size(reader.header.block_size)
+    , first_block(in_order(reorder,vec(i,j,0,0)))
+    , first_block_shape(reader.header.block_shape(first_block))
+    , blocks(reader.header.blocks)
+    , slice_blocks(blocks[reorder[2]],blocks[reorder[3]])
+    , strides(in_order(reorder,pentago::strides(data.shape)))
+
+    // If there's a reflection, prepare to rearrange data accordingly
+    , rmin(rotation_minimal_quadrants(reader.header.section.counts[0]),
+           rotation_minimal_quadrants(reader.header.section.counts[1]),
+           rotation_minimal_quadrants(reader.header.section.counts[2]),
+           rotation_minimal_quadrants(reader.header.section.counts[3]))
+    , moves(standard.y<4?Vector<int,4>():vec(rmin[0].y,rmin[1].y,rmin[2].y,rmin[3].y))
   {
-    try {
-      Array<Vector<super_t,2>> buffer(first_block_shape.product(),false);
-      Array<uint8_t,2> symmetries(4,block_size,false);
-      for (const int kl : partition_loop(slice_blocks.product())) {
-        if (error)
-          break;
-        const int k = kl/slice_blocks[1],
-                  l = kl-k*slice_blocks[1];
-        const Vector<int,4> block = in_order(reorder,vec(i,j,k,l));
-        const Vector<int,4> block_shape = reader.header.block_shape(block);
-        OTHER_ASSERT(block_shape.product()<=buffer.size());
-        const Vector<int,4> block_moves = clamp_min(moves-block_size*block,0);
-        // Compute symmetries needed to restore minimality after reflection (rs in the above derivation)
-        if (standard.y>=4)
-          for (int a=0;a<4;a++)
-            for (int b=0;b<block_shape[a];b++) {
-              const quadrant_t q = rmin[a][block_size*block[a]+b];
-              symmetries(a,b) = rotation_minimal_quadrants_inverse[pack(reflections[unpack(q,0)],reflections[unpack(q,1)])]&3;
-            }
-        // Read, uncompress, and unfilter the block
-        RawArray<Vector<super_t,2>,4> block_data(block_shape,buffer.data());
-        reader.read_block(block,block_data);
-        // Move block data into place
-        Vector<super_t,2>* start = &data(0,0,block_size*k,block_size*l);
-        for (int ii=0;ii<block_shape[0];ii++)
-          for (int jj=0;jj<block_shape[1];jj++)
-            for (int kk=0;kk<block_shape[2];kk++)
-              for (int ll=0;ll<block_shape[3];ll++) {
-                const Vector<super_t,2>& src = block_data(ii^(ii<block_moves[0]),jj^(jj<block_moves[1]),kk^(kk<block_moves[2]),ll^(ll<block_moves[3]));
-                Vector<super_t,2>& dst = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
-                const symmetry_t symmetry = standard.y<4?inverse_rotation:inverse_rotation*symmetry_t(4,symmetries(0,ii)+4*symmetries(1,jj)+16*symmetries(2,kk)+64*symmetries(3,ll));
-                for (int a=0;a<2;a++)
-                  dst[a] = transform_super(symmetry,src[a]);
-              }
-      }
-    } catch (const exception& e) {
-      #pragma omp critical
-      if (!error)
-        error = ExceptionValue(e);
+    OTHER_ASSERT(standard.x==reader.header.section);
+    for (int a=0;a<4;a++)
+      OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[reorder[a]]:reader.header.shape[reorder[a]]));
+  }
+
+  void process_block(int k, int l, RawArray<Vector<super_t,2>,4> block_data) {
+    thread_time_t time("copy");
+    const Vector<int,4> block = in_order(reorder,vec(i,j,k,l));
+    OTHER_ASSERT(block_data.shape==reader.header.block_shape(block));
+    const Vector<int,4> block_moves = clamp_min(moves-block_size*block,0);
+    // Compute symmetries needed to restore minimality after reflection (rs in the above derivation)
+    uint8_t symmetries[block_size][4];
+    if (standard.y>=4)
+      for (int a=0;a<4;a++)
+        for (int b=0;b<block_data.shape[a];b++) {
+          const quadrant_t q = rmin[a].x[block_size*block[a]+b];
+          symmetries[b][a] = rotation_minimal_quadrants_inverse[pack(reflections[unpack(q,0)],reflections[unpack(q,1)])]&3;
+        }
+    // Move block data into place
+    Vector<super_t,2>* start = &data(0,0,block_size*k,block_size*l);
+    for (int ii=0;ii<block_data.shape[0];ii++)
+      for (int jj=0;jj<block_data.shape[1];jj++)
+        for (int kk=0;kk<block_data.shape[2];kk++)
+          for (int ll=0;ll<block_data.shape[3];ll++) {
+            const Vector<super_t,2>& src = block_data(ii^(ii<block_moves[0]),jj^(jj<block_moves[1]),kk^(kk<block_moves[2]),ll^(ll<block_moves[3]));
+            Vector<super_t,2>& dst = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
+            const symmetry_t symmetry = standard.y<4?inverse_rotation:inverse_rotation*symmetry_t(4,symmetries[ii][0]+4*symmetries[jj][1]+16*symmetries[kk][2]+64*symmetries[ll][3]);
+            for (int a=0;a<2;a++)
+              dst[a] = transform_super(symmetry,src[a]);
+          }
+  }
+};
+
+}
+
+static void endgame_read_block_slice(section_t desired_section, const supertensor_reader_t& reader, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> data) {
+  read_helper_t helper(desired_section,reader,order,i,j,data);
+  for (const int k : range(helper.slice_blocks[0]))
+    for (const int l : range(helper.slice_blocks[1])) {
+      const Vector<int,4> block = in_order(helper.reorder,vec(i,j,k,l));
+      reader.schedule_read_block(block,boost::bind(&read_helper_t::process_block,&helper,k,l,_1));
     }
-  }
-  if (error)
-    error.throw_();
-}
-
-template<bool turn> static void in_place_extreme(RawArray<Vector<super_t,2>> dst, RawArray<const Vector<super_t,2>> src) {
-  OTHER_ASSERT(dst.size()==src.size());
-  for (const int i : range(dst.size())) {
-    auto& d = dst[i];
-    const auto& s = src[i];
-    if (turn==0) // black to play
-      d.set(d[0]|s[0],d[1]&s[1]);
-    else // white to play
-      d.set(d[0]&s[0],d[1]|s[1]);
-  }
-}
-
-static void in_place_extreme(bool turn, RawArray<Vector<super_t,2>> dst, RawArray<const Vector<super_t,2>> src) {
-  if (turn==0)
-    in_place_extreme<0>(dst,src);
-  else
-    in_place_extreme<1>(dst,src);
+  wait_all();
 }
 
 // Do not use in performance critical code
@@ -295,87 +234,132 @@ static board_t section_board(const section_t& section, const Vector<int,4>& I) {
                    rotation_minimal_quadrants(section.counts[3]).x[I[3]]);
 }
 
-static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data) {
-  OTHER_ASSERT(!first_pass || writer.header.section==first_pass->header.section);
-  const int block_size = writer.header.block_size;
-  const Vector<int,4> first_block = in_order(order,vec(i,j,0,0));
-  const Vector<int,4> first_block_shape = writer.header.block_shape(first_block);
-  const Vector<int,4> blocks(writer.header.blocks);
-  const Vector<int,2> slice_blocks(blocks[order[2]],blocks[order[3]]);
-  const Vector<int,4> strides = in_order(order,pentago::strides(data.shape));
-  for (int a=0;a<4;a++)
-    OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[order[a]]:writer.header.shape[order[a]]));
+namespace {
 
-  // Write blocks in parallel, mainly to accelerate zlib compression
-  ExceptionValue error;
-  #pragma omp parallel
+struct write_helper_t : public boost::noncopyable {
+  supertensor_writer_t& writer;
+  const Ptr<const supertensor_reader_t> first_pass;
+  const Vector<int,4> order;
+  const int i, j;
+  const RawArray<const Vector<super_t,2>,4> data;
+  const int block_size;
+  const Vector<int,4> first_block, first_block_shape, blocks;
+  const Vector<int,2> slice_blocks;
+  const Vector<int,4> strides;
+
+  write_helper_t(supertensor_writer_t& writer, Ptr<const supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data)
+    : writer(writer)
+    , first_pass(first_pass)
+    , order(order)
+    , i(i), j(j)
+    , data(data)
+    , block_size(writer.header.block_size)
+    , first_block(in_order(order,vec(i,j,0,0)))
+    , first_block_shape(writer.header.block_shape(first_block))
+    , blocks(writer.header.blocks)
+    , slice_blocks(blocks[order[2]],blocks[order[3]])
+    , strides(in_order(order,pentago::strides(data.shape)))
   {
-    try {
-      Array<Vector<super_t,2>> buffer(first_block_shape.product(),false),
-                               first_buffer(first_pass?first_block_shape.product():0,false);
-      for (const int kl : partition_loop(slice_blocks.product())) {
-        if (error)
-          break;
-        const int k = kl/slice_blocks[1],
-                  l = kl-k*slice_blocks[1];
-        const Vector<int,4> block = in_order(order,vec(i,j,k,l));
-        const Vector<int,4> block_shape = writer.header.block_shape(block);
-        OTHER_ASSERT(block_shape.product()<=buffer.size());
-        // Move data into place
-        RawArray<Vector<super_t,2>,4> block_data(block_shape,buffer.data());
-        const Vector<super_t,2>* start = &data(0,0,block_size*k,block_size*l);
-        for (int ii=0;ii<block_shape[0];ii++)
-          for (int jj=0;jj<block_shape[1];jj++)
-            for (int kk=0;kk<block_shape[2];kk++)
-              for (int ll=0;ll<block_shape[3];ll++)
-                block_data(ii,jj,kk,ll) = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
-        // Combine with data from the first pass if applicable
-        if (first_pass) {
-          RawArray<Vector<super_t,2>,4> first_block_data(block_shape,first_buffer.data());
-          first_pass->read_block(block,first_block_data);
-          in_place_extreme(writer.header.section.sum()&1,block_data.flat,first_block_data.flat);
-        }
-        // Filter, compress, and write the block
-        writer.write_block(block,block_data,false);
-      }
-    } catch (const exception& e) {
-      #pragma omp critical
-      if (!error)
-        error = ExceptionValue(e);
-    }
+    OTHER_ASSERT(!first_pass || writer.header.section==first_pass->header.section);
+    for (int a=0;a<4;a++)
+      OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[order[a]]:writer.header.shape[order[a]]));
   }
-  if (error)
-    error.throw_();
+
+  void process_block(int k, int l, Array<Vector<super_t,2>,4> first_pass_data) {
+    thread_time_t time("copy");
+    const Vector<int,4> block = in_order(order,vec(i,j,k,l));
+    const Vector<int,4> block_shape = writer.header.block_shape(block);
+    Array<Vector<super_t,2>,4> block_data;
+    if (first_pass) {
+      OTHER_ASSERT(first_pass_data.shape==block_shape);
+      block_data = first_pass_data;
+    } else
+      block_data.resize(block_shape,false,false);
+    // Move data into place, combining with first pass data if applicable
+    const Vector<super_t,2>* start = &data(0,0,block_size*k,block_size*l);
+    if (!first_pass)
+      for (int ii=0;ii<block_data.shape[0];ii++)
+        for (int jj=0;jj<block_data.shape[1];jj++)
+          for (int kk=0;kk<block_data.shape[2];kk++)
+            for (int ll=0;ll<block_data.shape[3];ll++)
+              block_data(ii,jj,kk,ll) = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
+    else if (!(writer.header.section.sum()&1)) // second pass, with black to move
+      for (int ii=0;ii<block_data.shape[0];ii++)
+        for (int jj=0;jj<block_data.shape[1];jj++)
+          for (int kk=0;kk<block_data.shape[2];kk++)
+            for (int ll=0;ll<block_data.shape[3];ll++) {
+              auto& dst = block_data(ii,jj,kk,ll);
+              const auto& src = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
+              dst.set(dst[0]|src[0],dst[1]&src[1]);
+            }
+    else // second pass, with white to move
+      for (int ii=0;ii<block_data.shape[0];ii++)
+        for (int jj=0;jj<block_data.shape[1];jj++)
+          for (int kk=0;kk<block_data.shape[2];kk++)
+            for (int ll=0;ll<block_data.shape[3];ll++) {
+              auto& dst = block_data(ii,jj,kk,ll);
+              const auto& src = start[strides[0]*ii+strides[1]*jj+strides[2]*kk+strides[3]*ll];
+              dst.set(dst[0]&src[0],dst[1]|src[1]);
+            }
+    // Write
+    writer.schedule_write_block(block,block_data);
+  }
+};
+
 }
 
-template<bool turn,bool final> static void endgame_compute_block_slice_helper(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3) {
-  for (int a=0;a<4;a++)
-    OTHER_ASSERT((a==2 || dest.shape[a]==src2.shape[a]) && (a==3 || dest.shape[a]==src3.shape[a]));
-  const section_t section = writer.header.section;
-  OTHER_ASSERT(section==section.standardize<8>().x); // Prevent accidental computation of unnecessary data
-  const Vector<uint8_t,2> move = Vector<uint8_t,2>::axis_vector(turn);
-  const RawArray<const quadrant_t> rmin0 = safe_rmin_slice(section.counts[order[0]],writer.header.block_size*i+range(dest.shape[0])),
-                                   rmin1 = safe_rmin_slice(section.counts[order[1]],writer.header.block_size*j+range(dest.shape[1])),
-                                   rmin2 = rotation_minimal_quadrants(section.counts[order[2]]).x,
-                                   rmin3 = rotation_minimal_quadrants(section.counts[order[3]]).x;
-  OTHER_ASSERT(dest.shape[2]==rmin2.size());
-  OTHER_ASSERT(dest.shape[3]==rmin3.size());
-  OTHER_ASSERT(section.counts[order[2]].sum()==9 || src2.shape[2]==rotation_minimal_quadrants(section.counts[order[2]]+move).x.size());
-  OTHER_ASSERT(section.counts[order[3]].sum()==9 || src3.shape[3]==rotation_minimal_quadrants(section.counts[order[3]]+move).x.size());
+static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data) {
+  write_helper_t helper(writer,first_pass,order,i,j,data);
+  for (const int k : range(helper.slice_blocks[0]))
+    for (const int l : range(helper.slice_blocks[1])) {
+      if (!first_pass)
+        schedule(CPU,boost::bind(&write_helper_t::process_block,&helper,k,l,Array<Vector<super_t,2>,4>()));
+      else {
+        const Vector<int,4> block = in_order(order,vec(i,j,k,l));
+        first_pass->schedule_read_block(block,boost::bind(&write_helper_t::process_block,&helper,k,l,_1));
+      }
+    }
+  wait_all();
+}
 
-  // Run outer two dimensions in parallel
-  const int outer_size = dest.shape[0]*dest.shape[1];
-  #pragma omp parallel for
-  for (int outer=0;outer<outer_size;outer++) {
-    const int ii = outer/dest.shape[1],
-              jj = outer-ii*dest.shape[1];
+namespace {
+
+template<bool turn,bool final> struct compute_helper_t {
+  const Vector<int,4> order;
+  const RawArray<Vector<super_t,2>,4> dest;
+  const RawArray<const Vector<super_t,2>,4> src2, src3;
+  const section_t section;
+  const Vector<uint8_t,2> move;
+  const Vector<RawArray<const quadrant_t>,4> rmin;
+
+  compute_helper_t(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3)
+    : order(order)
+    , dest(dest), src2(src2), src3(src3)
+    , section(writer.header.section)
+    , move(Vector<uint8_t,2>::axis_vector(turn))
+    , rmin(safe_rmin_slice(section.counts[order[0]],writer.header.block_size*i+range(dest.shape[0])),
+           safe_rmin_slice(section.counts[order[1]],writer.header.block_size*j+range(dest.shape[1])),
+           rotation_minimal_quadrants(section.counts[order[2]]).x,
+           rotation_minimal_quadrants(section.counts[order[3]]).x)
+  {
+    for (int a=0;a<4;a++)
+      OTHER_ASSERT((a==2 || dest.shape[a]==src2.shape[a]) && (a==3 || dest.shape[a]==src3.shape[a]));
+    OTHER_ASSERT(section==section.standardize<8>().x); // Prevent accidental computation of unnecessary data
+    OTHER_ASSERT(dest.shape[2]==rmin[2].size());
+    OTHER_ASSERT(dest.shape[3]==rmin[3].size());
+    OTHER_ASSERT(section.counts[order[2]].sum()==9 || src2.shape[2]==rotation_minimal_quadrants(section.counts[order[2]]+move).x.size());
+    OTHER_ASSERT(section.counts[order[3]].sum()==9 || src3.shape[3]==rotation_minimal_quadrants(section.counts[order[3]]+move).x.size());
+  }
+
+  void compute_slice(int ii, int jj) {
     // Run inner two dimensions sequentially.  Hopefully this produces nice cache behavior.
+    thread_time_t time("compute");
     for (int kk=0;kk<dest.shape[2];kk++)
       for (int ll=0;ll<dest.shape[3];ll++) {
-        const quadrant_t q0 = rmin0[ii],
-                         q1 = rmin1[jj],
-                         q2 = rmin2[kk],
-                         q3 = rmin3[ll];
+        const quadrant_t q0 = rmin[0][ii],
+                         q1 = rmin[1][jj],
+                         q2 = rmin[2][kk],
+                         q3 = rmin[3][ll];
         const board_t board =  (board_t)q0<<16*order[0]
                               |(board_t)q1<<16*order[1]
                               |(board_t)q2<<16*order[2]
@@ -416,6 +400,16 @@ template<bool turn,bool final> static void endgame_compute_block_slice_helper(co
         d[1-turn] = ~not_loss;
       }
   }
+};
+
+}
+
+template<bool turn,bool final> static void endgame_compute_block_slice_helper(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3) {
+  compute_helper_t<turn,final> helper(writer,order,i,j,dest,src2,src3);
+  for (const int ii : range(dest.shape[0]))
+    for (const int jj : range(dest.shape[1]))
+      schedule(CPU,boost::bind(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
+  wait_all();
 }
 
 static void endgame_compute_block_slice(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3) {
@@ -432,7 +426,6 @@ static void endgame_compute_block_slice(const supertensor_writer_t& writer, Vect
 using namespace pentago;
 
 void wrap_endgame() {
-  OTHER_FUNCTION(final_endgame_slice)
   OTHER_FUNCTION(endgame_read_block_slice)
   OTHER_FUNCTION(endgame_write_block_slice)
   OTHER_FUNCTION(endgame_compute_block_slice)
