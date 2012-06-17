@@ -85,6 +85,9 @@ void initialize_threads(int cpu_threads, int io_threads);
 // Schedule a job
 void schedule(thread_type_t type, const function<void()>& f);
 
+// Schedule many jobs
+void schedule(thread_type_t type, const vector<function<void()>>& fs);
+
 // Wait for all jobs to complete
 void wait_all();
 

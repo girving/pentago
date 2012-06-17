@@ -20,6 +20,7 @@ verify_samples = PropManager.add('verify',0).set_help('if nonzero, load tensor f
 nop = PropManager.add('nop',False).set_help('do nothing')
 cpu_threads = PropManager.add('cpu_threads',-1).set_abbrev('j').set_help('number of cpu threads')
 io_threads = PropManager.add('io_threads',-1).set_abbrev('i').set_help('number of io threads')
+history = PropManager.add('history',False).set_help('record to visualize thread execution history')
 
 def show_section(s):
   return '%d-'%sum(s)+''.join(map(str,ravel(s)))
@@ -174,6 +175,29 @@ def verify(section):
         for child in section_children(section):
           verify(child)
 
+def draw_history(history):
+  import pylab
+  colors = list('bgrcmyk'*4)
+  start = min(times.min() for n,entries in history for _,times in entries)
+  legend_artists = []
+  legend_labels = []
+  name_to_color = {}
+  axes = pylab.figure().add_subplot(111)
+  for n,entries in history:
+    for name,times in entries:
+      if 'idle' not in name:
+        if name not in name_to_color:
+          color = name_to_color[name] = colors.pop()
+          pylab.plot([0],[0],color=color,label=name,linewidth=5)
+        else:
+          color = name_to_color[name]
+        lo = len(history)-n
+        times[:,1] -= times[:,0]
+        times[:,0] -= start
+        axes.broken_barh(times,(lo,.8),edgecolor=color,facecolor=color,label=name)
+  axes.legend()
+  pylab.show()
+
 def main():
   # Parse properties
   global section,block_size,symmetries
@@ -202,6 +226,7 @@ def main():
   Log.write('command = %s'%parser.command())
 
   # Do whatever is necessary
+  set_thread_history(history())
   init_thread_pools(cpu_threads(),io_threads())
   if verify_samples():
     init_supertable(21)
@@ -211,6 +236,8 @@ def main():
       compute(section)
     finally:
       report_thread_times(True)
+      if history():
+        draw_history(thread_history())
 
 if __name__=='__main__':
   main()

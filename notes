@@ -214,3 +214,23 @@ With thread pools, we get a modest speedup:
     compress             136.4368 s
     missing: master 0.5920, cpu 4.5102, io 0.3730
 
+----------------------------------------------------------------------
+
+Using 8 cpu threads and 2 io threads on my laptop, 44444444 takes 2764.6664 s.  This gives a total time estimate of
+
+  2764 * 13540337135288 / 655360000 / 3600 = 15862 hours
+
+or 5.16 days on 1024/8 copies of my laptop.  The timings are
+
+  timing
+    cpu-idle             18209.1595 s
+    io-idle                670.2501 s
+    master-idle           2758.7469 s
+    decompress             367.2136 s
+    read                  4687.3154 s
+    copy                    96.1492 s
+    write                  162.2309 s
+    compute                937.2499 s
+    compress              2433.5504 s
+
+Hopefully Nautilus has better IO bandwidth than I do.

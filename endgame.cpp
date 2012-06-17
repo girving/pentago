@@ -186,9 +186,10 @@ struct read_helper_t : public boost::noncopyable {
       OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[reorder[a]]:reader.header.shape[reorder[a]]));
   }
 
-  void process_block(int k, int l, RawArray<Vector<super_t,2>,4> block_data) {
+  void process_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> block_data) {
     thread_time_t time("copy");
-    const Vector<int,4> block = in_order(reorder,vec(i,j,k,l));
+    OTHER_ASSERT(block[reorder[0]]==i && block[reorder[1]]==j);
+    const int k = block[reorder[2]], l = block[reorder[3]];
     OTHER_ASSERT(block_data.shape==reader.header.block_shape(block));
     const Vector<int,4> block_moves = clamp_min(moves-block_size*block,0);
     // Compute symmetries needed to restore minimality after reflection (rs in the above derivation)
@@ -218,11 +219,11 @@ struct read_helper_t : public boost::noncopyable {
 
 static void endgame_read_block_slice(section_t desired_section, const supertensor_reader_t& reader, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> data) {
   read_helper_t helper(desired_section,reader,order,i,j,data);
+  Array<Vector<int,4>> slice;
   for (const int k : range(helper.slice_blocks[0]))
-    for (const int l : range(helper.slice_blocks[1])) {
-      const Vector<int,4> block = in_order(helper.reorder,vec(i,j,k,l));
-      reader.schedule_read_block(block,boost::bind(&read_helper_t::process_block,&helper,k,l,_1));
-    }
+    for (const int l : range(helper.slice_blocks[1]))
+      slice.append(in_order(helper.reorder,vec(i,j,k,l)));
+  reader.schedule_read_blocks(slice,boost::bind(&read_helper_t::process_block,&helper,_1,_2));
   wait_all();
 }
 
@@ -265,9 +266,10 @@ struct write_helper_t : public boost::noncopyable {
       OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[order[a]]:writer.header.shape[order[a]]));
   }
 
-  void process_block(int k, int l, Array<Vector<super_t,2>,4> first_pass_data) {
+  void process_block(Vector<int,4> block, Array<Vector<super_t,2>,4> first_pass_data) {
     thread_time_t time("copy");
-    const Vector<int,4> block = in_order(order,vec(i,j,k,l));
+    OTHER_ASSERT(block[order[0]]==i && block[order[1]]==j);
+    const int k = block[order[2]], l = block[order[3]];
     const Vector<int,4> block_shape = writer.header.block_shape(block);
     Array<Vector<super_t,2>,4> block_data;
     if (first_pass) {
@@ -310,15 +312,21 @@ struct write_helper_t : public boost::noncopyable {
 
 static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data) {
   write_helper_t helper(writer,first_pass,order,i,j,data);
-  for (const int k : range(helper.slice_blocks[0]))
-    for (const int l : range(helper.slice_blocks[1])) {
-      if (!first_pass)
-        schedule(CPU,boost::bind(&write_helper_t::process_block,&helper,k,l,Array<Vector<super_t,2>,4>()));
-      else {
+  if (!first_pass) {
+    vector<function<void()>> jobs;
+    for (const int k : range(helper.slice_blocks[0]))
+      for (const int l : range(helper.slice_blocks[1])) {
         const Vector<int,4> block = in_order(order,vec(i,j,k,l));
-        first_pass->schedule_read_block(block,boost::bind(&write_helper_t::process_block,&helper,k,l,_1));
+        jobs.push_back(boost::bind(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
       }
-    }
+    schedule(CPU,jobs);
+  } else {
+    Array<Vector<int,4>> slice;
+    for (const int k : range(helper.slice_blocks[0]))
+      for (const int l : range(helper.slice_blocks[1]))
+        slice.append(in_order(order,vec(i,j,k,l)));
+    first_pass->schedule_read_blocks(slice,boost::bind(&write_helper_t::process_block,&helper,_1,_2));
+  }
   wait_all();
 }
 
@@ -406,9 +414,11 @@ template<bool turn,bool final> struct compute_helper_t {
 
 template<bool turn,bool final> static void endgame_compute_block_slice_helper(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3) {
   compute_helper_t<turn,final> helper(writer,order,i,j,dest,src2,src3);
+  vector<function<void()>> jobs;
   for (const int ii : range(dest.shape[0]))
     for (const int jj : range(dest.shape[1]))
-      schedule(CPU,boost::bind(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
+      jobs.push_back(boost::bind(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
+  schedule(CPU,jobs);
   wait_all();
 }
 

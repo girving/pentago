@@ -98,7 +98,10 @@ public:
   Array<Vector<super_t,2>,4> read_block(Vector<int,4> block) const;
 
   // Read a block eventually, and call a (thread safe) function once the read completes
-  void schedule_read_block(Vector<int,4> block, const function<void(Array<Vector<super_t,2>,4>)>& cont) const;
+  void schedule_read_block(Vector<int,4> block, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const;
+
+  // Schedule several block reads together
+  void schedule_read_blocks(RawArray<const Vector<int,4>> blocks, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const;
 
   uint64_t compressed_size(Vector<int,4> block) const;
   uint64_t uncompressed_size(Vector<int,4> block) const;

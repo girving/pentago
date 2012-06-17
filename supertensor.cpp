@@ -255,13 +255,13 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
 
 supertensor_reader_t::~supertensor_reader_t() {}
 
-static void save(Array<Vector<super_t,2>,4>* dst, Array<Vector<super_t,2>,4> src) {
+static void save(Array<Vector<super_t,2>,4>* dst, Vector<int,4> block, Array<Vector<super_t,2>,4> src) {
   *dst = src;
 }
 
 Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<int,4> block) const {
   Array<Vector<super_t,2>,4> data;
-  schedule_read_block(block,boost::bind(save,&data,_1));
+  schedule_read_block(block,boost::bind(save,&data,_1,_2));
   wait_all();
   OTHER_ASSERT(data.shape==header.block_shape(block));
   return data;
@@ -279,9 +279,19 @@ static void unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_d
   cont(data);
 }
 
-void supertensor_reader_t::schedule_read_block(Vector<int,4> block, const function<void(Array<Vector<super_t,2>,4>)>& cont) const {
-  OTHER_ASSERT(index.valid(block));
-  schedule(IO,boost::bind(read_and_uncompress,fd.fd,index[block],function<void(Array<uint8_t>)>(boost::bind(unfilter,header.filter,header.block_shape(block),_1,cont))));
+void supertensor_reader_t::schedule_read_block(Vector<int,4> block, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const {
+  schedule_read_blocks(RawArray<const Vector<int,4>>(1,&block),cont);
+}
+
+void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<int,4>> blocks, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const {
+  vector<function<void()>> jobs;
+  for (auto block : blocks) {
+    OTHER_ASSERT(index.valid(block));
+    jobs.push_back(boost::bind(read_and_uncompress,fd.fd,index[block],
+                                 function<void(Array<uint8_t>)>(boost::bind(unfilter,header.filter,header.block_shape(block),_1,
+                                   function<void(Array<Vector<super_t,2>,4>)>(boost::bind(cont,block,_1))))));
+  }
+  schedule(IO,jobs);
 }
 
 // Write header at offset 0, and return the header size
