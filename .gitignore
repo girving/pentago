@@ -6,3 +6,4 @@ build
 *.pyc
 .DS_Store
 *.pentago
+history-*.try
