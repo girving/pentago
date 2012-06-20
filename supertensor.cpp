@@ -134,20 +134,6 @@ void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray
   schedule(IO,boost::bind(&Self::pwrite,this,blob,compressed));
 }
 
-template<class TA> static RawArray<typename CopyConst<uint8_t,typename TA::Element>::type> char_view(const TA& data) {
-  uint64_t size = sizeof(typename TA::Element)*(size_t)data.size();
-  OTHER_ASSERT(size<(uint64_t)1<<31);
-  typedef typename CopyConst<uint8_t,typename TA::Element>::type C;
-  return RawArray<C>(size,(C*)data.data());
-}
-
-template<class TA> static Array<typename CopyConst<uint8_t,typename TA::Element>::type> char_view_own(const TA& data) {
-  uint64_t size = sizeof(typename TA::Element)*(size_t)data.size();
-  OTHER_ASSERT(size<(uint64_t)1<<31);
-  typedef typename CopyConst<uint8_t,typename TA::Element>::type C;
-  return Array<C>(size,(C*)data.data(),data.borrow_owner());
-}
-
 static const char magic[21] = "pentago supertensor\n";
 
 fildes_t::fildes_t(const string& path, int flags, mode_t mode)

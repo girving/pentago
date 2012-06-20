@@ -101,22 +101,21 @@ def lowrank(data,plot=False):
       pylab.show()
       sys.exit(0)
 
-def identity(data):
-  pass
+def identity(data,shape=None):
+  return data
 
 def shuffle(data):
   shape = data.shape[:4]
   data = ravel(data.view(uint8))
   d = unpackbits(data).reshape(shape+(2,4,4,4,4))
   d = d.swapaxes(1,5).swapaxes(2,5).swapaxes(3,6).swapaxes(4,5).swapaxes(5,7).swapaxes(7,8)
-  data[:] = packbits(d)
+  return packbits(d)
 
-def unshuffle(data):
-  shape = data.shape[:4]
-  data = ravel(data.view(uint8))
+def unshuffle(data,shape):
+  data = char_view(data)
   d = unpackbits(data).reshape(shape[0],4,shape[1],4,shape[2],4,shape[3],4,2)
   d = d.swapaxes(7,8).swapaxes(5,7).swapaxes(4,5).swapaxes(3,6).swapaxes(2,5).swapaxes(1,5)
-  data[:] = packbits(d)
+  return packbits(d).view(uint64).reshape(shape+(2,4))
 
 def popsort(data):
   data = data.reshape(-1,2,4)
@@ -124,7 +123,26 @@ def popsort(data):
   counts = counts[:,0] - counts[:,1]
   order = argsort(counts)
   data[:] = data[order]
+  return interleave_help(data)
+
+def char_view(data):
+  return ravel(data).view(uint8)
+
+def interleave_help(data):
+  data = data.reshape(-1,2,4)
   interleave(data)
+  return data
+
+def uninterleave_help(data,shape):
+  data = data.view(uint64).reshape(shape+(2,4))
+  uninterleave(data.reshape(-1,2,4))
+  return data
+
+def compact_help(data):
+  return compact(data.reshape(-1,2,4))
+
+def uncompact_help(data,shape):
+  return uncompact(data).reshape(shape+(2,4))
 
 def driver():
   do_count = PropManager.add('count',False)
@@ -133,6 +151,7 @@ def driver():
   parser.parse('filter-test')
 
   Log.configure('filter test',0,0,100)
+  init_thread_pools(-1,-1)
   reader = supertensor_reader_t('data/section-32-44444444.pentago')
   header = reader.header
   level = 4
@@ -140,8 +159,9 @@ def driver():
 
   # Define filters
   filters = [('identity',identity,identity)
-            ,('interleave',interleave,uninterleave)
+            ,('interleave',interleave_help,uninterleave_help)
             ,('shuffle',shuffle,unshuffle)
+            ,('compact',compact_help,uncompact_help)
             ,('popsort',popsort,None)]
 
   # Loop through a few random blocks
@@ -161,8 +181,7 @@ def driver():
       Log.write('uncompressed size = %d'%uncompressed)
       Log.write('compressed size   = %d'%compressed)
       Log.write('base ratio = %g'%(compressed/uncompressed))
-      data = empty(tuple(header.block_shape(b))+(2,4),uint64)
-      reader.read_block(b,data)
+      data = reader.read_block(b)
 
       # Compute total wins, losses, and ties
       ltotal = 32*data.size
@@ -176,13 +195,12 @@ def driver():
 
       # Test the compression after each filter
       for name,filter,inverse in filters:
-        d = data.copy()
-        filter(d)
-        fsize = measure_compression(ravel(d).view(uint8),level)
+        d = filter(data.copy())
+        fsize = measure_compression(char_view(d),level)
         totals[name] += fsize
         Log.write('%s ratio = %g'%(name,fsize/uncompressed))
         if inverse is not None:
-          inverse(d)
+          d = inverse(d,data.shape[:4])
           assert all(data==d)
 
       # Optionally compute entropies

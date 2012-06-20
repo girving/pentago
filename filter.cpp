@@ -180,7 +180,7 @@ static Array<int,2> count_rotation_cases(Array<const Vector<super_t,2>,4> data) 
   return counts;
 }
 
-static inline Vector<super_t,2> interleave(const Vector<super_t,2>& s) {
+static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
   const __m128i mask32 = other::pack<uint32_t>(-1,0,-1,0);
   #define EXPAND1(a) ({ \
     a = (a|_mm_slli_epi64(a,16))&_mm_set1_epi64x(0x0000ffff0000ffff); \
@@ -204,7 +204,7 @@ static inline Vector<super_t,2> interleave(const Vector<super_t,2>& s) {
                                    s01.y|_mm_slli_epi64(s11.y,1)));
 }
 
-static inline Vector<super_t,2> uninterleave(const Vector<super_t,2>& s) {
+static inline Vector<super_t,2> uninterleave_super(const Vector<super_t,2>& s) {
   #define CONTRACT1(w) ({ \
     __m128i a = w&_mm_set1_epi64x(0x5555555555555555); \
     a = (a|_mm_srli_epi64(a, 1))&_mm_set1_epi64x(0x3333333333333333); \
@@ -226,22 +226,87 @@ static inline Vector<super_t,2> uninterleave(const Vector<super_t,2>& s) {
  
 void interleave(RawArray<Vector<super_t,2>> data) {
   for (auto& s : data)
-    s = interleave(s);
+    s = interleave_super(s);
 }
 
 void uninterleave(RawArray<Vector<super_t,2>> data) {
   for (auto& s : data)
-    s = uninterleave(s);
+    s = uninterleave_super(s);
 }
 
-static void interleave(NdArray<Vector<super_t,2>> data) {
-  for (auto& s : data.flat)
-    s = interleave(s);
+// Turn 5*256 win/loss/tie values into 256 bytes
+static inline void compact_chunk(uint8_t dst[256], const Vector<super_t,2> src[5]) {
+  const super_t s[2][5] = {{src[0].x,src[1].x,src[2].x,src[3].x,src[4].x},
+                           {src[0].y,src[1].y,src[2].y,src[3].y,src[4].y}};
+  const uint8_t* c0 = (const uint8_t*)s[0]; // size 5*32
+  const uint8_t* c1 = (const uint8_t*)s[1]; // size 5*32
+  #define GET_FIVE(c,i) ({ \
+    const int bit = 5*i, lo = bit&7, hi = bit>>3; \
+    const uint8_t lo_mask = (1<<min(5,8-lo))-1, \
+                  hi_mask = 0x1f&~lo_mask; \
+    (c[hi]>>lo&lo_mask) | (lo>3?c[hi+1]<<(8-lo)&hi_mask:0); \
+    })
+  for (int i=0;i<256;i++)
+    dst[i] = pack_table[GET_FIVE(c0,i)]+2*pack_table[GET_FIVE(c1,i)];
+  #undef GET_FIVE
 }
 
-static void uninterleave(NdArray<Vector<super_t,2>> data) {
-  for (auto& s : data.flat)
-    s = uninterleave(s);
+// Inverse of compact_chunk
+static inline void uncompact_chunk(Vector<super_t,2> dst[5], const uint8_t src[256]) {
+  super_t d[2][5];
+  memset(d,0,sizeof(d));
+  uint8_t* c0 = (uint8_t*)d[0]; // size 5*32
+  uint8_t* c1 = (uint8_t*)d[1]; // size 5*32
+  #define SET_FIVE(c,i,v) ({ \
+    const int bit = 5*i, lo = bit&7, hi = bit>>3; \
+    c[hi] |= v<<lo; \
+    if (lo>3)  c[hi+1] |= v>>(8-lo); \
+    })
+  for (int i=0;i<256;i++) {
+    SET_FIVE(c0,i,unpack_table[src[i]][0]);
+    SET_FIVE(c1,i,unpack_table[src[i]][1]);
+  }
+  #undef SET_FIVE
+  for (int i=0;i<5;i++) {
+    dst[i].x = d[0][i];
+    dst[i].y = d[1][i];
+  }
+}
+
+// Compaction packs 5 win/loss/tie values into 1 bytes (3**5 < 2**8), destroying the original array
+Array<uint8_t> compact(Array<Vector<super_t,2>> src) {
+  Array<uint8_t> dst = char_view_own(src).slice_own(0,(256*src.size()+4)/5);
+  const int chunks = src.size()/5,
+            extra = src.size()-5*chunks;
+  for (int i=0;i<chunks;i++)
+    compact_chunk(&dst[256*i],&src[5*i]);
+  if (extra) {
+    Vector<super_t,2> rest[5];
+    memset(rest,0,sizeof(rest));
+    memcpy(rest,src.data()+5*chunks,sizeof(Vector<super_t,2>)*extra);
+    compact_chunk((uint8_t*)rest,rest);
+    memcpy(dst.data()+256*chunks,rest,dst.size()-256*chunks);
+  }
+  return dst;
+}
+
+// Inverse of compact.  Not in-place since the output is larger than the input.
+Array<Vector<super_t,2>> uncompact(Array<const uint8_t> src) {
+  Array<Vector<super_t,2>> dst(5*src.size()/256,false);
+  OTHER_ASSERT(src.size()==(256*dst.size()+4)/5);
+  const int chunks = dst.size()/5, 
+            extra = dst.size()-5*chunks;
+  for (int i=0;i<chunks;i++)
+    uncompact_chunk(&dst[5*i],&src[256*i]);
+  if (extra) {
+    uint8_t src_rest[256];
+    memset(src_rest,0,sizeof(src_rest));
+    memcpy(src_rest,src.data()+256*chunks,src.size()-256*chunks);
+    Vector<super_t,2> dst_rest[5];
+    uncompact_chunk(dst_rest,src_rest);
+    memcpy(dst.data()+5*chunks,dst_rest,sizeof(Vector<super_t,2>)*extra);
+  }
+  return dst;
 }
 
 }
@@ -251,10 +316,12 @@ void wrap_filter() {
   OTHER_FUNCTION(count_causal_cases)
   OTHER_FUNCTION(count_outer_causal_cases)
   OTHER_FUNCTION(count_rotation_cases)
-  python::function("interleave",static_cast<void(*)(NdArray<Vector<super_t,2>>)>(interleave));
-  python::function("uninterleave",static_cast<void(*)(NdArray<Vector<super_t,2>>)>(uninterleave));
+  OTHER_FUNCTION(interleave)
+  OTHER_FUNCTION(uninterleave)
   OTHER_FUNCTION(arbitrary_causal_filter)
   OTHER_FUNCTION(inverse_arbitrary_causal_filter)
   OTHER_FUNCTION(outer_causal_filter)
   OTHER_FUNCTION(inverse_outer_causal_filter)
+  OTHER_FUNCTION(compact)
+  OTHER_FUNCTION(uncompact)
 }
