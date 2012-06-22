@@ -89,15 +89,6 @@ void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Ar
   schedule(CPU,boost::bind(decompress,blob,compressed,cont));
 }
 
-static uint64_t measure_compression(RawArray<const uint8_t> data, int level) {
-  size_t dest_size = compressBound(data.size());
-  Array<uint8_t> compressed(dest_size,false);
-  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),data.size(),level);
-  if (z!=Z_OK)
-    throw IOError(format("zlib failure in measure_compression: %s",zlib_error(z)));
-  return dest_size;
-}
-
 void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t> data) {
   OTHER_ASSERT(thread_type()==IO);
 
@@ -115,20 +106,24 @@ void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t>
     throw IOError(format("failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
 }
 
+Array<uint8_t> compress(RawArray<const uint8_t> data, int level) {
+  size_t dest_size = compressBound(data.size());
+  OTHER_ASSERT(dest_size<(uint64_t)1<<31);
+  Array<uint8_t> compressed(dest_size,false);
+  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),data.size(),level);
+  if (z!=Z_OK)
+    throw IOError(format("zlib failure in compress_and_write: %s",zlib_error(z)));
+  return compressed.slice_own(0,dest_size);
+}
+
 void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray<const uint8_t> data) {
   OTHER_ASSERT(thread_type()==CPU);
 
   // Compress
   thread_time_t time("compress");
   blob->uncompressed_size = data.size();
-  size_t dest_size = compressBound(blob->uncompressed_size);
-  Array<uint8_t> compressed(dest_size,false);
-  int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),blob->uncompressed_size,level);
-  if (z!=Z_OK)
-    throw IOError(format("zlib failure in compress_and_write: %s",zlib_error(z)));
-  OTHER_ASSERT(dest_size<(uint64_t)1<<31);
-  blob->compressed_size = dest_size;
-  compressed.resize(dest_size);
+  Array<uint8_t> compressed = compress(data,level);
+  blob->compressed_size = compressed.size();
 
   // Schedule write
   schedule(IO,boost::bind(&Self::pwrite,this,blob,compressed));
@@ -435,5 +430,5 @@ void wrap_supertensor() {
     .OTHER_METHOD(uncompressed_size)
     ;}
 
-  OTHER_FUNCTION(measure_compression)
+  OTHER_FUNCTION_2(compress,pentago::compress)
 }

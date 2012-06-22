@@ -196,7 +196,7 @@ def driver():
       # Test the compression after each filter
       for name,filter,inverse in filters:
         d = filter(data.copy())
-        fsize = measure_compression(char_view(d),level)
+        fsize = len(compress(char_view(d),level))
         totals[name] += fsize
         Log.write('%s ratio = %g'%(name,fsize/uncompressed))
         if inverse is not None:
