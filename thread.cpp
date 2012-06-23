@@ -240,8 +240,10 @@ void* thread_pool_t::worker(void* pool_) {
       f();
     } catch (const exception& e) {
       lock_t lock(pool.mutex);
-      pool.error = e;
+      if (!pool.error)
+        pool.error = e;
       pool.die = true;
+      pool.master_cond.signal();
       return 0;
     }
   }
@@ -251,6 +253,7 @@ void thread_pool_t::schedule(const function<void()>& f) {
   lock_t lock(mutex);
   if (error)
     error.throw_();
+  OTHER_ASSERT(!die);
   jobs.push_back(f);
   if (waiting)
     worker_cond.signal();
@@ -260,6 +263,7 @@ void thread_pool_t::schedule(const vector<function<void()>>& fs) {
   lock_t lock(mutex);
   if (error)
     error.throw_();
+  OTHER_ASSERT(!die);
   extend(jobs,fs);
   if (waiting)
     worker_cond.broadcast();
@@ -269,8 +273,11 @@ void thread_pool_t::wait() {
   OTHER_ASSERT(is_master());
   thread_time_t time("master-idle");
   lock_t lock(mutex);
-  while (jobs.size() || waiting<count)
+  while (!die && (jobs.size() || waiting<count))
     master_cond.wait();
+  if (error)
+    error.throw_();
+  OTHER_ASSERT(!die);
 }
 
 Ptr<thread_pool_t> cpu_pool;
@@ -313,6 +320,12 @@ void wait_all() {
     io_pool->wait();
     lock_t cpu_lock(cpu_pool->mutex);
     lock_t io_lock(io_pool->mutex);
+    if (cpu_pool->error)
+      cpu_pool->error.throw_();
+    if (io_pool->error)
+      io_pool->error.throw_();
+    OTHER_ASSERT(!cpu_pool->die);
+    OTHER_ASSERT(!io_pool->die);
     if (   !cpu_pool->jobs.size() && cpu_pool->waiting==cpu_pool->count
         && !io_pool->jobs.size() && io_pool->waiting==io_pool->count)
       break;
