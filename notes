@@ -234,3 +234,18 @@ or 5.16 days on 1024/8 copies of my laptop.  The timings are
     compress              2433.5504 s
 
 Hopefully Nautilus has better IO bandwidth than I do.
+
+-----------------------------------------------------------------------
+
+It would be nice to store enough data so that perfect play can be evaluated from any position (a strong solution
+of the game).  Unfortunately, this is quite hard: since only n <= 11 and n >= 35 fit into 8 GB of RAM.  That's
+a gap of 24 stones, which is quite hard to skip over. Notes:
+
+1. We'll clearly store all slices for n <= 11.
+
+2. I still need to write the code which dumps out a sparse sampling of computed data for testing purposes.
+   This isn't enough for verification, alas.
+
+3. It seems that random 18 stone positions can be solved fairly easily.  It's somewhat likely this is less true
+   of perfect 18 stone positions, but hopefully not *that* much less true.  In which case, it suffices to store
+   17 stones and down.  We won't know until we try, but it's probably the best strategy to hope for.
