@@ -90,16 +90,18 @@ def quadrants():
 @command
 def probability():
   random.seed(7384101)
-  stones = 26
+  stones = 18 # 12 # 26
   turn = stones&1
   depth = 35-stones
+  aggressive = not turn
   wins = 0
   init_supertable(21)
-  print 'random %d stone positions, depth %d'%(stones,depth)
+  clear_stats()
+  print 'random %d stone positions, depth %d, turn %d, aggressive %d'%(stones,depth,turn,aggressive)
   for total in xrange(1,100000):
     board = random_board(stones)
     print show_board(board)
-    score = super_evaluate(depth,flipto(board,turn),zeros(4,int))
+    score = super_evaluate(aggressive,depth,flipto(board,turn),zeros(4,int))
     print 'board %d, score %d %d'%(board,score//4,score%4)
     if score%4!=1:
       wins += 1
