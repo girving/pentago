@@ -6,12 +6,9 @@ from other.core.value import parser
 from interface import *
 import time
 
-# Results:
-# 
-# uncompressed = 85525504
-# no filter    = 17895159
-# interleaved  = 14365735
-# 
+level = PropManager.add('level',21)
+parser.parse('Pentago filter benchmarks')
+level = level()
 
 def count(data):
   with Log.scope('count causal'):
@@ -154,7 +151,6 @@ def driver():
   init_thread_pools(-1,-1)
   reader = supertensor_reader_t('data/section-32-44444444.pentago')
   header = reader.header
-  level = 4
   random.seed(9454242)
 
   # Define filters
