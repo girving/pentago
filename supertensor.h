@@ -113,7 +113,7 @@ struct supertensor_writer_t : public Object {
 
   const string path;
   fildes_t fd;
-  supertensor_header_t header; // incomplete until the destructor fires
+  supertensor_header_t header; // incomplete until finalize is called
   const int level; // zlib compression level
   const Array<supertensor_blob_t,4> index;
   uint64_t next_offset;
