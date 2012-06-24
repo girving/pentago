@@ -5,6 +5,7 @@
 #include "all_boards.h"
 #include "supertensor.h"
 #include "superengine.h"
+#include "count.h"
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
@@ -339,8 +340,11 @@ template<bool turn,bool final> struct compute_helper_t {
   const section_t section;
   const Vector<uint8_t,2> move;
   const Vector<RawArray<const quadrant_t>,4> rmin;
+  const bool count;
+  mutex_t win_counts_mutex;
+  Vector<uint64_t,3> win_counts;
 
-  compute_helper_t(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3)
+  compute_helper_t(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count)
     : order(order)
     , dest(dest), src2(src2), src3(src3)
     , section(writer.header.section)
@@ -349,6 +353,7 @@ template<bool turn,bool final> struct compute_helper_t {
            safe_rmin_slice(section.counts[order[1]],writer.header.block_size*j+range(dest.shape[1])),
            rotation_minimal_quadrants(section.counts[order[2]]).x,
            rotation_minimal_quadrants(section.counts[order[3]]).x)
+    , count(count)
   {
     for (int a=0;a<4;a++)
       OTHER_ASSERT((a==2 || dest.shape[a]==src2.shape[a]) && (a==3 || dest.shape[a]==src3.shape[a]));
@@ -362,6 +367,7 @@ template<bool turn,bool final> struct compute_helper_t {
   void compute_slice(int ii, int jj) {
     // Run inner two dimensions sequentially.  Hopefully this produces nice cache behavior.
     thread_time_t time("compute");
+    Vector<uint64_t,3> win_counts;
     for (int kk=0;kk<dest.shape[2];kk++)
       for (int ll=0;ll<dest.shape[3];ll++) {
         const quadrant_t q0 = rmin[0][ii],
@@ -406,30 +412,39 @@ template<bool turn,bool final> struct compute_helper_t {
         Vector<super_t,2>& d = dest(ii,jj,kk,ll);
         d[turn] = wins;
         d[1-turn] = ~not_loss;
+        if (count)
+          win_counts += Vector<uint64_t,3>(popcounts_over_stabilizers(board,d));
       }
+    // Contribute to counts
+    if (count) {
+      lock_t lock(win_counts_mutex);
+      this->win_counts += win_counts;
+    }
   }
 };
 
 }
 
-template<bool turn,bool final> static void endgame_compute_block_slice_helper(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3) {
-  compute_helper_t<turn,final> helper(writer,order,i,j,dest,src2,src3);
+template<bool turn,bool final> static Vector<uint64_t,3> endgame_compute_block_slice_helper(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j,
+                                                                                            RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count) {
+  compute_helper_t<turn,final> helper(writer,order,i,j,dest,src2,src3,count);
   vector<function<void()>> jobs;
   for (const int ii : range(dest.shape[0]))
     for (const int jj : range(dest.shape[1]))
       jobs.push_back(boost::bind(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
   schedule(CPU,jobs);
   wait_all();
+  return helper.win_counts;
 }
 
-static void endgame_compute_block_slice(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3) {
+static Vector<uint64_t,3> endgame_compute_block_slice(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count) {
   const int stones = writer.header.section.sum();
   if (stones&1)
-    endgame_compute_block_slice_helper<1,false>(writer,order,i,j,dest,src2,src3);
+    return endgame_compute_block_slice_helper<1,false>(writer,order,i,j,dest,src2,src3,count);
   else if (stones<36)
-    endgame_compute_block_slice_helper<0,false>(writer,order,i,j,dest,src2,src3);
+    return endgame_compute_block_slice_helper<0,false>(writer,order,i,j,dest,src2,src3,count);
   else
-    endgame_compute_block_slice_helper<0,true >(writer,order,i,j,dest,src2,src3);
+    return endgame_compute_block_slice_helper<0,true >(writer,order,i,j,dest,src2,src3,count);
 }
 
 }

@@ -5,6 +5,7 @@
 #include <other/core/math/uint128.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
+#include <other/core/structure/Hashtable.h>
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/remove_const_reference.h>
 #include <tr1/unordered_map>
@@ -228,10 +229,65 @@ double estimate_supercount_boards(int n, double tol) {
   return (double)hits/steps*estimate_count_boards(n);
 }
 
+static inline int log_count_local_stabilizers(quadrant_t q) {
+  const quadrant_t s0 = unpack(q,0),
+                   s1 = unpack(q,1),
+                   s0r = rotations[s0][0],
+                   s1r = rotations[s1][0];
+  if (s0==s0r && s1==s1r)
+    return 2;
+  const quadrant_t s0rr = rotations[s0r][0],
+                   s1rr = rotations[s1r][0];
+  return s0==s0rr && s1==s1rr ? 1 : 0;
+ }
+
+static int log_count_local_stabilizers(board_t board) {
+  return log_count_local_stabilizers(quadrant(board,0))
+        +log_count_local_stabilizers(quadrant(board,1))
+        +log_count_local_stabilizers(quadrant(board,2))
+        +log_count_local_stabilizers(quadrant(board,3));
+}
+
+Vector<uint16_t,3> popcounts_over_stabilizers(board_t board, const Vector<super_t,2>& wins) {
+  const int shift = log_count_local_stabilizers(board),
+            mask = (1<<shift)-1,
+            w0 = popcount(wins.x),
+            w1 = popcount(wins.y);
+  OTHER_ASSERT(!(w0&mask) && !(w1&mask));
+  return Vector<uint16_t,3>(w0>>shift,w1>>shift,256>>shift);
+}
+
+static void popcounts_over_stabilizers_test(int steps) {
+  Ref<Random> random = new_<Random>(83191941);
+  Hashtable<board_t> seen;
+  for (int step=0;step<steps;step++) {
+    const int stones = random->uniform<int>(0,37);
+    const board_t board = random_board(random,stones);
+    Vector<super_t,2> wins; 
+    wins.x = super_meaningless(board);
+    wins.y = ~wins.x;
+    // Count the fast way
+    const Vector<uint16_t,3> fast = popcounts_over_stabilizers(board,wins);
+    OTHER_ASSERT(fast.x+fast.y==fast.z);
+    // Count the slow way 
+    Vector<uint16_t,3> slow;
+    seen.delete_all_entries(); 
+    for (int s=0;s<256;s++) {
+      const board_t b = transform_board(symmetry_t(0,s),board);
+      if (seen.set(b))
+        slow.x += meaningless(b);
+    }
+    slow.z = seen.size();
+    slow.y = slow.z-slow.x;
+    OTHER_ASSERT(slow==fast);
+  }
+}
+
 }
 using namespace pentago;
 
 void wrap_count() {
   OTHER_FUNCTION(count_boards)
   OTHER_FUNCTION(estimate_supercount_boards)
+  OTHER_FUNCTION(popcounts_over_stabilizers_test)
 }

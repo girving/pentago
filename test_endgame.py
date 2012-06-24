@@ -54,5 +54,9 @@ def test_supertensor():
           assert all(block==data[b])
   report_thread_times(True)
 
+def test_popcounts_over_stabilizers():
+  popcounts_over_stabilizers_test(1024)
+
 if __name__=='__main__':
   test_supertensor()
+  test_popcounts_over_stabilizers()
