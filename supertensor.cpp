@@ -409,9 +409,6 @@ void supertensor_writer_t::finalize() {
 
   // Finalize header
   h.valid = true;
-  off_t o = lseek(fd.fd,0,SEEK_SET);
-  if (o < 0)
-    throw IOError(format("read_and_uncompress: lseek failed, %s",strerror(errno)));
   write_header(fd.fd,h);
   header = h;
   fd.close();

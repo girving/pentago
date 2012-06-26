@@ -5,5 +5,6 @@ site_scons
 build
 *.pyc
 .DS_Store
-*.pentago
+section-*.pentago
 history-*.try
+sparse-*.try

@@ -22,12 +22,17 @@ nop = PropManager.add('nop',False).set_help('do nothing')
 cpu_threads = PropManager.add('cpu_threads',-1).set_abbrev('j').set_help('number of cpu threads')
 io_threads = PropManager.add('io_threads',-1).set_abbrev('i').set_help('number of io threads')
 history = PropManager.add('history','').set_help('record thread execution history to given file')
+samples = PropManager.add('samples',1024).set_help('number of sparse samples to save to a separate file')
+sparse_verify_samples = PropManager.add('sparse',0).set_help('verify (at most) the given number of sparse samples')
 
 def show_section(s):
   return '%d-'%sum(s)+''.join(map(str,ravel(s)))
 
 def section_file(s):
-  return os.path.join(dir(),'section-%s.pentago'%show_section(s))
+  return os.path.join(dir,'section-%s.pentago'%show_section(s))
+
+def sparse_file(s):
+  return os.path.join(dir,'sparse-%s.try'%show_section(s))
 
 def child_section(section,q):
   child = section.copy()
@@ -76,6 +81,9 @@ def compute_pass(writer,first_pass,readers,order):
   def part(array,*shape):
     return array.reshape(-1,2,4)[:product(shape)].reshape(shape+(2,4))
 
+  # Prepare for sampling
+  sparse = sparse_sample_t(writer,samples) if first_pass else None
+
   # Loop over block slices in the first two dimensions, computing two dimensional block slices spanning the last two dimensions
   clear_thread_times()
   counts = zeros(3,uint64)
@@ -88,19 +96,23 @@ def compute_pass(writer,first_pass,readers,order):
         dest_part = part(dest,block_shape[order[0]],block_shape[order[1]],shape [order[2]],shape [order[3]])
         src2_part = part(src2,block_shape[order[0]],block_shape[order[1]],shape2[order[2]],shape [order[3]])
         src3_part = part(src3,block_shape[order[0]],block_shape[order[1]],shape [order[2]],shape3[order[3]])
-        if reader2 or reader3:
-          if reader2:
-            endgame_read_block_slice(child_section(section,order[2]),reader2,order,i,j,src2_part)
-          if reader3:
-            endgame_read_block_slice(child_section(section,order[3]),reader3,order,i,j,src3_part)
+        if reader2:
+          endgame_read_block_slice(child_section(section,order[2]),reader2,order,i,j,src2_part)
+        if reader3:
+          endgame_read_block_slice(child_section(section,order[3]),reader3,order,i,j,src3_part)
         counts += endgame_compute_block_slice(writer,order,i,j,dest_part,src2_part,src3_part,bool(first_pass))
-        endgame_write_block_slice(writer,first_pass,order,i,j,dest_part)
+        endgame_write_block_slice(writer,first_pass,order,i,j,dest_part,sparse)
         report_thread_times(False)
-  if first_pass:
-    Log.write('section %s win counts: black %d, white %d, total %d'%(show_section(section),counts[0],counts[1],counts[2]))
 
   # Done with this pass!
   writer.finalize()
+
+  # Write extra data
+  if first_pass:
+    Log.write('section %s win counts: black %d, white %d, total %d'%(show_section(section),counts[0],counts[1],counts[2]))
+    assert len(sparse.boards)==len(sparse.wins)==samples
+    tryfile.write(sparse_file(section),{'stones':int(sum(section)),'section':section,'boards':sparse.boards,'wins':sparse.wins})
+
 
 def section_children(section):
   turn = int(sum(section))&1
@@ -179,9 +191,26 @@ def verify(section):
         for child in section_children(section):
           verify(child)
 
+def sparse_verify(section):
+  with Log.scope('sparse verify %s'%show_section(section)):
+    random = Random(85421133)
+    sparse = tryfile.read(sparse_file(section))
+    assert all(sparse['section']==section)
+    samples = sparse_verify_samples()
+    if samples<0 or samples>len(sparse['boards']):
+      samples = len(sparse['boards'])
+    Log.write('verifying %d samples'%samples)
+    try:
+      endgame_sparse_verify(section,sparse['boards'],sparse['wins'],random,samples)
+    except RuntimeError,e:
+      Log.write(str(e))
+      if recurse():
+        for child in section_children(section):
+          sparse_verify(child)
+
 def main():
   # Parse properties
-  global section,block_size,symmetries,history
+  global section,block_size,symmetries,history,dir,samples
   parser.parse('Pentago endgame database computation',positional=[section])
   m = re.match('^\D*(?:\d\d-)?(\d{8})\D*$',section())
   if not m:
@@ -192,6 +221,8 @@ def main():
   block_size = block_size()
   symmetries = symmetries()
   history = history()
+  samples = samples()
+  dir = dir()
 
   # Verify that section is standardized to prevent accidental computation of unnecessary data
   standard = standardize_section(section,symmetries)
@@ -199,8 +230,8 @@ def main():
     raise ValueError('refusing to compute nonstandard section %s (did you mean %s?)'%(show_section(section),show_section(standard)))
 
   # Make directory if necessary
-  if not exists(dir()):
-    os.mkdir(dir())
+  if not exists(dir):
+    os.mkdir(dir)
 
   # Check history filename
   if history:
@@ -211,15 +242,18 @@ def main():
 
   # Configure logging
   Log.configure('endgame',0,0,100)
-  Log.copy_to_file(os.path.join(dir(),'log-%s'%show_section(section)),True)
+  Log.copy_to_file(os.path.join(dir,'log-%s'%show_section(section)),True)
   Log.write('command = %s'%parser.command())
 
   # Do whatever is necessary
   set_thread_history(bool(history))
   init_thread_pools(cpu_threads(),io_threads())
-  if verify_samples():
+  if verify_samples() or sparse_verify_samples():
     init_supertable(21)
-    verify(section)
+    if verify_samples():
+      verify(section)
+    if sparse_verify_samples():
+      sparse_verify(section)
   else:
     try:
       compute(section)

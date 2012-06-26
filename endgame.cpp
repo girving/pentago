@@ -11,10 +11,12 @@
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
 #include <other/core/python/module.h>
+#include <other/core/python/Class.h>
 #include <other/core/python/ExceptionValue.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/interrupts.h>
 #include <other/core/utility/Log.h>
+#include <other/core/utility/const_cast.h>
 #include <other/core/utility/ProgressIndicator.h>
 #include <boost/bind.hpp>
 namespace pentago {
@@ -112,6 +114,22 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
             progress.progress();
           }
         }
+}
+
+static void endgame_sparse_verify(const section_t section, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins, Random& random, int samples) {
+  OTHER_ASSERT(boards.size()==wins.size());
+  OTHER_ASSERT((unsigned)samples<=(unsigned)boards.size());
+  // Verify that all boards come from the section
+  for (auto board : boards)
+    OTHER_ASSERT(count(board)==section);
+  // Check samples in random order
+  Array<int> permutation = IdentityMap(boards.size()).copy();
+  ProgressIndicator progress(samples,true);
+  for (int i=0;i<samples;i++) {
+    swap(permutation[i],permutation[random.uniform<int>(i,boards.size())]);
+    verify("endgame sparse verify",boards[permutation[i]],wins[permutation[i]],true);
+    progress.progress();
+  }
 }
 
 // Given a section s and order o, we define the 4-tensor A(s,o,I) = f(... q[s[k],I[oi[k]]] ...), where f(q0,q1,q2,q3) is the superoutcome for the board with
@@ -238,29 +256,92 @@ static board_t section_board(const section_t& section, const Vector<int,4>& I) {
 
 namespace {
 
+struct sparse_sample_t : public Object {
+  OTHER_DECLARE_TYPE
+
+  const supertensor_header_t header;
+  const Vector<int,4> blocks;
+  const NestedArray<const Vector<int,4>> samples;
+  const NestedArray<board_t> block_boards;
+  const NestedArray<Vector<super_t,2>> block_wins;
+
+  sparse_sample_t(const supertensor_writer_t& writer, int count)
+    : header(writer.header)
+    , blocks(header.blocks)
+    , samples(random_samples(count))
+    , block_boards(NestedArray<board_t>::zeros_like(samples))
+    , block_wins(NestedArray<Vector<super_t,2>>::zeros_like(samples)) {}
+
+  int block_index(const Vector<int,4>& block) const {
+    OTHER_ASSERT(   (unsigned)block[0]<(unsigned)blocks[0]
+                 && (unsigned)block[1]<(unsigned)blocks[1]
+                 && (unsigned)block[2]<(unsigned)blocks[2]
+                 && (unsigned)block[3]<(unsigned)blocks[3]);
+    return ((block[0]*blocks[1]+block[1])*blocks[2]+block[2])*blocks[3]+block[3];
+  }
+
+  NestedArray<const Vector<int,4>> random_samples(int count) const {
+    OTHER_ASSERT(count>=0);
+    const int block_size = header.block_size;
+    const Vector<int,4> shape = header.section.shape();
+    Array<int,4> counts(blocks);
+    Array<Vector<int,4>> flat_samples(count,false);
+    const Ref<Random> random = new_<Random>(hash(header.section.sig()));
+    for (Vector<int,4>& I : flat_samples) {
+      for (int a=0;a<4;a++)
+        I[a] = random->uniform<int>(0,shape[a]);
+      counts[I/block_size]++; 
+    }
+    NestedArray<Vector<int,4>> samples(counts.flat,false);
+    for (const Vector<int,4>& I : flat_samples) {
+      const auto block = I/block_size;
+      const int b = block_index(block);
+      samples(b,--counts.flat[b]) = I-block_size*block;
+    }
+    return samples;
+  }
+
+  Array<const board_t> boards() const {
+    return block_boards.flat;
+  }
+
+  Array<const Vector<super_t,2>> wins() const {
+    return block_wins.flat;
+  }
+};
+
+OTHER_DEFINE_TYPE(sparse_sample_t)
+
 struct write_helper_t : public boost::noncopyable {
   supertensor_writer_t& writer;
   const Ptr<const supertensor_reader_t> first_pass;
   const Vector<int,4> order;
   const int i, j;
   const RawArray<const Vector<super_t,2>,4> data;
+  const Ptr<sparse_sample_t> sparse;
   const int block_size;
   const Vector<int,4> first_block, first_block_shape, blocks;
   const Vector<int,2> slice_blocks;
   const Vector<int,4> strides;
+  const Vector<RawArray<const quadrant_t>,4> rmin;
 
-  write_helper_t(supertensor_writer_t& writer, Ptr<const supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data)
+  write_helper_t(supertensor_writer_t& writer, Ptr<const supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data, const Ptr<sparse_sample_t> sparse)
     : writer(writer)
     , first_pass(first_pass)
     , order(order)
     , i(i), j(j)
     , data(data)
+    , sparse(sparse)
     , block_size(writer.header.block_size)
     , first_block(in_order(order,vec(i,j,0,0)))
     , first_block_shape(writer.header.block_shape(first_block))
     , blocks(writer.header.blocks)
     , slice_blocks(blocks[order[2]],blocks[order[3]])
     , strides(in_order(order,pentago::strides(data.shape)))
+    , rmin(rotation_minimal_quadrants(writer.header.section.counts[0]).x,
+           rotation_minimal_quadrants(writer.header.section.counts[1]).x,
+           rotation_minimal_quadrants(writer.header.section.counts[2]).x,
+           rotation_minimal_quadrants(writer.header.section.counts[3]).x)
   {
     OTHER_ASSERT(!first_pass || writer.header.section==first_pass->header.section);
     for (int a=0;a<4;a++)
@@ -306,13 +387,29 @@ struct write_helper_t : public boost::noncopyable {
             }
     // Write
     writer.schedule_write_block(block,block_data);
+    // Collect sparse samples
+    if (sparse) {
+      const int b = sparse->block_index(block);
+      RawArray<const Vector<int,4>> samples = sparse->samples[b];
+      RawArray<board_t> boards = sparse->block_boards[b];
+      RawArray<Vector<super_t,2>> wins = sparse->block_wins[b];
+      for (int i : range(samples.size())) {
+        const auto I = samples[i];
+        OTHER_ASSERT(block_data.valid(I));
+        boards[i] = quadrants(rmin[0][block_size*block[0]+I[0]],
+                              rmin[1][block_size*block[1]+I[1]],
+                              rmin[2][block_size*block[2]+I[2]],
+                              rmin[3][block_size*block[3]+I[3]]);
+        wins[i] = block_data[I];
+      }
+    }
   }
 };
 
 }
 
-static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data) {
-  write_helper_t helper(writer,first_pass,order,i,j,data);
+static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data, Ptr<sparse_sample_t> sparse) {
+  write_helper_t helper(writer,first_pass,order,i,j,data,sparse);
   if (!first_pass) {
     vector<function<void()>> jobs;
     for (const int k : range(helper.slice_blocks[0]))
@@ -437,7 +534,8 @@ template<bool turn,bool final> static Vector<uint64_t,3> endgame_compute_block_s
   return helper.win_counts;
 }
 
-static Vector<uint64_t,3> endgame_compute_block_slice(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count) {
+static Vector<uint64_t,3> endgame_compute_block_slice(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j,
+                                                      RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count) {
   const int stones = writer.header.section.sum();
   if (stones&1)
     return endgame_compute_block_slice_helper<1,false>(writer,order,i,j,dest,src2,src3,count);
@@ -455,4 +553,12 @@ void wrap_endgame() {
   OTHER_FUNCTION(endgame_write_block_slice)
   OTHER_FUNCTION(endgame_compute_block_slice)
   OTHER_FUNCTION(endgame_verify)
+  OTHER_FUNCTION(endgame_sparse_verify)
+
+  typedef sparse_sample_t Self;
+  Class<Self>("sparse_sample_t")
+    .OTHER_INIT(const supertensor_writer_t&,int)
+    .OTHER_GET(boards)
+    .OTHER_GET(wins)
+    ;
 }

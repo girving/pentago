@@ -23,6 +23,10 @@ using std::cout;
 using std::endl;
 using std::vector;
 
+section_t count(board_t board) {
+  return section_t(vec(count(quadrant(board,0)),count(quadrant(board,1)),count(quadrant(board,2)),count(quadrant(board,3))));
+}
+
 Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white) {
   OTHER_ASSERT(0<=black && 0<=white && black+white<=9);
   const int i = ((black*(21-black))>>1)+white;
@@ -399,7 +403,7 @@ void all_boards_sample_test(int n, int steps) {
   Ref<Random> random = new_<Random>(175131);
   for (int step=0;step<steps;step++) {
     const board_t board = random_board(random,n);
-    const section_t s(vec(count(quadrant(board,0)),count(quadrant(board,1)),count(quadrant(board,2)),count(quadrant(board,3))));
+    const section_t s = count(board);
     section_t ss;uint8_t g;s.standardize<8>().get(ss,g);
     // Does this section exist?
     int si = std::lower_bound(sections.begin(),sections.end(),ss)-sections.begin();

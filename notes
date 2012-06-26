@@ -270,6 +270,12 @@ mb and associated super s.  We have
 
 --------------------------------------------------------------------------
 
-TODO:
+Say we pick n elements out of m at a random with replacement.  If we partition m as m = a+b, is there an
+easy way to randomly determine how many elements to pick out of the first a?  Intuitively I think the answer
+is no, but let's see:
 
-1. Dump out a sparse set of super infos for testing purposes
+  P(|A| = k) = choose(n,k) (a/m)^k (b/m)^(n-k)
+
+Ah, this is just a binomial distribution.  According to the internet and NR, no analytic sampling technique
+exists, but efficient rejection schemes are possible.  In my case I can get away with simply generating all
+the random samples and sorting them into bins one by one.
