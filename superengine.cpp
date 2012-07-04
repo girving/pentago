@@ -241,6 +241,8 @@ template<bool remember,bool aggressive,bool debug> static typename results_t<rem
   return results.return_(info);
 }
 
+template superinfo_t super_evaluate_recurse<false>(bool,int,side_t,side_t,superdata_t,super_t);
+
 // Use only from top level
 template<bool remember> typename results_t<remember>::type super_evaluate_recurse(const bool aggressive, const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important) {
   #define CASE(a,d) if (aggressive==a && debug==d) return super_evaluate_recurse<remember,a,d>(depth,side0,side1,data,important);

@@ -247,7 +247,7 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
 }
 
 // Do not use in performance critical code
-static board_t section_board(const section_t& section, const Vector<int,4>& I) {
+OTHER_UNUSED static board_t section_board(const section_t& section, const Vector<int,4>& I) {
   return quadrants(rotation_minimal_quadrants(section.counts[0]).x[I[0]],
                    rotation_minimal_quadrants(section.counts[1]).x[I[1]],
                    rotation_minimal_quadrants(section.counts[2]).x[I[2]],
