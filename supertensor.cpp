@@ -2,6 +2,7 @@
 
 #include "supertensor.h"
 #include "filter.h"
+#include "aligned.h"
 #include <other/core/array/IndirectArray.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/to_python.h>
@@ -81,7 +82,7 @@ static void decompress(supertensor_blob_t blob, Array<const uint8_t> compressed,
   {
     thread_time_t time("decompress");
     size_t dest_size = blob.uncompressed_size;
-    uncompressed.resize(dest_size,false,false);
+    uncompressed = aligned_buffer<uint8_t>(dest_size);
     if (!is_lzma(compressed)) { // zlib
       int z = uncompress((uint8_t*)uncompressed.data(),&dest_size,compressed.data(),blob.compressed_size);
       if (z!=Z_OK)

@@ -6,6 +6,7 @@
 #include "supertensor.h"
 #include "superengine.h"
 #include "count.h"
+#include "aligned.h"
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
@@ -358,7 +359,7 @@ struct write_helper_t : public boost::noncopyable {
       OTHER_ASSERT(first_pass_data.shape==block_shape);
       block_data = first_pass_data;
     } else
-      block_data.resize(block_shape,false,false);
+      block_data = aligned_buffer<Vector<super_t,2>>(block_shape);
     // Move data into place, combining with first pass data if applicable
     const Vector<super_t,2>* start = &data(0,0,block_size*k,block_size*l);
     if (!first_pass)

@@ -2,6 +2,7 @@
 
 #include "filter.h"
 #include "superscore.h"
+#include "aligned.h"
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/NdArray.h>
@@ -292,7 +293,7 @@ Array<uint8_t> compact(Array<Vector<super_t,2>> src) {
 
 // Inverse of compact.  Not in-place since the output is larger than the input.
 Array<Vector<super_t,2>> uncompact(Array<const uint8_t> src) {
-  Array<Vector<super_t,2>> dst(5*src.size()/256,false);
+  const auto dst = aligned_buffer<Vector<super_t,2>>(5*src.size()/256);
   OTHER_ASSERT(src.size()==(256*dst.size()+4)/5);
   const int chunks = dst.size()/5, 
             extra = dst.size()-5*chunks;
