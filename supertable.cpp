@@ -166,7 +166,6 @@ static void supertable_test(int epochs) {
   // Repeatedly clear the supertable and run through a bunch of operations
   Hashtable<board_t> set;
   Array<board_t> boards;
-  Array<Vector<super_t,2> > garbage;
   for (int epoch=0;epoch<epochs;epoch++) {
     // Start fresh
     clear_supertable();
