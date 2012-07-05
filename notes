@@ -281,3 +281,89 @@ exists, but efficient rejection schemes are possible.  In my case I can get away
 the random samples and sorting them into bins one by one.
 
 --------------------------------------------------------------------------
+
+Okay, let's try overlapping read and write.  xz actually does seem quite slow, so I'm going to use this
+profile command:
+
+    time ./endgame --force 1 --level 4 --dir old-zlib-data-23jun2012 45544444
+
+Here's the baseline:
+
+      timing
+        cpu-idle                85.6344 s
+        io-idle                 43.0748 s
+        master-idle             32.4700 s
+        decompress              16.8907 s
+        read                    15.7602 s
+        copy                     2.8391 s
+        write                    6.4835 s
+        compute                 24.6512 s
+        compress               128.9502 s
+        missing: master 0.3853, cpu 3.8762, io 0.3919
+      job types
+        master = master-idle 
+        cpu = compress cpu-idle copy decompress compute 
+        io = io-idle write read 
+    END endgame                                        32.8652 s
+    endgame                                            32.8652 s
+      compute                                          32.8357 s
+        pass one                                       15.3904 s
+          slice                                        15.3687 s
+        pass two                                       17.3812 s
+          slice                                        17.2942 s
+
+With history tracking:
+
+      timing
+        cpu-idle               207.1326 s
+        io-idle                 37.1349 s
+        master-idle             48.4322 s
+        decompress              18.8600 s
+        read                     0.7231 s
+        copy                     3.2347 s
+        write                   59.2152 s
+        compute                 24.7412 s
+        compress               132.4269 s
+        missing: master 0.3636, cpu 3.9709, io 0.5183
+      job types
+        master = master-idle 
+        cpu = compress copy cpu-idle decompress compute 
+        io = io-idle write read 
+      saving thread history to blah.try
+    END endgame                                        49.0134 s
+    endgame                                            49.0134 s
+      compute                                          48.7763 s
+        pass one                                       34.7393 s
+          slice                                        34.7122 s
+        pass two                                       14.0357 s
+          slice                                        13.9877 s
+
+Well, that's a lot more of a slowdown that I'd expected.  Time to try shark.
+
+First, and interestingly, gcc seems nontrivially faster:
+
+      timing
+        cpu-idle                20.7596 s
+        io-idle                 52.6112 s
+        master-idle             28.4064 s
+        decompress              19.3231 s
+        read                     0.2727 s
+        copy                     3.6327 s
+        write                    4.0028 s
+        compute                 34.0035 s
+        compress               147.2051 s
+        missing: master 0.3366, cpu 5.0199, io 0.5993
+      job types
+        master = master-idle 
+        cpu = compress cpu-idle copy decompress compute 
+        io = io-idle write read 
+    END endgame                                        28.9874 s
+    endgame                                            28.9874 s
+      compute                                          28.7216 s
+        pass one                                       13.1299 s
+          slice                                        13.1042 s
+        pass two                                       15.5894 s
+          slice                                        15.5373 s
+
+On the other hand, the profile looks entirely different from the clang version, so maybe it's just noise.  Back to shark.
+Okay, shark just says zlib is the problem, which of course I already knew.  Enough profiling for now.
