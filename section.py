@@ -19,10 +19,20 @@ def sparse_file(s):
   return os.path.join(data_dir(),'sparse-%s.try'%show_section(s))
 
 def child_section(section,q):
+  if sum(section[q])==9:
+    return None
   child = section.copy()
   turn = int(sum(section))&1
   child[q,turn] += 1
-  return child if all(sum(child,axis=1)<=9) else None
+  return child
+
+def parent_section(section,q):
+  parent = section.copy()
+  turn = not (int(sum(section))&1)
+  if parent[q,turn]:
+    parent[q,turn] -= 1
+    return parent
+  return None
 
 def child_section_shape(section,q):
   '''The shape of a child section of the given section, or () if the child doesn't exist'''
@@ -49,6 +59,17 @@ def section_children(section):
       if not [() for c in children if all(child==c)]:
         children.append(child)
   return children
+
+def section_parents(section):
+  turn = int(sum(section))&1
+  parents = []
+  for q in xrange(4):
+    parent = parent_section(section,q)
+    if parent is not None:
+      parent = standardize_section(parent,symmetries())
+      if not [() for c in parents if all(parent==c)]:
+        parents.append(parent)
+  return parents
 
 exist_set = set()
 def exists(file):
