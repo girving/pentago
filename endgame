@@ -5,6 +5,7 @@ from other.core import *
 from other.core.value import parser
 from other.core.utility import tryfile
 from interface import *
+from section import *
 import time
 import tempfile
 
@@ -13,9 +14,7 @@ section = PropManager.add('section','').set_help('numbers of black and white sto
 block_size = PropManager.add('block_size',8).set_help('block size along all four quadrant dimensions')
 filter = PropManager.add('filter',1).set_help('filter type to precondition zlib compression')
 level = PropManager.add('level',21).set_help('zlib compression level')
-dir = PropManager.add('dir','data').set_help('top level data directory')
 recurse = PropManager.add('recurse',False).set_help('automatically recurse into child sections')
-symmetries = PropManager.add('symmetries',8).set_help('number of symmetries used to standardize sections')
 force = PropManager.add('force',False).set_help('recompute section even if it already exists')
 verify_samples = PropManager.add('verify',0).set_help('if nonzero, load tensor file and verify rather than computing, using the given number of samples')
 nop = PropManager.add('nop',False).set_help('do nothing')
@@ -24,35 +23,6 @@ io_threads = PropManager.add('io_threads',-1).set_abbrev('i').set_help('number o
 history = PropManager.add('history','').set_help('record thread execution history to given file')
 samples = PropManager.add('samples',1024).set_help('number of sparse samples to save to a separate file')
 sparse_verify_samples = PropManager.add('sparse',0).set_help('verify (at most) the given number of sparse samples')
-
-def show_section(s):
-  return '%d-'%sum(s)+''.join(map(str,ravel(s)))
-
-def section_file(s):
-  return os.path.join(dir,'section-%s.pentago'%show_section(s))
-
-def sparse_file(s):
-  return os.path.join(dir,'sparse-%s.try'%show_section(s))
-
-def child_section(section,q):
-  child = section.copy()
-  turn = int(sum(section))&1
-  child[q,turn] += 1
-  return child if all(sum(child,axis=1)<=9) else None
-
-def child_section_shape(section,q):
-  '''The shape of a child section of the given section, or () if the child doesn't exist'''
-  child = child_section(section,q)
-  if child is None:
-    return zeros(4,int)
-  return section_shape(child)
-
-def child_reader(readers,section,q):
-  child = child_section(section,q)
-  if child is None:
-    return None
-  reader, = [r for r in readers if all(r.header.section==standardize_section(child,symmetries))]
-  return reader
 
 def memory(*arrays):
   mem = sum(a.view(uint8).size for a in arrays)
@@ -113,21 +83,6 @@ def compute_pass(writer,first_pass,readers,order):
     assert len(sparse.boards)==len(sparse.wins)==samples
     tryfile.write(sparse_file(section),{'stones':int(sum(section)),'section':section,'boards':sparse.boards,'wins':sparse.wins})
 
-
-def section_children(section):
-  turn = int(sum(section))&1
-  children = []
-  for q in xrange(4):
-    child = child_section(section,q)
-    if child is not None:
-      child = standardize_section(child,symmetries)
-      if not [() for c in children if all(child==c)]:
-        children.append(child)
-  return children
-
-exist_set = set()
-def exists(file):
-  return file in exist_set or os.path.exists(file)
 
 def compute(section):
   '''Compute a single section, optionally recursing down to children'''
@@ -210,7 +165,7 @@ def sparse_verify(section):
 
 def main():
   # Parse properties
-  global section,block_size,symmetries,history,dir,samples
+  global section,block_size,history,samples
   parser.parse('Pentago endgame database computation',positional=[section])
   m = re.match('^\D*(?:\d\d-)?(\d{8})\D*$',section())
   if not m:
@@ -219,17 +174,16 @@ def main():
   section = asarray(map(int,m.group(1))).reshape(4,2)
   assert section_valid(section)
   block_size = block_size()
-  symmetries = symmetries()
   history = history()
   samples = samples()
-  dir = dir()
 
   # Verify that section is standardized to prevent accidental computation of unnecessary data
-  standard = standardize_section(section,symmetries)
+  standard = standardize_section(section,symmetries())
   if not all(section==standard):
     raise ValueError('refusing to compute nonstandard section %s (did you mean %s?)'%(show_section(section),show_section(standard)))
 
   # Make directory if necessary
+  dir = data_dir()
   if not exists(dir):
     os.mkdir(dir)
 
