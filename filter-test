@@ -7,6 +7,9 @@ from interface import *
 import time
 
 level = PropManager.add('level',21)
+do_count = PropManager.add('count',False)
+do_lowrank = PropManager.add('lowrank',False)
+plot = PropManager.add('plot',0)
 parser.parse('Pentago filter benchmarks')
 level = level()
 
@@ -16,6 +19,7 @@ def count(data):
       counts = count_causal_cases(data).reshape(3**8,3)
     else:
       counts = count_outer_causal_cases(data).reshape(3**4,3)
+    Log.write('counts shape = %s'%(counts.shape,))
   with Log.scope('report causal'):
     totals = sum(counts,axis=0)
     def prob(p,axis=-1):
@@ -37,6 +41,11 @@ def count(data):
     Log.write('conditional entropies = %s'%entropy(conditional))
     Log.write('conditional entropy = %s'%(sum(prob(conditional.sum(axis=-1),axis=0)*entropy(conditional))))
     Log.write('better entropy = %g'%(dot(prob(counts.sum(axis=-1)),entropy(counts))))
+  with Log.scope('bytes'):
+    counts = count_byte_cases(data.reshape(-1,2,4))
+    e = dot(prob(counts.sum(axis=-1)),entropy(counts))
+    Log.write('byte entropy = %g'%e)
+    Log.write('byte compression = %g'%(e/8))
   with Log.scope('count rotations'):
     counts = count_rotation_cases(data)
     assert counts.shape==(4,3**4)
@@ -142,11 +151,6 @@ def uncompact_help(data,shape):
   return uncompact(data).reshape(shape+(2,4))
 
 def driver():
-  do_count = PropManager.add('count',False)
-  do_lowrank = PropManager.add('lowrank',False)
-  plot = PropManager.add('plot',0)
-  parser.parse('filter-test')
-
   Log.configure('filter test',0,0,100)
   init_thread_pools(-1,-1)
   reader = supertensor_reader_t('data/section-32-44444444.pentago')

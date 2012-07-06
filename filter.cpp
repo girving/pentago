@@ -310,6 +310,16 @@ Array<Vector<super_t,2>> uncompact(Array<const uint8_t> src) {
   return dst;
 }
 
+Array<int,2> count_byte_cases(RawArray<const Vector<super_t,2>> data) {
+  auto copy = data.copy();
+  interleave(copy);
+  auto bytes = char_view(data);
+  Array<int,2> cases(256,256);
+  for (int i=1;i<bytes.size();i++)
+    cases(bytes[i-1],bytes[i])++;
+  return cases;
+}
+
 }
 using namespace pentago;
 
@@ -317,6 +327,7 @@ void wrap_filter() {
   OTHER_FUNCTION(count_causal_cases)
   OTHER_FUNCTION(count_outer_causal_cases)
   OTHER_FUNCTION(count_rotation_cases)
+  OTHER_FUNCTION(count_byte_cases)
   OTHER_FUNCTION(interleave)
   OTHER_FUNCTION(uninterleave)
   OTHER_FUNCTION(arbitrary_causal_filter)
