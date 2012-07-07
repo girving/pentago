@@ -30,7 +30,7 @@ def count(data):
     def entropy(p,axis=-1):
       p = prob(p,axis)
       assert allclose(sum(p,-1),1)
-      return -sum(p*log(maximum(p,1e-20)),axis)
+      return -sum(p*log(maximum(p,1e-20))/log(2),axis)
     Log.write('totals = %s'%totals)
     Log.write('probabilities = %s'%prob(totals))
     Log.write('entropy = %g'%entropy(totals))
