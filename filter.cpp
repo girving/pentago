@@ -320,6 +320,124 @@ Array<int,2> count_byte_cases(RawArray<const Vector<super_t,2>> data) {
   return cases;
 }
 
+typedef Vector<super_t,2> F3;
+
+static inline F3 add(const F3& f, const F3& g) {
+  super_t sx = f.x^g.x,
+          sy = f.y^g.y^(f.x&g.x);
+  sx ^= f.y&g.y;
+  super_t o = sx&sy;
+  return vec(sx^o,sy^o);
+}
+
+static inline F3 neg(const F3& f) {
+  return F3(f.y,f.x);
+}
+
+static inline F3 sub(const F3& f, const F3& g) {
+  return add(f,neg(g));
+}
+
+static inline F3 neg_add(const F3& f, const F3& g) {
+  return neg(add(f,g));
+}
+
+static inline F3 rev_sub(const F3& f, const F3& g) {
+  return sub(g,f);
+}
+
+template<bool invert> static inline void wavelet(F3& f0, F3& f1, F3& f2, F3& f3, F3& f4, F3& f5, F3& f6, F3& f7) {
+  if (!invert) {
+    const F3 p0 = add(f0,f1),
+             m0 = sub(f0,f1),
+             p1 = add(f2,f3),
+             m1 = sub(f2,f3),
+             p2 = add(f4,f5),
+             m2 = sub(f4,f5),
+             p3 = add(f6,f7),
+             m3 = sub(f6,f7);
+    const F3 pp0 = add(p0,p1),
+             pm0 = sub(p0,p1),
+             pp1 = add(p2,p3),
+             pm1 = sub(p2,p3);
+    const F3 ppp = add(pp0,pp1),
+             ppm = sub(pp0,pp1);
+    f0 = ppp;
+    f1 = ppm;
+    f2 = pm0;
+    f3 = pm1;
+    f4 = m0;
+    f5 = m1;
+    f6 = m2;
+    f7 = m3;
+  } else {
+    const F3 ppp = f0,
+             ppm = f1,
+             pm0 = f2,
+             pm1 = f3,
+             m0 = f4,
+             m1 = f5,
+             m2 = f6,
+             m3 = f7;
+    const F3 pp0 = neg_add(ppp,ppm),
+             pp1 = rev_sub(ppp,ppm);
+    const F3 p0 = neg_add(pp0,pm0),
+             p1 = rev_sub(pp0,pm0),
+             p2 = neg_add(pp1,pm1),
+             p3 = rev_sub(pp1,pm1);
+    f0 = neg_add(p0,m0);
+    f1 = rev_sub(p0,m0);
+    f2 = neg_add(p1,m1);
+    f3 = rev_sub(p1,m1);
+    f4 = neg_add(p2,m2);
+    f5 = rev_sub(p2,m2);
+    f6 = neg_add(p3,m3);
+    f7 = rev_sub(p3,m3);
+  }
+}
+
+template<bool invert> static void wavelet_loop(RawArray<F3> data, const Vector<int,4> shape, const Vector<int,4> strides) {
+  // Size 8 wavelet transform
+  #define WAVELET8() \
+    wavelet<invert>(data[base+stride*0],data[base+stride*1],data[base+stride*2],data[base+stride*3], \
+                    data[base+stride*4],data[base+stride*5],data[base+stride*6],data[base+stride*7]);
+  // Loop over three dimensions and wavelet transform the fourth
+  const int stride = strides[3];
+  #define LOOP(n) \
+    for (int i0=0;i0<shape[0];i0++) \
+      for (int i1=0;i1<shape[1];i1++) \
+        for (int i2=0;i2<shape[2];i2++) { \
+          const int base = strides[0]*i0+strides[1]*i1+strides[2]*i2; \
+          WAVELET##n(); \
+        }
+  // For now, we only bother with size 8 wavelet transforms
+  switch (shape[3]) {
+    case 8: LOOP(8); break;
+    default: break;
+  }
+}
+
+template<bool invert> static void wavelet_helper(RawArray<F3,4> data) {
+  const auto shape = data.shape;
+  const Vector<int,4> strides(shape[1]*shape[2]*shape[3],shape[2]*shape[3],shape[3],1);
+  for (int a=0;a<4;a++) {
+    auto a_shape = shape, a_strides = strides;
+    swap(a_shape[a],a_shape[3]);
+    swap(a_strides[a],a_strides[3]);
+    wavelet_loop<invert>(data.flat,a_shape,a_strides);
+  }
+}
+
+void wavelet_transform(RawArray<F3,4> data) {
+  wavelet_helper<false>(data); 
+  interleave(data.flat);
+}
+
+void wavelet_untransform(RawArray<F3,4> data) {
+  uninterleave(data.flat);
+  wavelet_helper<true>(data); 
+}
+
 }
 using namespace pentago;
 
@@ -336,4 +454,6 @@ void wrap_filter() {
   OTHER_FUNCTION(inverse_outer_causal_filter)
   OTHER_FUNCTION(compact)
   OTHER_FUNCTION(uncompact)
+  OTHER_FUNCTION(wavelet_transform)
+  OTHER_FUNCTION(wavelet_untransform)
 }

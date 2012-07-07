@@ -367,3 +367,24 @@ First, and interestingly, gcc seems nontrivially faster:
 
 On the other hand, the profile looks entirely different from the clang version, so maybe it's just noise.  Back to shark.
 Okay, shark just says zlib is the problem, which of course I already knew.  Enough profiling for now.
+
+--------------------------------------------------------------------------
+
+It'd be fun to give some sort of wavelet transform a try.  The trouble, as usual, is that working in F_3 is largely
+meaningless due to the wraparound.  Well, what if we ignored that?
+
+Given x_0, x_1, we can form
+
+    y_0 = x_0 + x_1
+    y_1 = x_0 - x_1 = y_0 + x_1
+
+The inverse operations are
+
+    x_0 = (y_0 + y_1)/2 = -(y_0 + y_1) = -y_1 - y_0
+    x_1 = (y_0 - y_1)/2 = -(y_0 - y_1) =  y_1 - y_0
+
+We can recursively continue this into a linear time lifting wavelet scheme by setting the differences to one side and
+repeating the construction on the sums.
+
+Conclusion: it works, but produces incredibly lousy compression.  The average ratio is 0.623704.  Unsurprisingly,
+wraparound arithmetic turns out to be pessimal.

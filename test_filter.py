@@ -28,6 +28,20 @@ def test_compact():
     dst = uncompact(dst)
     assert all(src==dst)
 
+def test_wavelet():
+  random.seed(9847224)
+  for s0 in 3,8:
+    for s1 in 3,8:
+      for s2 in 3,8:
+        for s3 in 3,8:
+          shape = s0,s1,s2,s3
+          data = random_supers(product(shape)).reshape(shape+(2,4))
+          save = data.copy()
+          wavelet_transform(data)
+          wavelet_untransform(data) 
+          assert all(data==save)
+
 if __name__=='__main__':
+  test_wavelet()
   test_compact()
   test_interleave()

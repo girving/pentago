@@ -150,6 +150,15 @@ def compact_help(data):
 def uncompact_help(data,shape):
   return uncompact(data).reshape(shape+(2,4))
 
+def wavelet_help(data):
+  wavelet_transform(data)
+  return data
+
+def unwavelet_help(data,shape):
+  data = data.reshape(shape+(2,4))
+  wavelet_untransform(data)
+  return data
+
 def driver():
   Log.configure('filter test',0,0,100)
   init_thread_pools(-1,-1)
@@ -162,7 +171,8 @@ def driver():
             ,('interleave',interleave_help,uninterleave_help)
             ,('shuffle',shuffle,unshuffle)
             ,('compact',compact_help,uncompact_help)
-            ,('popsort',popsort,None)]
+            ,('popsort',popsort,None)
+            ,('wavelet',wavelet_help,unwavelet_help)]
 
   # Loop through a few random blocks
   total_uncompressed = 0
