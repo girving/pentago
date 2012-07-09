@@ -388,3 +388,29 @@ repeating the construction on the sums.
 
 Conclusion: it works, but produces incredibly lousy compression.  The average ratio is 0.623704.  Unsurprisingly,
 wraparound arithmetic turns out to be pessimal.
+
+--------------------------------------------------------------------------
+
+Let's try to do low rank least squares probability estimation.  We'll actually estimate the logs of probabilities,
+or more generally some nonlinear function f(p).  So, we have outcomes p_sI.  If we compute estimates q_sI, an arithmetic
+coder will use the following number of bits to store the result:
+
+  B = -256 sum_sI p_sI log q_sI
+
+Drop the 256 to get
+
+  B = -sum_sI p_sI log q_sI
+
+This is subject to the constraints that
+
+  0 <= q_sI
+  sum_s q_sI = 1
+
+Say we have only two dimensions I = ij, and some nonlinear method of combining rank 1 values
+
+  q_sij = f(a_si,b_sj) / sum_s f(a_si,b_sj)
+
+  B = -sum_sI p_sI (log f(a_si,b_sj) - log sum_s' f(a_s'i,b_s'j))
+    = sum_I log sum_s f(a_si,b_sj) - sum_sI p_sI log f(a_si,b_sj)
+
+Let's say we just use f(a,b) = a+b.
