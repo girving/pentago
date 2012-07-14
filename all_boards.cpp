@@ -341,6 +341,9 @@ uint64_t all_boards_stats(int n, int symmetries) {
   Array<section_t> sections = all_boards_sections(n,1);
   int reduced_sections = 0;
   uint64_t max_section = 0;
+  Interval<uint64_t> blocks = 0;
+  uint64_t slices1 = 0;
+  uint64_t slices2 = 0;
   uint64_t total = 0;
   uint64_t reduced_total = 0;
   for (section_t s : sections) {
@@ -349,12 +352,18 @@ uint64_t all_boards_stats(int n, int symmetries) {
     total += size;
     if (symmetries==1 || (symmetries==4 && s.standardize<4>().x==s) || (symmetries==8 && s.standardize<8>().x==s)) {
       reduced_sections++;
+      const auto shape = s.shape();
+      const auto b = (shape/8).sorted();
+      blocks.min += b.product();
+      blocks.max += ((shape+7)/8).product();
+      slices1 += b.x*b.y*b.z;
+      slices2 += b.x*b.y;
       reduced_total += size;
     }
   }
   const uint64_t exact = count_boards(n,2048);
-  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %*d, unreduced sections = %5d, max section = %14s, average section = %g",
-    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),large(max_section),(double)reduced_total/reduced_sections) << endl;
+  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %*d, unreduced sections = %5d, blocks = %9lld %9lld, slices = %8lld %6lld, max section = %14s, average section = %g",
+    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,slices1,slices2,large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;
 }
