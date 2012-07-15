@@ -342,8 +342,8 @@ uint64_t all_boards_stats(int n, int symmetries) {
   int reduced_sections = 0;
   uint64_t max_section = 0;
   Interval<uint64_t> blocks = 0;
-  uint64_t slices1 = 0;
-  uint64_t slices2 = 0;
+  Interval<uint64_t> slices1 = 0;
+  Interval<uint64_t> slices2 = 0;
   uint64_t total = 0;
   uint64_t reduced_total = 0;
   for (section_t s : sections) {
@@ -353,17 +353,20 @@ uint64_t all_boards_stats(int n, int symmetries) {
     if (symmetries==1 || (symmetries==4 && s.standardize<4>().x==s) || (symmetries==8 && s.standardize<8>().x==s)) {
       reduced_sections++;
       const auto shape = s.shape();
-      const auto b = (shape/8).sorted();
-      blocks.min += b.product();
-      blocks.max += ((shape+7)/8).product();
-      slices1 += b.x*b.y*b.z;
-      slices2 += b.x*b.y;
+      const auto lo = (shape/8).sorted(),
+                 hi = ((shape+7)/8).sorted();
+      blocks.min += lo.product();
+      blocks.max += hi.product();
+      slices1.min += lo.x*lo.y*lo.z + lo.x*lo.y*lo.w + lo.x*lo.z*lo.w + lo.y*lo.z*lo.w;
+      slices1.max += hi.x*hi.y*hi.z + hi.x*hi.y*hi.w + hi.x*hi.z*hi.w + hi.y*hi.z*hi.w;
+      slices2.min += lo.x*lo.y+lo.z*lo.w;
+      slices2.max += hi.x*hi.y+hi.z*hi.w;
       reduced_total += size;
     }
   }
   const uint64_t exact = count_boards(n,2048);
-  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %*d, unreduced sections = %5d, blocks = %9lld %9lld, slices = %8lld %6lld, max section = %14s, average section = %g",
-    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,slices1,slices2,large(max_section),(double)reduced_total/reduced_sections) << endl;
+  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %*d, unreduced sections = %5d, blocks = %9lld %9lld, slices = %8lld %9lld / %7lld %7lld, max section = %14s, average section = %g",
+    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,slices1.min,slices1.max,slices2.min,slices2.max,large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;
 }

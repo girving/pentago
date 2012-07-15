@@ -59,6 +59,10 @@ struct section_t {
     return counts.sum().sum();
   }
 
+  Vector<int,4> sums() const {
+    return Vector<int,4>(counts[0].sum(),counts[1].sum(),counts[2].sum(),counts[3].sum());
+  }
+
   bool valid() const;
   section_t transform(uint8_t global) const;
 
@@ -66,10 +70,12 @@ struct section_t {
   template<int symmetries> Tuple<section_t,uint8_t> standardize() const;
 };
 
+
 ostream& operator<<(ostream& output, section_t section);
 PyObject* to_python(const section_t& section);
 } namespace other {
 template<> struct FromPython<pentago::section_t>{static pentago::section_t convert(PyObject* object);};
+template<> struct is_packed_pod<pentago::section_t>:public mpl::true_{}; // Make section_t hashable
 } namespace pentago {
 
 // Enumerate the different ways n stones can be distributed into the four quadrants
