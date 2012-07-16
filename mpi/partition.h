@@ -13,7 +13,20 @@ using std::vector;
 // Only 35 slices are returned, since computing slice 36 is unnecessary.
 vector<Array<const section_t>> descendent_sections(section_t root);
 
-// Information about a set of 1D block lines
+// A single 1D block line
+struct line_t {
+  section_t section;
+  int dimension; // which way the line points
+  int length; // length in blocks
+  Vector<int,3> base; // block indices in the other 3 dimensions
+
+  Vector<int,4> block(int i) const {
+    OTHER_ASSERT((unsigned)i<=(unsigned)length);
+    return base.insert(i,dimension);
+  }
+};
+
+// A set of 1D block lines
 struct lines_t {
   // Section information
   section_t section;
@@ -44,8 +57,14 @@ protected:
 public:
   ~partition_t();
 
+  // List all lines belonging to a given rank
+  Array<const line_t> rank_lines(int rank, bool owned);
+
   // Find the rank which owns a given block
   int block_to_rank(section_t section, Vector<int,4> block);
+
+  // Find the line that owns a given block
+  Vector<int,2> block_to_line(section_t section, Vector<int,4> block);
 
 private:
   // Can the remaining work fit within the given bound?
@@ -53,9 +72,6 @@ private:
 
   // Divide a set of lines between processes
   static Array<const Vector<int,2>> partition_lines(RawArray<uint64_t> work, RawArray<const lines_t> lines);
-
-  // Find the line that owns a given block
-  Vector<int,2> block_to_line(section_t section, Vector<int,4> block);
 };
 
 }

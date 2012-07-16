@@ -209,6 +209,32 @@ Array<const Vector<int,2>> partition_t::partition_lines(RawArray<uint64_t> work,
   return starts;
 }
 
+Array<const line_t> partition_t::rank_lines(int rank, bool owned) {
+  OTHER_ASSERT(0<=rank && rank<ranks);
+  RawArray<const lines_t> all_lines = owned?owner_lines:other_lines;
+  RawArray<const Vector<int,2>> starts = owned?owner_starts:other_starts;
+  const auto start = starts[rank], end = starts[rank+1];
+  Array<line_t> result;
+  for (int r : range(start.x,end.x+1)) {
+    const auto& chunk = all_lines[r];
+    const auto blocks = (chunk.section.shape()+block_size-1)/block_size;
+    const auto sizes = chunk.blocks.sizes();
+    for (int k : range(r==start.x?start.y:0,r==end.x?end.y:chunk.count)) {
+      line_t line;
+      line.section = chunk.section;
+      line.dimension = chunk.dimension;
+      line.length = blocks[chunk.dimension];
+      const int i01 = k/sizes.z,
+                i2 = k-i01*sizes.z,
+                i0 = i01/sizes.y,
+                i1 = i01-i0*sizes.y;
+      line.base = chunk.blocks.min+vec(i0,i1,i2);
+      result.append(line);
+    }
+  }
+  return result;
+}
+
 // Find the line that owns a given block
 Vector<int,2> partition_t::block_to_line(section_t section, Vector<int,4> block) {
   int index = first_owner_line.get(section);
@@ -281,6 +307,36 @@ static void partition_test() {
         int rank = partition->block_to_rank(section,block);
         OTHER_ASSERT(0<=rank && rank<ranks);
       }
+    }
+
+    // For several ranks, check that the lists of lines are consistent
+    if (ranks>=196608) {
+      int cross = 0, total = 0;
+      for (int i=0;i<100;i++) {
+        const int rank = random->uniform<int>(0,ranks);
+        // We should own all blocks in lines we own
+        Hashtable<Tuple<section_t,Vector<int,4>>> blocks;
+        auto owned = partition->rank_lines(rank,true);
+        for (const auto& line : owned)
+          for (int j=0;j<line.length;j++) {
+            const auto block = line.block(j);
+            OTHER_ASSERT(partition->block_to_rank(line.section,block)==rank);
+            blocks.set(tuple(line.section,block));
+          }
+        // We only own some of the blocks in lines we don't own
+        auto other = partition->rank_lines(rank,false);
+        for (const auto& line : other)
+          for (int j=0;j<line.length;j++) {
+            const auto block = line.block(j);
+            const bool own = partition->block_to_rank(line.section,block)==rank;
+            OTHER_ASSERT(own==blocks.contains(tuple(line.section,block)));
+            cross += own;
+            total++;
+          }
+      }
+      OTHER_ASSERT(total);
+      cout << "cross ratio = "<<cross<<'/'<<total<<" = "<<(double)cross/total<<endl;
+      OTHER_ASSERT(cross || ranks==786432);
     }
   }
 
