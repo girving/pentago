@@ -1,8 +1,8 @@
 // Unified interface to compression libraries
 
 #include <pentago/compress.h>
-#include <pentago/aligned.h>
 #include <pentago/thread.h>
+#include <pentago/utility/aligned.h>
 #include <zlib.h>
 #include <lzma.h>
 namespace pentago {

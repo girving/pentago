@@ -1,7 +1,7 @@
 // Operations on functions from rotations to scores
 
-#include "superscore.h"
-#include "score.h"
+#include <pentago/superscore.h>
+#include <pentago/score.h>
 #include <other/core/array/Array.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/python/module.h>

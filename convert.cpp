@@ -1,7 +1,7 @@
 // Instantiation necessary python conversions
 
-#include "superscore.h"
-#include "all_boards.h"
+#include <pentago/section.h>
+#include <pentago/superscore.h>
 #include <other/core/array/convert.h>
 #include <other/core/vector/convert.h>
 namespace other {

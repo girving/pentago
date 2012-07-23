@@ -8,7 +8,7 @@ import fileinput
 from other.core import *
 from other.core.value import parser
 from interface import *
-from ashelve import *
+from utility.ashelve import *
 
 # Properties
 game = PropManager.add('game','defense').set_allowed('defense'.split())

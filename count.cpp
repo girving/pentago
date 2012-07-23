@@ -1,6 +1,6 @@
 // Symmetry-aware board counting via Polya's enumeration theorem
 
-#include "symmetry.h"
+#include <pentago/symmetry.h>
 #include <other/core/array/sort.h>
 #include <other/core/math/uint128.h>
 #include <other/core/python/module.h>

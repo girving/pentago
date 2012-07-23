@@ -1,7 +1,7 @@
 // Hashed transposition table
 
-#include "table.h"
-#include "stat.h"
+#include <pentago/table.h>
+#include <pentago/stat.h>
 #include <other/core/array/Array.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>

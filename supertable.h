@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include "table.h"
-#include "superscore.h"
-#include "symmetry.h"
+#include <pentago/table.h>
+#include <pentago/superscore.h>
+#include <pentago/symmetry.h>
 namespace pentago {
 
 // We use the high bit to mark whether the player to move is the aggressor (the player trying to win)

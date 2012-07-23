@@ -1,13 +1,12 @@
 // Board enumeration
 
-#include "all_boards.h"
-#include "symmetry.h"
-#include "table.h"
-#include "count.h"
-#include <other/core/array/NdArray.h>
+#include <pentago/all_boards.h>
+#include <pentago/symmetry.h>
+#include <pentago/count.h>
+#include <pentago/table.h>
+#include <pentago/utility/large.h>
 #include <other/core/array/sort.h>
 #include <other/core/math/popcount.h>
-#include <other/core/math/uint128.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
@@ -22,23 +21,6 @@ using namespace other;
 using std::cout;
 using std::endl;
 using std::vector;
-
-section_t count(board_t board) {
-  return section_t(vec(count(quadrant(board,0)),count(quadrant(board,1)),count(quadrant(board,2)),count(quadrant(board,3))));
-}
-
-Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white) {
-  OTHER_ASSERT(0<=black && 0<=white && black+white<=9);
-  const int i = ((black*(21-black))>>1)+white;
-  const uint16_t lo = rotation_minimal_quadrants_offsets[i],
-                 hi = rotation_minimal_quadrants_offsets[i+1];
-  const int moved = rotation_minimal_quadrants_reflect_moved[i];
-  return tuple(RawArray<const quadrant_t>(hi-lo,rotation_minimal_quadrants_flat+lo),moved);
-}
-
-Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,2> counts) {
-  return rotation_minimal_quadrants(counts.x,counts.y);
-}
 
 template<int symmetries> static inline board_t maybe_standardize(board_t board);
 template<> inline board_t maybe_standardize<1>(board_t board) { return board; }
@@ -192,90 +174,6 @@ static Array<quadrant_t> minimal_quadrants() {
   return mins;
 }
 
-static Tuple<quadrant_t,uint8_t> rotation_standardize_quadrant(quadrant_t q) {
-  quadrant_t minq = q;
-  uint8_t minr = 0;
-  side_t s[4][2];
-  s[0][0] = unpack(q,0);
-  s[0][1] = unpack(q,1);
-  for (int r=0;r<3;r++) {
-    for (int i=0;i<2;i++)
-      s[r+1][i] = rotations[s[r][i]][0];
-    quadrant_t rq = pack(s[r+1][0],s[r+1][1]);
-    if (minq > rq) {
-      minq = rq;
-      minr = r+1;
-    }
-  }
-  return tuple(minq,minr);
-}
-
-section_t section_t::transform(uint8_t global) const {
-  const int r = global&3;
-  static uint8_t source[4][4] = {{0,1,2,3},{1,3,0,2},{3,2,1,0},{2,0,3,1}};
-  section_t t(vec(counts[source[r][0]],counts[source[r][1]],counts[source[r][2]],counts[source[r][3]]));
-  if (global&4)
-    swap(t.counts[0],t.counts[3]);
-  return t;
-}
-
-template<int symmetries> Tuple<section_t,uint8_t> section_t::standardize() const {
-  BOOST_STATIC_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
-  section_t best = *this;
-  uint8_t best_g = 0;
-  for (int g=1;g<symmetries;g++) {
-    section_t t = transform(g);
-    if (best > t) {
-      best = t;
-      best_g = g;
-    }
-  }
-  return tuple(best,best_g);
-}
-
-// For python exposure
-static Vector<int,4> section_shape(section_t s) {
-  return s.shape();
-}
-
-// For python exposure
-static section_t standardize_section(section_t s, int symmetries) {
-  OTHER_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
-  return symmetries==1?s:symmetries==4?s.standardize<4>().x:s.standardize<8>().x;
-}
-
-bool section_t::valid() const {
-  for (int i=0;i<4;i++)
-    if (!(0<=counts[i].x && 0<=counts[i].y && counts[i].sum()<=9))
-      return false;
-  const int black = counts[0].x+counts[1].x+counts[2].x+counts[3].x,
-            white = counts[0].y+counts[1].y+counts[2].y+counts[3].y;
-  if (black<white || black>white+1)
-    return false;
-  return true;
-}
-
-bool section_valid(Vector<Vector<uint8_t,2>,4> s) {
-  return section_t(s).valid();
-}
-
-ostream& operator<<(ostream& output, section_t section) {
-  return output<<section.counts;
-}
-
-PyObject* to_python(const section_t& section) {
-  return to_python(section.counts);
-}
-
-} namespace other {
-pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
-  pentago::section_t s(from_python<Vector<Vector<uint8_t,2>,4>>(object));
-  if (!s.valid())
-    throw ValueError(format("invalid section %s",str(s)));
-  return s;
-}
-} namespace pentago {
-
 Array<section_t> all_boards_sections(int n, int symmetries) {
   OTHER_ASSERT(0<=n && n<=36);
   OTHER_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
@@ -321,18 +219,6 @@ Array<uint64_t> all_boards_section_sizes(int n, int symmetries) {
   return sizes;
 }
 
-static string large(uint64_t x) {
-  string s = format("%llu",x);
-  int n = s.size(); 
-  string r;
-  for (int i=0;i<n;i++) {
-    if (i && (n-i)%3==0)
-      r.push_back(',');
-    r.push_back(s[i]);
-  }
-  return r;
-}
-
 uint64_t all_boards_stats(int n, int symmetries) {
   if (n==0) {
     RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
@@ -355,10 +241,12 @@ uint64_t all_boards_stats(int n, int symmetries) {
       const auto shape = s.shape();
       const auto lo = (shape/8).sorted(),
                  hi = ((shape+7)/8).sorted();
-      blocks.min += lo.product();
-      blocks.max += hi.product();
-      slices1.min += lo.x*lo.y*lo.z + lo.x*lo.y*lo.w + lo.x*lo.z*lo.w + lo.y*lo.z*lo.w;
-      slices1.max += hi.x*hi.y*hi.z + hi.x*hi.y*hi.w + hi.x*hi.z*hi.w + hi.y*hi.z*hi.w;
+      const auto lop = lo.product(),
+                 hip = hi.product();
+      blocks.min += lop;
+      blocks.max += hip;
+      slices1.min += lop?lop/lo.x+lop/lo.y+lop/lo.z+lop/lo.w:0;
+      slices1.max += hip/hi.x+hip/hi.y+hip/hi.z+hip/hi.w;
       slices2.min += lo.x*lo.y+lo.z*lo.w;
       slices2.max += hi.x*hi.y+hi.z*hi.w;
       reduced_total += size;
@@ -454,50 +342,6 @@ bool sorted_array_is_subset(RawArray<const board_t> boards0, RawArray<const boar
   return true;
 }
 
-board_t random_board(Random& random, const section_t& section) {
-  board_t board = 0;
-  int permutation[9] = {0,1,2,3,4,5,6,7,8};
-  for (int q=0;q<4;q++) {
-    for (int i=0;i<8;i++)
-      swap(permutation[i],permutation[random.uniform<int>(i,9)]);
-    quadrant_t side0 = 0, side1 = 0;
-    int b = section.counts[q][0],
-        w = section.counts[q][1];
-    for (int i=0;i<b;i++)
-      side0 |= 1<<permutation[i];
-    for (int i=b;i<b+w;i++)
-      side1 |= 1<<permutation[i];
-    board |= (uint64_t)pack(side0,side1)<<16*q;
-  }
-  return board;
-}
-
-static void rmin_test() {
-  // Check inverse
-  for (quadrant_t q=0;q<quadrant_count;q++) {
-    const auto standard = rotation_standardize_quadrant(q);
-    const int ir = rotation_minimal_quadrants_inverse[q];
-    const auto rmin = rotation_minimal_quadrants(count(q)).x;
-    OTHER_ASSERT(rmin.valid(ir/4) && rmin[ir/4]==standard.x);
-    OTHER_ASSERT(transform_board(symmetry_t(0,ir&3),standard.x)==q);
-  }
-
-  // Check that all quadrants changed by reflection occur in pairs in the first part of the array
-  for (uint8_t b=0;b<=9;b++)
-    for (uint8_t w=0;w<=9-b;w++) {
-      const auto rmin_moved = rotation_minimal_quadrants(vec(b,w));
-      const auto rmin = rmin_moved.x;
-      const int moved = rmin_moved.y;
-      OTHER_ASSERT((moved&1)==0 && (!moved || moved<rmin.size()));
-      for (int i=0;i<rmin.size();i++) {
-        const quadrant_t q = rmin[i];
-        const quadrant_t qr = pack(reflections[unpack(q,0)],reflections[unpack(q,1)]);
-        const int ir = rotation_minimal_quadrants_inverse[qr]/4;
-        OTHER_ASSERT((i^(i<moved))==ir);
-      }
-    }
-}
-
 }
 using namespace pentago;
 using namespace other::python;
@@ -512,8 +356,4 @@ void wrap_all_boards() {
   OTHER_FUNCTION(all_boards_sample_test)
   OTHER_FUNCTION(all_boards_section_sizes)
   OTHER_FUNCTION(sorted_array_is_subset)
-  OTHER_FUNCTION(section_shape)
-  OTHER_FUNCTION(section_valid)
-  OTHER_FUNCTION(standardize_section)
-  OTHER_FUNCTION(rmin_test)
 }

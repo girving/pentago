@@ -1,9 +1,10 @@
 // In memory and out-of-core operations on large four dimensional arrays of superscores
 
-#include "supertensor.h"
-#include "filter.h"
-#include "aligned.h"
-#include "compress.h"
+#include <pentago/supertensor.h>
+#include <pentago/filter.h>
+#include <pentago/compress.h>
+#include <pentago/utility/aligned.h>
+#include <pentago/utility/char_view.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/to_python.h>
@@ -61,7 +62,7 @@ void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Ar
   }
 
   // Schedule decompression
-  schedule(CPU,boost::bind(decompress,compressed,blob.uncompressed_size,cont));
+  threads_schedule(CPU,boost::bind(decompress,compressed,blob.uncompressed_size,cont));
 }
 
 void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t> data) {
@@ -91,7 +92,7 @@ void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray
   blob->compressed_size = compressed.size();
 
   // Schedule write
-  schedule(IO,boost::bind(&Self::pwrite,this,blob,compressed));
+  threads_schedule(IO,boost::bind(&Self::pwrite,this,blob,compressed));
 }
 
 static const char magic[21] = "pentago supertensor\n";
@@ -116,12 +117,14 @@ static const string& check_extension(const string& path) {
   return path;
 }
 
+namespace {
 struct field_t {
   int header_offset, file_offset, size;
 
   field_t(int header_offset, int file_offset, int size)
     : header_offset(header_offset), file_offset(file_offset), size(size) {}
 };
+}
 
 // List of offset,size pairs
 static Array<const field_t> header_fields() {
@@ -145,8 +148,20 @@ static Array<const field_t> header_fields() {
   return fields;
 }
 
+void supertensor_header_t::pack(RawArray<uint8_t> buffer) const {
+  OTHER_ASSERT(buffer.size()==header_size);
+  static const Array<const field_t> fields = header_fields();
+  int next = 0;
+  for (auto f : fields) {
+    memcpy(buffer.data()+next,(char*)this+f.header_offset,f.size);
+    next += f.size;
+  }
+}
+
 static int total_size(RawArray<const field_t> fields) {
-  return fields.project<int,&field_t::size>().sum();
+  const int size = fields.project<int,&field_t::size>().sum();
+  OTHER_ASSERT(supertensor_header_t::header_size==size);
+  return size;
 }
 
 static void save_index(Vector<int,4> blocks, Array<const supertensor_blob_t,4>* dst, Array<const uint8_t> src) {
@@ -193,8 +208,8 @@ supertensor_reader_t::supertensor_reader_t(const string& path)
 
   // Read block index
   Array<const supertensor_blob_t,4> index;
-  schedule(IO,boost::bind(read_and_uncompress,fd.fd,h.index,function<void(Array<uint8_t>)>(boost::bind(save_index,Vector<int,4>(h.blocks),&index,_1))));
-  wait_all();
+  threads_schedule(IO,boost::bind(read_and_uncompress,fd.fd,h.index,function<void(Array<uint8_t>)>(boost::bind(save_index,Vector<int,4>(h.blocks),&index,_1))));
+  threads_wait_all();
   OTHER_ASSERT((index.shape==Vector<int,4>(h.blocks)));
   const_cast_(this->index) = index;
 }
@@ -208,7 +223,7 @@ static void save(Array<Vector<super_t,2>,4>* dst, Vector<int,4> block, Array<Vec
 Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<int,4> block) const {
   Array<Vector<super_t,2>,4> data;
   schedule_read_block(block,boost::bind(save,&data,_1,_2));
-  wait_all();
+  threads_wait_all();
   OTHER_ASSERT(data.shape==header.block_shape(block));
   return data;
 }
@@ -237,51 +252,52 @@ void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<int,4>> bl
                                  function<void(Array<uint8_t>)>(boost::bind(unfilter,header.filter,header.block_shape(block),_1,
                                    function<void(Array<Vector<super_t,2>,4>)>(boost::bind(cont,block,_1))))));
   }
-  schedule(IO,jobs);
+  threads_schedule(IO,jobs);
 }
 
 // Write header at offset 0, and return the header size
 static uint64_t write_header(int fd, const supertensor_header_t& h) {
   const auto fields = header_fields();
   const int header_size = total_size(fields);
-  char buffer[header_size];
-  for (auto f : fields)
-    memcpy(buffer+f.file_offset,(char*)&h+f.header_offset,f.size);
+  uint8_t buffer[header_size];
+  h.pack(RawArray<uint8_t>(header_size,buffer));
   ssize_t w = pwrite(fd,buffer,header_size,0);
   if (w < 0 || w < header_size)
     throw IOError(format("failed to write header to supertensor file: %s",w<0?strerror(errno):"incomplete write"));
   return header_size;
 }
 
+supertensor_header_t::supertensor_header_t() {}
+
+supertensor_header_t::supertensor_header_t(section_t section, int block_size, int filter)
+  : version(2)
+  , valid(false)
+  , stones(section.sum())
+  , section(section)
+  , shape(section.shape())
+  , block_size(block_size)
+  , blocks((shape+block_size-1)/block_size)
+  , filter(filter) {
+  memcpy(magic,pentago::magic,20);
+  index.uncompressed_size = index.compressed_size = index.offset = 0;
+  // valid and index must be filled in later
+}
+
 supertensor_writer_t::supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level)
   : path(check_extension(path))
   , fd(path,O_WRONLY|O_CREAT|O_TRUNC,0644)
-  , header()
+  , header(section,block_size,filter) // Initialize everything except for valid and index, which finalize will fill in later
   , level(level) {
   if (fd.fd < 0)
     throw IOError(format("can't open supertensor file \"%s\" for writing: %s",path,strerror(errno)));
   if (block_size&1)
     throw ValueError(format("supertensor block size must be even (not %d) to support block-wise reflection",block_size));
 
-  // Initialize header
-  supertensor_header_t h;
-  memcpy(h.magic,magic,20);
-  h.version = 2;
-  h.stones = section.counts.sum().sum();
-  h.section = section;
-  h.shape = Vector<uint16_t,4>(section.shape());
-  h.block_size = block_size;
-  h.blocks = (h.shape+block_size-1)/block_size;
-  h.filter = filter;
-  // valid and index will be finalized during the destructor
-  h.valid = false;
-  const_cast_(header) = h;
-
   // Write preliminary header
-  next_offset = write_header(fd.fd,h);
+  next_offset = write_header(fd.fd,header);
 
   // Initialize block index to all undefined
-  const_cast_(index) = Array<supertensor_blob_t,4>(Vector<int,4>(h.blocks));
+  const_cast_(index) = Array<supertensor_blob_t,4>(Vector<int,4>(header.blocks));
 }
 
 supertensor_writer_t::~supertensor_writer_t() {
@@ -300,18 +316,18 @@ static void filter(int filter, Array<Vector<super_t,2>,4> data, const function<v
     case 1: interleave(data.flat); break;
     default: throw ValueError(format("supertensor_writer_t::write_block: unknown filter %d",filter));
   }
-  schedule(CPU,boost::bind(cont,char_view_own(data.flat))); 
+  threads_schedule(CPU,boost::bind(cont,char_view_own(data.flat))); 
 }
 
 void supertensor_writer_t::write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data) {
   schedule_write_block(block,data);
-  wait_all();
+  threads_wait_all();
 }
 
 void supertensor_writer_t::schedule_write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data) {
   OTHER_ASSERT(data.shape==header.block_shape(block));
   OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
-  schedule(CPU,boost::bind(filter,header.filter,data,function<void(Array<uint8_t>)>(boost::bind(&Self::compress_and_write,this,&index[block],_1))));
+  threads_schedule(CPU,boost::bind(filter,header.filter,data,function<void(Array<uint8_t>)>(boost::bind(&Self::compress_and_write,this,&index[block],_1))));
 }
 
 void supertensor_writer_t::finalize() {
@@ -319,15 +335,15 @@ void supertensor_writer_t::finalize() {
     return;
 
   // Check if all blocks have been written
-  wait_all();
+  threads_wait_all();
   for (auto blob : index.flat)
     if (!blob.offset)
       throw RuntimeError(format("can't finalize incomplete supertensor file \"%s\"",path));
 
   // Write index
   supertensor_header_t h = header;
-  schedule(CPU,boost::bind(&Self::compress_and_write,this,&h.index,char_view_own(index.flat)));
-  wait_all();
+  threads_schedule(CPU,boost::bind(&Self::compress_and_write,this,&h.index,char_view_own(index.flat)));
+  threads_wait_all();
 
   // Finalize header
   h.valid = true;

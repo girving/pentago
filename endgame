@@ -201,7 +201,7 @@ def main():
 
   # Do whatever is necessary
   set_thread_history(bool(history))
-  init_thread_pools(cpu_threads(),io_threads())
+  init_threads(cpu_threads(),io_threads())
   if verify_samples() or sparse_verify_samples():
     init_supertable(21)
     if verify_samples():

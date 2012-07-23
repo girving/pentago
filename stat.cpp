@@ -1,6 +1,6 @@
 // Statistics
 
-#include "stat.h"
+#include <pentago/stat.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
 #include <other/core/utility/Timer.h>

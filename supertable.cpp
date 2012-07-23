@@ -1,9 +1,9 @@
 // Rotation abstracted hashed transposition table
 
-#include "supertable.h"
-#include "stat.h"
-#include "symmetry.h"
-#include "trace.h"
+#include <pentago/supertable.h>
+#include <pentago/stat.h>
+#include <pentago/symmetry.h>
+#include <pentago/trace.h>
 #include <other/core/array/Array.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>

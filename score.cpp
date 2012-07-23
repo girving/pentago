@@ -1,6 +1,6 @@
 // Score definitions and immediately evaluation functions
 
-#include "score.h"
+#include <pentago/score.h>
 #include <other/core/math/min.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>

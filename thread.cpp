@@ -1,6 +1,6 @@
 // Thread utilities
 
-#include "thread.h"
+#include <pentago/thread.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/stl.h>
 #include <other/core/random/counter.h>
@@ -136,7 +136,7 @@ private:
   int waiting;
   bool die;
 
-  friend void pentago::wait_all();
+  friend void pentago::threads_wait_all();
 
   thread_pool_t(thread_type_t type, int threads, int delta_priority);
 public:
@@ -250,6 +250,7 @@ void* thread_pool_t::worker(void* pool_) {
 }
 
 void thread_pool_t::schedule(const function<void()>& f) {
+  OTHER_ASSERT(threads.size());
   lock_t lock(mutex);
   if (error)
     error.throw_();
@@ -260,6 +261,7 @@ void thread_pool_t::schedule(const function<void()>& f) {
 }
 
 void thread_pool_t::schedule(const vector<function<void()>>& fs) {
+  OTHER_ASSERT(threads.size());
   lock_t lock(mutex);
   if (error)
     error.throw_();
@@ -289,7 +291,7 @@ void set_thread_history(bool flag) {
   history = flag;
 }
 
-void init_thread_pools(int cpu_threads, int io_threads) {
+void init_threads(int cpu_threads, int io_threads) {
   if (cpu_threads<0)
     cpu_threads = sysconf(_SC_NPROCESSORS_ONLN);
   if (io_threads<0)
@@ -304,17 +306,17 @@ void init_thread_pools(int cpu_threads, int io_threads) {
   }
 }
 
-void schedule(thread_type_t type, const function<void()>& f) {
+void threads_schedule(thread_type_t type, const function<void()>& f) {
   OTHER_ASSERT(type==CPU || type==IO);
   (type==CPU?cpu_pool:io_pool)->schedule(f);
 }
 
-void schedule(thread_type_t type, const vector<function<void()>>& fs) {
+void threads_schedule(thread_type_t type, const vector<function<void()>>& fs) {
   OTHER_ASSERT(type==CPU || type==IO);
   (type==CPU?cpu_pool:io_pool)->schedule(fs);
 }
 
-void wait_all() {
+void threads_wait_all() {
   for (;;) {
     cpu_pool->wait();
     io_pool->wait();
@@ -336,7 +338,7 @@ void wait_all() {
 
 void clear_thread_times() {
   OTHER_ASSERT(is_master());
-  wait_all();
+  threads_wait_all();
   lock_t lock(time_mutex);
   double now = time();
   for (auto table : time_tables)
@@ -359,7 +361,7 @@ static const char* sanitize_name(const string& name) {
 
 void report_thread_times(bool total) {
   OTHER_ASSERT(is_master());
-  wait_all();
+  threads_wait_all();
   lock_t lock(time_mutex);
   double totals[3] = {0,0,0};
   const double now = time(),
@@ -454,7 +456,7 @@ static void thread_pool_test() {
     Array<uint128_t> parallel(serial.size());
     for (int i=0;i<jobs;i++)
       cpu_pool->schedule(boost::bind(add_noise,parallel,2*i,&mutex));
-    wait_all();
+    threads_wait_all();
 
     // Compare
     OTHER_ASSERT(serial==parallel);
@@ -468,7 +470,7 @@ void wrap_thread() {
   master = pthread_self();
   time_info.init_thread(MASTER);
   OTHER_FUNCTION(set_thread_history)
-  OTHER_FUNCTION(init_thread_pools)
+  OTHER_FUNCTION(init_threads)
   OTHER_FUNCTION(thread_pool_test)
   OTHER_FUNCTION(clear_thread_times)
   OTHER_FUNCTION(report_thread_times)

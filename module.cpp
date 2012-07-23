@@ -22,6 +22,7 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(analyze)
   OTHER_WRAP(thread)
   OTHER_WRAP(aligned)
+  OTHER_WRAP(section)
 
   // MPI
   OTHER_WRAP(partition)

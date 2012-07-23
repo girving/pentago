@@ -23,9 +23,12 @@ struct aligned_buffer_t : public boost::noncopyable
 // Allocate an aligned, uninitialized array of the given type and size
 template<class T> Array<T> aligned_buffer(int size) {
   BOOST_MPL_ASSERT((boost::has_trivial_destructor<T>));
-  char* data = (char*)malloc(sizeof(T)*size);
-  if (!data) throw bad_alloc();
-  auto* buffer = new aligned_buffer_t(data);
+  BOOST_STATIC_ASSERT(!(sizeof(T)&(sizeof(T)-1))); // size must be a power of two
+  void* data;
+  const size_t alignment = max(sizeof(T),sizeof(void*));
+  if (posix_memalign(&data,alignment,sizeof(T)*size))
+    throw bad_alloc();
+  auto* buffer = new aligned_buffer_t((char*)data);
   Array<T> array(size,(T*)data,(PyObject*)buffer);
   OTHER_XDECREF(buffer);
   return array;

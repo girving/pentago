@@ -6,7 +6,7 @@ from interface import *
 import tempfile
 
 def test_thread_pool():
-  init_thread_pools(-1,-1)
+  init_threads(-1,-1)
   thread_pool_test()
 
 if __name__=='__main__':

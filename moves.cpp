@@ -1,6 +1,6 @@
 // Move generation code
 
-#include "moves.h"
+#include <pentago/moves.h>
 #include <other/core/array/Array.h>
 #include <other/core/python/module.h>
 namespace pentago {

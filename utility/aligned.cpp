@@ -1,7 +1,7 @@
 // Aligned array allocation
 
-#include "aligned.h"
-#include "filter.h"
+#include <pentago/utility/aligned.h>
+#include <pentago/utility/char_view.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/python/module.h>
 #include <vector>

@@ -1,7 +1,7 @@
 // Move generation code
 #pragma once
 
-#include "board.h"
+#include <pentago/board.h>
 #include <other/core/math/integer_log.h>
 #include <other/core/math/popcount.h>
 namespace pentago {

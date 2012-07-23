@@ -15,14 +15,14 @@
  *
  * On disk, the file format is
  *
- *   // at offset 0
+ *   // At offset 0
  *   supertensor_header_t header; // packed
  *
- *   // at index_offset
+ *   // At header.index.offset
  *   char compressed_index_data[]; // zlib compressed data, representing
- *     supertensor_block_t blocks[][][][]; // 4D array of information about each block
+ *     supertensor_blob_t blocks[][][][]; // 4D array of information about each block
  *
- *   // elsewhere
+ *   // Elsewhere
  *   char compressed_block_data[]; // zlib compressed block data, representing
  *     super_t filtered_block_data[][][][][2]; // filtered superscores, representing
  *       super_t block_data[][][][][2]; // sequence of (black win, white win) pairs
@@ -36,9 +36,9 @@
  * 2 - Change quadrant ordering to support block-wise reflection
  */
 
-#include "superscore.h"
-#include "all_boards.h"
-#include "thread.h"
+#include <pentago/superscore.h>
+#include <pentago/section.h>
+#include <pentago/thread.h>
 #include <other/core/array/Array4d.h>
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
@@ -58,6 +58,8 @@ struct supertensor_blob_t {
 };
 
 struct supertensor_header_t {
+  static const int header_size = 85;
+
   char magic[20]; // = "pentago supertensor\n"
   uint32_t version; // see version history above
   bool valid; // was the file finished?
@@ -69,7 +71,11 @@ struct supertensor_header_t {
   uint32_t filter; // algorithm used to preprocess superscore data before zlib compression (0 for none)
   supertensor_blob_t index; // size and location of the compressed block index
 
+  supertensor_header_t();
+  supertensor_header_t(section_t section, int block_size, int filter); // Initialize everything except for valid and index
+
   Vector<int,4> block_shape(Vector<int,4> block) const;
+  void pack(RawArray<uint8_t> buffer) const;
 };
 
 // RAII holder for a file descriptor

@@ -1,8 +1,8 @@
 // Operations involving pentago symmetries
 #pragma once
 
-#include "board.h"
-#include "superscore.h"
+#include <pentago/board.h>
+#include <pentago/superscore.h>
 #include <other/core/structure/Tuple.h>
 namespace pentago {
 

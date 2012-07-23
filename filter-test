@@ -161,7 +161,7 @@ def unwavelet_help(data,shape):
 
 def driver():
   Log.configure('filter test',0,0,100)
-  init_thread_pools(-1,-1)
+  init_threads(-1,-1)
   reader = supertensor_reader_t('data/section-32-44444444.pentago')
   header = reader.header
   random.seed(9454242)

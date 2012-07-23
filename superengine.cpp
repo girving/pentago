@@ -1,13 +1,13 @@
 // Core tree search engine abstracted over rotations
 
-#include "superengine.h"
-#include "score.h"
-#include "sort.h"
-#include "stat.h"
-#include "moves.h"
-#include "superscore.h"
-#include "supertable.h"
-#include "trace.h"
+#include <pentago/superengine.h>
+#include <pentago/score.h>
+#include <pentago/stat.h>
+#include <pentago/moves.h>
+#include <pentago/superscore.h>
+#include <pentago/supertable.h>
+#include <pentago/trace.h>
+#include <pentago/utility/sort.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
 #include <other/core/structure/HashtableIterator.h>

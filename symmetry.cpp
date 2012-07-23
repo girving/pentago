@@ -1,6 +1,6 @@
 // Operations involving pentago symmetries
 
-#include "symmetry.h"
+#include <pentago/symmetry.h>
 #include <other/core/array/Array.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/math/integer_log.h>

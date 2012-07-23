@@ -1,6 +1,6 @@
 // Core tree search engine abstracted over rotations
 
-#include "supertable.h"
+#include <pentago/supertable.h>
 #include <vector>
 namespace pentago {
 

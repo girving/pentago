@@ -1,5 +1,6 @@
 SConstruct
 SConstruct.options
+setup.cfg
 .sconsign.dblite
 site_scons
 build

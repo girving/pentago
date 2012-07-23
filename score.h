@@ -1,7 +1,7 @@
 // Score definitions and immediately evaluation functions
 #pragma once
 
-#include "board.h"
+#include <pentago/board.h>
 #include <other/core/utility/config.h>
 namespace pentago {
 

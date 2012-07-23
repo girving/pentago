@@ -6,8 +6,8 @@
 // 2. Since our hash is bijective, we store only the high order bits of the hash to detect collisions.
 //    This is compatible with zero initialization since hash_board(board)!=0 for all valid boards.
 
-#include "board.h"
-#include "score.h"
+#include <pentago/board.h>
+#include <pentago/score.h>
 namespace pentago {
 
 static inline uint64_t hash_board(board_t key) {

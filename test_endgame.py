@@ -7,7 +7,7 @@ import tempfile
 
 def test_supertensor():
   Log.configure('test',0,1,0)
-  init_thread_pools(-1,-1)
+  init_threads(-1,-1)
 
   # Choose tiny parameters
   section = (2,0),(0,2),(1,1),(1,1)

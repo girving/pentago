@@ -1,14 +1,15 @@
 // Endgame database computation
 
-#include "symmetry.h"
-#include "superscore.h"
-#include "all_boards.h"
-#include "supertensor.h"
-#include "superengine.h"
-#include "count.h"
-#include "aligned.h"
+#include <pentago/symmetry.h>
+#include <pentago/superscore.h>
+#include <pentago/section.h>
+#include <pentago/supertensor.h>
+#include <pentago/superengine.h>
+#include <pentago/count.h>
+#include <pentago/utility/aligned.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
+#include <other/core/array/NestedArray.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
 #include <other/core/python/module.h>
@@ -49,15 +50,6 @@ template<int d> static Vector<int,d> strides(Vector<int,d> shape) {
   for (int i=d-2;i>=0;i--)
     strides[i] = strides[i+1]*shape[i+1];
   return strides;
-}
-
-static Vector<int,4> quadrant_permutation(uint8_t global) {
-  typedef Vector<uint8_t,2> CV;
-  section_t s = section_t(vec(CV(0,0),CV(1,0),CV(2,0),CV(3,0))).transform(global);
-  Vector<int,4> p;
-  for (int i=0;i<4;i++)
-    p[i] = s.counts.find(CV(i,0));
-  return p;
 }
 
 static void verify(const char* prefix, const board_t board, const Vector<super_t,2>& result, bool verbose=false) {
@@ -184,7 +176,7 @@ struct read_helper_t : public boost::noncopyable {
     , inverse_rotation((4-rotation)&3,(1+4+16+64)*rotation)
 
     // Determine which quadrants are mapped to where, and compose with order
-    , reorder(quadrant_permutation(standard.y).subset(order))
+    , reorder(section_t::quadrant_permutation(standard.y).subset(order))
 
     // Gather shape and stride information
     , block_size(reader.header.block_size)
@@ -244,7 +236,7 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
     for (const int l : range(helper.slice_blocks[1]))
       slice.append(in_order(helper.reorder,vec(i,j,k,l)));
   reader.schedule_read_blocks(slice,boost::bind(&read_helper_t::process_block,&helper,_1,_2));
-  wait_all();
+  threads_wait_all();
 }
 
 // Do not use in performance critical code
@@ -418,7 +410,7 @@ static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<superten
         const Vector<int,4> block = in_order(order,vec(i,j,k,l));
         jobs.push_back(boost::bind(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
       }
-    schedule(CPU,jobs);
+    threads_schedule(CPU,jobs);
   } else {
     Array<Vector<int,4>> slice;
     for (const int k : range(helper.slice_blocks[0]))
@@ -426,7 +418,7 @@ static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<superten
         slice.append(in_order(order,vec(i,j,k,l)));
     first_pass->schedule_read_blocks(slice,boost::bind(&write_helper_t::process_block,&helper,_1,_2));
   }
-  wait_all();
+  threads_wait_all();
 }
 
 namespace {
@@ -530,8 +522,8 @@ template<bool turn,bool final> static Vector<uint64_t,3> endgame_compute_block_s
   for (const int ii : range(dest.shape[0]))
     for (const int jj : range(dest.shape[1]))
       jobs.push_back(boost::bind(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
-  schedule(CPU,jobs);
-  wait_all();
+  threads_schedule(CPU,jobs);
+  threads_wait_all();
   return helper.win_counts;
 }
 

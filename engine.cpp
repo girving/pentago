@@ -1,11 +1,11 @@
 // Core tree search engine
 
-#include "board.h"
-#include "score.h"
-#include "moves.h"
-#include "sort.h"
-#include "stat.h"
-#include "table.h"
+#include <pentago/board.h>
+#include <pentago/score.h>
+#include <pentago/moves.h>
+#include <pentago/stat.h>
+#include <pentago/table.h>
+#include <pentago/utility/sort.h>
 #include <other/core/math/min.h>
 #include <other/core/python/module.h>
 #include <other/core/utility/interrupts.h>

@@ -1,11 +1,12 @@
-// MPI-related utilities
+// MPI related utilities
 
 #include <pentago/mpi/utility.h>
+#include <other/core/utility/Log.h>
 namespace pentago {
 namespace mpi {
 
-using std::cout;
-using std::cerr;
+using Log::cout;
+using Log::cerr;
 using std::endl;
 
 static bool verbose_ = true;
@@ -16,13 +17,6 @@ bool verbose() {
 
 void set_verbose(bool verbose) {
   verbose_ = verbose;
-}
-
-// Are we the master process
-bool is_master() {
-  int rank;
-  MPI_Comm_rank(MPI_COMM_WORLD,&rank);
-  return !rank;
 }
 
 void die(const string& msg) {
@@ -42,14 +36,28 @@ void check_failed(const char* file, const char* function, int line, const char* 
 }
 
 scope_t::scope_t(const char* name)
-  : thread_time_t(name), name(name) {
-  if (verbose())
-    cout << name << " : start" << endl;
+  : thread_time_t(name) {
+  Log::push_scope(name);
 }
 
 scope_t::~scope_t() {
-  if (verbose())
-    cout << name << " : done" << endl;
+  Log::pop_scope();
+}
+
+Vector<int,4> section_blocks(section_t section, int block_size) {
+  return (section.shape()+block_size-1)/block_size;
+}
+
+int comm_size(MPI_Comm comm) {
+  int size;
+  CHECK(MPI_Comm_size(comm,&size));
+  return size;
+}
+
+int comm_rank(MPI_Comm comm) {
+  int rank;
+  CHECK(MPI_Comm_rank(comm,&rank));
+  return rank;
 }
 
 }

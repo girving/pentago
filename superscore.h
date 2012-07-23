@@ -44,7 +44,7 @@ We want to rewrite this in terms of operations on F.  Let's see
 Given a state (u,a) in A*G, 
 */
 
-#include "board.h"
+#include <pentago/board.h>
 #include <other/core/math/popcount.h>
 #include <other/core/math/sse.h>
 #include <other/core/random/forward.h>

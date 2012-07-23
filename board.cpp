@@ -1,6 +1,6 @@
 // Board definitions and utility functions
 
-#include "board.h"
+#include <pentago/board.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>

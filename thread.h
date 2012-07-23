@@ -80,15 +80,15 @@ enum thread_type_t { MASTER=0, CPU=1, IO=2 };
 thread_type_t thread_type();
 
 // Initialize thread pools
-void initialize_threads(int cpu_threads, int io_threads);
+void init_threads(int cpu_threads, int io_threads);
 
 // Schedule a job
-void schedule(thread_type_t type, const function<void()>& f);
+void threads_schedule(thread_type_t type, const function<void()>& f);
 
 // Schedule many jobs
-void schedule(thread_type_t type, const vector<function<void()>>& fs);
+void threads_schedule(thread_type_t type, const vector<function<void()>>& fs);
 
 // Wait for all jobs to complete
-void wait_all();
+void threads_wait_all();
 
 }

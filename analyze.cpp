@@ -1,7 +1,7 @@
 // Various analysis code
 
-#include "all_boards.h"
-#include "superscore.h"
+#include <pentago/section.h>
+#include <pentago/superscore.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/range.h>

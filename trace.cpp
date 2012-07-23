@@ -1,8 +1,8 @@
 // Tracing code for use in debugging inconsistency detections
 
-#include "trace.h"
-#include "moves.h"
-#include "superengine.h"
+#include <pentago/trace.h>
+#include <pentago/moves.h>
+#include <pentago/superengine.h>
 #include <other/core/python/module.h>
 #include <other/core/structure/Hashtable.h>
 namespace pentago {
