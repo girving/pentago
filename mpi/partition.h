@@ -27,7 +27,7 @@ struct lines_t {
   Box<Vector<int,3>> blocks; // Ranges of blocks along the other three dimensions
   int count; // Number of lines in this range = blocks.volume()
   int node_step; // Number of nodes in all blocks except possibly those at the end of lines
-  uint64_t line_size; // All lines in this line range have the same size
+  int line_size; // All lines in this line range have the same size
 
   // Running total information, meaningful for owners only
   uint64_t block_id; // Unique id of first block (others are indexed consecutively)
@@ -79,10 +79,10 @@ public:
 
 private:
   // Can the remaining work fit within the given bound?
-  template<bool record> static bool fit(RawArray<uint64_t> work, RawArray<const lines_t> lines, const uint64_t bound, RawArray<Vector<int,2>> starts=(RawArray<Vector<int,2>>()));
+  template<bool record> static bool fit(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines, const uint64_t bound, RawArray<Vector<int,2>> starts=(RawArray<Vector<int,2>>()));
 
   // Divide a set of lines between processes
-  static Array<const Vector<int,2>> partition_lines(RawArray<uint64_t> work, RawArray<const lines_t> lines);
+  static Array<const Vector<int,2>> partition_lines(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines);
 };
 
 }
