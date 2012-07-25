@@ -26,4 +26,5 @@ OTHER_PYTHON_MODULE(pentago) {
 
   // MPI
   OTHER_WRAP(partition)
+  OTHER_WRAP(predict)
 }

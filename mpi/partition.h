@@ -50,6 +50,7 @@ struct partition_t : public Object {
   const double owner_excess, total_excess; // Initialized only if verbose
   const uint64_t total_blocks, total_nodes;
   const int max_rank_blocks; // Maximum number of blocks owned by a rank
+  const uint64_t max_rank_nodes; // Maximum number of nodes owned by a rank
 
 protected:
   partition_t(const int ranks, const int block_size, const int slice, Array<const section_t> sections, bool save_work=false);

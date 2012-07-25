@@ -8,6 +8,7 @@
 #include <pentago/utility/memory.h>
 #include <other/core/array/sort.h>
 #include <other/core/python/Class.h>
+#include <other/core/python/stl.h>
 #include <other/core/random/Random.h>
 #include <other/core/math/constants.h>
 #include <other/core/utility/const_cast.h>
@@ -33,15 +34,10 @@ vector<Array<const section_t>> descendent_sections(section_t root) {
     if (seen.set(section)) {
       int n = section.sum();
       slices.at(n).append(section);
-      if (n < 35) {
-        bool turn = n&1;
+      if (n < 35)
         for (int i=0;i<4;i++)
-          if (section.counts[i][turn]<9) {
-            auto child = section;
-            child.counts[i][turn]++;
-            stack.append(child);
-          }
-      }
+          if (section.counts[i].sum()<9)
+            stack.append(section.child(i));
     }
   }
 
@@ -60,7 +56,7 @@ static vector<string> names(36);
 partition_t::partition_t(const int ranks, const int block_size, const int slice, Array<const section_t> sections, bool save_work)
   : ranks(ranks), block_size(block_size), slice(slice), sections(sections)
   , owner_excess(inf), total_excess(inf)
-  , total_blocks(0), total_nodes(0), max_rank_blocks(0) {
+  , total_blocks(0), total_nodes(0), max_rank_blocks(0), max_rank_nodes(0) {
   OTHER_ASSERT(ranks>0);
   scope_t scope("partition");
 
@@ -154,7 +150,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
   const_cast_(this->total_nodes) = node_offset;
 
   // Partition lines between processes, attempting to equalize (1) owned work and (2) total work.
-  Array<uint64_t> work_nodes(save_work?ranks:0), work_penalties(ranks);
+  Array<uint64_t> work_nodes(ranks), work_penalties(ranks);
 
   const_cast_(owner_starts) = partition_lines(work_nodes,work_penalties,owner_lines);
   if (verbose()) {
@@ -162,7 +158,8 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
     const_cast_(owner_excess) = (double)max/sum*ranks;
     cout << "slice "<<slice<<" owned work: all = "<<large(sum)<<", range = "<<large(work_nodes.min())<<' '<<large(max)<<", excess = "<<owner_excess<<endl;
   }
-  const_cast_(owner_work) = work_nodes.copy();
+  if (save_work)
+    const_cast_(owner_work) = work_nodes.copy();
 
   const_cast_(other_starts) = partition_lines(work_nodes,work_penalties,other_lines);
   if (verbose()) {
@@ -170,18 +167,22 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
     const_cast_(total_excess) = (double)max/sum*ranks;
     cout << "slice "<<slice<<" total work: all = "<<large(sum)<<", range = "<<large(work_nodes.min())<<' '<<large(max)<<", excess = "<<total_excess<<endl;
   }
-  const_cast_(other_work) = work_nodes;
+  if (save_work)
+    const_cast_(other_work) = work_nodes;
 
   // Compute the maximum number of blocks owned by a rank
-  uint64_t max_blocks = 0;
+  uint64_t max_blocks = 0,
+           max_nodes = 0;
   Vector<uint64_t,2> start;
   for (int rank=0;rank<ranks;rank++) {
     const auto end = rank_offsets(rank+1);
     max_blocks = max(max_blocks,end.x-start.x);
+    max_nodes = max(max_nodes,end.y-start.y);
     start = end;
   }
   OTHER_ASSERT(max_blocks<(1<<30));
   const_cast_(this->max_rank_blocks) = max_blocks;
+  const_cast_(this->max_rank_nodes) = max_nodes;
 }
 
 partition_t::~partition_t() {}
@@ -213,8 +214,7 @@ template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawAr
       int count = min(chunk.count-start.y,free/penalty);
       free -= count*penalty;
       if (record) {
-        if (work_nodes.size())
-          work_nodes[p] += count*(uint64_t)chunk.line_size;
+        work_nodes[p] += count*(uint64_t)chunk.line_size;
         work_penalties[p] += count*penalty;
       }
       start.y += count;
@@ -481,8 +481,18 @@ static void partition_test() {
 
 }
 }
+using namespace other;
+using namespace pentago;
 using namespace pentago::mpi;
 
 void wrap_partition() {
   OTHER_FUNCTION(partition_test)
+  OTHER_FUNCTION(descendent_sections)
+
+  typedef partition_t Self;
+  Class<Self>("partition_t")
+    .OTHER_INIT(int,int,int,Array<const section_t>,bool)
+    .OTHER_FIELD(max_rank_blocks)
+    .OTHER_FIELD(max_rank_nodes)
+    ;
 }

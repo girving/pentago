@@ -145,11 +145,12 @@ int main(int argc, char** argv) {
 
   // Report
   if (!rank) {
+    Log::Scope scope("parameters");
     cout << "command =";
     for (int i=0;i<argc;i++)
       cout << ' '<<argv[i];
-    cout << "\nprocesses = "<<ranks
-         << "\nthreads / process = "<<threads
+    cout << "\nranks = "<<ranks
+         << "\nthreads / rank = "<<threads
          << "\nsection = "<<section
          << "\nblock size = "<<block_size
          << "\nsaved slices = "<<save
@@ -177,6 +178,8 @@ int main(int argc, char** argv) {
     Ptr<partition_t> prev_partition;
     Ptr<block_store_t> prev_blocks;
     for (int slice=(int)slices.size()-1;slice>=0;slice--) {
+      if (!slices[slice].size())
+        break;
       Log::Scope scope(format("slice %d",slice));
 
       // Partition work among processors
