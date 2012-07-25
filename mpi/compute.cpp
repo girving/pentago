@@ -72,10 +72,10 @@ struct allocated_t : public boost::noncopyable {
   // is the block, to avoid copying before and after compute.
   const Array<Vector<super_t,2>> input, output;
 
-  // When computation is complete, add self here
-  finished_lines_t& finished;
+  // When computation is complete, send a wakeup message here
+  const MPI_Comm wakeup_comm;
 
-  allocated_t(const line_data_t& self, finished_lines_t& finished);
+  allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm);
 };
 
 // Mark this const so that the two identical calls in allocated_t's constructor can be CSE'ed
@@ -83,7 +83,7 @@ OTHER_CONST static Tuple<section_t,uint8_t> standardize_child_section(section_t 
   return section.child(dimension).standardize<8>();
 }
 
-allocated_t::allocated_t(const line_data_t& self, finished_lines_t& finished)
+allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
   // Standardize
   : standard_child_section(standardize_child_section(self.line.section,self.line.dimension).x)
   , section_transform(     standardize_child_section(self.line.section,self.line.dimension).y)
@@ -111,8 +111,8 @@ allocated_t::allocated_t(const line_data_t& self, finished_lines_t& finished)
   , input(aligned_buffer<Vector<super_t,2>>(self.input_shape.product()))
   , output(aligned_buffer<Vector<super_t,2>>(self.output_shape.product()))
 
-  // When computation is complete, add self here
-  , finished(finished) {
+  // When computation is complete, send a wakeup message here
+  , wakeup_comm(wakeup_comm) {
 
   // Compute symmetries needed to restore minimality after reflection
   const Vector<int,4> standard_input_shape(self.input_shape.subset(permutation));
@@ -130,8 +130,8 @@ allocated_t::allocated_t(const line_data_t& self, finished_lines_t& finished)
   }
 }
 
-void line_data_t::allocate(finished_lines_t& finished) {
-  rest.reset(new allocated_t(*this,finished));
+void line_data_t::allocate(const MPI_Comm wakeup_comm) {
+  rest.reset(new allocated_t(*this,wakeup_comm));
 }
 
 section_t line_data_t::standard_child_section() const {
@@ -173,12 +173,8 @@ void line_data_t::decrement_missing_input_blocks() {
     schedule_compute_line(*this);
 }
 
-void line_data_t::decrement_unsent_output_blocks(uint64_t* total_memory_usage) {
-  // If all sends are complete, deallocate.
-  if (!--rest->unsent_output_blocks) {
-    *total_memory_usage -= memory_usage();
-    delete this;
-  }
+int line_data_t::decrement_unsent_output_blocks() {
+  return --rest->unsent_output_blocks;
 }
 
 /*********************** compute_microline ************************/
@@ -281,8 +277,8 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
 
   // Are we done with this line?
   if (!--rest.missing_microlines) {
-    spin_t spin(rest.finished.lock);
-    rest.finished.lines.push_back(line);
+    BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
+    CHECK(MPI_Send((void*)&line,1,MPI_LONG_LONG_INT,comm_rank(rest.wakeup_comm),wakeup_tag,rest.wakeup_comm));
   }
 }
 

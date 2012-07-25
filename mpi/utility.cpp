@@ -20,7 +20,7 @@ void set_verbose(bool verbose) {
 }
 
 void die(const string& msg) {
-  cerr << msg << endl;
+  cerr << "rank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
   MPI_Abort(MPI_COMM_WORLD,1);
   abort();
 }
@@ -58,6 +58,29 @@ int comm_rank(MPI_Comm comm) {
   int rank;
   CHECK(MPI_Comm_rank(comm,&rank));
   return rank;
+}
+
+MPI_Comm comm_dup(MPI_Comm comm) {
+  MPI_Comm dup;
+  CHECK(MPI_Comm_dup(comm,&dup));
+  return dup;
+}
+
+int get_count(MPI_Status& status, MPI_Datatype datatype) {
+  int count;
+  CHECK(MPI_Get_count(&status,datatype,&count));
+  return count;
+}
+
+mpi_world_t::mpi_world_t(int& argc, char**& argv) {
+  int provided;
+  CHECK(MPI_Init_thread(&argc,&argv,MPI_THREAD_MULTIPLE,&provided));
+  if (provided<MPI_THREAD_MULTIPLE)
+    die(format("Insufficent MPI thread support: required = multiple, provided = %d",provided));
+}
+
+mpi_world_t::~mpi_world_t() {
+  CHECK(MPI_Finalize());
 }
 
 }

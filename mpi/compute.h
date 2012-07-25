@@ -7,20 +7,27 @@
 #include <other/core/array/Array4d.h>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <mpi.h>
 namespace pentago {
 namespace mpi {
 
 using namespace other;
 using boost::scoped_ptr;
 struct allocated_t;
-struct finished_lines_t;
 
-/* Note:
+/* Notes:
  *
- * Unlike the out-of-core solver, here we store both input and output data in block major order (essentially a 5D array).
- * Furthermore, the compute kernel consumes data from the input array in native format, accounting for axis permutation
- * and symmetries on the fly.  As a consequence, both input and output blocks are available as flat slices of input or
- * output without copying or rearrangement, avoiding extra buffering.
+ * 1. Unlike the out-of-core solver, here we store both input and output data in block major order (essentially a 5D array).
+ *    Furthermore, the compute kernel consumes data from the input array in native format, accounting for axis permutation
+ *    and symmetries on the fly.  As a consequence, both input and output blocks are available as flat slices of input or
+ *    output without copying or rearrangement, avoiding extra buffering.
+ *
+ * 2. Each line starts out unallocated.  Eventually, four things happen:
+ *
+ *    Allocation: Sufficient memory exists, so input and output buffers are allocated.  Requests are sent out to whoever owns the input blocks.
+ *    Scheduling: All input blocks arrive, so all microlines are scheduled for execution on worker threads.
+ *    Completion: All microlines complete.  A wakeup request is sent to the communication thread, which posts sends for each output block.
+ *    Deallocation: All output sends complete, so the line is deallocated.
  */
 
 struct line_data_t : public boost::noncopyable {
@@ -38,8 +45,8 @@ struct line_data_t : public boost::noncopyable {
   // Valid before allocate is called
   uint64_t memory_usage() const;
 
-  // Prepare to compute.  When computation is complete, add self to finished.
-  void allocate(finished_lines_t& finished);
+  // Prepare to compute.
+  void allocate(MPI_Comm wakeup_comm);
 
   // Information about the child
   section_t standard_child_section() const;
@@ -57,9 +64,8 @@ struct line_data_t : public boost::noncopyable {
   // When the count hits zero, the line will be automatically schedule.
   void decrement_missing_input_blocks();
 
-  // Same as above, but for when output block sends complete.  When the count hits zero, the line will be deallocated.
-  // If the line is freed, total_memory_usage is reduced accordingly.
-  void decrement_unsent_output_blocks(uint64_t* total_memory_usage);
+  // Decrement the number of unsent output blocks, and return the number remaining.
+  int decrement_unsent_output_blocks();
 };
 
 // Schedule a line computation (called once all input blocks are in place)

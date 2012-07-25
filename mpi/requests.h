@@ -22,21 +22,43 @@ using std::vector;
  *
  * 3. There is currently no routine to wait until all requests are complete, because in our current usage the
  *    global barrier automatically lets us know when everything is done.
+ *
+ * 4. It is safe to add requests during the callbacks
  */
 
 class requests_t : public boost::noncopyable {
   Array<MPI_Request> requests;
-  vector<function<void()>> callbacks;
+  vector<function<void(MPI_Status* status)>> callbacks;
+  Array<bool> cancellables;
 public:
 
   requests_t();
   ~requests_t();
 
-  // Register a new request with an optional callback, to be called when the request completes.
-  void add(MPI_Request request, const function<void()>& callback);
+  bool active() const {
+    return requests.size();
+  }
 
-  // Check for completed requests, and return true if everything is done.
-  bool test();
+  // Register a new request with an optional callback, to be called when the request completes.
+  // If the request can be safely cancelled, and the callback skipped, specify accordingly.
+  void add(MPI_Request request, const function<void(MPI_Status* status)>& callback, bool cancellable=false);
+
+  // Check for completed requests without blocking
+  void testsome() {
+    checksome(false);
+  }
+
+  // Check for completed requests, blocking until at least one completes
+  void waitsome() {
+    checksome(true);
+  }
+
+  // Cancel all pending messages, and wait for them to complete.  All pending callbacks
+  // must be cancellable; otherwise an error is thrown.
+  void cancel_and_waitall();
+
+private:
+  void checksome(bool wait); 
 };
 
 }

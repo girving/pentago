@@ -42,6 +42,14 @@ template<int d> static inline Vector<int,d> block_shape(Vector<int,d> shape, Vec
 // Convenience functions
 int comm_size(MPI_Comm comm);
 int comm_rank(MPI_Comm comm);
+MPI_Comm comm_dup(MPI_Comm comm);
+int get_count(MPI_Status& status, MPI_Datatype datatype);
+
+// Init and finalize
+struct mpi_world_t : public boost::noncopyable {
+  mpi_world_t(int& argc, char**& argv);
+  ~mpi_world_t();
+};
 
 }
 }

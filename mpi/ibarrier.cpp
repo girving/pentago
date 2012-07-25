@@ -44,6 +44,16 @@ void ibarrier_t::recv() {
   // Receive the zero size message in order to know who it came from
   MPI_Status status;
   CHECK(MPI_Recv(0,0,MPI_INT,MPI_ANY_SOURCE,tag,comm,&status));
+  process(status);
+}
+
+MPI_Request ibarrier_t::irecv() {
+  MPI_Request request;
+  CHECK(MPI_Irecv(0,0,MPI_INT,MPI_ANY_SOURCE,tag,comm,&request));
+  return request;
+}
+
+void ibarrier_t::process(MPI_Status status) {
   const int source = status.MPI_SOURCE;
   if (source==parent(rank)) // Upwards message: everyone must be done
     set_done();

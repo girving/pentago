@@ -38,12 +38,8 @@ fail:
 
 int main(int argc, char** argv) {
   // Initialize MPI
-  int provided;
-  CHECK(MPI_Init_thread(&argc,&argv,MPI_THREAD_MULTIPLE,&provided));
-  if (provided<MPI_THREAD_MULTIPLE)
-    die(format("Insufficent MPI thread support: required = multiple, provided = %d",provided));
-  MPI_Comm comm;
-  CHECK(MPI_Comm_dup(MPI_COMM_WORLD,&comm));
+  mpi_world_t world(argc,argv);
+  MPI_Comm comm = MPI_COMM_WORLD;
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   set_verbose(!rank);
@@ -173,6 +169,9 @@ int main(int argc, char** argv) {
   // Compute one list of sections per slice
   const vector<Array<const section_t>> slices = descendent_sections(section);
 
+  // Allocate communicators
+  flow_comms_t comms(comm);
+
   // Compute each slice in turn
   {
     Ptr<partition_t> prev_partition;
@@ -200,7 +199,7 @@ int main(int argc, char** argv) {
       // Compute (and communicate)
       {
         Log::Scope scope("compute");
-        compute_lines(comm,prev_blocks,blocks,lines,free_memory);
+        compute_lines(comms,prev_blocks,blocks,lines,free_memory);
       }
 
       // Deallocate obsolete slice
@@ -223,9 +222,5 @@ int main(int argc, char** argv) {
   // Dump total timing
   // TODO: synchronize all processes
   report_thread_times(true);
-
-  // All done
-  MPI_Comm_free(&comm);
-  MPI_Finalize();
   return 0;
 }

@@ -32,6 +32,12 @@ public:
   // If a probed message has the given tag, call this function.
   void recv();
 
+  // Post a wildcard receive.  Once this completes, pass the result to status.
+  MPI_Request irecv();
+
+  // If you've already received a message with the given tag, call this function.
+  void process(MPI_Status status);
+
 private:
   void decrement();
   void set_done();
