@@ -76,8 +76,9 @@ public:
   // Access the data for a completed block
   RawArray<const Vector<super_t,2>,4> get(section_t section, Vector<int,4> block) const;
 
-  // Same as above, but refer to blocks via *local* block id, and return a flat array.
-  RawArray<const Vector<super_t,2>> get(int local_id) const;
+  // Same as above, but refer to blocks via *local* block id.
+  RawArray<const Vector<super_t,2>,4> get(int local_id) const;
+  RawArray<const Vector<super_t,2>> get_flat(int local_id) const;
 
   // Count wins and losses.  Normally scheduled automatically from accumulate.
   void count_wins(int local_id);

@@ -9,10 +9,16 @@
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/memory.h>
 #include <other/core/python/numpy.h>
+#include <other/core/random/Random.h>
 #include <other/core/structure/HashtableIterator.h>
+#include <other/core/utility/Hasher.h>
+#include <tr1/unordered_map>
 #include <boost/bind.hpp>
 namespace pentago {
 namespace mpi {
+
+using std::make_pair;
+using std::tr1::unordered_map;
 
 /* Notes:
  *
@@ -252,7 +258,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   CHECK(MPI_File_close(&file));
 }
 
-void check_directory(MPI_Comm comm, const string& dir) {
+void check_directory(const MPI_Comm comm, const string& dir) {
   const int slice = 24;
   const int rank = comm_rank(comm);
   const Array<const section_t> sections;
@@ -262,7 +268,7 @@ void check_directory(MPI_Comm comm, const string& dir) {
   write_sections(comm,format("%s/empty.pentago"),blocks,0);
 }
 
-void write_counts(MPI_Comm comm, const string& filename, const block_store_t& blocks) {
+void write_counts(const MPI_Comm comm, const string& filename, const block_store_t& blocks) {
   thread_time_t time("write-counts");
 
   // Reduce win counts down to root, destroying them in the process
@@ -299,6 +305,88 @@ void write_counts(MPI_Comm comm, const string& filename, const block_store_t& bl
   const int amode = MPI_MODE_WRONLY | MPI_MODE_CREATE;
   CHECK(MPI_File_open(MPI_COMM_SELF,(char*)filename.c_str(),amode,MPI_INFO_NULL,&file));
   CHECK(MPI_File_write(file,buffer.data(),buffer.size(),MPI_BYTE,MPI_STATUS_IGNORE));
+  CHECK(MPI_File_close(&file));
+}
+
+void write_sparse_samples(const MPI_Comm comm, const string& filename, const block_store_t& blocks, const int samples_per_section) {
+  thread_time_t time("write-sparse");
+  const int rank = comm_rank(comm);
+  const bool turn = blocks.partition->slice&1;
+  const int block_size = blocks.partition->block_size;
+
+  // Organize blocks by section
+  unordered_map<section_t,unordered_map<Vector<int,4>,RawArray<const Vector<super_t,2>,4>,Hasher>,Hasher> section_blocks;
+  for (int b : range(blocks.blocks()))
+    section_blocks[blocks.block_info[b].section].insert(make_pair(blocks.block_info[b].block,blocks.get(b)));
+
+  // Collect random samples
+  typedef Tuple<board_t,Vector<uint64_t,8>> sample_t;
+  BOOST_STATIC_ASSERT(sizeof(sample_t)==72);
+  Array<sample_t> samples;
+  for (const auto& s : section_blocks) {
+    const auto section = s.first;
+    const auto shape = section.shape();
+    const auto rmin = vec(rotation_minimal_quadrants(section.counts[0]).x,
+                          rotation_minimal_quadrants(section.counts[1]).x,
+                          rotation_minimal_quadrants(section.counts[2]).x,
+                          rotation_minimal_quadrants(section.counts[3]).x);
+    const auto random = new_<Random>(hash(section));
+    for (int i=0;i<samples_per_section;i++) {
+      const auto index = random->uniform(Vector<int,4>(),shape),
+                 block = (index+block_size-1)/block_size;
+      const auto it = s.second.find(block);
+      if (it != s.second.end()) {
+        const auto board = quadrants(rmin[0][index[0]],
+                                     rmin[1][index[1]],
+                                     rmin[2][index[2]],
+                                     rmin[3][index[3]]);
+        auto data = it->second[index-block_size*block];
+        data.y = ~data.y;
+        if (turn)
+          swap(data.x,data.y);
+        Vector<uint64_t,8> packed;
+        BOOST_STATIC_ASSERT(sizeof(packed)==sizeof(data));
+        memcpy(&packed,&data,sizeof(data));
+        samples.append(tuple(board,packed));
+      }
+    }
+  }
+
+  // Count total samples and send to root
+  const int local_samples = samples.size();
+  int total_samples;
+  CHECK(MPI_Reduce((void*)&local_samples,&total_samples,1,MPI_LONG_LONG_INT,MPI_SUM,0,comm));
+
+  // Open the file
+  MPI_File file;
+  const int amode = MPI_MODE_WRONLY | MPI_MODE_CREATE;
+  CHECK(MPI_File_open(comm,(char*)filename.c_str(),amode,MPI_INFO_NULL,&file));
+
+  // Write our data
+  if (rank) {
+    // On non-root processes, we only need to write out samples
+    CHECK(MPI_File_write_ordered(file,samples.data(),9*samples.size(),MPI_LONG_LONG_INT,MPI_STATUS_IGNORE));
+  } else {
+    // On the root, we have to write out both header and our samples.  First, build the header.
+    Array<uint8_t> header;
+    {
+      RawArray<Vector<uint64_t,9>> all_samples(total_samples,0); // False array of all samples
+      fill_numpy_header(header,all_samples);
+    }
+    // Construct datatype combining header with local samples
+    int lengths[2] = {header.size(),9*samples.size()};
+    MPI_Aint displacements[2] = {(MPI_Aint)header.data(),(MPI_Aint)samples.data()};
+    MPI_Datatype types[2] = {MPI_BYTE,MPI_LONG_LONG_INT};
+    MPI_Datatype datatype;
+    CHECK(MPI_Type_struct(2,lengths,displacements,types,&datatype));
+    CHECK(MPI_Type_commit(&datatype));
+    // Write 
+    CHECK(MPI_File_write_ordered(file,0,1,datatype,MPI_STATUS_IGNORE));
+    // Free datatype
+    CHECK(MPI_Type_free(&datatype));
+  }
+
+  // Done!
   CHECK(MPI_File_close(&file));
 }
 

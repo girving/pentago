@@ -16,6 +16,7 @@ dir = PropManager.add('dir','data')
 level = PropManager.add('level',26)
 memory = PropManager.add('memory','').set_required(True)
 section = PropManager.add('section','').set_required(True)
+samples = PropManager.add('samples',128)
 parser.parse('Endgame prediction script',positional=[section])
 
 # 'Parse' simple properties
@@ -23,6 +24,7 @@ ranks = ranks()
 threads = threads()
 block_size = block_size()
 save = save()
+samples = samples()
 
 # Parse memory
 m = re.match('^(\d+)(M|MB|G|GB)$',memory())

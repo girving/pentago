@@ -98,15 +98,22 @@ RawArray<const Vector<super_t,2>,4> block_store_t::get(section_t section, Vector
   return RawArray<const Vector<super_t,2>,4>(shape,all_data.data()+offsets.y-first.y);
 }
 
-RawArray<const Vector<super_t,2>> block_store_t::get(int local_id) const {
+RawArray<const Vector<super_t,2>> block_store_t::get_flat(int local_id) const {
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
   OTHER_ASSERT(!block_info[local_id].missing_contributions);
   return all_data.slice(block_info[local_id].offset,block_info[local_id+1].offset);
 }
 
+RawArray<const Vector<super_t,2>,4> block_store_t::get(int local_id) const {
+  const auto flat = get_flat(local_id);
+  const auto shape = block_shape(block_info[local_id].section.shape(),block_info[local_id].block,partition->block_size);
+  OTHER_ASSERT(flat.size()==shape.product());
+  return RawArray<const Vector<super_t,2>,4>(shape,flat.data());
+}
+
 void block_store_t::count_wins(int local_id) {
   // Prepare
-  const auto flat_data = get(local_id);
+  const auto flat_data = get_flat(local_id);
   const auto& info = block_info[local_id];
   const auto base = partition->block_size*info.block;
   const auto shape = block_shape(info.section.shape(),info.block,partition->block_size);

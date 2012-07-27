@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
   int block_size = 8;
   int level = 26;
   uint64_t memory_limit = 0;
+  int samples = 128;
   string dir;
   static const option options[] = {
     {"help",no_argument,0,'h'},
@@ -59,6 +60,7 @@ int main(int argc, char** argv) {
     {"dir",required_argument,0,'d'},
     {"level",required_argument,0,'l'},
     {"memory",required_argument,0,'m'},
+    {"samples",required_argument,0,'r'},
     {0,0,0,0}};
   for (;;) {
     int option = 0;
@@ -78,6 +80,7 @@ int main(int argc, char** argv) {
                   "  -d, --dir <dir>            Save and log to given new directory (required)\n"
                   "  -l, --level <n>            Compression level: 1-9 is zlib, 20-29 is xz (default 26)\n"
                   "  -m, --memory <n>           Approximate memory usage limit per *rank* (required)\n"
+                  "      --samples <n>          Number of sparse samples to save per section (default 128)\n"
                << flush;
           MPI_Abort(comm,0);
         }
@@ -92,6 +95,7 @@ int main(int argc, char** argv) {
       INT_ARG('b',block-size,block_size)
       INT_ARG('s',save,save)
       INT_ARG('l',level,level)
+      INT_ARG('r',samples,samples)
       case 'm': {
         double memory = strtod(optarg,&end);
         if (!strcmp(end,"MB") || !strcmp(end,"M"))
@@ -116,6 +120,8 @@ int main(int argc, char** argv) {
     die_master(format("error: invalid block size %d",block_size));
   if (block_size != 8)
     die_master(format("error: for now, block size is hard coded to 8 (see compute.cpp)"));
+  if (samples < 0)
+    die_master(format("error: must specify positive value for --samples, not %d",samples));
   if (save == -100)
     die_master("error: must specify how many slices to save with --save");
   section_t section = parse_section(argv[optind++]);
@@ -210,10 +216,11 @@ int main(int argc, char** argv) {
       prev_blocks = blocks;
       lines.clean_memory();
 
-      // Write information to disk
+      // Write various information to disk
       {
         Log::Scope scope("write");
         write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
+        write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks,samples);
         if (slice <= save)
           write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
       }

@@ -213,7 +213,7 @@ void flow_t::process_request(MPI_Status* status) {
   OTHER_ASSERT(input_blocks);
   const int local_block_id = status->MPI_TAG;
   // Send block data
-  const auto block_data = input_blocks->get(local_block_id);
+  const auto block_data = input_blocks->get_flat(local_block_id);
   MPI_Request request;
   CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,local_block_id,comms.response_comm,&request));
   // The barrier tells us when all messages are finished, so we don't need this request
