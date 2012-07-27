@@ -7,6 +7,8 @@
 #include <pentago/supertensor.h>
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/char_view.h>
+#include <pentago/utility/memory.h>
+#include <other/core/python/numpy.h>
 #include <other/core/structure/HashtableIterator.h>
 #include <boost/bind.hpp>
 namespace pentago {
@@ -58,7 +60,7 @@ static void filter_and_compress_and_store(Array<uint8_t>* dst, RawArray<const Ve
 }
 
 void write_sections(const MPI_Comm comm, const string& filename, const block_store_t& blocks, const int level) {
-  thread_time_t time("write");
+  thread_time_t time("write-sections");
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   const auto& partition = *blocks.partition;
@@ -82,6 +84,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
   // Determine the base offset of each rank
   const auto sections = partition.sections;
+  const auto& section_id = partition.section_id;
   const uint64_t header_size = sizeof(magic)+sizeof(int)+supertensor_header_t::header_size*sections.size();
   uint64_t local_size = 0;
   for (const auto& c : compressed)
@@ -124,11 +127,6 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   // partitioning scheme each rank owns blocks from at most a few sections, so it is reasonably efficient
   // to send one message per rank per section.  Each rank organizes its block offsets by section, does
   // a bunch of MPI_Isends, and then waits to receive information about any sections it owns.
-
-  // Map section ids back to sections
-  Hashtable<section_t,int> section_id;
-  for (int i=0;i<sections.size();i++)
-    section_id.set(sections[i],i);
 
   // Organize block information by section
   int remaining_owned_blocks = 0;
@@ -262,6 +260,46 @@ void check_directory(MPI_Comm comm, const string& dir) {
   const auto lines = partition->rank_lines(rank,true);
   const auto blocks = new_<block_store_t>(partition,rank,lines);
   write_sections(comm,format("%s/empty.pentago"),blocks,0);
+}
+
+void write_counts(MPI_Comm comm, const string& filename, const block_store_t& blocks) {
+  thread_time_t time("write-counts");
+
+  // Reduce win counts down to root, destroying them in the process
+  const int rank = comm_rank(comm);
+  const RawArray<Vector<uint64_t,3>> counts = blocks.section_counts;
+  if (rank) {
+    CHECK(MPI_Reduce(counts.data(),0,3*counts.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
+    // Only the root does the actual writing
+    return;
+  }
+  // From here on we're the root
+  CHECK(MPI_Reduce(MPI_IN_PLACE,counts.data(),3*counts.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
+
+  // Prepare data array
+  Array<Vector<uint64_t,4>> data(counts.size(),false);
+  const bool turn = blocks.partition->slice&1;
+  for (int i=0;i<data.size();i++) {
+    auto wins = counts[i].x, losses = counts[i].z-counts[i].y;
+    if (turn)
+      swap(wins,losses);
+    data[i].set(blocks.partition->sections[i].sig(),wins,losses,counts[i].z);
+  }
+
+  // Pack numpy buffer
+  Array<uint8_t> buffer(256+memory_usage(data),false);
+  size_t data_size = fill_numpy_header(buffer,data);
+  OTHER_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size()); 
+  int header_size = buffer.size();
+  buffer.resize(header_size+data_size,false,true);
+  memcpy(buffer.data()+header_size,data.data(),data_size);
+
+  // Write file
+  MPI_File file;
+  const int amode = MPI_MODE_WRONLY | MPI_MODE_CREATE;
+  CHECK(MPI_File_open(MPI_COMM_SELF,(char*)filename.c_str(),amode,MPI_INFO_NULL,&file));
+  CHECK(MPI_File_write(file,buffer.data(),buffer.size(),MPI_BYTE,MPI_STATUS_IGNORE));
+  CHECK(MPI_File_close(&file));
 }
 
 }

@@ -27,16 +27,6 @@ using Log::cout;
 using std::endl;
 using std::vector;
 
-static RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int lo, int hi) {
-  RawArray<const quadrant_t> rmin = rotation_minimal_quadrants(counts).x;
-  OTHER_ASSERT(0<=lo && lo<=hi && (unsigned)hi<=(unsigned)rmin.size());
-  return rmin.slice(lo,hi);
-}
-
-static RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, Range<int> range) {
-  return safe_rmin_slice(counts,range.lo,range.hi);
-}
-
 static Vector<int,4> in_order(Vector<int,4> order, Vector<int,4> I) {
   Vector<int,4> block;
   for (int i=0;i<4;i++)

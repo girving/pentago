@@ -18,6 +18,10 @@ static inline Vector<uint8_t,2> count(quadrant_t q) {
 Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white);
 Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,2> counts);
 
+// Slices of rotation_minimal_quadrants
+RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int lo, int hi);
+RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, Range<int> range);
+
 struct section_t {
   Vector<Vector<uint8_t,2>,4> counts;
 

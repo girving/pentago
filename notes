@@ -268,6 +268,23 @@ mb and associated super s.  We have
 
   sum_{b in O} f(b) = (sum_{g in G} f(g mb)) / |{g in G | g mb = mb}|
 
+----------------
+
+Ah, no: the group we need to consider is anything which leaves the section unchanged, which may include global
+rotations and global reflections.  In this case, orbits can cross between different supers in the section.
+Suppose an orbit O of the group G of all symmetries touches the set S of supers, and let G(s) be the set of
+symmetries which send the minimal board mb into s.  We have G(s) = g(s) L, where L is the group of symmetries
+that preserve the initial super, and g(s) is one symmetry that sends mb into s.
+
+  sum_{b in O} f(b) = |S| sum_{b in O(s(mb))} f(b)
+                    = (sum_{g in L} f(g mb)) / |{g in L | g mb = mb}|
+
+I claim this last sum is left unchanged if L is replaced by the purely local group, since it changes the
+numerator and denominator equally.  This is a property we can unit test, which I will do not.  If true, we can
+ignore the global portion entirely when computing the per-section counts, and only consider it when summing sections.
+
+Let's state the whole thing again to verify that it makes sense.  Let 
+
 --------------------------------------------------------------------------
 
 Say we pick n elements out of m at a random with replacement.  If we partition m as m = a+b, is there an

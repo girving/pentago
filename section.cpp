@@ -29,6 +29,16 @@ Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,
   return rotation_minimal_quadrants(counts.x,counts.y);
 }
 
+RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int lo, int hi) {
+  RawArray<const quadrant_t> rmin = rotation_minimal_quadrants(counts).x;
+  OTHER_ASSERT(0<=lo && lo<=hi && (unsigned)hi<=(unsigned)rmin.size());
+  return rmin.slice(lo,hi);
+}
+
+RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, Range<int> range) {
+  return safe_rmin_slice(counts,range.lo,range.hi);
+}
+
 Vector<int,4> section_t::shape() const {
   return vec(rotation_minimal_quadrants(counts[0]).x.size(),
              rotation_minimal_quadrants(counts[1]).x.size(),

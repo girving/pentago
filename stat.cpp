@@ -3,7 +3,7 @@
 #include <pentago/stat.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
-#include <other/core/utility/Timer.h>
+#include <other/core/utility/time.h>
 namespace pentago {
 
 using namespace other;
@@ -24,11 +24,11 @@ static void clear_stats() {
   total_lookups = 0;
   successful_lookups = 0;
   distance_prunes = 0;
-  start_time = get_current_time();
+  start_time = get_time();
 }
 
 void print_stats() {
-  double elapsed = get_current_time()-start_time;
+  double elapsed = get_time()-start_time;
   cout << "expanded nodes = "<<total_expanded_nodes<<" (";
   bool found = false;
   for (int d=36;d>0;d--)
@@ -45,7 +45,7 @@ void print_stats() {
 }
 
 static unordered_map<string,Ref<> > stats() {
-  double time = get_current_time();
+  double time = get_time();
   unordered_map<string,Ref<> > stats;
   #define ST(stat) stats.insert(make_pair(string(#stat),steal_ref_check(to_python(stat))));
   ST(total_lookups)

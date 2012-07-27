@@ -19,9 +19,12 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, co
     const auto prev_end = prev_partition->rank_offsets(rank+1),
                end = partition.rank_offsets(rank+1);
     const auto lines = partition.rank_count_lines(rank,true)+partition.rank_count_lines(rank,false);
-    const auto memory = partition_memory
-                      + 2*sizeof(block_store_t)+sizeof(block_info_t)*(prev_end.x-prev_start.x+end.x-start.x)+sizeof(Vector<super_t,2>)*(prev_end.y-prev_start.y+end.y-start.y)
-                      + sizeof(line_t)*lines+base_compute_memory_usage(lines);
+    const auto memory = partition_memory // partition_t
+                      + 2*sizeof(block_store_t) // block_store_t
+                      + sizeof(block_info_t)*(prev_end.x-prev_start.x+end.x-start.x) // block_store_t.block_info
+                      + sizeof(Vector<super_t,2>)*(prev_end.y-prev_start.y+end.y-start.y) // block_store_t.all_data
+                      + sizeof(Vector<uint64_t,3>)*(prev_partition->sections.size()+partition.sections.size()) // block_store_t.section_counts
+                      + sizeof(line_t)*lines+base_compute_memory_usage(lines); // line_t and line_data_t
     max_memory = max(max_memory,memory);
     prev_start = prev_end;
     start = end;

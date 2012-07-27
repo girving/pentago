@@ -278,7 +278,7 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
   // Are we done with this line?
   if (!--rest.missing_microlines) {
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
-    CHECK(MPI_Send((void*)&line,1,MPI_LONG_LONG_INT,comm_rank(rest.wakeup_comm),wakeup_tag,rest.wakeup_comm));
+    CHECK(MPI_Send((void*)&line,1,MPI_LONG_LONG_INT,0,wakeup_tag,rest.wakeup_comm));
   }
 }
 

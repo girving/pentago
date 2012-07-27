@@ -68,6 +68,10 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
   for (const auto& section : sections)
     OTHER_ASSERT(section.sum()==slice);
 
+  // Invert sections
+  for (int s=0;s<sections.size();s++) 
+    const_cast_(section_id).set(sections[s],s);
+
   // Each section is a 4D array of blocks, and computing a section requires iterating
   // over all its 1D block lines along the four different dimensions.  One of the
   // dimensions (the most expensive one based on branching factor) is chosen as the
@@ -228,7 +232,7 @@ template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawAr
   return false; // Didn't manage to distribute all lines
   success:
   if (record)
-    starts.slice(p,starts.size()).fill(start);
+    starts.slice(p+1,starts.size()).fill(start);
   return true;
 }
 
@@ -292,7 +296,7 @@ Array<line_t> partition_t::rank_lines(int rank, bool owned) const {
   RawArray<const Vector<int,2>> starts = owned?owner_starts:other_starts;
   const auto start = starts[rank], end = starts[rank+1];
   Array<line_t> result;
-  for (int r : range(start.x,end.x+1)) {
+  for (int r : range(start.x,min(end.x+1,all_lines.size()))) {
     const auto& chunk = all_lines[r];
     const auto sizes = chunk.blocks.sizes();
     for (int k : range(r==start.x?start.y:0,r==end.x?end.y:chunk.count)) {
@@ -494,5 +498,7 @@ void wrap_partition() {
     .OTHER_INIT(int,int,int,Array<const section_t>,bool)
     .OTHER_FIELD(max_rank_blocks)
     .OTHER_FIELD(max_rank_nodes)
+    .OTHER_FIELD(owner_starts)
+    .OTHER_FIELD(other_starts)
     ;
 }

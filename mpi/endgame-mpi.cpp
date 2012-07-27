@@ -210,10 +210,12 @@ int main(int argc, char** argv) {
       prev_blocks = blocks;
       lines.clean_memory();
 
-      // Write to disk if desired
-      if (slice <= save) {
+      // Write information to disk
+      {
         Log::Scope scope("write");
-        write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
+        write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
+        if (slice <= save)
+          write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
       }
 
       // Dump timing

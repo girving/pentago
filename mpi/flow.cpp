@@ -48,7 +48,9 @@ flow_comms_t::flow_comms_t(MPI_Comm comm)
   , request_comm(comm_dup(comm))
   , response_comm(comm_dup(comm))
   , output_comm(comm_dup(comm))
-  , wakeup_comm(comm_dup(comm)) {}
+  , wakeup_comm(comm_dup(MPI_COMM_SELF)) {
+  OTHER_ASSERT(!comm_rank(wakeup_comm));
+}
 
 flow_comms_t::~flow_comms_t() {
   CHECK(MPI_Comm_free(&barrier_comm));
@@ -146,7 +148,6 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   OTHER_ASSERT(!unscheduled_lines.size());
   OTHER_ASSERT(!block_requests.size());
   threads_wait_all();
-  output_blocks.set_complete();
 }
 
 flow_t::~flow_t() {}
@@ -242,7 +243,7 @@ void flow_t::process_output(MPI_Status* status) {
 
 void flow_t::post_wakeup_recv() {
   MPI_Request request;
-  CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,comms.rank,wakeup_tag,comms.wakeup_comm,&request));
+  CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,wakeup_tag,comms.wakeup_comm,&request));
   requests.add(request,wakeup_callback,true);
 }
 

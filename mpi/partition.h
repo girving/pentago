@@ -43,6 +43,7 @@ struct partition_t : public Object {
   const int block_size;
   const int slice; // Common number of stones in each section
   const Array<const section_t> sections;
+  const Hashtable<section_t,int> section_id; // The inverse of sections
   const Array<const lines_t> owner_lines, other_lines;
   const Hashtable<section_t,int> first_owner_line;
   const Array<const Vector<int,2>> owner_starts, other_starts;

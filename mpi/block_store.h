@@ -36,6 +36,7 @@ struct block_info_t {
   section_t section;
   Vector<int,4> block;
   int offset; // Local offset into all_data
+  mutable int missing_contributions; // How many incoming contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
 BOOST_STATIC_ASSERT(sizeof(block_info_t)<=40);
@@ -49,11 +50,11 @@ public:
   const Vector<uint64_t,2> first, last; // Ranges of block and node ids
   const Array<const block_info_t> block_info; // Information about each block we own, plus one sentinel
   const Array<Vector<super_t,2>> all_data;
+  const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
   const int required_contributions;
   static const bool compressed = false; // For now, we're always uncompressed
 private:
-  counter_t missing_contributions; // How many incoming contributions are needed to complete every block
-  bool complete;
+  spinlock_t section_counts_lock;
 
   // Allocate all blocks initialized to zero (loss), and initialize a window for one-sided accumulate ops.  Collective.
   block_store_t(const partition_t& partition, const int rank, Array<const line_t> lines);
@@ -69,16 +70,17 @@ public:
   uint64_t memory_usage() const;
 
   // Accumulate new data into a block.  This function is thread safe.
+  // If the block is complete, schedule a counting job.
   void accumulate(int local_id, RawArray<const Vector<super_t,2>> new_data);
-
-  // Declare that all blocks are complete
-  void set_complete();
 
   // Access the data for a completed block
   RawArray<const Vector<super_t,2>,4> get(section_t section, Vector<int,4> block) const;
 
   // Same as above, but refer to blocks via *local* block id, and return a flat array.
   RawArray<const Vector<super_t,2>> get(int local_id) const;
+
+  // Count wins and losses.  Normally scheduled automatically from accumulate.
+  void count_wins(int local_id);
 };
 
 }

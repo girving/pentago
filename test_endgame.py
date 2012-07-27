@@ -55,7 +55,7 @@ def test_supertensor():
   report_thread_times(True)
 
 def test_popcounts_over_stabilizers():
-  popcounts_over_stabilizers_test(1024)
+  popcounts_over_stabilizers_test(4*1024)
 
 if __name__=='__main__':
   test_supertensor()

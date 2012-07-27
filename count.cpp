@@ -1,6 +1,7 @@
 // Symmetry-aware board counting via Polya's enumeration theorem
 
 #include <pentago/symmetry.h>
+#include <pentago/section.h>
 #include <other/core/array/sort.h>
 #include <other/core/math/uint128.h>
 #include <other/core/python/module.h>
@@ -261,9 +262,16 @@ static void popcounts_over_stabilizers_test(int steps) {
   Ref<Random> random = new_<Random>(83191941);
   Hashtable<board_t> seen;
   for (int step=0;step<steps;step++) {
+    // Generate a board with significant probability of duplicate quadrants
     const int stones = random->uniform<int>(0,37);
-    const board_t board = random_board(random,stones);
-    Vector<super_t,2> wins; 
+    board_t board = random_board(random,stones);
+    const int qs = random->uniform<int>(0,256);
+    board = quadrants(quadrant(board,qs>>0&3),
+                      quadrant(board,qs>>2&3),
+                      quadrant(board,qs>>4&3),
+                      quadrant(board,qs>>6&3));
+    // Compute meaningless data
+    Vector<super_t,2> wins;
     wins.x = super_meaningless(board);
     wins.y = ~wins.x;
     // Count the fast way
@@ -272,15 +280,41 @@ static void popcounts_over_stabilizers_test(int steps) {
     // Count the slow way 
     Vector<uint16_t,3> slow;
     seen.delete_all_entries(); 
-    for (int s=0;s<256;s++) {
-      const board_t b = transform_board(symmetry_t(0,s),board);
-      if (seen.set(b))
-        slow.x += meaningless(b);
-    }
+    for (int g=0;g<8;g++)
+      for (int l=0;l<256;l++) {
+        const board_t b = transform_board(symmetry_t(g,l),board);
+        for (int q=0;q<4;q++)
+          if (rotation_standardize_quadrant(quadrant(board,q)).x != rotation_standardize_quadrant(quadrant(b,q)).x)
+            goto skip;
+        if (seen.set(b))
+          slow.x += meaningless(b);
+        skip:;
+      }
     slow.z = seen.size();
     slow.y = slow.z-slow.x;
     OTHER_ASSERT(slow==fast);
   }
+}
+
+Vector<uint64_t,3> sum_section_counts(RawArray<const section_t> sections, RawArray<const Vector<uint64_t,3>> counts) {
+  OTHER_ASSERT(sections.size()==counts.size());
+  Vector<uint64_t,3> total;
+  for (int i=0;i<sections.size();i++) {
+    // Count how many different unstandardized sections we can make from this one
+    section_t transforms[8];
+    transforms[0] = sections[i];
+    int multiplier = 1;
+    for (int s=1;s<8;s++) {
+      transforms[s] = sections[i].transform(s);
+      for (int t=0;t<s;t++)
+        if (transforms[t]==transforms[s])
+          goto found;
+      multiplier++;
+      found:;
+    }
+    total += (uint64_t)multiplier*counts[i];
+  }
+  return total;
 }
 
 }
@@ -290,4 +324,5 @@ void wrap_count() {
   OTHER_FUNCTION(count_boards)
   OTHER_FUNCTION(estimate_supercount_boards)
   OTHER_FUNCTION(popcounts_over_stabilizers_test)
+  OTHER_FUNCTION(sum_section_counts)
 }
