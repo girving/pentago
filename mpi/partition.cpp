@@ -51,7 +51,7 @@ vector<Array<const section_t>> descendent_sections(section_t root) {
 
 OTHER_DEFINE_TYPE(partition_t)
 
-static vector<string> names(36);
+static const uint64_t worst_line = 8*8*8*420;
 
 partition_t::partition_t(const int ranks, const int block_size, const int slice, Array<const section_t> sections, bool save_work)
   : ranks(ranks), block_size(block_size), slice(slice), sections(sections)
@@ -75,7 +75,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
   // Each section is a 4D array of blocks, and computing a section requires iterating
   // over all its 1D block lines along the four different dimensions.  One of the
   // dimensions (the most expensive one based on branching factor) is chosen as the
-  // owner: the processor which computes an owning line owns all contained blocks.
+  // owner: the rank which computes an owning line owns all contained blocks.
 
   // For now, our partitioning strategy is completely unaware of both graph topology
   // and network topology.  We simply lay out all lines end to end and give each
@@ -88,6 +88,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
 
   // Construct the sets of lines
   Array<lines_t> owner_lines, other_lines;
+  uint64_t owner_line_count = 0, other_line_count = 0;
   for (auto section : sections) {
     const auto shape = section.shape(),
                blocks_lo = shape/block_size,
@@ -102,6 +103,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
                    blocks_lo_k = blocks_lo.remove_index(k),
                    blocks_hi_k = blocks_hi.remove_index(k);
         Array<lines_t>& lines = owner_k==k?owner_lines:other_lines;
+        uint64_t& line_count = owner_k==k?owner_line_count:other_line_count;
         for (int i0=0;i0<2;i0++) {
           for (int i1=0;i1<2;i1++) {
             for (int i2=0;i2<2;i2++) {
@@ -127,6 +129,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
                 chunk.node_step = block_size*cross_section;
                 chunk.block_id = chunk.node_offset = (uint64_t)1<<60; // Garbage value
                 lines.append(chunk);
+                line_count += chunk.count;
               }
             }
           }
@@ -145,8 +148,8 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
     block_id += chunk.length*chunk.count;
     node_offset += (uint64_t)chunk.line_size*chunk.count;
   }
-  if (verbose())
-    cout << "total blocks = "<<large(block_id)<<", total nodes = "<<large(node_offset)<<endl;
+  if (verbose() && sections.size())
+    cout << "total lines = "<<owner_line_count<<' '<<other_line_count<<", total blocks = "<<large(block_id)<<", total nodes = "<<large(node_offset)<<endl;
   // Remember
   const_cast_(this->owner_lines) = owner_lines;
   const_cast_(this->other_lines) = other_lines;
@@ -156,20 +159,24 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
   // Partition lines between processes, attempting to equalize (1) owned work and (2) total work.
   Array<uint64_t> work_nodes(ranks), work_penalties(ranks);
 
-  const_cast_(owner_starts) = partition_lines(work_nodes,work_penalties,owner_lines);
-  if (verbose()) {
+  const_cast_(owner_starts) = partition_lines(work_nodes,work_penalties,owner_lines,owner_line_count);
+  if (verbose() && sections.size()) {
     const auto sum = work_nodes.sum(), max = work_nodes.max();
     const_cast_(owner_excess) = (double)max/sum*ranks;
-    cout << "slice "<<slice<<" owned work: all = "<<large(sum)<<", range = "<<large(work_nodes.min())<<' '<<large(max)<<", excess = "<<owner_excess<<endl;
+    const auto penalty_excess = (double)work_penalties.max()/work_penalties.sum()*ranks;
+    cout << "slice "<<slice<<" owned work: all = "<<large(sum)<<", range = "<<large(work_nodes.min())<<' '<<large(max)<<", excess = "<<owner_excess<<" ("<<penalty_excess<<')'<<endl;
+    OTHER_ASSERT(max<=(owner_line_count+ranks-1)/ranks*worst_line);
   }
   if (save_work)
     const_cast_(owner_work) = work_nodes.copy();
 
-  const_cast_(other_starts) = partition_lines(work_nodes,work_penalties,other_lines);
-  if (verbose()) {
+  const_cast_(other_starts) = partition_lines(work_nodes,work_penalties,other_lines,other_line_count);
+  if (verbose() && sections.size()) {
     auto sum = work_nodes.sum(), max = work_nodes.max();
     const_cast_(total_excess) = (double)max/sum*ranks;
-    cout << "slice "<<slice<<" total work: all = "<<large(sum)<<", range = "<<large(work_nodes.min())<<' '<<large(max)<<", excess = "<<total_excess<<endl;
+    const auto penalty_excess = (double)work_penalties.max()/work_penalties.sum()*ranks;
+    cout << "slice "<<slice<<" total work: all = "<<large(sum)<<", range = "<<large(work_nodes.min())<<' '<<large(max)<<", excess = "<<total_excess<<" ("<<penalty_excess<<')'<<endl;
+    OTHER_ASSERT(max<=(owner_line_count+other_line_count+ranks-1)/ranks*worst_line);
   }
   if (save_work)
     const_cast_(other_work) = work_nodes;
@@ -215,11 +222,12 @@ template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawAr
       const uint64_t penalty = line_penalty(chunk);
       if (free < penalty)
         break;
-      int count = min(chunk.count-start.y,free/penalty);
+      const int count = min(chunk.count-start.y,free/penalty);
       free -= count*penalty;
       if (record) {
         work_nodes[p] += count*(uint64_t)chunk.line_size;
         work_penalties[p] += count*penalty;
+        OTHER_ASSERT(work_penalties[p]<=bound);
       }
       start.y += count;
       if (start.y == chunk.count) {
@@ -237,19 +245,19 @@ template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawAr
 }
 
 // Divide a set of lines between processes
-Array<const Vector<int,2>> partition_t::partition_lines(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines) {
-  // Compute a lower bound for how much work each processor needs to do
+Array<const Vector<int,2>> partition_t::partition_lines(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines, const int line_count) {
+  // Compute a lower bound for how much work each rank needs to do
   const int ranks = work_penalties.size();
-  const uint64_t done = work_penalties.sum();
+  const uint64_t sum_done = work_penalties.sum(),
+                 max_done = work_penalties.max();
   uint64_t left = 0;
   for (auto& chunk : lines)
     left += chunk.count*line_penalty(chunk);
-  uint64_t lo = (done+left+ranks-1)/ranks;
+  uint64_t lo = max(max_done,(sum_done+left+ranks-1)/ranks);
 
-  // Double upper bound until we fit
-  uint64_t hi = lo;
-  while (!fit<false>(work_nodes,work_penalties,lines,hi))
-    hi *= 2;
+  // Compute an upper bound based on assuming each line is huge, and dividing them equally between ranks
+  uint64_t hi = max_done+(line_count+ranks-1)/ranks*worst_line;
+  OTHER_ASSERT(fit<false>(work_nodes,work_penalties,lines,hi));
 
   // Binary search to find the minimum maximum amount of work
   while (lo+1 < hi) {
@@ -325,11 +333,11 @@ uint64_t partition_t::rank_count_lines(int rank, bool owned) const {
   return result;
 }
 
-// Find the processor which owns a given block
+// Find the rank which owns a given block
 int partition_t::block_to_rank(section_t section, Vector<int,4> block) const {
   // Find the line range and specific line that contains this block
   const auto line = block_to_line(section,block);
-  // Perform a binary search to find right processor.
+  // Perform a binary search to find the right rank.
   // Invariants: owner_starts[lo] <= line < owner_starts[hi]
   int lo = 0, hi = ranks;
   while (lo+1 < hi) {
