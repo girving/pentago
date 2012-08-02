@@ -2,6 +2,7 @@
 
 #include <pentago/table.h>
 #include <pentago/stat.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/Array.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>
@@ -58,9 +59,9 @@ static table_type_t table_type;
 
 void init_table(int bits) {
   if (bits<1 || bits>30)
-    throw ValueError(format("expected 1<=bits<=30, got bits = %d",bits));
+    THROW(ValueError,"expected 1<=bits<=30, got bits = %d",bits);
   if (64-bits+score_bits>64)
-    throw ValueError(format("bits = %d is too small, the high order hash bits won't fit",bits));
+    THROW(ValueError,"bits = %d is too small, the high order hash bits won't fit",bits);
   table_bits = bits;
   cout << "initializing table: bits = "<<bits<<", size = "<<pow(2.,double(bits-20+3))<<"MB"<<endl;
   table = Array<uint64_t>(); // Allocate memory lazily in set_table_type
@@ -76,11 +77,11 @@ static ostream& operator<<(ostream& output, table_type_t type) {
 
 void set_table_type(table_type_t type) {
   if (table_bits<10)
-    throw RuntimeError(format("transposition table not initialized: table_bits = %d",table_bits));
+    THROW(RuntimeError,"transposition table not initialized: table_bits = %d",table_bits);
   if (table_type==blank_table)
     table_type = type;
   if (table_type!=type)
-    throw RuntimeError(format("transposition table already set to type %s, must reinitialize before changing to type %s",str(table_type),str(type)));
+    THROW(RuntimeError,"transposition table already set to type %s, must reinitialize before changing to type %s",str(table_type),str(type));
 
   // Allocate table if we haven't already
   OTHER_ASSERT(!table.size() || (uint64_t)table.size()==(uint64_t)1<<table_bits);

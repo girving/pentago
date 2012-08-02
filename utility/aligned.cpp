@@ -2,6 +2,7 @@
 
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/char_view.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/python/module.h>
 #include <vector>
@@ -78,13 +79,13 @@ Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size) {
   (void)PyObject_INIT(buffer,&buffer->pytype);
 #ifndef __APPLE__
   if (!posix_memalign(&buffer->start,alignment,size))
-    throw bad_alloc();
+    THROW(bad_alloc);
   return tuple(buffer->start,(PyObject*)buffer);
 #else
   // Mac OS 10.7.4 has a buggy version of posix_memalign, so do our own alignment at the cost of one extra element
   buffer->start = malloc(size+alignment-1);
   if (!buffer->start)
-    throw bad_alloc();
+    THROW(bad_alloc);
   size_t p = (size_t)buffer->start;
   p = (p+alignment-1)&~(alignment-1);
   return tuple((void*)p,(PyObject*)buffer);

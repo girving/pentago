@@ -38,24 +38,27 @@ def test_supertensor():
   writer.finalize()
 
   # Prepare for reading
-  reader = supertensor_reader_t(file.name)
-  assert all(reader.header.section==section)
-  assert reader.header.block_size==block_size
-  assert reader.header.filter==filter
-  assert all(reader.header.blocks==blocks)
+  reader0 = supertensor_reader_t(file.name)
+  reader1, = open_supertensors(file.name)
+  for reader in reader0,reader1:
+    assert all(reader.header.section==section)
+    assert reader.header.block_size==block_size
+    assert reader.header.filter==filter
+    assert all(reader.header.blocks==blocks)
 
   # Read and verify data in a different order than we wrote it
-  for i in xrange(blocks[0]):
-    for j in xrange(blocks[1]):
-      for k in xrange(blocks[2]):
-        for l in xrange(blocks[3]):
-          b = i,j,k,l
-          block = reader.read_block(b)
-          assert all(block==data[b])
+  for reader in reader0,reader1:
+    for i in xrange(blocks[0]):
+      for j in xrange(blocks[1]):
+        for k in xrange(blocks[2]):
+          for l in xrange(blocks[3]):
+            b = i,j,k,l
+            block = reader.read_block(b)
+            assert all(block==data[b])
   report_thread_times(True)
 
 def test_popcounts_over_stabilizers():
-  popcounts_over_stabilizers_test(4*1024)
+  popcounts_over_stabilizers_test(1024)
 
 if __name__=='__main__':
   test_supertensor()

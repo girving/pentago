@@ -3,6 +3,7 @@
 #include <pentago/trace.h>
 #include <pentago/moves.h>
 #include <pentago/superengine.h>
+#include <pentago/utility/debug.h>
 #include <other/core/python/module.h>
 #include <other/core/structure/Hashtable.h>
 namespace pentago {
@@ -85,7 +86,7 @@ void trace_error(bool aggressive, int depth, board_t board, const char* context)
   check_board(board);
   board = superstandardize(board).x;
   errors.append(situation_t(aggressive,depth,board));
-  throw RuntimeError(format("trace inconsistency detected in %s: depth %d, board %lld, aggressive %d, stone depth %d",context,depth,board,aggressive,depth+count_stones(board)));
+  THROW(RuntimeError,"trace inconsistency detected in %s: depth %d, board %lld, aggressive %d, stone depth %d",context,depth,board,aggressive,depth+count_stones(board));
 }
 
 void trace_dependency(bool parent_aggressive, int parent_depth, board_t parent, bool child_aggressive, int child_depth, board_t child, superinfo_t child_info) {

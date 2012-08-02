@@ -17,6 +17,7 @@ level = PropManager.add('level',26)
 memory = PropManager.add('memory','').set_required(True)
 section = PropManager.add('section','').set_required(True)
 samples = PropManager.add('samples',128)
+meaningless = PropManager.add('meaningless',0)
 parser.parse('Endgame prediction script',positional=[section])
 
 # 'Parse' simple properties
@@ -25,6 +26,11 @@ threads = threads()
 block_size = block_size()
 save = save()
 samples = samples()
+meaningless = meaningless()
+
+# Meaningless isn't supported by predict
+if meaningless:
+  raise ValueError('predict doesn\'t accept --meaningless')
 
 # Parse memory
 m = re.match('^(\d+)(M|MB|G|GB)$',memory())
@@ -38,9 +44,10 @@ if not m:
   raise ValueError('bad section %s'%section())
 section = asarray(map(int,m.group(1))).reshape(4,2)
 
-# Configure logging
+# Configure logging and threads
 Log.configure('predict',0,0,100)
 Log.write('command = %s'%parser.command())
+init_threads(1,0)
 
 # Dump general information
 with Log.scope('parameters'):
@@ -56,7 +63,7 @@ def line_parallelism(base_memory):
   return (memory-base_memory)/line_cost
 
 # Simulate execution
-slices = descendent_sections(section)
+slices = descendent_sections(section,35)
 prev_partition = None
 max_blocks = 0
 max_base_memory = 0
@@ -95,4 +102,6 @@ with Log.scope('summary'):
 
 # Example runs:
 #
+# Meaningless: ./predict --ranks 1 --threads 8 --save 20 --memory 3G --meaningless 4 00000000
+# Test: ./predict --ranks 1 --threads 8 --save 34 --memory 3G 44444554
 # Mira (Blue Gene/Q): ./predict --ranks 49152 --threads 64 --save 18 --memory 8G 00000000

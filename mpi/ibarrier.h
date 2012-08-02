@@ -53,6 +53,10 @@ public:
   ibarrier_countdown_t(MPI_Comm comm, int tag, int count);
   ~ibarrier_countdown_t();
 
+  int remaining() const {
+    return count;
+  }
+
   // Reduce the count
   void decrement();
 };

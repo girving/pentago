@@ -8,12 +8,17 @@ namespace pentago {
 // even the code is also capable of computing in the other direction.
 
 using std::vector;
+struct block_cache_t;
 
 // Limit black's options to the given number of moves (chosen after move ordering)
 void set_super_move_limit(int limit);
 
 // Turn on or off debug mode
 void set_super_debug(bool on);
+
+// Set a block cache of precomputed "endgame" information.  Warning: This is
+// extremely slow per evaluation, so use only with very low depth.
+void set_block_cache(Ptr<const block_cache_t> cache);
 
 // Current knowledge about a board position.  This is computed during shallow evaluation and
 // passed down to super_evaluate_recurse if the node is expanded.  It also sucks up rather a

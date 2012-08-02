@@ -26,5 +26,7 @@ struct line_t {
 };
 BOOST_STATIC_ASSERT(sizeof(line_t)==48);
 
+ostream& operator<<(ostream& output, const line_t& line);
+
 }
 }

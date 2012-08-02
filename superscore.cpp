@@ -2,6 +2,7 @@
 
 #include <pentago/superscore.h>
 #include <pentago/score.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/Array.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/python/module.h>
@@ -111,7 +112,7 @@ static void super_win_test(int steps) {
       for (int r0=0;r0<4;r0++) for (int r1=0;r1<4;r1++) for (int r2=0;r2<4;r2++) for (int r3=0;r3<4;r3++) {
         side_t rside = quadrants(rotated[0][r0],rotated[1][r1],rotated[2][r2],rotated[3][r3]);
         if (won(rside)!=wins(r0,r1,r2,r3))
-          throw AssertionError(format("side %lld, rside %lld, r %d %d %d %d, correct %d, incorrect %d",side,rside,r0,r1,r2,r3,won(rside),wins(r0,r1,r2,r3)));
+          THROW(AssertionError,"side %lld, rside %lld, r %d %d %d %d, correct %d, incorrect %d",side,rside,r0,r1,r2,r3,won(rside),wins(r0,r1,r2,r3));
       }
 
       // Is the user impatient?
@@ -181,7 +182,7 @@ uint8_t first(super_t s) {
   for (int r=0;r<256;r++)
     if (s(r))
       return r;
-  throw ValueError("zero passed to super_t first");
+  THROW(ValueError,"zero passed to super_t first");
 }
 
 static NdArray<uint64_t> super_wins_py(NdArray<const board_t> sides) {

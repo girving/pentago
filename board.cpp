@@ -1,6 +1,7 @@
 // Board definitions and utility functions
 
 #include <pentago/board.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/module.h>
@@ -26,7 +27,7 @@ bool black_to_move(board_t board) {
 void check_board(board_t board) {
   #define CHECK(q) \
     if (!(quadrant(board,q)<(int)pow(3.,9.))) \
-      throw ValueError(format("quadrant %d has invalid value %d",q,quadrant(board,q)));
+      THROW(ValueError,"quadrant %d has invalid value %d",q,quadrant(board,q));
   CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 

@@ -19,6 +19,10 @@ ostream& operator<<(ostream& output, symmetry_t s) {
   return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
 
+ostream& operator<<(ostream& output, local_symmetry_t s) {
+  return output<<format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
+}
+
 static void group_test() {
   // Test identity and inverses
   const symmetry_t e = 0;
@@ -62,6 +66,15 @@ static void group_test() {
     for (auto b : generators)
       for (auto c : generators)
         OTHER_ASSERT((a*b)*c==a*(b*c));
+
+  // Check products of local with general
+  for (auto a : symmetries)
+    for (int r : range(256)) {
+      local_symmetry_t b(r);
+      symmetry_t sb(b);
+      OTHER_ASSERT(a*b==a*sb);
+      OTHER_ASSERT(b*a==sb*a);
+    }
 }
 
 // rotate_quadrants[r][q] is the quadrant moved to q under rotation r
@@ -373,4 +386,5 @@ void wrap_symmetry() {
   OTHER_FUNCTION(superstandardize_test)
   OTHER_FUNCTION(super_action_test)
   OTHER_FUNCTION_2(superstandardize,superstandardize_py)
+  OTHER_FUNCTION(meaningless)
 }

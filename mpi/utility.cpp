@@ -1,11 +1,12 @@
 // MPI related utilities
 
 #include <pentago/mpi/utility.h>
+#include <pentago/utility/debug.h>
 #include <other/core/utility/Log.h>
+#include <other/core/utility/process.h>
 namespace pentago {
 namespace mpi {
 
-using Log::cout;
 using Log::cerr;
 using std::endl;
 
@@ -20,19 +21,23 @@ void set_verbose(bool verbose) {
 }
 
 void die(const string& msg) {
-  cerr << "rank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
+  cerr << "\nrank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
+  process::backtrace();
+  if (getenv("OTHER_BREAK_ON_ASSERT"))
+    breakpoint();
   MPI_Abort(MPI_COMM_WORLD,1);
   abort();
 }
 
-void die_master(const string& msg) {
-  if (!verbose())
-    MPI_Barrier(MPI_COMM_WORLD);
-  die(msg);
+void check_failed(const char* file, const char* function, int line, const char* call, int result) {
+  die(format("%s:%s:%d: %s failed: %s",file,function,line,call,error_string(result)));
 }
 
-void check_failed(const char* file, const char* function, int line, const char* call, int result) {
-  die(format("%s:%s:%d: %s failed with code %d",file,function,line,call,result));
+string error_string(int code) {
+  int length;
+  char error[MPI_MAX_ERROR_STRING];
+  MPI_Error_string(code,error,&length);
+  return error;
 }
 
 scope_t::scope_t(const char* name)
@@ -66,9 +71,11 @@ MPI_Comm comm_dup(MPI_Comm comm) {
   return dup;
 }
 
-int get_count(MPI_Status& status, MPI_Datatype datatype) {
+int get_count(MPI_Status* status, MPI_Datatype datatype) {
   int count;
-  CHECK(MPI_Get_count(&status,datatype,&count));
+  CHECK(MPI_Get_count(status,datatype,&count));
+  if (count == MPI_UNDEFINED)
+    die("get_count: MPI_Get_count result is undefined");
   return count;
 }
 
@@ -77,6 +84,13 @@ mpi_world_t::mpi_world_t(int& argc, char**& argv) {
   CHECK(MPI_Init_thread(&argc,&argv,MPI_THREAD_MULTIPLE,&provided));
   if (provided<MPI_THREAD_MULTIPLE)
     die(format("Insufficent MPI thread support: required = multiple, provided = %d",provided));
+
+  // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
+  debug::set_error_callback(die);
+  throw_callback = die;
+
+  // Make MPI errors return so that we can check the error codes ourselves
+  MPI_Comm_set_errhandler(MPI_COMM_WORLD,MPI_ERRORS_RETURN);
 }
 
 mpi_world_t::~mpi_world_t() {

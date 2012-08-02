@@ -20,22 +20,29 @@ void requests_t::add(MPI_Request request, const function<void(MPI_Status*)>& cal
 }
 
 void requests_t::checksome(bool wait) {
-  vector<Tuple<function<void(MPI_Status*)>,MPI_Status>> pending;
+  vector<Tuple<function<void(MPI_Status*)>,MPI_Status*>> pending;
+  int n = requests.size();
+  MPI_Status statuses[n];
   {
-    int n = requests.size();
     int indices[n];
-    MPI_Status statuses[n];
     int finished;
     const auto check = wait?MPI_Waitsome:MPI_Testsome;
     CHECK(check(n,requests.data(),&finished,indices,statuses));
+    // Add requested callback to pending list
+    pending.resize(finished);
+    for (int i=0;i<finished;i++) {
+      int j = indices[i];
+      if (callbacks[j]) {
+        swap(pending[i].x,callbacks[j]);
+        pending[i].y = &statuses[i];
+      }
+    }
     // The MPI standard doesn't appear to specify whether the indices are sorted.  Removing an unsorted list
     // of elements from an array is very unpleasant, so we sort.  If they're already sorted, this is cheap.
-    insertion_sort(finished,indices,statuses);
-    // Extract callbacks from the array without executing them
+    insertion_sort(finished,indices);
+    // Prune away satisfied requests
     for (int i=finished-1;i>=0;i--) {
       int j = indices[i];
-      if (callbacks[j])
-        pending.push_back(tuple(callbacks[j],statuses[j]));
       requests.remove_index_lazy(j);
       cancellables.remove_index_lazy(j);
       callbacks[j].swap(callbacks[--n]);
@@ -44,7 +51,7 @@ void requests_t::checksome(bool wait) {
   }
   // Launch pending callbacks
   for (auto& pair : pending)
-    pair.x(&pair.y);
+    pair.x(pair.y);
 }
 
 void requests_t::cancel_and_waitall() {

@@ -89,4 +89,7 @@ board_t random_board(Random& random, const section_t& section);
 // Count stones in all quadrants
 section_t count(board_t board);
 
+// Show counts and rmin indices
+string show_board_rmins(const board_t board);
+
 }

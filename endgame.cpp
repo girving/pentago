@@ -1,5 +1,6 @@
 // Endgame database computation
 
+#include <pentago/endgame.h>
 #include <pentago/symmetry.h>
 #include <pentago/superscore.h>
 #include <pentago/section.h>
@@ -7,6 +8,7 @@
 #include <pentago/superengine.h>
 #include <pentago/count.h>
 #include <pentago/utility/aligned.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/NestedArray.h>
@@ -42,7 +44,7 @@ template<int d> static Vector<int,d> strides(Vector<int,d> shape) {
   return strides;
 }
 
-static void verify(const char* prefix, const board_t board, const Vector<super_t,2>& result, bool verbose=false) {
+void endgame_verify_board(const char* prefix, const board_t board, const Vector<super_t,2>& result, bool verbose) {
   const bool turn = popcount(unpack(board,0))!=popcount(unpack(board,1));
   const board_t flipped = turn?pack(unpack(board,1),unpack(board,0)):board;
   const super_t win = super_evaluate_all(true,36,flipped);
@@ -57,7 +59,7 @@ static void verify(const char* prefix, const board_t board, const Vector<super_t
         section_t section;
         for (int i=0;i<4;i++)
           section.counts[i] = count(quadrant(board,i));
-        throw RuntimeError(format("%s failed: section %s, board %lld, rotation %d, fast %d, slow %d",prefix,str(section),board,r,fast,slow));
+        THROW(RuntimeError,"%s failed: section %s, board %lld, rotation %d, fast %d, slow %d",prefix,str(section),board,r,fast,slow);
       }
     }
 }
@@ -93,24 +95,21 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
           for (Vector<int,4> sample : samples[((block[0]*blocks[1]+block[1])*blocks[2]+block[2])*blocks[3]+block[3]]) {
             const Vector<super_t,2>& result = data[sample-block_size*block];
             const board_t board = quadrants(rmin[0][sample[0]],rmin[1][sample[1]],rmin[2][sample[2]],rmin[3][sample[3]]);
-            verify("endgame verify",board,result,true);
+            endgame_verify_board("endgame verify",board,result,true);
             progress.progress();
           }
         }
 }
 
-static void endgame_sparse_verify(const section_t section, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins, Random& random, int samples) {
+static void endgame_sparse_verify(RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins, Random& random, int samples) {
   OTHER_ASSERT(boards.size()==wins.size());
   OTHER_ASSERT((unsigned)samples<=(unsigned)boards.size());
-  // Verify that all boards come from the section
-  for (auto board : boards)
-    OTHER_ASSERT(count(board)==section);
   // Check samples in random order
   Array<int> permutation = IdentityMap(boards.size()).copy();
   ProgressIndicator progress(samples,true);
   for (int i=0;i<samples;i++) {
     swap(permutation[i],permutation[random.uniform<int>(i,boards.size())]);
-    verify("endgame sparse verify",boards[permutation[i]],wins[permutation[i]],true);
+    endgame_verify_board("endgame sparse verify",boards[permutation[i]],wins[permutation[i]],true);
     progress.progress();
   }
 }

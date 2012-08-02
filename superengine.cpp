@@ -7,6 +7,7 @@
 #include <pentago/superscore.h>
 #include <pentago/supertable.h>
 #include <pentago/trace.h>
+#include <pentago/block_cache.h>
 #include <pentago/utility/sort.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
@@ -37,6 +38,13 @@ void set_super_debug(bool on) {
   debug = on;
 }
 
+// Block cache
+static Ptr<const block_cache_t> block_cache;
+
+void set_block_cache(Ptr<const block_cache_t> cache) {
+  block_cache = cache;
+}
+
 // Evaluate everything we can about a position without recursing into children.
 template<bool aggressive,bool debug> static inline superdata_t OTHER_ALWAYS_INLINE super_shallow_evaluate(const int depth, const side_t side0, const side_t side1, const super_t wins0, const super_t wins1, const super_t interesting) {
   // Check whether the current state is a win for either player
@@ -62,6 +70,12 @@ template<bool aggressive,bool debug> static inline superdata_t OTHER_ALWAYS_INLI
   // Exit early if possible
   if (!(interesting&~info.known))
     goto done;
+
+  // If we have a block cache of precomputed "endgame" information, look there
+  if (block_cache && block_cache->lookup(aggressive,side0,side1,info.wins)) {
+    info.known = ~super_t(0);
+    goto done;
+  }
 
   // Look up the position in the transposition table
   {
@@ -114,7 +128,7 @@ template<bool remember,bool aggressive,bool debug> static typename results_t<rem
   PRINT_STATS(24);
   superinfo_t& info = data.lookup.info;
   super_t possible = 0; // Keep track of possible wins that we might have missed
-  results_t<remember> results; // Optionally keep track of results about children 
+  results_t<remember> results; // Optionally keep track of results about children
 
   // Consistency check
   OTHER_ASSERT(info.valid());
@@ -292,7 +306,7 @@ super_t super_evaluate_all(bool aggressive, int depth, const board_t board) {
   // Unpack board
   const side_t side0 = unpack(board,0),
                side1 = unpack(board,1);
-  
+
   // We don't need to search past the end of the game
   depth = min(depth,36-popcount(side0|side1));
 
@@ -365,4 +379,5 @@ void wrap_superengine() {
   OTHER_FUNCTION(super_evaluate_children)
   OTHER_FUNCTION(set_super_move_limit)
   OTHER_FUNCTION(set_super_debug)
+  OTHER_FUNCTION(set_block_cache)
 }

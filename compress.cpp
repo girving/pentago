@@ -3,6 +3,7 @@
 #include <pentago/compress.h>
 #include <pentago/thread.h>
 #include <pentago/utility/aligned.h>
+#include <pentago/utility/debug.h>
 #include <zlib.h>
 #include <lzma.h>
 namespace pentago {
@@ -45,7 +46,7 @@ Array<uint8_t> compress(RawArray<const uint8_t> data, int level) {
     Array<uint8_t> compressed(dest_size,false);
     int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),data.size(),level);
     if (z!=Z_OK)
-      throw IOError(format("zlib failure in compress_and_write: %s",zlib_error(z)));
+      THROW(IOError,"zlib failure in compress_and_write: %s",zlib_error(z));
     return compressed.slice_own(0,dest_size);
   } else { // lzma
     size_t dest_size = lzma_stream_buffer_bound(data.size());
@@ -54,7 +55,7 @@ Array<uint8_t> compress(RawArray<const uint8_t> data, int level) {
     size_t pos = 0;
     lzma_ret r = lzma_easy_buffer_encode(level-20,LZMA_CHECK_CRC64,0,data.data(),data.size(),compressed.data(),&pos,dest_size);
     if (r!=LZMA_OK)
-      throw RuntimeError(format("lzma compression error: %s (%d)",lzma_error(r),r));
+      THROW(RuntimeError,"lzma compression error: %s (%d)",lzma_error(r),r);
     return compressed.slice_own(0,pos);
   }
 }
@@ -75,17 +76,17 @@ Array<uint8_t> decompress(Array<const uint8_t> compressed, const size_t uncompre
   if (!is_lzma(compressed)) { // zlib
     int z = uncompress((uint8_t*)uncompressed.data(),&dest_size,compressed.data(),compressed.size());
     if (z!=Z_OK)
-      throw IOError(format("zlib failure in read_and_uncompress: %s",zlib_error(z)));
+      THROW(IOError,"zlib failure in read_and_uncompress: %s",zlib_error(z));
   } else { // lzma
     const uint32_t flags = LZMA_TELL_NO_CHECK | LZMA_TELL_UNSUPPORTED_CHECK;
     uint64_t memlimit = UINT64_MAX;
     size_t in_pos = 0, out_pos = 0;
     lzma_ret r = lzma_stream_buffer_decode(&memlimit,flags,0,compressed.data(),&in_pos,compressed.size(),uncompressed.data(),&out_pos,dest_size);
     if (r!=LZMA_OK)
-      throw IOError(format("lzma failure in read_and_uncompress: %s (%d)",lzma_error(r),r));
+      THROW(IOError,"lzma failure in read_and_uncompress: %s (%d)",lzma_error(r),r);
   }
   if (dest_size != uncompressed_size)
-    throw IOError(format("read_and_compress: expected uncompressed size %zu, got %zu",uncompressed_size,dest_size));
+    THROW(IOError,"read_and_compress: expected uncompressed size %zu, got %zu",uncompressed_size,dest_size);
   return uncompressed;
 }
 

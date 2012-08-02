@@ -23,9 +23,11 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(thread)
   OTHER_WRAP(aligned)
   OTHER_WRAP(section)
+  OTHER_WRAP(block_cache)
 
   // MPI
   OTHER_WRAP(partition)
   OTHER_WRAP(block_store)
   OTHER_WRAP(predict)
+  OTHER_WRAP(check)
 }

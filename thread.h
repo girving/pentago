@@ -91,4 +91,7 @@ void threads_schedule(thread_type_t type, const vector<function<void()>>& fs);
 // Wait for all jobs to complete
 void threads_wait_all();
 
+// Join the CPU thread pool until all jobs complete
+void threads_wait_all_help();
+
 }

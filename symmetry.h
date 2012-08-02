@@ -15,9 +15,27 @@ using std::ostream;
 
 // In the following comments, x' is the inverse of x.
 
-struct symmetry_t {
-  // The following operations composed as reflect . global . local
+// A purely local symmetry
+struct local_symmetry_t {
+  uint8_t local;
 
+  local_symmetry_t()
+    : local(0) {}
+
+  explicit local_symmetry_t(uint8_t local) 
+    : local(local) {}
+
+  local_symmetry_t operator*(local_symmetry_t s) const {
+    return local_symmetry_t((((local&0x33)+(s.local&0x33))&0x33)+(((local&0xcc)+(s.local&0xcc))&0xcc));
+  }
+
+  local_symmetry_t inverse() const {
+    return local_symmetry_t(local^(local&0x55)<<1);
+  }
+};
+
+// Global plus local symmetry
+struct symmetry_t {
   // A 1 bit reflect field and A 2-bit counterclockwise rotation field for the board as a whole
   unsigned global : 3;
 
@@ -32,18 +50,16 @@ struct symmetry_t {
   symmetry_t(uint8_t global, uint8_t local)
     : global(global), local(local) {}
 
-  symmetry_t operator*(symmetry_t s) const {
-    // We seek x = g l sg sl = global local s.global s.local
-    // Commute local and global transforms: l sg = sg (sg' l sg) = sg l2, x = g sg l2 sl
-    uint8_t l2 = commute_global_local_symmetries[s.global][local];
-    // Unit tests to the rescue
-    return symmetry_t(((global^s.global)&4)|(((global^(global&s.global>>2)<<1)+s.global)&3),
-                      (((l2&0x33)+(s.local&0x33))&0x33)+(((l2&0xcc)+(s.local&0xcc))&0xcc));
+  symmetry_t(local_symmetry_t s)
+    : global(0), local(s.local) {}
+
+  static uint8_t invert_global(uint8_t global) {
+    return global^(~global>>2&(global&1))<<1;
   }
 
   symmetry_t inverse() const {
-    uint8_t li = local^(local&0x55)<<1; // Invert local
-    uint8_t gi = global^(~global>>2&(global&1))<<1; // Invert global
+    uint8_t li = local_symmetry_t(local).inverse().local; // Invert local
+    uint8_t gi = invert_global(global); // Invert global
     // Commute local through global
     return symmetry_t(gi,commute_global_local_symmetries[gi][li]);
   }
@@ -64,6 +80,25 @@ struct symmetry_t {
     return s.global<<8|s.local;
   }
 };
+
+// Group product
+inline symmetry_t operator*(symmetry_t a, symmetry_t b) {
+  // We seek x = ag al bg bl = a.global a.local b.global b.local
+  // Commute local and global transforms: al bg = bg (bg' al bg) = bg l2, x = ag bg l2 bl
+  const uint8_t l2 = commute_global_local_symmetries[b.global][a.local];
+  // Unit tests to the rescue
+  return symmetry_t(((a.global^b.global)&4)|(((a.global^(a.global&b.global>>2)<<1)+b.global)&3),
+                    (local_symmetry_t(l2)*local_symmetry_t(b.local)).local);
+}
+
+inline symmetry_t operator*(symmetry_t a, local_symmetry_t b) {
+  return symmetry_t(a.global,(local_symmetry_t(a.local)*b).local);
+}
+
+inline symmetry_t operator*(local_symmetry_t a, symmetry_t b) {
+  const uint8_t l2 = commute_global_local_symmetries[b.global][a.local];
+  return symmetry_t(b.global,(local_symmetry_t(l2)*local_symmetry_t(b.local)).local);
+}
 
 // A symmetry is a function s : X -> X, where X = Z_6^2 is the set of Pentago squares.
 // A side_t is a subset A of X, and a board_t is two such subsets.  These functions compute s(A).
@@ -91,6 +126,7 @@ bool meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 super_t super_meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 
 ostream& operator<<(ostream& output, symmetry_t s) OTHER_EXPORT;
+ostream& operator<<(ostream& output, local_symmetry_t s) OTHER_EXPORT;
 symmetry_t random_symmetry(Random& random);
 
 // Convenient enumeration of all symmetries

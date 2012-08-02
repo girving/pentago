@@ -4,6 +4,7 @@
 #include <pentago/symmetry.h>
 #include <pentago/count.h>
 #include <pentago/table.h>
+#include <pentago/utility/debug.h>
 #include <pentago/utility/large.h>
 #include <other/core/array/sort.h>
 #include <other/core/math/popcount.h>
@@ -162,7 +163,7 @@ static int distinguishing_hash_bits(RawArray<const board_t> boards) {
     return bits;
     collision:;
   }
-  throw ValueError("distinguishing_hash_bits: the set of boards contains duplicates");
+  THROW(ValueError,"distinguishing_hash_bits: the set of boards contains duplicates");
 }
 
 // Quadrants minimal w.r.t. rotations and reflections

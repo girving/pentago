@@ -29,11 +29,25 @@
  *
  * All data is little endian.
  *
+ * To support MPI usage, it is also possible to concatenate multiple supertensors into
+ * one file using the format
+ *
+ *   char magic[20] = "pentago sections   \n";
+ *   uint32_t version;
+ *   uint32_t sections;
+ *   uint32_t section_header_size;
+ *   supertensor_header_t headers[sections];
+ *   ... compressed per-section data ...
+ *
+ * All offsets are relative to the start of the entire file, and blocks from different
+ * sections can occur interleaved in any order.
+ *
  * File version history:
  *
  * 0 - Initial unstable version
  * 1 - Switch to storing both black and white wins
  * 2 - Change quadrant ordering to support block-wise reflection
+ * 3 - Allow multiple sections in one file
  */
 
 #include <pentago/superscore.h>
@@ -57,6 +71,10 @@ struct supertensor_blob_t {
     , offset(0) {}
 };
 
+const int supertensor_magic_size = 20;
+extern const char single_supertensor_magic[21];
+extern const char multiple_supertensor_magic[21];
+
 struct supertensor_header_t {
   static const int header_size = 85;
 
@@ -79,24 +97,29 @@ struct supertensor_header_t {
 };
 
 // RAII holder for a file descriptor
-struct fildes_t : public boost::noncopyable {
+struct fildes_t : public Object {
+  OTHER_NEW_FRIEND
   int fd;
 
+protected:
   fildes_t(const string& path, int flags, mode_t mode=0);
+public:
   ~fildes_t();
 
-  void close(); 
+  void close();
 };
 
 struct supertensor_reader_t : public Object {
   OTHER_DECLARE_TYPE
 
-  const fildes_t fd;
+  const Ref<const fildes_t> fd;
   const supertensor_header_t header;
   const Array<const supertensor_blob_t,4> index;
 
-protected:
+private:
   supertensor_reader_t(const string& path);
+  supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset);
+  void initialize(const string& path, const uint64_t header_offset);
 public:
   ~supertensor_reader_t();
 
@@ -111,6 +134,9 @@ public:
 
   uint64_t compressed_size(Vector<int,4> block) const;
   uint64_t uncompressed_size(Vector<int,4> block) const;
+
+  // For debugging purposes
+  uint64_t total_size() const;
 };
 
 struct supertensor_writer_t : public Object {
@@ -118,7 +144,7 @@ struct supertensor_writer_t : public Object {
   typedef supertensor_writer_t Self;
 
   const string path;
-  fildes_t fd;
+  const Ref<fildes_t> fd;
   supertensor_header_t header; // incomplete until finalize is called
   const int level; // zlib compression level
   const Array<supertensor_blob_t,4> index;
@@ -147,5 +173,8 @@ private:
   void compress_and_write(supertensor_blob_t* blob, RawArray<const uint8_t> data);
   void pwrite(supertensor_blob_t* blob, Array<const uint8_t> data);
 };
+
+// Open one or more supertensors from a single file
+vector<Ref<supertensor_reader_t>> open_supertensors(const string& path);
 
 }

@@ -4,6 +4,9 @@
 #include <other/core/array/forward.h>
 #include <other/core/python/forward.h>
 #include <other/core/structure/forward.h>
+namespace other {
+template<class TK,class T> struct HashtableEntry;
+}
 namespace pentago {
 
 template<class T> static inline uint64_t memory_usage(const T& object) {
@@ -20,6 +23,10 @@ template<class T> static inline uint64_t memory_usage(const Ptr<T>& object) {
 
 template<class T> static inline uint64_t memory_usage(const Array<T>& array) {
   return sizeof(T)*array.size();
+}
+
+template<class T,int d> static inline uint64_t memory_usage(const Array<T,d>& array) {
+  return sizeof(T)*array.flat.size();
 }
 
 template<class TK,class T> static inline uint64_t memory_usage(const Hashtable<TK,T>& table) {

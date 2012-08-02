@@ -141,6 +141,10 @@ struct super_t {
     return (*this)(r.x,r.y,r.z,r.w);
   }
 
+  template<class I> bool operator[](const I& i) const {
+    return operator()(i);
+  }
+
   static super_t singleton(uint8_t r) {
     uint8_t hi = r>>6;
     uint64_t chunk = (uint64_t)1<<(r&63);

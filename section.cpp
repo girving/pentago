@@ -2,6 +2,8 @@
 
 #include <pentago/section.h>
 #include <pentago/symmetry.h>
+#include <pentago/utility/debug.h>
+#include <other/core/array/NdArray.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/str.h>
@@ -118,7 +120,11 @@ bool section_valid(Vector<Vector<uint8_t,2>,4> s) {
 }
 
 ostream& operator<<(ostream& output, section_t section) {
-  return output<<section.counts;
+  output << section.sum() << '-';
+  for (int i=0;i<4;i++)
+    for (int j=0;j<2;j++)
+      output << (int)section.counts[i][j];
+  return output;
 }
 
 PyObject* to_python(const section_t& section) {
@@ -129,7 +135,7 @@ PyObject* to_python(const section_t& section) {
 pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
   pentago::section_t s(from_python<Vector<Vector<uint8_t,2>,4>>(object));
   if (!s.valid())
-    throw ValueError(format("invalid section %s",str(s)));
+    THROW(ValueError,"invalid section %s",str(s));
   return s;
 }
 } namespace pentago {
@@ -196,6 +202,29 @@ static void rmin_test() {
     }
 }
 
+static NdArray<section_t> board_section(NdArray<const board_t> boards) {
+  for (const auto board : boards.flat)
+    check_board(board);
+  NdArray<section_t> sections(boards.shape,false);
+  for (int i=0;i<boards.flat.size();i++)
+    sections.flat[i] = count(boards.flat[i]);
+  return sections;
+}
+
+static string show_quadrant_rmins(const quadrant_t quadrant) {
+  const auto c = count(quadrant);
+  const auto rmin = rotation_minimal_quadrants(c);
+  const int ir = rotation_minimal_quadrants_inverse[quadrant];
+  return format("%d%d-%03d-%d%c",c.x,c.y,ir/4,ir&3,ir/4<rmin.y?"ur"[(ir/4)&1]:'i');
+}
+
+string show_board_rmins(const board_t board) {
+  return format("%s %s\n%s %s",show_quadrant_rmins(quadrant(board,1)),
+                               show_quadrant_rmins(quadrant(board,3)),
+                               show_quadrant_rmins(quadrant(board,0)),
+                               show_quadrant_rmins(quadrant(board,2)));
+}
+
 }
 using namespace pentago;
 using namespace other::python;
@@ -205,4 +234,5 @@ void wrap_section() {
   OTHER_FUNCTION(section_valid)
   OTHER_FUNCTION(standardize_section)
   OTHER_FUNCTION(rmin_test)
+  OTHER_FUNCTION(board_section)
 }

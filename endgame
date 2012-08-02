@@ -156,7 +156,8 @@ def sparse_verify(section):
       samples = len(sparse['boards'])
     Log.write('verifying %d samples'%samples)
     try:
-      endgame_sparse_verify(section,sparse['boards'],sparse['wins'],random,samples)
+      assert all(board_section(sparse['boards'])==section)
+      endgame_sparse_verify(sparse['boards'],sparse['wins'],random,samples)
     except RuntimeError,e:
       Log.write(str(e))
       if recurse():

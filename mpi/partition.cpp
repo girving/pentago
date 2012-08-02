@@ -14,18 +14,20 @@
 #include <other/core/utility/const_cast.h>
 #include <other/core/vector/Interval.h>
 #include <other/core/utility/Log.h>
+#include <other/core/utility/str.h>
 namespace pentago {
 namespace mpi {
 
 using Log::cout;
 using std::endl;
 
-vector<Array<const section_t>> descendent_sections(section_t root) {
+vector<Array<const section_t>> descendent_sections(const section_t root, const int max_slice) {
   scope_t scope("dependents");
-  OTHER_ASSERT(root.sum()<36);
+  OTHER_ASSERT(0<=max_slice && max_slice<=35);
+  OTHER_ASSERT(root.sum()<=max_slice);
 
   // Recursively compute all sections that root depends on
-  vector<Array<section_t>> slices(36);
+  vector<Array<section_t>> slices(max_slice+1);
   Hashtable<section_t> seen;
   Array<section_t> stack;
   stack.append(root);
@@ -34,7 +36,7 @@ vector<Array<const section_t>> descendent_sections(section_t root) {
     if (seen.set(section)) {
       int n = section.sum();
       slices.at(n).append(section);
-      if (n < 35)
+      if (n < max_slice)
         for (int i=0;i<4;i++)
           if (section.counts[i].sum()<9)
             stack.append(section.child(i));
@@ -211,8 +213,11 @@ static inline uint64_t line_penalty(const lines_t& chunk) {
 template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines, const uint64_t bound, RawArray<Vector<int,2>> starts) {
   Vector<int,2> start;
   int p = 0;
-  if (start.x==lines.size())
+  if (start.x==lines.size()) {
+    if (record)
+      starts[p] = start;
     goto success;
+  }
   for (;p<work_penalties.size();p++) {
     if (record)
       starts[p] = start;
@@ -369,7 +374,7 @@ Vector<int,2> partition_t::block_to_line(section_t section, Vector<int,4> block)
     skip:;
     index++;
   } while (owner_lines.valid(index) && owner_lines[index].section==section);
-  die("block_to_line failed");
+  die(format("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section,block_size)),str(block)));
 }
 
 // (block_id, global node offset) for a given block

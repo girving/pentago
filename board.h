@@ -91,6 +91,11 @@ extern board_t random_board(Random& random);
 // Generate a random board with n stones
 extern board_t random_board(Random& random, int n);
 
+// Maybe swap sides
+static inline board_t flip_board(board_t board, bool turn) {
+  return pack(unpack(board,turn),unpack(board,1-turn));
+}
+
 extern string str_board(board_t board);
 
 }

@@ -4,6 +4,7 @@
 #include <pentago/stat.h>
 #include <pentago/symmetry.h>
 #include <pentago/trace.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/Array.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
@@ -36,9 +37,9 @@ static Array<superentry_t> table;
 
 void init_supertable(int bits) {
   if (bits<1 || bits>30)
-    throw ValueError(format("expected 1<=bits<=30, got bits = %d",bits));
+    THROW(ValueError,"expected 1<=bits<=30, got bits = %d",bits);
   if (64-bits>hash_bits)
-    throw ValueError(format("bits = %d is too small, the high order hash bits won't fit",bits));
+    THROW(ValueError,"bits = %d is too small, the high order hash bits won't fit",bits);
   table_bits = bits;
   cout << "initializing supertable: bits = "<<bits<<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
   table = Array<superentry_t>((uint64_t)1<<bits,false);

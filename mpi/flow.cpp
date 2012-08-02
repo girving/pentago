@@ -4,19 +4,24 @@
 #include <pentago/mpi/compute.h>
 #include <pentago/mpi/ibarrier.h>
 #include <pentago/mpi/requests.h>
+#include <pentago/mpi/trace.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/thread.h>
 #include <pentago/utility/aligned.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/utility/const_cast.h>
+#include <other/core/utility/ProgressIndicator.h>
 #include <other/core/utility/Hasher.h>
+#include <other/core/utility/Log.h>
 #include <boost/noncopyable.hpp>
 #include <boost/bind.hpp>
 #include <tr1/unordered_map>
 namespace pentago {
 namespace mpi {
 
+using Log::cout;
+using std::endl;
 using std::make_pair;
 using std::tr1::unordered_map;
 
@@ -60,7 +65,7 @@ flow_comms_t::~flow_comms_t() {
   CHECK(MPI_Comm_free(&wakeup_comm));
 }
 
-namespace {
+// Leave flow_t outside an anonymous namespace to reduce backtrace sizes
 
 struct flow_t {
   const flow_comms_t& comms;
@@ -79,6 +84,7 @@ struct flow_t {
 
   // Keep track out how much more stuff has to happen.  This includes both blocks we need to send and those we need to receive.
   ibarrier_countdown_t countdown;
+  ProgressIndicator progress;
 
   // Current free memory
   uint64_t free_memory;
@@ -112,6 +118,7 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , output_blocks(output_blocks)
   , block_size(output_blocks.partition->block_size)
   , countdown(comms.barrier_comm,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
+  , progress(countdown.remaining(),false)
   , free_memory(memory_limit)
   , output_buffer(aligned_buffer<Vector<super_t,2>>(sqr(sqr(block_size))))
   , barrier_callback(boost::bind(&flow_t::process_barrier,this,_1))
@@ -147,7 +154,7 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   // Finish up
   OTHER_ASSERT(!unscheduled_lines.size());
   OTHER_ASSERT(!block_requests.size());
-  threads_wait_all();
+  threads_wait_all_help();
 }
 
 flow_t::~flow_t() {}
@@ -163,6 +170,7 @@ void flow_t::schedule_lines() {
     unscheduled_lines.pop();
     line->allocate(comms.wakeup_comm);
     free_memory -= line_memory;
+    MPI_TRACE("allocate line %s",str(line->line));
     // Request all input blocks
     const int input_count = line->input_blocks();
     if (!input_count)
@@ -181,6 +189,7 @@ void flow_t::schedule_lines() {
           const auto owner_offsets = input_blocks->partition->rank_offsets(owner);
           const int owner_block_id = block_id-owner_offsets.x;
           CHECK(MPI_Send(0,0,MPI_INT,owner,owner_block_id,comms.request_comm));
+          MPI_TRACE("block request: owner %d, owner block id %d",owner,owner_block_id);
           it = block_requests.insert(make_pair(block_id,block_request)).first;
           // Post a receive for the request
           const auto block_data = line->input_block_data(b);
@@ -195,15 +204,18 @@ void flow_t::schedule_lines() {
 }
 
 void flow_t::post_barrier_recv() {
+  MPI_TRACE("post barrier recv");
   requests.add(countdown.barrier.irecv(),barrier_callback,true);
 }
 
 void flow_t::process_barrier(MPI_Status* status) {
+  MPI_TRACE("process barrier");
   countdown.barrier.process(*status);
   post_barrier_recv();
 }
 
 void flow_t::post_request_recv() {
+  MPI_TRACE("post request recv");
   MPI_Request request;
   CHECK(MPI_Irecv(0,0,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.request_comm,&request));
   requests.add(request,request_callback,true);
@@ -212,10 +224,12 @@ void flow_t::post_request_recv() {
 void flow_t::process_request(MPI_Status* status) {
   OTHER_ASSERT(input_blocks);
   const int local_block_id = status->MPI_TAG;
+  MPI_TRACE("process request: local block %d",local_block_id);
   // Send block data
   const auto block_data = input_blocks->get_flat(local_block_id);
   MPI_Request request;
   CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,local_block_id,comms.response_comm,&request));
+  MPI_TRACE("block response: source %d, local block id %d",status->MPI_SOURCE,local_block_id);
   // The barrier tells us when all messages are finished, so we don't need this request
   CHECK(MPI_Request_free(&request));
   // Repost wildcard receive
@@ -223,6 +237,7 @@ void flow_t::process_request(MPI_Status* status) {
 }
 
 void flow_t::post_output_recv() {
+  MPI_TRACE("post output recv");
   MPI_Request request;
   CHECK(MPI_Irecv(output_buffer.data(),8*output_buffer.size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
   requests.add(request,output_callback,true);
@@ -231,17 +246,20 @@ void flow_t::post_output_recv() {
 // Incoming output data for a block
 void flow_t::process_output(MPI_Status* status) {
   // How many elements did we receive?
-  int count = get_count(*status,MPI_LONG_LONG_INT);
+  int count = get_count(status,MPI_LONG_LONG_INT);
+  MPI_TRACE("process output block: source %d, local block id %d, count %g",status->MPI_SOURCE,status->MPI_TAG,count/8.);
   OTHER_ASSERT(!(count&7));
   const auto block_data = output_buffer.slice(0,count/8);
   // For now, do the accumulate in this thread
   output_blocks.accumulate(status->MPI_TAG,block_data);
   // One step closer...
+  progress.progress();
   countdown.decrement();
   post_output_recv();
 }
 
 void flow_t::post_wakeup_recv() {
+  MPI_TRACE("post wakeup recv");
   MPI_Request request;
   CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,wakeup_tag,comms.wakeup_comm,&request));
   requests.add(request,wakeup_callback,true);
@@ -250,8 +268,9 @@ void flow_t::post_wakeup_recv() {
 // Line line has finished; post sends for all output blocks
 void flow_t::process_wakeup(MPI_Status* status) {
   BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
-  OTHER_ASSERT(get_count(*status,MPI_LONG_LONG_INT)==1);
+  OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
   line_data_t* const line = (line_data_t*)wakeup_buffer; 
+  MPI_TRACE("process wakeup %s",str(line->line));
   const function<void(MPI_Status*)> callback(boost::bind(&flow_t::finish_output_send,this,line,_1));
   for (int b=0;b<line->line.length;b++) {
     const auto block = line->line.block(b);
@@ -262,17 +281,23 @@ void flow_t::process_wakeup(MPI_Status* status) {
     const int owner_block_id = block_id-owner_offsets.x;
     MPI_Request request;
     CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,owner_block_id,comms.output_comm,&request));
+    MPI_TRACE("send output: owner %d, owner block id %d, count %d",owner,owner_block_id,block_data.size());
     requests.add(request,callback);
   }
+  post_wakeup_recv();
 }
 
 void flow_t::finish_output_send(line_data_t* const line, MPI_Status* status) {
-  if (!line->decrement_unsent_output_blocks()) {
+  const int remaining = line->decrement_unsent_output_blocks();
+  MPI_TRACE("finish output send %s: remaining %d",str(line->line),remaining);
+  if (!remaining) {
+    MPI_TRACE("deallocate line %s",str(line->line));
     free_memory -= line->memory_usage();
     delete line;
     schedule_lines();
   }
   // One step closer...
+  progress.progress();
   countdown.decrement();
 }
 
@@ -285,11 +310,13 @@ void flow_t::process_response(MPI_Status* status) {
     die(format("other rank %d sent an unrequested block %lld",status->MPI_SOURCE,block_id));
   const auto request = it->second;
   block_requests.erase(it);
+  MPI_TRACE("process response: owner %d, owner block id %d",status->MPI_SOURCE,status->MPI_TAG);
 
   // Data has already been received into the first dependent line.  Copy data to other dependent lines
   OTHER_ASSERT(request->dependent_lines.size());
   const auto first_line = request->dependent_lines[0];
   const auto first_block_data = first_line->input_block_data(request->block);
+  OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==8*first_block_data.size());
   for (int i=1;i<(int)request->dependent_lines.size();i++) {
     const auto& line = request->dependent_lines[i];
     const auto block_data = line->input_block_data(request->block);
@@ -305,9 +332,7 @@ void flow_t::process_response(MPI_Status* status) {
   delete request;
 }
 
-}
-
-void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, Array<const line_t> lines, const uint64_t memory_limit) {
+void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit) {
   // Everything happens in this helper class
   flow_t(comms,input_blocks,output_blocks,lines,memory_limit);
 }

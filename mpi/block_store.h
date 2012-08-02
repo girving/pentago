@@ -84,5 +84,8 @@ public:
   void count_wins(int local_id);
 };
 
+// The kernel of count_wins factored out for use elsewhere
+Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<int,4> block, RawArray<const Vector<super_t,2>> data);
+
 }
 }

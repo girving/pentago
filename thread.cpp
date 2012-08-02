@@ -1,6 +1,7 @@
 // Thread utilities
 
 #include <pentago/thread.h>
+#include <pentago/utility/debug.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/stl.h>
 #include <other/core/random/counter.h>
@@ -11,12 +12,14 @@
 #include <other/core/utility/stl.h>
 #include <other/core/vector/Interval.h>
 #include <boost/bind.hpp>
+#include <deque>
 #include <set>
 namespace pentago {
 
 using Log::cout;
 using std::endl;
 using std::flush;
+using std::deque;
 using std::set;
 using std::exception;
 
@@ -24,17 +27,17 @@ using std::exception;
 #error "pentago requires thread_safe=1"
 #endif
 
-#define CHECK(exp) ({ \
-  int r_ = (exp); \
-  if (r_) \
-    throw RuntimeError(format("thread_pool_t: %s failed, %s",#exp,strerror(r_))); \
-  })
-
 static pthread_t master;
 
 static bool is_master() {
   return pthread_equal(master,pthread_self());
 }
+
+#define CHECK(exp) ({ \
+  int r_ = (exp); \
+  if (r_) \
+    THROW(RuntimeError,"thread_pool_t: %s failed, %s",#exp,strerror(r_)); \
+  })
 
 /****************** thread_time_t *****************/
 
@@ -131,14 +134,15 @@ private:
   vector<pthread_t> threads;
   mutex_t mutex;
   cond_t master_cond, worker_cond;
-  vector<function<void()>> jobs;
+  deque<function<void()>> jobs;
   ExceptionValue error;
   int waiting;
   bool die;
 
   friend void pentago::threads_wait_all();
+  friend void pentago::threads_wait_all_help();
 
-  thread_pool_t(thread_type_t type, int threads, int delta_priority);
+  thread_pool_t(thread_type_t type, int count, int delta_priority);
 public:
   ~thread_pool_t();
 
@@ -185,7 +189,7 @@ thread_pool_t::thread_pool_t(thread_type_t type, int count, int delta_priority)
     else {
       pthread_attr_destroy(&attr);
       shutdown();
-      throw RuntimeError(format("thread_pool_t: thread creation failed, %s",strerror(r)));
+      THROW(RuntimeError,"thread_pool_t: thread creation failed, %s",strerror(r));
     }
   }
   pthread_attr_destroy(&attr);
@@ -211,17 +215,16 @@ void* thread_pool_t::worker(void* pool_) {
   time_info.init_thread(pool.type);
   for (;;) {
     // Grab a job
-    bool die = false;
     function<void()> f;
     {
       thread_time_t time(pool.idle_name.c_str());
       lock_t lock(pool.mutex);
-      while (!die && !f) {
+      while (!f) {
         if (pool.die)
-          die = true;
+          return 0;
         else if (pool.jobs.size()) {
-          swap(f,pool.jobs.back());
-          pool.jobs.pop_back();
+          swap(f,pool.jobs.front());
+          pool.jobs.pop_front();
         } else {
           pool.master_cond.signal();
           pool.waiting++;
@@ -231,14 +234,12 @@ void* thread_pool_t::worker(void* pool_) {
       }
     }
 
-    // Were we killed?
-    if (die)
-      return 0;
-
     // Run the job
     try {
       f();
     } catch (const exception& e) {
+      if (throw_callback)
+        throw_callback(e.what());
       lock_t lock(pool.mutex);
       if (!pool.error)
         pool.error = e;
@@ -292,46 +293,88 @@ void set_thread_history(bool flag) {
 }
 
 void init_threads(int cpu_threads, int io_threads) {
+  OTHER_ASSERT(cpu_threads);
+  if (cpu_threads==-1 && io_threads==-1 && cpu_pool)
+    return;
+  OTHER_ASSERT(!cpu_pool && !io_pool);
+  master = pthread_self();
+  time_info.init_thread(MASTER);
   if (cpu_threads<0)
     cpu_threads = sysconf(_SC_NPROCESSORS_ONLN);
   if (io_threads<0)
     io_threads = 2;
-  OTHER_ASSERT(!!cpu_pool == !!io_pool);
-  if (cpu_pool)
-    OTHER_ASSERT(cpu_pool->count==cpu_threads && io_pool->count==io_threads);
-  else {
-    cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);
+  cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);
+  if (io_threads)
     io_pool = new_<thread_pool_t>(IO,io_threads,1000);
-    time_info.total_start = time_info.local_start = time();
-  }
+  time_info.total_start = time_info.local_start = time();
 }
 
 void threads_schedule(thread_type_t type, const function<void()>& f) {
   OTHER_ASSERT(type==CPU || type==IO);
+  if (type!=CPU) OTHER_ASSERT(io_pool);
   (type==CPU?cpu_pool:io_pool)->schedule(f);
 }
 
 void threads_schedule(thread_type_t type, const vector<function<void()>>& fs) {
   OTHER_ASSERT(type==CPU || type==IO);
+  if (type!=CPU) OTHER_ASSERT(io_pool);
   (type==CPU?cpu_pool:io_pool)->schedule(fs);
 }
 
 void threads_wait_all() {
-  for (;;) {
+  if (!io_pool)
     cpu_pool->wait();
-    io_pool->wait();
-    lock_t cpu_lock(cpu_pool->mutex);
-    lock_t io_lock(io_pool->mutex);
-    if (cpu_pool->error)
-      cpu_pool->error.throw_();
-    if (io_pool->error)
-      io_pool->error.throw_();
-    OTHER_ASSERT(!cpu_pool->die);
-    OTHER_ASSERT(!io_pool->die);
-    if (   !cpu_pool->jobs.size() && cpu_pool->waiting==cpu_pool->count
-        && !io_pool->jobs.size() && io_pool->waiting==io_pool->count)
-      break;
+  else
+    for (;;) {
+      cpu_pool->wait();
+      io_pool->wait();
+      lock_t cpu_lock(cpu_pool->mutex);
+      lock_t io_lock(io_pool->mutex);
+      if (cpu_pool->error)
+        cpu_pool->error.throw_();
+      if (io_pool->error)
+        io_pool->error.throw_();
+      OTHER_ASSERT(!cpu_pool->die);
+      OTHER_ASSERT(!io_pool->die);
+      if (   !cpu_pool->jobs.size() && cpu_pool->waiting==cpu_pool->count
+          && !io_pool->jobs.size() && io_pool->waiting==io_pool->count)
+        break;
+    }
+}
+
+// TODO: This function doesn't account for the case when the pool temporarily
+// runs out of jobs, but currently running jobs schedule a bunch more.  If
+// that happens, it safely but stupidly reverts to wait().
+void threads_wait_all_help() {
+  auto& pool = *cpu_pool;
+  for (;;) {
+    // Grab a job
+    function<void()> f;
+    {
+      lock_t lock(pool.mutex);
+      if (pool.die || !pool.jobs.size())
+        goto wait;
+      else {
+        swap(f,pool.jobs.front());
+        pool.jobs.pop_front();
+      }
+    }
+
+    // Run the job
+    try {
+      f();
+    } catch (const exception& e) {
+      if (throw_callback)
+        throw_callback(e.what());
+      lock_t lock(pool.mutex);
+      if (!pool.error)
+        pool.error = e;
+      pool.die = true;
+      goto wait;
+    }
   }
+  wait:
+  threads_wait_all();
 }
 
 /****************** time reports *****************/
@@ -401,7 +444,10 @@ void report_thread_times(bool total) {
   cout << "timing\n";
   for (auto& iname : order)
     cout << format("  %-20s %10.4f s\n",sanitize_name(iname.y.c_str()),times.get(iname.y.c_str()).y);
-  cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",elapsed-totals[MASTER],cpu_pool->count*elapsed-totals[CPU],io_pool->count*elapsed-totals[IO]);
+  if (io_pool)
+    cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",elapsed-totals[MASTER],cpu_pool->count*elapsed-totals[CPU],io_pool->count*elapsed-totals[IO]);
+  else
+    cout << format("  missing: master %.4f, cpu %.4f\n",elapsed-totals[MASTER],cpu_pool->count*elapsed-totals[CPU]);
   cout << flush;
 
   // Show which jobs ran on which type of thread
@@ -467,8 +513,6 @@ static void thread_pool_test() {
 using namespace pentago;
 
 void wrap_thread() {
-  master = pthread_self();
-  time_info.init_thread(MASTER);
   OTHER_FUNCTION(set_thread_history)
   OTHER_FUNCTION(init_threads)
   OTHER_FUNCTION(thread_pool_test)

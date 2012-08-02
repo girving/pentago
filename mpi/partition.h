@@ -13,7 +13,7 @@ using std::vector;
 
 // Compute all sections that root depends, organized by slice.
 // Only 35 slices are returned, since computing slice 36 is unnecessary.
-vector<Array<const section_t>> descendent_sections(section_t root);
+vector<Array<const section_t>> descendent_sections(const section_t root, const int max_slice);
 
 // A set of 1D block lines
 struct lines_t {
