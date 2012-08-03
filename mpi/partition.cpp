@@ -55,6 +55,26 @@ OTHER_DEFINE_TYPE(partition_t)
 
 static const uint64_t worst_line = 8*8*8*420;
 
+// A regular grid of 1D block lines with the same section, dimension, and shape
+struct chunk_t {
+  // Section information
+  section_t section;
+  Vector<int,4> shape;
+
+  // Line information
+  int dimension; // Line dimension
+  int length; // Line length in blocks
+  Box<Vector<int,3>> blocks; // Ranges of blocks along the other three dimensions
+  int count; // Number of lines in this range = blocks.volume()
+  int node_step; // Number of nodes in all blocks except possibly those at the end of lines
+  int line_size; // All lines in this line range have the same size
+
+  // Running total information, meaningful for owners only
+  uint64_t block_id; // Unique id of first block (others are indexed consecutively)
+  uint64_t node_offset; // Total number of nodes in all blocks in lines before this
+};
+BOOST_STATIC_ASSERT(sizeof(chunk_t)==88);
+
 partition_t::partition_t(const int ranks, const int block_size, const int slice, Array<const section_t> sections, bool save_work)
   : ranks(ranks), block_size(block_size), slice(slice), sections(sections)
   , owner_excess(inf), total_excess(inf)
@@ -89,7 +109,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
   // enough to do redundantly across all processes.
 
   // Construct the sets of lines
-  Array<lines_t> owner_lines, other_lines;
+  Array<chunk_t> owner_lines, other_lines;
   uint64_t owner_line_count = 0, other_line_count = 0;
   for (auto section : sections) {
     const auto shape = section.shape(),
@@ -104,13 +124,13 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
         const auto shape_k = shape.remove_index(k),
                    blocks_lo_k = blocks_lo.remove_index(k),
                    blocks_hi_k = blocks_hi.remove_index(k);
-        Array<lines_t>& lines = owner_k==k?owner_lines:other_lines;
+        Array<chunk_t>& lines = owner_k==k?owner_lines:other_lines;
         uint64_t& line_count = owner_k==k?owner_line_count:other_line_count;
         for (int i0=0;i0<2;i0++) {
           for (int i1=0;i1<2;i1++) {
             for (int i2=0;i2<2;i2++) {
               const auto I = vec(i0,i1,i2);
-              lines_t chunk;
+              chunk_t chunk;
               for (int a=0;a<3;a++) {
                 if (I[a]) {
                   chunk.blocks.min[a] = blocks_lo_k[a];
@@ -203,14 +223,14 @@ partition_t::~partition_t() {}
 // Compute a penalty amount for a line.  This is based on (1) the number of blocks and (2) the total memory required by the blocks.
 // Penalizing lines based purely on memory is suboptimal, since it results in a wildly varying number of blocks/lines assigned to
 // different ranks.  Thus, we artificially inflate small blocks and very short lines in order to even things out.
-static inline uint64_t line_penalty(const lines_t& chunk) {
+static inline uint64_t line_penalty(const chunk_t& chunk) {
   const int block_size = 8;
   const int block_penalty = sqr(sqr(block_size))*2/3;
   return max(chunk.line_size,block_penalty*max(chunk.length,4));
 }
 
 // Can the remaining work fit within the given bound?
-template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines, const uint64_t bound, RawArray<Vector<int,2>> starts) {
+template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const chunk_t> lines, const uint64_t bound, RawArray<Vector<int,2>> starts) {
   Vector<int,2> start;
   int p = 0;
   if (start.x==lines.size()) {
@@ -250,7 +270,7 @@ template<bool record> bool partition_t::fit(RawArray<uint64_t> work_nodes, RawAr
 }
 
 // Divide a set of lines between processes
-Array<const Vector<int,2>> partition_t::partition_lines(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const lines_t> lines, const int line_count) {
+Array<const Vector<int,2>> partition_t::partition_lines(RawArray<uint64_t> work_nodes, RawArray<uint64_t> work_penalties, RawArray<const chunk_t> lines, const int line_count) {
   // Compute a lower bound for how much work each rank needs to do
   const int ranks = work_penalties.size();
   const uint64_t sum_done = work_penalties.sum(),
@@ -305,7 +325,7 @@ Vector<uint64_t,2> partition_t::rank_offsets(int rank) const {
 
 Array<line_t> partition_t::rank_lines(int rank, bool owned) const {
   OTHER_ASSERT(0<=rank && rank<ranks);
-  RawArray<const lines_t> all_lines = owned?owner_lines:other_lines;
+  RawArray<const chunk_t> all_lines = owned?owner_lines:other_lines;
   RawArray<const Vector<int,2>> starts = owned?owner_starts:other_starts;
   const auto start = starts[rank], end = starts[rank+1];
   Array<line_t> result;
@@ -329,7 +349,7 @@ Array<line_t> partition_t::rank_lines(int rank, bool owned) const {
 
 uint64_t partition_t::rank_count_lines(int rank, bool owned) const {
   OTHER_ASSERT(0<=rank && rank<ranks);
-  RawArray<const lines_t> all_lines = owned?owner_lines:other_lines;
+  RawArray<const chunk_t> all_lines = owned?owner_lines:other_lines;
   RawArray<const Vector<int,2>> starts = owned?owner_starts:other_starts;
   const auto start = starts[rank], end = starts[rank+1];
   uint64_t result = 0;
