@@ -11,6 +11,6 @@ Library(env,'pentago',['other_core','lzma'],extra=['gen/tables.cpp'],skip=['endg
 
 env = env.Clone()
 env.Append(LIBS=['pentago','other_core'])
-if env['PLATFORM']=='posix':
-  env.Append(LIBS=['tcmalloc'])
+if 0 and env['PLATFORM']=='posix':
+  env.Append(LIBS=['tcmalloc']) # tcmalloc doesn't ever release memory to the OS, which is scary
 Program(env,'endgame-mpi','mpi/endgame-mpi.cpp')
