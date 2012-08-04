@@ -5,7 +5,7 @@
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/trace.h>
 #include <pentago/endgame.h>
-#include <pentago/utility/mmap.h>
+#include <pentago/utility/memory.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/index.h>
 #include <other/core/array/IndirectArray.h>
@@ -115,7 +115,7 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
   , unsent_output_blocks(self.line.length)
 
   // Allocate memory for both input and output in a single buffer
-  , input(mmap_buffer<Vector<super_t,2>>(self.input_shape.product()+self.output_shape.product()))
+  , input(large_buffer<Vector<super_t,2>>(self.input_shape.product()+self.output_shape.product(),false))
 
   // When computation is complete, send a wakeup message here
   , wakeup_comm(wakeup_comm) {

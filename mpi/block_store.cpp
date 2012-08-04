@@ -3,7 +3,6 @@
 #include <pentago/mpi/block_store.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/count.h>
-#include <pentago/utility/mmap.h>
 #include <pentago/utility/memory.h>
 #include <other/core/python/Class.h>
 #include <other/core/utility/const_cast.h>
@@ -55,7 +54,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, Array
   const_cast_(this->block_info) = block_info;
 
   // Allocate space for all blocks as one huge array, and zero it to indicate losses.
-  const_cast_(this->all_data) = mmap_buffer<Vector<super_t,2>>(last.y-first.y);
+  const_cast_(this->all_data) = large_buffer<Vector<super_t,2>>(last.y-first.y,true);
 
   // Count the number of required contributions before all blocks are complete
   uint64_t total_count = 0;
