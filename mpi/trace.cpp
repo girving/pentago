@@ -9,7 +9,7 @@ namespace mpi {
 
 using std::endl;
 
-#ifdef MPI_TRACING
+#ifdef PENTAGO_MPI_TRACING
 
 static spinlock_t lock;
 

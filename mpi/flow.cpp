@@ -171,7 +171,7 @@ void flow_t::schedule_lines() {
     unscheduled_lines.pop();
     free_memory -= line_memory;
     line->allocate(comms.wakeup_comm);
-    MPI_TRACE("allocate line %s",str(line->line));
+    PENTAGO_MPI_TRACE("allocate line %s",str(line->line));
     // Request all input blocks
     const int input_count = line->input_blocks();
     if (!input_count)
@@ -190,7 +190,7 @@ void flow_t::schedule_lines() {
           const auto owner_offsets = input_blocks->partition->rank_offsets(owner);
           const int owner_block_id = block_id-owner_offsets.x;
           CHECK(MPI_Send(0,0,MPI_INT,owner,owner_block_id,comms.request_comm));
-          MPI_TRACE("block request: owner %d, owner block id %d",owner,owner_block_id);
+          PENTAGO_MPI_TRACE("block request: owner %d, owner block id %d",owner,owner_block_id);
           it = block_requests.insert(make_pair(block_id,block_request)).first;
           // Post a receive for the request
           const auto block_data = line->input_block_data(b);
@@ -205,18 +205,18 @@ void flow_t::schedule_lines() {
 }
 
 void flow_t::post_barrier_recv() {
-  MPI_TRACE("post barrier recv");
+  PENTAGO_MPI_TRACE("post barrier recv");
   requests.add(countdown.barrier.irecv(),barrier_callback,true);
 }
 
 void flow_t::process_barrier(MPI_Status* status) {
-  MPI_TRACE("process barrier");
+  PENTAGO_MPI_TRACE("process barrier");
   countdown.barrier.process(*status);
   post_barrier_recv();
 }
 
 void flow_t::post_request_recv() {
-  MPI_TRACE("post request recv");
+  PENTAGO_MPI_TRACE("post request recv");
   MPI_Request request;
   CHECK(MPI_Irecv(0,0,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.request_comm,&request));
   requests.add(request,request_callback,true);
@@ -225,12 +225,12 @@ void flow_t::post_request_recv() {
 void flow_t::process_request(MPI_Status* status) {
   OTHER_ASSERT(input_blocks);
   const int local_block_id = status->MPI_TAG;
-  MPI_TRACE("process request: local block %d",local_block_id);
+  PENTAGO_MPI_TRACE("process request: local block %d",local_block_id);
   // Send block data
   const auto block_data = input_blocks->get_flat(local_block_id);
   MPI_Request request;
   CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,local_block_id,comms.response_comm,&request));
-  MPI_TRACE("block response: source %d, local block id %d",status->MPI_SOURCE,local_block_id);
+  PENTAGO_MPI_TRACE("block response: source %d, local block id %d",status->MPI_SOURCE,local_block_id);
   // The barrier tells us when all messages are finished, so we don't need this request
   CHECK(MPI_Request_free(&request));
   // Repost wildcard receive
@@ -238,7 +238,7 @@ void flow_t::process_request(MPI_Status* status) {
 }
 
 void flow_t::post_output_recv() {
-  MPI_TRACE("post output recv");
+  PENTAGO_MPI_TRACE("post output recv");
   MPI_Request request;
   CHECK(MPI_Irecv(output_buffer.data(),8*output_buffer.size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
   requests.add(request,output_callback,true);
@@ -248,7 +248,7 @@ void flow_t::post_output_recv() {
 void flow_t::process_output(MPI_Status* status) {
   // How many elements did we receive?
   int count = get_count(status,MPI_LONG_LONG_INT);
-  MPI_TRACE("process output block: source %d, local block id %d, count %g",status->MPI_SOURCE,status->MPI_TAG,count/8.);
+  PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, count %g",status->MPI_SOURCE,status->MPI_TAG,count/8.);
   OTHER_ASSERT(!(count&7));
   const auto block_data = output_buffer.slice(0,count/8);
   // For now, do the accumulate in this thread
@@ -260,7 +260,7 @@ void flow_t::process_output(MPI_Status* status) {
 }
 
 void flow_t::post_wakeup_recv() {
-  MPI_TRACE("post wakeup recv");
+  PENTAGO_MPI_TRACE("post wakeup recv");
   MPI_Request request;
   CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,wakeup_tag,comms.wakeup_comm,&request));
   requests.add(request,wakeup_callback,true);
@@ -271,7 +271,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
   BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
   OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
   line_data_t* const line = (line_data_t*)wakeup_buffer; 
-  MPI_TRACE("process wakeup %s",str(line->line));
+  PENTAGO_MPI_TRACE("process wakeup %s",str(line->line));
   const function<void(MPI_Status*)> callback(boost::bind(&flow_t::finish_output_send,this,line,_1));
   for (int b=0;b<line->line.length;b++) {
     const auto block = line->line.block(b);
@@ -282,7 +282,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
     const int owner_block_id = block_id-owner_offsets.x;
     MPI_Request request;
     CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,owner_block_id,comms.output_comm,&request));
-    MPI_TRACE("send output: owner %d, owner block id %d, count %d",owner,owner_block_id,block_data.size());
+    PENTAGO_MPI_TRACE("send output: owner %d, owner block id %d, count %d",owner,owner_block_id,block_data.size());
     requests.add(request,callback);
   }
   post_wakeup_recv();
@@ -290,9 +290,9 @@ void flow_t::process_wakeup(MPI_Status* status) {
 
 void flow_t::finish_output_send(line_data_t* const line, MPI_Status* status) {
   const int remaining = line->decrement_unsent_output_blocks();
-  MPI_TRACE("finish output send %s: remaining %d",str(line->line),remaining);
+  PENTAGO_MPI_TRACE("finish output send %s: remaining %d",str(line->line),remaining);
   if (!remaining) {
-    MPI_TRACE("deallocate line %s",str(line->line));
+    PENTAGO_MPI_TRACE("deallocate line %s",str(line->line));
     const auto line_memory = line->memory_usage();
     delete line;
     free_memory += line_memory;
@@ -312,7 +312,7 @@ void flow_t::process_response(MPI_Status* status) {
     die(format("other rank %d sent an unrequested block %lld",status->MPI_SOURCE,block_id));
   const auto request = it->second;
   block_requests.erase(it);
-  MPI_TRACE("process response: owner %d, owner block id %d",status->MPI_SOURCE,status->MPI_TAG);
+  PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d",status->MPI_SOURCE,status->MPI_TAG);
 
   // Data has already been received into the first dependent line.  Copy data to other dependent lines
   OTHER_ASSERT(request->dependent_lines.size());

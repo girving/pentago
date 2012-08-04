@@ -285,7 +285,7 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
                                                                              :0);
   const symmetry_t base_transform = rest.inverse_transform*local_symmetry;
 
-#ifdef MPI_DEBUG
+#ifdef PENTAGO_MPI_DEBUG
   // Check that child data is consistent before and after transformation
   const auto child_rmin = vec(rotation_minimal_quadrants(rest.standard_child_section.counts[0]),
                               rotation_minimal_quadrants(rest.standard_child_section.counts[1]),
@@ -342,7 +342,7 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
         const int j = ir/4;
         const symmetry_t symmetry = local_symmetry_t((ir&3)<<2*dim)*base_transform*local_symmetry_t(symmetries[j]);
         const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+block_stride*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
-#ifdef MPI_DEBUG
+#ifdef PENTAGO_MPI_DEBUG
         const auto child_board = child_board_base|(board_t)child_rmin[child_dim].x[j^(j<line_moves)]<<16*child_dim;
         slow_verify("child inline",child_board,child,true);
         const auto after_board = flip_board(pack(new_side0,side1),turn);
@@ -366,7 +366,7 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
     // Send a pointer to ourselves to the communication thread
     line_data_t* pointer = line;
     CHECK(MPI_Send(&pointer,1,MPI_LONG_LONG_INT,0,wakeup_tag,rest.wakeup_comm));
-    MPI_TRACE("sent wakeup for %s",str(line->line));
+    PENTAGO_MPI_TRACE("sent wakeup for %s",str(line->line));
   }
 }
 
@@ -393,7 +393,7 @@ template void compute_microline<false>(line_data_t* const,const Vector<int,3>);
  * number of threads.  Yes, I clearly want to do that.  TODO: Say whether I did this.
  */
 void schedule_compute_line(line_data_t& line) {
-  MPI_TRACE("schedule compute line %s",str(line.line));
+  PENTAGO_MPI_TRACE("schedule compute line %s",str(line.line));
   // Schedule each microline
   const auto cross_section = line.output_shape.remove_index(line.line.dimension);
   const auto compute = line.line.section.sum()==35?compute_microline<true>:compute_microline<false>;

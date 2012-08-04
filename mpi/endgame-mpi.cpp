@@ -231,12 +231,12 @@ int main(int argc, char** argv) {
          << "\nlevel = "<<level
          << "\nmemory limit = "<<large(memory_limit)
          << endl;
-#ifdef MPI_DEBUG
+#ifdef PENTAGO_MPI_DEBUG
     cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 
 #endif
   }
 
-#ifdef MPI_DEBUG
+#ifdef PENTAGO_MPI_DEBUG
   init_supertable(12);
 #endif
 
@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
       if (slice+1==meaningless) {
         prev_partition = new_<partition_t>(ranks,block_size,slice+1,slices[slice+1]);
         prev_blocks = meaningless_block_store(*prev_partition,rank);
-#ifdef MPI_DEBUG
+#ifdef PENTAGO_MPI_DEBUG
         set_block_cache(store_block_cache(ref(prev_blocks)));
 #endif
       }
