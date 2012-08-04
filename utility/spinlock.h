@@ -6,6 +6,7 @@
 #else
 #include <pthread.h>
 #endif
+#include <boost/type_traits/is_same.hpp>
 #include <boost/noncopyable.hpp>
 namespace pentago {
 
@@ -48,7 +49,7 @@ struct spinlock_t {
 //
 // I've checked that both are safe to do with glibc, so we restrict to that for now.
 #ifdef __GLIBC__
-BOOST_STATIC_ASSERT(boost::is_same<volatile int,pthread_spinlock_t);
+BOOST_MPL_ASSERT((boost::is_same<volatile int,pthread_spinlock_t>));
 #else
 #error "I'm not sure if pthread_spin_destroy is a no-op on this system"
 #endif

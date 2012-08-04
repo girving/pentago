@@ -78,7 +78,7 @@ Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size) {
   auto* buffer = (aligned_buffer_t*)malloc(sizeof(aligned_buffer_t));
   (void)PyObject_INIT(buffer,&buffer->pytype);
 #ifndef __APPLE__
-  if (!posix_memalign(&buffer->start,alignment,size))
+  if (posix_memalign(&buffer->start,alignment,size))
     THROW(bad_alloc);
   return tuple(buffer->start,(PyObject*)buffer);
 #else

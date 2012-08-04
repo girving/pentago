@@ -2,7 +2,7 @@
 #pragma once
 
 #include <pentago/mpi/block_store.h>
-#include <mpi.h>
+#include <pentago/mpi/config.h>
 namespace pentago {
 namespace mpi {
 

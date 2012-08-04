@@ -409,14 +409,14 @@ vector<Ref<supertensor_reader_t>> open_supertensors(const string& path) {
   else if (!memcmp(buffer,multiple_supertensor_magic,20)) {
     uint32_t header[3];
     ssize_t r = pread(fd->fd,header,sizeof(header),20);
-    if (r < sizeof(header))
+    if (r < (int)sizeof(header))
       THROW(IOError,"invalid multiple supertensor file \"%s\": error reading global header, %s",path,r<0?strerror(errno):"unexpected eof");
     if (header[0] != 3)
       THROW(IOError,"multiple supertensor file \"%s\" has unknown version %d",path,header[0]);
     if (header[1] >= 8239)
       THROW(IOError,"multiple supertensor file \"%s\" has weird section count %d",path,header[1]);
     const size_t offset = 20+3*sizeof(uint32_t);
-    for (int s=0;s<header[1];s++)
+    for (int s=0;s<(int)header[1];s++)
       readers.push_back(new_<supertensor_reader_t>(path,fd,offset+header[2]*s));
   } else
     THROW(IOError,"invalid supertensor file \"%s\": bad magic string",path);

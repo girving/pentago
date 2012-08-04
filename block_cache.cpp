@@ -80,7 +80,7 @@ protected:
     : memory_limit(memory_limit)
     , free_memory(memory_limit) {
     for (const auto& reader : reader_list) {
-      OTHER_ASSERT(reader->header.block_size==block_size);
+      OTHER_ASSERT((int)reader->header.block_size==block_size);
       readers.insert(make_pair(reader->header.section,reader));
     }
   }
@@ -122,7 +122,7 @@ protected:
   store_block_cache_t(const mpi::block_store_t& blocks)
     : blocks(ref(blocks)) {
     OTHER_ASSERT(blocks.partition->ranks==1);
-    OTHER_ASSERT(blocks.partition->block_size==block_size);
+    OTHER_ASSERT((int)blocks.partition->block_size==block_size);
   }
 public:
 

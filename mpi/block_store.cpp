@@ -30,7 +30,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, Array
   OTHER_ASSERT(partition.block_size==8);
 
   // Make sure 32-bit array indices suffice
-  OTHER_ASSERT(last.y-first.y<(1<<31));
+  OTHER_ASSERT(last.y-first.y<(1u<<31));
 
   // Compute map from local block id to local offset
   int block_id = 0, node = 0;
@@ -50,8 +50,8 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, Array
       block_info[block_id].lock = spinlock_t();
       block_info[++block_id].offset = node;
     }
-  OTHER_ASSERT(block_id==last.x-first.x);
-  OTHER_ASSERT(node==last.y-first.y);
+  OTHER_ASSERT((uint64_t)block_id==last.x-first.x);
+  OTHER_ASSERT((uint64_t)node==last.y-first.y);
   const_cast_(this->block_info) = block_info;
 
   // Allocate space for all blocks as one huge array, and zero it to indicate losses.
@@ -67,7 +67,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, Array
     block_info[b].missing_contributions = count;
     total_count += count;
   }
-  OTHER_ASSERT(total_count<(1<<31));
+  OTHER_ASSERT(total_count<(1u<<31));
   const_cast_(required_contributions) = total_count;
 }
 

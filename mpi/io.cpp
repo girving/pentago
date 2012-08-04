@@ -92,10 +92,8 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   const int local_blocks = blocks.blocks();
   vector<Array<uint8_t>> compressed(local_blocks);
   auto progress = tuple(spinlock_t(),ProgressIndicator(local_blocks));
-  for (int b : range(local_blocks)) {
-    const auto info = blocks.block_info[b];
+  for (int b : range(local_blocks))
     threads_schedule(CPU,boost::bind(filter_and_compress_and_store,&progress,&compressed[b],blocks.get(b).flat,level,turn));
-  }
   threads_wait_all_help();
 
   // Determine the base offset of each rank
@@ -108,7 +106,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     thread_time_t time(time_tag);
     for (const auto& c : compressed)
       local_size += c.size();
-    OTHER_ASSERT(local_size<(1<<31));
+    OTHER_ASSERT(local_size<(1u<<31));
     CHECK(MPI_Exscan(&local_size,&previous,1,MPI_LONG_LONG_INT,MPI_SUM,comm));
   }
 
@@ -231,7 +229,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   uint64_t local_block_indexes_size = 0;
   for (const auto& bi : compressed_block_indexes)
     local_block_indexes_size += bi.y.size();
-  OTHER_ASSERT(local_block_indexes_size<(1<<31));
+  OTHER_ASSERT(local_block_indexes_size<(1u<<31));
   uint64_t previous_block_indexes_size = 0;
   CHECK(MPI_Exscan(&local_block_indexes_size,&previous_block_indexes_size,1,MPI_LONG_LONG_INT,MPI_SUM,comm));
   const uint64_t local_block_index_start = block_index_start+previous_block_indexes_size;

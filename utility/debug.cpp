@@ -28,10 +28,10 @@ template<class Error> void __attribute__ ((noreturn)) maybe_throw(const char* ms
 
 #define REGISTER_BARE(Error) \
   namespace { template<> const char* error_name_t<Error>::name = #Error; } \
-  template void maybe_throw<Error>() __attribute__ ((noreturn));
+  template void __attribute__ ((noreturn)) maybe_throw<Error>();
 #define REGISTER(Error) \
   namespace { template<> const char* error_name_t<Error>::name = #Error; } \
-  template void maybe_throw<Error>(const char*) __attribute__ ((noreturn));
+  template void __attribute__ ((noreturn)) maybe_throw<Error>(const char*);
 REGISTER(AssertionError)
 REGISTER(RuntimeError)
 REGISTER(ValueError)

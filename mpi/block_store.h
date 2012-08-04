@@ -1,11 +1,11 @@
 // Data structure keeping track of all blocks we own
 #pragma once
 
+#include <pentago/mpi/config.h>
 #include <pentago/mpi/partition.h>
 #include <pentago/superscore.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
-#include <mpi.h>
 namespace pentago {
 namespace mpi {
 

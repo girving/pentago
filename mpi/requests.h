@@ -1,11 +1,11 @@
 // A list of requests together with callbacks
 #pragma once
 
+#include <pentago/mpi/config.h>
 #include <other/core/array/Array.h>
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
 #include <vector>
-#include <mpi.h>
 namespace pentago {
 namespace mpi {
 

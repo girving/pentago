@@ -2,12 +2,12 @@
 #pragma once
 
 #include <pentago/mpi/line.h>
+#include <pentago/mpi/config.h>
 #include <pentago/symmetry.h>
 #include <pentago/utility/spinlock.h>
 #include <other/core/array/Array4d.h>
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <mpi.h>
 namespace pentago {
 namespace mpi {
 

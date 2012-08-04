@@ -210,11 +210,11 @@ static void process_data(compare_t* self, subcompare_t* sub, RawArray<const Tupl
 // Check one supertensor file against another, and verify that all sparse samples are consistent.  Return counts and number of samples found in this section.
 static Tuple<Vector<uint64_t,3>,int> compare_readers_and_samples(const supertensor_reader_t& reader, const Ptr<const supertensor_reader_t> old_reader, RawArray<const board_t> sample_boards, RawArray<const Vector<super_t,2>> sample_wins) {
   compare_t self(reader.header.section,old_reader);
-  OTHER_ASSERT(reader.header.block_size==block_size);
+  OTHER_ASSERT((int)reader.header.block_size==block_size);
   OTHER_ASSERT(sample_boards.size()==sample_wins.size());
   if (old_reader) {
     OTHER_ASSERT(old_reader->header.section==self.section);
-    OTHER_ASSERT(old_reader->header.block_size==block_size);
+    OTHER_ASSERT((int)old_reader->header.block_size==block_size);
   }
 
   // Organize samples by block

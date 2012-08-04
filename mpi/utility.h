@@ -1,9 +1,9 @@
 // MPI related utilities
 
+#include <pentago/mpi/config.h>
 #include <pentago/thread.h>
 #include <pentago/section.h>
 #include <other/core/vector/Vector.h>
-#include <mpi.h>
 namespace pentago {
 namespace mpi {
 

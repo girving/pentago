@@ -458,7 +458,7 @@ static void partition_test() {
       max_lines = max(max_lines,lines);
       rank_total_lines += lines;
     }
-    OTHER_ASSERT(max_blocks==partition->max_rank_blocks);
+    OTHER_ASSERT(max_blocks==(uint64_t)partition->max_rank_blocks);
     OTHER_ASSERT(total_lines==rank_total_lines);
     cout << "average blocks = "<<(double)total_blocks/ranks<<", max blocks = "<<max_blocks<<endl;
     cout << "average lines = "<<(double)total_lines/ranks<<", max lines = "<<max_lines<<endl;
@@ -471,7 +471,7 @@ static void partition_test() {
         // We should own all blocks in lines we own
         Hashtable<Tuple<section_t,Vector<int,4>>> blocks;
         const auto owned = partition->rank_lines(rank,true);
-        OTHER_ASSERT(owned.size()==partition->rank_count_lines(rank,true));
+        OTHER_ASSERT((uint64_t)owned.size()==partition->rank_count_lines(rank,true));
         const auto first_offsets = partition->rank_offsets(rank),
                    last_offsets = partition->rank_offsets(rank+1);
         bool first = true;
@@ -495,7 +495,7 @@ static void partition_test() {
         OTHER_ASSERT(next_offset==last_offsets);
         // We only own some of the blocks in lines we don't own
         auto other = partition->rank_lines(rank,false);
-        OTHER_ASSERT(other.size()==partition->rank_count_lines(rank,false));
+        OTHER_ASSERT((uint64_t)other.size()==partition->rank_count_lines(rank,false));
         for (const auto& line : other)
           for (int j=0;j<line.length;j++) {
             const auto block = line.block(j);

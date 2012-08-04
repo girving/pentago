@@ -1,6 +1,7 @@
 // Massively parallel in-core endgame database computation
 
 #include <pentago/mpi/flow.h>
+#include <pentago/mpi/config.h>
 #include <pentago/mpi/partition.h>
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
@@ -17,7 +18,6 @@
 #include <other/core/utility/Log.h>
 #include <sys/stat.h>
 #include <getopt.h>
-#include <mpi.h>
 using namespace pentago;
 using namespace pentago::mpi;
 

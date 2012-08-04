@@ -1,6 +1,6 @@
 // A nonblocking version of MPI_Barrier
 
-#include <mpi.h>
+#include <pentago/mpi/config.h>
 #include <boost/noncopyable.hpp>
 namespace pentago {
 namespace mpi {
