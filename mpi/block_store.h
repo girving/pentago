@@ -53,8 +53,8 @@ public:
   const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
   const int required_contributions;
   static const bool compressed = false; // For now, we're always uncompressed
-private:
   spinlock_t section_counts_lock;
+private:
 
   // Allocate all blocks initialized to zero (loss), and initialize a window for one-sided accumulate ops.  Collective.
   block_store_t(const partition_t& partition, const int rank, Array<const line_t> lines);
@@ -80,6 +80,7 @@ public:
   RawArray<const Vector<super_t,2>,4> get(int local_id) const;
   RawArray<const Vector<super_t,2>> get_flat(int local_id) const;
 
+private:
   // Count wins and losses.  Normally scheduled automatically from accumulate.
   void count_wins(int local_id);
 };

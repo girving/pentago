@@ -122,7 +122,7 @@ void block_store_t::count_wins(int local_id) {
   const int section_id = partition->section_id.get(info.section);
   const auto counts = count_block_wins(info.section,info.block,flat_data);
   spin_t spin(section_counts_lock);
-  section_counts[section_id] += counts; 
+  section_counts[section_id] += counts;
 }
 
 Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<int,4> block, RawArray<const Vector<super_t,2>> flat_data) {

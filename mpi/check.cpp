@@ -2,6 +2,7 @@
 
 #include <pentago/mpi/block_store.h>
 #include <pentago/mpi/utility.h>
+#include <pentago/count.h>
 #include <pentago/supertensor.h>
 #include <pentago/symmetry.h>
 #include <pentago/utility/index.h>
@@ -35,7 +36,8 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
   OTHER_ASSERT(shape.product()==flat_data.size());
   const RawArray<Vector<super_t,2>,4> block_data(shape,flat_data.data());
 
-  // Fill
+  // Fill and count
+  Vector<uint64_t,3> counts;
   for (int i0=0;i0<shape[0];i0++)
     for (int i1=0;i1<shape[1];i1++)
       for (int i2=0;i2<shape[2];i2++)
@@ -47,11 +49,15 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
           // level up will be a win.  All wins makes for a very boring analysis.
           node.x = super_meaningless(board)|super_meaningless(board,1)|super_meaningless(board,2)|super_meaningless(board,3);
           node.y = node.x|super_meaningless(board,7);
+          // Count wins
+          counts += Vector<uint64_t,3>(popcounts_over_stabilizers(board,node)); 
         }
   info->missing_contributions = 0;
 
-  // Count
-  self->count_wins(local_id);
+  // Add to section counts
+  const int section_id = self->partition->section_id.get(info->section);
+  spin_t spin(self->section_counts_lock);
+  self->section_counts[section_id] += counts;
 }
 
 Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank) {
