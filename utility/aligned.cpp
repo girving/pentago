@@ -22,7 +22,7 @@ struct aligned_buffer_t : public boost::noncopyable
 static void free_buffer(PyObject* object) {
   aligned_buffer_t* buffer = (aligned_buffer_t*)object;
   free(buffer->start);
-  delete buffer;
+  free(buffer);
 }
 
 PyTypeObject aligned_buffer_t::pytype = {
