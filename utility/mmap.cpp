@@ -1,20 +1,20 @@
-// Aligned array allocation
+// Array allocation using mmap
 
-#include <pentago/utility/aligned.h>
+#include <pentago/utility/mmap.h>
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/python/module.h>
+#include <sys/mman.h>
 #include <vector>
 namespace pentago {
 
 using std::vector;
-using std::bad_alloc;
 
 namespace {
 
-struct aligned_buffer_t : public boost::noncopyable {
+struct mmap_buffer_t : public boost::noncopyable {
   OTHER_DECLARE_TYPE // Declare pytype
   PyObject_HEAD // Reference counter and pointer to type object
   size_t size; // Size of memory block
@@ -22,18 +22,18 @@ struct aligned_buffer_t : public boost::noncopyable {
 };
 
 static void free_buffer(PyObject* object) {
-  aligned_buffer_t* buffer = (aligned_buffer_t*)object;
-  free(buffer->start);
+  mmap_buffer_t* buffer = (mmap_buffer_t*)object;
+  munmap(buffer->start,buffer->size);
   ssize_t size = buffer->size;
   free(buffer);
   report_large_alloc(-size);
 }
 
-PyTypeObject aligned_buffer_t::pytype = {
+PyTypeObject mmap_buffer_t::pytype = {
   PyObject_HEAD_INIT(&PyType_Type)
   0,                          // ob_size
-  "pentago.aligned_buffer_t", // tp_name
-  sizeof(aligned_buffer_t),   // tp_basicsize
+  "pentago.mmap_buffer_t",    // tp_name
+  sizeof(mmap_buffer_t),      // tp_basicsize
   0,                          // tp_itemsize
   free_buffer,                // tp_dealloc
   0,                          // tp_print
@@ -72,69 +72,22 @@ PyTypeObject aligned_buffer_t::pytype = {
   0,                          // tp_free
 };
 
-// All necessary aligned_buffer_t::pytpe fields are filled in, so no PyType_Ready is needed
+// All necessary mmap_buffer_t::pytpe fields are filled in, so no PyType_Ready is needed
 
 }
 
-Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size) {
+Tuple<void*,PyObject*> mmap_buffer_helper(size_t size) {
   if (!size)
     return tuple((void*)0,(PyObject*)0);
-#ifndef __APPLE__
-  void* start;
-  if (posix_memalign(&start,alignment,size))
-    THROW(bad_alloc);
-  void* pointer = start;
-#else
-  // Mac OS 10.7.4 has a buggy version of posix_memalign, so do our own alignment at the cost of one extra element
-  void* start = malloc(size+alignment-1);
-  if (!start)
-    THROW(bad_alloc);
-  size_t p = (size_t)start;
-  p = (p+alignment-1)&~(alignment-1);
-  void* pointer = (void*)p;
-#endif
-  auto* buffer = (aligned_buffer_t*)malloc(sizeof(aligned_buffer_t));
+  void* start = mmap(0,size,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE,-1,0);
+  if (start==MAP_FAILED)
+    THROW(RuntimeError,"anonymous mmap failed, size = %zu",size);
+  auto* buffer = (mmap_buffer_t*)malloc(sizeof(mmap_buffer_t));
   (void)PyObject_INIT(buffer,&buffer->pytype);
   buffer->size = size;
   buffer->start = start;
   report_large_alloc(size);
-  return tuple(pointer,(PyObject*)buffer);
+  return tuple(start,(PyObject*)buffer);
 }
 
-// Most useful when run under valgrind to test for leaks
-static void aligned_test() {
-  // Check empty buffer
-  struct large_t { char data[64]; };
-  aligned_buffer<large_t>(0);
-
-  vector<Array<uint8_t>> buffers;
-  for (int i=0;i<100;i++) {
-    // Test 1D
-    auto x = aligned_buffer<int>(10);
-    x.zero();
-    x[0] = 1;
-    x.last() = 2;
-    OTHER_ASSERT(x.sum()==3);
-    buffers.push_back(char_view_own(x));
-
-    // Test 2D
-    auto y = aligned_buffer<float>(vec(4,5));
-    y.flat.zero();
-    y(0,0) = 1;
-    y(0,4) = 2;
-    y(3,0) = 3;
-    y(3,4) = 4;
-    OTHER_ASSERT(y.sum()==10);
-    buffers.push_back(char_view_own(y.flat));
-  }
-
-  for (auto& x : buffers)
-    OTHER_ASSERT((((long)x.data())&15)==0);
-}
-
-}
-using namespace pentago;
-
-void wrap_aligned() {
-  OTHER_FUNCTION(aligned_test)
 }

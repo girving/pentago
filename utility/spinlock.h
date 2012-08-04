@@ -8,6 +8,7 @@
 #endif
 #include <boost/type_traits/is_same.hpp>
 #include <boost/noncopyable.hpp>
+#include <boost/mpl/assert.hpp>
 namespace pentago {
 
 /* Important non-portability note:

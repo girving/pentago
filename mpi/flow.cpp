@@ -7,7 +7,7 @@
 #include <pentago/mpi/trace.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/thread.h>
-#include <pentago/utility/aligned.h>
+#include <pentago/utility/mmap.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/utility/const_cast.h>
@@ -120,7 +120,7 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , countdown(comms.barrier_comm,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
   , progress(countdown.remaining(),false)
   , free_memory(memory_limit)
-  , output_buffer(aligned_buffer<Vector<super_t,2>>(sqr(sqr(block_size))))
+  , output_buffer(mmap_buffer<Vector<super_t,2>>(sqr(sqr(block_size))))
   , barrier_callback(boost::bind(&flow_t::process_barrier,this,_1))
   , request_callback(boost::bind(&flow_t::process_request,this,_1))
   , output_callback(boost::bind(&flow_t::process_output,this,_1))

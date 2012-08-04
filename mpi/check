@@ -70,7 +70,7 @@ for slice in arange(36):
           for reader,counts in zip(readers,counts):
             section = reader.header.section
             assert all(section==counts[:1].view(uint8).reshape(4,2))
-            old_reader = None if meaningless else supertensor_reader_t('%s/section-%s.pentago'%(old_dir,show_section(section)))
+            old_reader = None if meaningless or not old_dir else supertensor_reader_t('%s/section-%s.pentago'%(old_dir,show_section(section)))
             counts2,samples_found = compare_readers_and_samples(reader,old_reader,sample_boards,sample_wins)
             assert all(counts[1:]==counts2)
             assert samples_found==256

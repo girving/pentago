@@ -5,7 +5,7 @@
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/trace.h>
 #include <pentago/endgame.h>
-#include <pentago/utility/aligned.h>
+#include <pentago/utility/mmap.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/index.h>
 #include <other/core/array/IndirectArray.h>
@@ -114,12 +114,16 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
   , missing_microlines(self.output_shape.remove_index(self.line.dimension).product())
   , unsent_output_blocks(self.line.length)
 
-  // Allocate memory
-  , input(aligned_buffer<Vector<super_t,2>>(self.input_shape.product()))
-  , output(aligned_buffer<Vector<super_t,2>>(self.output_shape.product()))
+  // Allocate memory for both input and output in a single buffer
+  , input(mmap_buffer<Vector<super_t,2>>(self.input_shape.product()+self.output_shape.product()))
 
   // When computation is complete, send a wakeup message here
   , wakeup_comm(wakeup_comm) {
+
+  // Split buffer into two pieces
+  const int split = self.input_shape.product();
+  const_cast_(output) = input.slice_own(split,input.size());
+  const_cast_(input) = input.slice_own(0,split);
 
   // If there's a reflection, prepare to rearrange data accordingly
   const auto child_rmin = vec(rotation_minimal_quadrants(standard_child_section.counts[0]),

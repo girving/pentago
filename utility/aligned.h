@@ -7,7 +7,6 @@
 namespace pentago {
 
 using namespace other;
-using std::bad_alloc;
 
 // Allocate an aligned buffer with the given properties, and return buffer and owner.
 Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size);

@@ -13,9 +13,12 @@
 #include <pentago/compress.h>
 #include <pentago/superengine.h>
 #include <pentago/supertable.h>
+#include <pentago/utility/aligned.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
 #include <other/core/utility/Log.h>
+#include <other/core/utility/process.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <getopt.h>
 using namespace pentago;
@@ -47,13 +50,19 @@ static section_t parse_section(const string& s) {
     cerr << argv[0] << ": " << format(__VA_ARGS__) << endl; \
   return 1; })
 
+static void report(const char* name) {
+  cout << "memory "<<name<<": "<<memory_report()<<endl;
+}
+
 int main(int argc, char** argv) {
   // Initialize MPI
+  report("start");
   mpi_world_t world(argc,argv);
   MPI_Comm comm = MPI_COMM_WORLD;
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   set_verbose(!rank);
+  report("mpi");
 
   // Parse command line options
   int save = -100;
@@ -182,6 +191,7 @@ int main(int argc, char** argv) {
   // Allocate thread pool
   const int workers = threads-1;
   init_threads(workers,0);
+  report("threads");
 
   // Make sure the compression level is valid
   if (!rank) {
@@ -239,6 +249,7 @@ int main(int argc, char** argv) {
 
   // Allocate communicators
   flow_comms_t comms(comm);
+  report("base");
 
   // Compute each slice in turn
   {
@@ -275,8 +286,9 @@ int main(int argc, char** argv) {
       if (memory_limit < base_memory)
         die(format("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit)));
       const auto free_memory = memory_limit-base_memory;
-      cout << "memory usage: partitions = "<<partition_memory<<", blocks = "<<block_memory<<", lines = "<<line_memory<<", total = "<<large(base_memory)<<endl;
+      cout << "memory usage: partitions = "<<partition_memory<<", blocks = "<<large(block_memory)<<", lines = "<<line_memory<<", total = "<<large(base_memory)<<endl;
       cout << "maximum line parallelism = "<<free_memory/(2*13762560)<<endl;
+      report("compute");
 
       // Compute (and communicate)
       {
@@ -288,6 +300,7 @@ int main(int argc, char** argv) {
       prev_partition = partition;
       prev_blocks = blocks;
       lines.clean_memory();
+      report("free");
 
       // Write various information to disk
       {
@@ -307,5 +320,6 @@ int main(int argc, char** argv) {
   // Dump total timing
   // TODO: synchronize all processes
   report_thread_times(true);
+  report("final");
   return 0;
 }
