@@ -7,6 +7,8 @@
 #include <pentago/mpi/trace.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/thread.h>
+#include <pentago/utility/large.h>
+#include <pentago/utility/memory.h>
 #include <pentago/utility/mmap.h>
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
@@ -168,8 +170,8 @@ void flow_t::schedule_lines() {
       break;
     // Schedule the line
     unscheduled_lines.pop();
-    line->allocate(comms.wakeup_comm);
     free_memory -= line_memory;
+    line->allocate(comms.wakeup_comm);
     MPI_TRACE("allocate line %s",str(line->line));
     // Request all input blocks
     const int input_count = line->input_blocks();
@@ -292,8 +294,9 @@ void flow_t::finish_output_send(line_data_t* const line, MPI_Status* status) {
   MPI_TRACE("finish output send %s: remaining %d",str(line->line),remaining);
   if (!remaining) {
     MPI_TRACE("deallocate line %s",str(line->line));
-    free_memory -= line->memory_usage();
+    const auto line_memory = line->memory_usage();
     delete line;
+    free_memory += line_memory;
     schedule_lines();
   }
   // One step closer...

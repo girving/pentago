@@ -79,7 +79,7 @@ PyTypeObject mmap_buffer_t::pytype = {
 Tuple<void*,PyObject*> mmap_buffer_helper(size_t size) {
   if (!size)
     return tuple((void*)0,(PyObject*)0);
-  void* start = mmap(0,size,PROT_READ|PROT_WRITE,MAP_ANONYMOUS|MAP_PRIVATE,-1,0);
+  void* start = mmap(0,size,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0);
   if (start==MAP_FAILED)
     THROW(RuntimeError,"anonymous mmap failed, size = %zu",size);
   auto* buffer = (mmap_buffer_t*)malloc(sizeof(mmap_buffer_t));
