@@ -33,10 +33,10 @@ if meaningless:
   raise ValueError('predict doesn\'t accept --meaningless')
 
 # Parse memory
-m = re.match('^(\d+)(M|MB|G|GB)$',memory())
+m = re.match('^(\d+(?:\.\d*)|\.\d+)(M|MB|G|GB)$',memory())
 if not m:
   raise ValueError('weird memory limit %s'%memory())
-memory = int(m.group(1))<<{'M':20,'G':30}[m.group(2)[0]]
+memory = int(float(m.group(1))*2**{'M':20,'G':30}[m.group(2)[0]])
 
 # Parse section
 m = re.match('^\D*(?:\d\d-)?(\d{8})\D*$',section())
