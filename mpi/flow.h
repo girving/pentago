@@ -19,6 +19,10 @@ struct flow_comms_t : public boost::noncopyable {
   MPI_Comm output_comm; // Output data to be merged into one of our local output blocks.  Tag = owner block id, block data.
   MPI_Comm wakeup_comm; // Wake up messages from a worker thread to the communication thread when a line finishes.  Tag = wakeup_tag, data = &line
 
+  // Note: In compressed mode, response messages are compressed but output messages are uncompressed.  This is because
+  // (1) the messages is stored compressed by the owner, so sending compressed is easy and (2) most output messages would need
+  // to be temporarily uncompressed at the owner anyways to be combined with previous contributions.
+
   explicit flow_comms_t(MPI_Comm comm);
   ~flow_comms_t();
 };

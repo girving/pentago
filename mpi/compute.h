@@ -39,7 +39,7 @@ struct line_data_t : public boost::noncopyable {
   // Valid only after allocate is called
   scoped_ptr<allocated_t> rest;
 
-  line_data_t(const line_t& line, const int block_size);
+  line_data_t(const line_t& line);
   ~line_data_t();
 
   // Valid before allocate is called

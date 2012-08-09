@@ -5,9 +5,10 @@
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/trace.h>
 #include <pentago/endgame.h>
-#include <pentago/utility/memory.h>
+#include <pentago/utility/ceil_div.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/index.h>
+#include <pentago/utility/memory.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
 #include <other/core/utility/const_cast.h>
@@ -21,13 +22,8 @@ using std::endl;
 
 /*********************** line_data_t ************************/
 
-// We're going to be dividing by block size, so take advantage of the fact that it's 8
-static const int block_size = 8;
-static const int block_shift = 3;
-
-line_data_t::line_data_t(const line_t& line, const int block_size_)
+line_data_t::line_data_t(const line_t& line)
   : line(line) {
-  OTHER_ASSERT(block_size_==8);
 
   // Compute input and output shapes
   const int dim = line.dimension;
@@ -35,7 +31,7 @@ line_data_t::line_data_t(const line_t& line, const int block_size_)
   const auto child_section = line.section.child(dim);
   const auto child_section_shape = child_section.shape();
   OTHER_ASSERT(section_shape.remove_index(dim)==child_section_shape.remove_index(dim));
-  auto output_shape = block_shape(section_shape,line.block(0),block_size);
+  auto output_shape = block_shape(section_shape,line.block(0));
   output_shape[dim] = section_shape[dim];
   auto input_shape = output_shape;
   input_shape[dim] = child_section_shape[dim];
@@ -97,7 +93,7 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
   , section_transform(     standardize_child_section(self.line.section,self.line.dimension).y)
   , permutation(section_t::quadrant_permutation(symmetry_t::invert_global(section_transform)))
   , child_dimension(permutation.find(self.line.dimension&3))
-  , child_length((self.input_shape[self.line.dimension]+block_size-1)/block_size)
+  , child_length(ceil_div(self.input_shape[self.line.dimension],block_size))
   , first_child_block(self.line.block_base.insert(0,self.line.dimension&3).subset(permutation))
 
   // Prepare a transform that rotates quadrants globally while preserving their orientation, reflecting first if necessary.

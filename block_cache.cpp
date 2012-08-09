@@ -28,8 +28,6 @@ bool block_cache_t::lookup(const bool aggressive, const side_t side0, const side
   return lookup(aggressive,pack(side0,side1),wins);
 }
 
-static const int block_size = 8;
-
 bool block_cache_t::lookup(const bool aggressive, const board_t board, super_t& wins) const {
   // Account for global symmetries
   const bool turn = count(board).sum()&1;
@@ -117,12 +115,21 @@ struct store_block_cache_t : public block_cache_t {
   typedef block_cache_t Base;
 
   const Ref<const mpi::block_store_t> blocks;
+#if PENTAGO_MPI_COMPRESS
+  const uint64_t memory_limit;
+  mutable unordered_map<Tuple<section_t,Vector<int,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
+  mutable uint64_t free_memory;
+#endif
 
 protected:
-  store_block_cache_t(const mpi::block_store_t& blocks)
-    : blocks(ref(blocks)) {
+  store_block_cache_t(const mpi::block_store_t& blocks, const uint64_t memory_limit)
+    : blocks(ref(blocks))
+#if PENTAGO_MPI_COMPRESS
+    , memory_limit(memory_limit)
+    , free_memory(memory_limit)
+#endif
+  {
     OTHER_ASSERT(blocks.partition->ranks==1);
-    OTHER_ASSERT((int)blocks.partition->block_size==block_size);
   }
 public:
 
@@ -135,7 +142,21 @@ public:
   }
 
   RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<int,4> block) const {
-    return blocks->get(section,block);
+#if PENTAGO_MPI_COMPRESS
+    const auto key = tuple(section,block);
+    const auto it = block_cache.find(key);
+    if (it != block_cache.end())
+      return it->second;
+    const auto data = blocks->uncompress_and_get(section,block);
+    const auto memory = memory_usage(data);
+    if (free_memory < memory)
+      THROW(RuntimeError,"store_block_cache_t: memory limit of %s exceeded (%zu blocks loaded)",large(memory_limit),block_cache.size());
+    free_memory -= memory;
+    block_cache.insert(make_pair(key,data));
+    return data;
+#else
+    return blocks->get_raw(section,block);
+#endif
   }
 };
 OTHER_DEFINE_TYPE(store_block_cache_t)
@@ -145,8 +166,8 @@ Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_r
   return new_<reader_block_cache_t>(readers,memory_limit);
 }
 
-Ref<const block_cache_t> store_block_cache(const mpi::block_store_t& blocks) {
-  return new_<store_block_cache_t>(blocks);
+Ref<const block_cache_t> store_block_cache(const mpi::block_store_t& blocks, const uint64_t memory_limit) {
+  return new_<store_block_cache_t>(blocks,memory_limit);
 }
 
 }

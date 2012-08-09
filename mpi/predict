@@ -74,7 +74,7 @@ for slice in reversed(xrange(len(slices))):
   if not len(slices[slice]):
     break
   with Log.scope('slice %d'%slice):
-    partition = partition_t(ranks,block_size,slice,slices[slice],True)
+    partition = partition_t(ranks,slice,slices[slice],True)
     Log.write('blocks = %d'%partition.max_rank_blocks)
     Log.write('nodes = %d'%partition.max_rank_nodes)
     max_blocks = max(max_blocks,partition.max_rank_blocks)

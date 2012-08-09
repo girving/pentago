@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
   // Parse command line options
   int save = -100;
   int threads = 0;
-  int block_size = 8;
+  int specified_block_size = 8;
   int level = 26;
   uint64_t memory_limit = 0;
   int samples = 256;
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
             error("--" #long_opt " expected int, got '%s'",optarg); \
           break; }
       INT_ARG('t',threads,threads)
-      INT_ARG('b',block-size,block_size)
+      INT_ARG('b',block-size,specified_block_size)
       INT_ARG('s',save,save)
       INT_ARG('l',level,level)
       INT_ARG('p',samples,samples)
@@ -152,6 +152,8 @@ int main(int argc, char** argv) {
     error("must specify --threads n (or -t n) with n > 1");
   if (threads < 1)
     error("need at least two threads for communication vs. compute");
+  if (block_size != specified_block_size)
+    error("block size is currently hard coded to %d, can't specify %s",block_size,specified_block_size);
   if (block_size < 2 || (block_size&1))
     error("invalid block size %d",block_size);
   if (block_size != 8)
@@ -207,10 +209,10 @@ int main(int argc, char** argv) {
       check_directory(comm,dir);
       const int slice = test[6]-'0';
       const auto sections = all_boards_sections(slice,8);
-      const auto partition = new_<partition_t>(ranks,block_size,slice,sections);
-      const auto blocks = meaningless_block_store(partition,rank);
+      const auto partition = new_<partition_t>(ranks,slice,sections);
+      const auto blocks = meaningless_block_store(partition,rank,samples);
       write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
-      write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks,samples);
+      write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks);
       write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
     } else
       error("unknown unit test '%s'",test);
@@ -263,24 +265,24 @@ int main(int argc, char** argv) {
 
       // Allocate meaningless data if necessary
       if (slice+1==meaningless) {
-        prev_partition = new_<partition_t>(ranks,block_size,slice+1,slices[slice+1]);
-        prev_blocks = meaningless_block_store(*prev_partition,rank);
+        prev_partition = new_<partition_t>(ranks,slice+1,slices[slice+1]);
+        prev_blocks = meaningless_block_store(*prev_partition,rank,samples);
 #ifdef PENTAGO_MPI_DEBUG
         set_block_cache(store_block_cache(ref(prev_blocks)));
 #endif
       }
 
       // Partition work among processors
-      const auto partition = new_<partition_t>(ranks,block_size,slice,slices[slice]);
+      const auto partition = new_<partition_t>(ranks,slice,slices[slice]);
 
       // Allocate memory for all the blocks we own
       auto lines = partition->rank_lines(rank,true);
-      const auto blocks = new_<block_store_t>(partition,rank,lines);
+      const auto blocks = new_<block_store_t>(partition,rank,samples,lines);
       lines.append_elements(partition->rank_lines(rank,false));
 
-      // Measure current memory usage
+      // Estimate peak memory usage ignoring active lines
       const auto partition_memory = memory_usage(prev_partition)+memory_usage(partition),
-                 block_memory = memory_usage(prev_blocks)+memory_usage(blocks),
+                 block_memory = (prev_blocks?prev_blocks->estimate_peak_memory_usage():0)+blocks->estimate_peak_memory_usage(),
                  line_memory = memory_usage(lines)+base_compute_memory_usage(lines.size()),
                  base_memory = partition_memory+block_memory+line_memory;
       if (memory_limit < base_memory)
@@ -295,6 +297,7 @@ int main(int argc, char** argv) {
         Log::Scope scope("compute");
         compute_lines(comms,prev_blocks,blocks,lines,free_memory);
       }
+      blocks->print_compression_stats();
 
       // Deallocate obsolete slice
       prev_partition = partition;
@@ -306,7 +309,7 @@ int main(int argc, char** argv) {
       {
         Log::Scope scope("write");
         write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
-        write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks,samples);
+        write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks);
         if (slice <= save)
           write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
       }

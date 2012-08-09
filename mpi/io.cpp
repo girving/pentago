@@ -45,12 +45,28 @@ static void compress_and_store(Array<uint8_t>* dst, RawArray<const uint8_t> data
   *dst = compress(data,level);
 }
 
+#if PENTAGO_MPI_COMPRESS
+static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* progress, Array<uint8_t>* dst, const block_store_t* blocks, int local_id, int level, bool turn) {
+#else
 static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* progress, Array<uint8_t>* dst, RawArray<const Vector<super_t,2>> data, int level, bool turn) {
+#endif
+
+#if PENTAGO_MPI_COMPRESS
+  // Uncompress if necessary
+  Array<Vector<super_t,2>> data = blocks->uncompress_and_get_flat(local_id);
+#endif
+
   // Adjust for the different format of block_store_t and apply interleave filtering
+#if PENTAGO_MPI_COMPRESS
+  const auto filtered = data.raw();
+#else
   Array<Vector<super_t,2>> filtered;
+#endif
   {
     thread_time_t time("filter");
-    filtered = aligned_buffer<Vector<super_t,2>>(data.size());
+#if !PENTAGO_MPI_COMPRESS
+    filtered = large_buffer<Vector<super_t,2>>(data.size(),false);
+#endif
     if (!turn)
       for (int i=0;i<data.size();i++)
         filtered[i] = interleave_super(vec(data[i].x,~data[i].y));
@@ -77,7 +93,6 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   const auto& partition = *blocks.partition;
-  const int block_size = partition.block_size;
   const int filter = 1; // interleave filtering
   const bool turn = partition.slice&1;
 
@@ -93,7 +108,11 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   vector<Array<uint8_t>> compressed(local_blocks);
   auto progress = tuple(spinlock_t(),ProgressIndicator(local_blocks));
   for (int b : range(local_blocks))
-    threads_schedule(CPU,boost::bind(filter_and_compress_and_store,&progress,&compressed[b],blocks.get(b).flat,level,turn));
+#if PENTAGO_MPI_COMPRESS
+    threads_schedule(CPU,boost::bind(filter_and_compress_and_store,&progress,&compressed[b],&blocks,b,level,turn));
+#else
+    threads_schedule(CPU,boost::bind(filter_and_compress_and_store,&progress,&compressed[b],blocks.get_raw_flat(b),level,turn));
+#endif
   threads_wait_all_help();
 
   // Determine the base offset of each rank
@@ -125,7 +144,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     for (int b : range(local_blocks)) {
       const auto info = blocks.block_info[b];
       block_blobs[b].compressed_size = compressed[b].size();
-      block_blobs[b].uncompressed_size = sizeof(Vector<super_t,2>)*block_shape(info.section.shape(),info.block,block_size).product();
+      block_blobs[b].uncompressed_size = sizeof(Vector<super_t,2>)*block_shape(info.section.shape(),info.block).product();
       block_blobs[b+1].offset = block_blobs[b].offset+compressed[b].size();
     }
     OTHER_ASSERT(block_blobs.last().offset==header_size+previous+local_size);
@@ -166,7 +185,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
       const auto info = blocks.block_info[b];
       const int sid = section_id.get(info.section);
       if (info.block==Vector<int,4>()) {
-        const auto section_blocks = pentago::mpi::section_blocks(sections[sid],block_size);
+        const auto section_blocks = pentago::mpi::section_blocks(sections[sid]);
         Array<supertensor_blob_t,4> block_index(section_blocks,false);
         memset(block_index.data(),0,sizeof(supertensor_blob_t)*block_index.flat.size());
         block_indexes.set(sid,block_index);
@@ -240,7 +259,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   int next_block_index_offset = local_block_index_start;
   for (const auto& bi : compressed_block_indexes) {
     auto& blob = index_blobs[bi.x];
-    blob.uncompressed_size = sizeof(supertensor_blob_t)*section_blocks(sections[bi.x],block_size).product();
+    blob.uncompressed_size = sizeof(supertensor_blob_t)*section_blocks(sections[bi.x]).product();
     blob.compressed_size = bi.y.size();
     blob.offset = next_block_index_offset;
     next_block_index_offset += bi.y.size();
@@ -295,10 +314,11 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 void check_directory(const MPI_Comm comm, const string& dir) {
   const int slice = 24;
   const int rank = comm_rank(comm);
+  const int samples_per_section = 0;
   const Array<const section_t> sections;
-  const auto partition = new_<partition_t>(comm_size(comm),8,slice,sections);
+  const auto partition = new_<partition_t>(comm_size(comm),slice,sections);
   const auto lines = partition->rank_lines(rank,true);
-  const auto blocks = new_<block_store_t>(partition,rank,lines);
+  const auto blocks = new_<block_store_t>(partition,rank,samples_per_section,lines);
   write_sections(comm,format("%s/empty.pentago",dir),blocks,0);
 }
 
@@ -341,49 +361,29 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
   CHECK(MPI_File_close(&file));
 }
 
-void write_sparse_samples(const MPI_Comm comm, const string& filename, const block_store_t& blocks, const int samples_per_section) {
+void write_sparse_samples(const MPI_Comm comm, const string& filename, block_store_t& blocks) {
   thread_time_t time("write-sparse");
   const int rank = comm_rank(comm);
   const bool turn = blocks.partition->slice&1;
-  const int block_size = blocks.partition->block_size;
 
-  // Organize blocks by section
-  unordered_map<section_t,unordered_map<Vector<int,4>,RawArray<const Vector<super_t,2>,4>,Hasher>,Hasher> section_blocks;
-  for (int b : range(blocks.blocks()))
-    section_blocks[blocks.block_info[b].section].insert(make_pair(blocks.block_info[b].block,blocks.get(b)));
-
-  // Collect random samples
-  typedef Tuple<board_t,Vector<uint64_t,8>> sample_t;
-  BOOST_STATIC_ASSERT(sizeof(sample_t)==9*sizeof(uint64_t));
-  Array<sample_t> samples;
-  for (const auto& s : section_blocks) {
-    const auto section = s.first;
-    const auto shape = section.shape();
-    const auto rmin = vec(rotation_minimal_quadrants(section.counts[0]).x,
-                          rotation_minimal_quadrants(section.counts[1]).x,
-                          rotation_minimal_quadrants(section.counts[2]).x,
-                          rotation_minimal_quadrants(section.counts[3]).x);
-    const auto random = new_<Random>(hash(section));
-    for (int i=0;i<samples_per_section;i++) {
-      const auto index = random->uniform(Vector<int,4>(),shape),
-                 block = index/block_size;
-      const auto it = s.second.find(block);
-      if (it != s.second.end()) {
-        const auto board = quadrants(rmin[0][index[0]],
-                                     rmin[1][index[1]],
-                                     rmin[2][index[2]],
-                                     rmin[3][index[3]]);
-        auto data = it->second[index-block_size*block];
-        data.y = ~data.y;
-        if (turn)
-          swap(data.x,data.y);
-        Vector<uint64_t,8> packed;
-        BOOST_STATIC_ASSERT(sizeof(packed)==sizeof(data));
-        memcpy(&packed,&data,sizeof(data));
-        samples.append(tuple(board,packed));
-      }
+  // Mangle samples into correct output format in place
+  typedef block_store_t::sample_t sample_t;
+  const RawArray<sample_t> samples = blocks.samples.flat;
+  if (!turn) // Black to play
+    for (auto& sample : samples)
+      sample.wins.y = ~sample.wins.y;
+  else // White to play
+    for (auto& sample : samples) {
+      sample.wins.y = ~sample.wins.y;
+      swap(sample.wins.x,sample.wins.y);
     }
-  }
+
+  // Generate a datatype for the pieces of block_store_t::sample_t that we need
+  MPI_Datatype sample_type;
+  int lengths[2] = {1,8};
+  MPI_Aint displacements[2] = {offsetof(sample_t,board),offsetof(sample_t,wins)};
+  MPI_Datatype types[2] = {MPI_LONG_LONG_INT,MPI_LONG_LONG_INT};
+  CHECK(MPI_Type_create_struct(2,lengths,displacements,types,&sample_type));
 
   // Count total samples and send to root
   const int local_samples = samples.size();
@@ -397,7 +397,8 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, const blo
   // Write our data
   if (rank) {
     // On non-root processes, we only need to write out samples
-    CHECK(MPI_File_write_ordered(file,samples.data(),9*samples.size(),MPI_LONG_LONG_INT,MPI_STATUS_IGNORE));
+    CHECK(MPI_Type_commit(&sample_type));
+    CHECK(MPI_File_write_ordered(file,samples.data(),samples.size(),sample_type,MPI_STATUS_IGNORE));
   } else {
     // On the root, we have to write out both header and our samples.  First, build the header.
     Array<uint8_t> header;
@@ -406,9 +407,9 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, const blo
       fill_numpy_header(header,all_samples);
     }
     // Construct datatype combining header with local samples
-    int lengths[2] = {header.size(),9*samples.size()};
+    int lengths[2] = {header.size(),samples.size()};
     MPI_Aint displacements[2] = {(MPI_Aint)header.data(),(MPI_Aint)samples.data()};
-    MPI_Datatype types[2] = {MPI_BYTE,MPI_LONG_LONG_INT};
+    MPI_Datatype types[2] = {MPI_BYTE,sample_type};
     MPI_Datatype datatype;
     CHECK(MPI_Type_struct(2,lengths,displacements,types,&datatype));
     CHECK(MPI_Type_commit(&datatype));
@@ -420,6 +421,7 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, const blo
 
   // Done!
   CHECK(MPI_File_close(&file));
+  CHECK(MPI_Type_free(&sample_type));
 }
 
 }

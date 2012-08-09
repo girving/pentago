@@ -82,8 +82,8 @@ thread_type_t thread_type();
 // Initialize thread pools
 void init_threads(int cpu_threads, int io_threads);
 
-// Schedule a job
-void threads_schedule(thread_type_t type, const function<void()>& f);
+// Schedule a job.  Schedule at the back of the queue if !soon, or the front if soon.
+void threads_schedule(thread_type_t type, const function<void()>& f, bool soon=false);
 
 // Schedule many jobs
 void threads_schedule(thread_type_t type, const vector<function<void()>>& fs);

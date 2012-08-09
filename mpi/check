@@ -24,9 +24,9 @@ init_threads(-1,-1)
 # Generate meaningless data
 if meaningless:
   sections = all_boards_sections(meaningless,8)
-  partition = partition_t(1,8,meaningless,sections,False)
+  partition = partition_t(1,meaningless,sections,False)
   with Log.scope('meaningless'):
-    cache = store_block_cache(meaningless_block_store(partition,0))
+    cache = store_block_cache(meaningless_block_store(partition,0,0),1<<30)
   set_block_cache(cache)
 
 # Process each slice that exists, keeping track of which files we've checked
@@ -62,6 +62,7 @@ for slice in arange(36):
       # Open slice file
       if os.path.exists(slice_file):
         readers = open_supertensors(slice_file)
+        assert 20+3*4+sum(reader.total_size() for reader in readers)==os.stat(slice_file).st_size
         assert counts.shape==(len(readers),4)
         unchecked.remove(slice_file)
 

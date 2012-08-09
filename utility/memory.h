@@ -28,6 +28,11 @@ template<class T> static inline uint64_t memory_usage(const Ptr<T>& object) {
   return object?memory_usage(*object):0;
 }
 
+// Arguably, RawArrays don't take up any of their own memory, but that version of the function would be useless.
+template<class T> static inline uint64_t memory_usage(const RawArray<T>& array) {
+  return sizeof(T)*array.size();
+}
+
 template<class T> static inline uint64_t memory_usage(const Array<T>& array) {
   return sizeof(T)*array.size();
 }

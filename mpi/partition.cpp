@@ -3,6 +3,7 @@
 #include <pentago/mpi/partition.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/all_boards.h>
+#include <pentago/utility/ceil_div.h>
 #include <pentago/utility/index.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
@@ -75,16 +76,12 @@ struct chunk_t {
 };
 BOOST_STATIC_ASSERT(sizeof(chunk_t)==88);
 
-partition_t::partition_t(const int ranks, const int block_size, const int slice, Array<const section_t> sections, bool save_work)
-  : ranks(ranks), block_size(block_size), slice(slice), sections(sections)
+partition_t::partition_t(const int ranks, const int slice, Array<const section_t> sections, bool save_work)
+  : ranks(ranks), slice(slice), sections(sections)
   , owner_excess(inf), total_excess(inf)
   , total_blocks(0), total_nodes(0), max_rank_blocks(0), max_rank_nodes(0) {
   OTHER_ASSERT(ranks>0);
   scope_t scope("partition");
-
-  // For now, block size is hard coded to 8.  This is used below.
-  if (block_size!=8)
-    die("partition_t: block size must be 8 for now");
 
   // Verify that caller didn't lie about slice
   for (const auto& section : sections)
@@ -114,7 +111,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
   for (auto section : sections) {
     const auto shape = section.shape(),
                blocks_lo = shape/block_size,
-               blocks_hi = (shape+block_size-1)/block_size;
+               blocks_hi = ceil_div(shape,block_size);
     const auto sums = section.sums();
     OTHER_ASSERT(sums.sum()<36);
     const int owner_k = sums.argmin();
@@ -146,7 +143,7 @@ partition_t::partition_t(const int ranks, const int block_size, const int slice,
                 chunk.shape = shape;
                 chunk.dimension = k;
                 chunk.length = blocks_hi[k];
-                const int cross_section = block_shape(shape_k,chunk.blocks.min,block_size).product();
+                const int cross_section = block_shape(shape_k,chunk.blocks.min).product();
                 chunk.line_size = shape[k]*cross_section;
                 chunk.node_step = block_size*cross_section;
                 chunk.block_id = chunk.node_offset = (uint64_t)1<<60; // Garbage value
@@ -224,7 +221,6 @@ partition_t::~partition_t() {}
 // Penalizing lines based purely on memory is suboptimal, since it results in a wildly varying number of blocks/lines assigned to
 // different ranks.  Thus, we artificially inflate small blocks and very short lines in order to even things out.
 static inline uint64_t line_penalty(const chunk_t& chunk) {
-  const int block_size = 8;
   const int block_penalty = sqr(sqr(block_size))*2/3;
   return max(chunk.line_size,block_penalty*max(chunk.length,4));
 }
@@ -394,7 +390,7 @@ Vector<int,2> partition_t::block_to_line(section_t section, Vector<int,4> block)
     skip:;
     index++;
   } while (owner_lines.valid(index) && owner_lines[index].section==section);
-  die(format("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section,block_size)),str(block)));
+  die(format("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section)),str(block)));
 }
 
 // (block_id, global node offset) for a given block
@@ -408,7 +404,6 @@ Vector<uint64_t,2> partition_t::block_offsets(section_t section, Vector<int,4> b
 
 static void partition_test() {
   const int stones = 24;
-  const int block_size = 8;
   const uint64_t total = 1921672470396,
                  total_blocks = 500235319;
 
@@ -423,7 +418,7 @@ static void partition_test() {
   auto random = new_<Random>(877411);
   for (int ranks=3<<2;ranks<=(3<<18);ranks<<=2) {
     Log::Scope scope(format("ranks %d",ranks));
-    auto partition = new_<partition_t>(ranks,block_size,stones,sections,true);
+    auto partition = new_<partition_t>(ranks,stones,sections,true);
 
     // Check totals
     OTHER_ASSERT(partition->total_nodes==total);
@@ -440,7 +435,7 @@ static void partition_test() {
 
     // Check that random blocks all occur in the partition
     for (auto section : sections) {
-      const auto blocks = (section.shape()+block_size-1)/block_size;
+      const auto blocks = ceil_div(section.shape(),block_size);
       for (int i=0;i<10;i++) {
         const auto block = random->uniform(Vector<int,4>(),blocks);
         int rank = partition->block_to_rank(section,block);
@@ -490,7 +485,7 @@ static void partition_test() {
             blocks.set(tuple(line.section,block));
             OTHER_ASSERT(next_offset==offsets);
             next_offset.x++;
-            next_offset.y += block_shape(line.section.shape(),block,block_size).product();
+            next_offset.y += block_shape(line.section.shape(),block).product();
           }
         OTHER_ASSERT(next_offset==last_offsets);
         // We only own some of the blocks in lines we don't own
@@ -528,7 +523,7 @@ void wrap_partition() {
 
   typedef partition_t Self;
   Class<Self>("partition_t")
-    .OTHER_INIT(int,int,int,Array<const section_t>,bool)
+    .OTHER_INIT(int,int,Array<const section_t>,bool)
     .OTHER_FIELD(max_rank_blocks)
     .OTHER_FIELD(max_rank_nodes)
     .OTHER_FIELD(owner_starts)

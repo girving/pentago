@@ -35,6 +35,10 @@ struct spinlock_t {
     OSSpinLockLock(&spinlock);
   }
 
+  bool trylock() {
+    return OSSpinLockTry(&spinlock);
+  }
+
   void unlock() {
     OSSpinLockUnlock(&spinlock);
   }
@@ -67,6 +71,10 @@ struct spinlock_t {
 
   void lock() {
     pthread_spin_lock(&spinlock);
+  }
+
+  bool trylock() {
+    return !pthread_spin_trylock(&spinlock);
   }
 
   void unlock() {

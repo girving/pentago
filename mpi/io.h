@@ -19,7 +19,8 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
 // Write sparse samples to a .npy file.  Collective.
 // The format is a sequence of (board,black-wins,white-wins) tuples packed as 9 uint64_t's.
 // The samples chosen are identical to those chosen by the out-of-core solver, but in somewhat scrambled order.
-void write_sparse_samples(const MPI_Comm, const string& filename, const block_store_t& blocks, const int samples_per_section);
+// Update: samples are now collected as blocks complete inside block_store_t in order to avoid an unnecessary decompression pass.
+void write_sparse_samples(const MPI_Comm, const string& filename, block_store_t& blocks);
 
 }
 }

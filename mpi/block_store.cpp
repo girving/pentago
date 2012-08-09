@@ -3,58 +3,74 @@
 #include <pentago/mpi/block_store.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/count.h>
+#include <pentago/utility/char_view.h>
+#include <pentago/utility/index.h>
 #include <pentago/utility/memory.h>
+#include <other/core/array/Array4d.h>
 #include <other/core/python/Class.h>
+#include <other/core/random/Random.h>
 #include <other/core/utility/const_cast.h>
+#include <other/core/utility/Hasher.h>
 #include <other/core/utility/Log.h>
+#include <tr1/unordered_map>
 #include <boost/bind.hpp>
+#include <snappy.h>
 namespace pentago {
 namespace mpi {
 
 OTHER_DEFINE_TYPE(block_store_t)
+using std::tr1::unordered_map;
+using std::make_pair;
 using Log::cout;
 using std::endl;
 
-static const int block_size = 8;
-
-block_store_t::block_store_t(const partition_t& partition, const int rank, Array<const line_t> lines)
+block_store_t::block_store_t(const partition_t& partition, const int rank, const int samples_per_section, Array<const line_t> lines)
   : partition(ref(partition))
   , rank(rank)
   , first(partition.rank_offsets(rank))
   , last(partition.rank_offsets(rank+1))
   , section_counts(partition.sections.size())
-  , required_contributions(0) { // set below
-
-  // Block size must be 8 (used in count_block_wins below)
-  OTHER_ASSERT(partition.block_size==8);
-
+  , required_contributions(0) // set below
+#if PENTAGO_MPI_COMPRESS
+  , store(last.x-first.x,snappy::MaxCompressedLength(64*sqr(sqr(block_size))))
+#endif
+{
   // Make sure 32-bit array indices suffice
   OTHER_ASSERT(last.y-first.y<(1u<<31));
 
   // Compute map from local block id to local offset
-  int block_id = 0, node = 0;
+  int block_id = 0;
+  int node = 0;
   Array<block_info_t> block_info(last.x-first.x+1,false);
+#if !PENTAGO_MPI_COMPRESS
   block_info[0].offset = 0;
+#endif
   for (auto line : lines)
     for (int i : range(line.length)) {
       auto offsets = line.block_offsets(i);
-      OTHER_ASSERT(   block_info.valid(block_id+1)
-                   && offsets.x==first.x+block_id
-                   && offsets.y==first.y+block_info[block_id].offset);
+      OTHER_ASSERT(block_info.valid(block_id+1) && offsets.x==first.x+block_id);
+#if !PENTAGO_MPI_COMPRESS
+      OTHER_ASSERT(offsets.y==first.y+block_info[block_id].offset);
+#endif
       const auto block = line.block(i);
       OTHER_ASSERT(partition.block_offsets(line.section,block)==vec(first.x+block_id,first.y+node));
-      node += block_shape(line.section.shape(),block,block_size).product();
+      node += block_shape(line.section.shape(),block).product();
       block_info[block_id].section = line.section;
       block_info[block_id].block = block;
       block_info[block_id].lock = spinlock_t();
-      block_info[++block_id].offset = node;
+#if !PENTAGO_MPI_COMPRESS
+      block_info[block_id].offset = node;
+#endif
+      block_id++;
     }
   OTHER_ASSERT((uint64_t)block_id==last.x-first.x);
   OTHER_ASSERT((uint64_t)node==last.y-first.y);
   const_cast_(this->block_info) = block_info;
 
+#if !PENTAGO_MPI_COMPRESS
   // Allocate space for all blocks as one huge array, and zero it to indicate losses.
   const_cast_(this->all_data) = large_buffer<Vector<super_t,2>>(last.y-first.y,true);
+#endif
 
   // Count the number of required contributions before all blocks are complete
   uint64_t total_count = 0;
@@ -67,68 +83,222 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, Array
   }
   OTHER_ASSERT(total_count<(1u<<31));
   const_cast_(required_contributions) = total_count;
+
+  // Organize blocks by section
+  unordered_map<section_t,unordered_map<Vector<int,4>,int,Hasher>,Hasher> section_blocks;
+  if (samples_per_section)
+    for (int b : range(blocks()))
+      section_blocks[block_info[b].section].insert(make_pair(block_info[b].block,b));
+
+  // Count random samples in each block
+  Array<int> sample_counts(blocks());
+  for (const auto& s : section_blocks) {
+    const auto section = s.first;
+    const auto shape = section.shape();
+    const auto rmin = vec(rotation_minimal_quadrants(section.counts[0]).x,
+                          rotation_minimal_quadrants(section.counts[1]).x,
+                          rotation_minimal_quadrants(section.counts[2]).x,
+                          rotation_minimal_quadrants(section.counts[3]).x);
+    const auto random = new_<Random>(hash(section));
+    for (int i=0;i<samples_per_section;i++) {
+      const auto index = random->uniform(Vector<int,4>(),shape),
+                 block = index/block_size;
+      const auto it = s.second.find(block);
+      if (it != s.second.end())
+        sample_counts[it->second]++;
+    }
+  }
+  const_cast_(samples) = NestedArray<sample_t>(sample_counts,false);
+
+  // Prepare to collect random samples from each block.  Note that this duplicates the loop from above.
+  for (const auto& s : section_blocks) {
+    const auto section = s.first;
+    const auto shape = section.shape();
+    const auto rmin = vec(rotation_minimal_quadrants(section.counts[0]).x,
+                          rotation_minimal_quadrants(section.counts[1]).x,
+                          rotation_minimal_quadrants(section.counts[2]).x,
+                          rotation_minimal_quadrants(section.counts[3]).x);
+    const auto random = new_<Random>(hash(section));
+    for (int i=0;i<samples_per_section;i++) {
+      const auto index = random->uniform(Vector<int,4>(),shape),
+                 block = index/block_size;
+      const auto it = s.second.find(block);
+      if (it != s.second.end()) {
+        auto& sample = samples[it->second][--sample_counts[it->second]];
+        sample.board = quadrants(rmin[0][index[0]],
+                                 rmin[1][index[1]],
+                                 rmin[2][index[2]],
+                                 rmin[3][index[3]]);
+        sample.index = pentago::index(block_shape(shape,block),index-block_size*block);
+      }
+    }
+  }
 }
 
 block_store_t::~block_store_t() {}
 
-uint64_t block_store_t::memory_usage() const {
-  return sizeof(block_store_t)+pentago::memory_usage(block_info)+pentago::memory_usage(all_data)+pentago::memory_usage(section_counts);
+uint64_t block_store_t::base_memory_usage() const {
+  return sizeof(block_store_t)+pentago::memory_usage(block_info)+pentago::memory_usage(section_counts);
 }
 
-void block_store_t::accumulate(int local_id, RawArray<const Vector<super_t,2>> new_data) {
+uint64_t block_store_t::current_memory_usage() const {
+  return base_memory_usage()
+#if PENTAGO_MPI_COMPRESS
+    +store.current_memory_usage();
+#else
+    +pentago::memory_usage(all_data);
+#endif
+}
+
+uint64_t block_store_t::estimate_peak_memory_usage() const {
+#if PENTAGO_MPI_COMPRESS
+  return base_memory_usage()+sparse_store_t::estimate_peak_memory_usage(blocks(),snappy_compression_estimate*64*(last.y-first.y));
+#else
+  return current_memory_usage();
+#endif
+}
+
+void block_store_t::print_compression_stats() const {
+#if PENTAGO_MPI_COMPRESS
+  // We're going to compute the mean and variance of the compression ratio for a randomly chosen *byte*.
+  // First integrate moments 0, 1, and 2.
+  uint64_t uncompressed = 0;
+  uint64_t compressed = 0, peak_compressed = 0;
+  double sqr_compressed = 0, peak_sqr_compressed = 0;
+  for (int b : range(blocks())) {
+    const int k = 64*block_shape(block_info[b].section.shape(),block_info[b].block).product();
+    uncompressed += k;
+    compressed += store.size(b);
+    peak_compressed += store.peak_size(b);
+    sqr_compressed += sqr((double)store.size(b))/k;
+    peak_sqr_compressed += sqr((double)store.peak_size(b))/k;
+  }
+  // Compute statistics
+  const double mean = (double)compressed/uncompressed;
+  const double dev = sqrt(sqr_compressed/uncompressed-sqr(mean));
+  const double peak_mean = (double)peak_compressed/uncompressed;
+  const double peak_dev = sqrt(peak_sqr_compressed/uncompressed-sqr(peak_mean));
+  cout << "compression ratio = "<<mean<<" +- "<<dev<<", peak = "<<peak_mean<<" +- "<<peak_dev<<endl; 
+#endif
+}
+
+void block_store_t::accumulate(int local_id, RawArray<Vector<super_t,2>> new_data) {
   OTHER_ASSERT(0<=local_id && local_id<blocks());
-  const auto local_data = all_data.slice(block_info[local_id].offset,block_info[local_id+1].offset);
+  const auto* info = &block_info[local_id];
+#if !PENTAGO_MPI_COMPRESS
+  const auto local_data = all_data.slice(info[0].offset,info[1].offset);
   OTHER_ASSERT(local_data.size()==new_data.size());
   {
-    spin_t spin(block_info[local_id].lock);
-    for (int i=0;i<local_data.size();i++) {
-      local_data[i].x |= new_data[i].x;
-      local_data[i].y |= new_data[i].y;
+    spin_t spin(info->lock);
+    for (int i=0;i<local_data.size();i++)
+      local_data[i] |= new_data[i];
+    // If all contributions are in place, count and sample
+    if (!--info->missing_contributions) {
+      for (auto& sample : samples[local_id])
+        sample.wins = local_data[sample.index];
+      const auto counts = count_block_wins(info->section,info->block,local_data);
+      const int section_id = partition->section_id.get(info->section);
+      spin_t spin(section_counts_lock);
+      section_counts[section_id] += counts;
     }
-    if (!--block_info[local_id].missing_contributions)
-      threads_schedule(CPU,boost::bind(&block_store_t::count_wins,this,local_id));
   }
+#else // PENTAGO_MPI_COMPRESS
+  spin_t spin(info->lock);
+  // If previous contributions exist, uncompress the old data and combine it with the new
+  if (store.size(local_id)) {
+    const auto old_data = uncompress_and_get_flat(local_id,true);
+    OTHER_ASSERT(new_data.size()==old_data.size());
+    for (int i=0;i<new_data.size();i++)
+      new_data[i] |= old_data[i];
+  }
+  // If all contributions are in place, count and sample
+  if (!--info->missing_contributions) {
+    for (auto& sample : samples[local_id])
+      sample.wins = new_data[sample.index];
+    const auto counts = count_block_wins(info->section,info->block,new_data);
+    const int section_id = partition->section_id.get(info->section);
+    spin_t spin(section_counts_lock);
+    section_counts[section_id] += counts;
+  }
+  // Compress data into place
+  store.compress_and_set(local_id,char_view(new_data));
+#endif
 }
 
-RawArray<const Vector<super_t,2>,4> block_store_t::get(section_t section, Vector<int,4> block) const {
+void block_store_t::assert_contains(section_t section, Vector<int,4> block) const {
+  const auto offsets = partition->block_offsets(section,block);
+  const int local_id = offsets.x-first.x;
+  OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
+}
+
+#if PENTAGO_MPI_COMPRESS
+
+Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<int,4> block) const {
+  const auto offsets = partition->block_offsets(section,block);
+  const int local_id = offsets.x-first.x;
+  return uncompress_and_get(local_id);
+}
+
+Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(int local_id) const {
+  const auto flat = uncompress_and_get_flat(local_id);
+  const block_info_t& info = block_info[local_id];
+  const auto shape = block_shape(info.section.shape(),info.block);
+  return Array<Vector<super_t,2>,4>(shape,flat.data(),flat.borrow_owner());
+}
+
+Array<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(int local_id, bool allow_incomplete) const {
+  const auto compressed = get_compressed(local_id,allow_incomplete);
+  const block_info_t& info = block_info[local_id];
+  const int flat_size = block_shape(info.section.shape(),info.block).product();
+  // Check size
+  size_t uncompressed_size;
+  OTHER_ASSERT(   snappy::GetUncompressedLength(compressed.data(),compressed.size(),&uncompressed_size)
+               && uncompressed_size==sizeof(Vector<super_t,2>)*flat_size);
+  // Uncompress into a temporary array.  For sake of simplicity, we'll hope that malloc manages to avoid fragmentation.
+  // In the future, we may want to keep a list of temporary blocks around to eliminate fragmentation entirely.
+  const auto flat = large_buffer<Vector<super_t,2>>(flat_size,false);
+  OTHER_ASSERT(snappy::RawUncompress(compressed.data(),compressed.size(),(char*)flat.data()));
+  return flat;
+}
+
+RawArray<const char> block_store_t::get_compressed(int local_id, bool allow_incomplete) const {
+  OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
+  if (!allow_incomplete)
+    OTHER_ASSERT(!block_info[local_id].missing_contributions);
+  return store.current_buffer(local_id);
+}
+
+#else
+
+RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Vector<int,4> block) const {
   const auto offsets = partition->block_offsets(section,block);
   const int local_id = offsets.x-first.x;
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
   OTHER_ASSERT(!block_info[local_id].missing_contributions);
-  const auto shape = block_shape(section.shape(),block,block_size);
+  const auto shape = block_shape(section.shape(),block);
   OTHER_ASSERT(first.y<=offsets.y && offsets.y+shape.product()<=last.y);
   return RawArray<const Vector<super_t,2>,4>(shape,all_data.data()+offsets.y-first.y);
 }
 
-RawArray<const Vector<super_t,2>> block_store_t::get_flat(int local_id) const {
+RawArray<const Vector<super_t,2>> block_store_t::get_raw_flat(int local_id) const {
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
   OTHER_ASSERT(!block_info[local_id].missing_contributions);
   return all_data.slice(block_info[local_id].offset,block_info[local_id+1].offset);
 }
 
-RawArray<const Vector<super_t,2>,4> block_store_t::get(int local_id) const {
-  const auto flat = get_flat(local_id);
-  const auto shape = block_shape(block_info[local_id].section.shape(),block_info[local_id].block,block_size);
+RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(int local_id) const {
+  const auto flat = get_raw_flat(local_id);
+  const auto shape = block_shape(block_info[local_id].section.shape(),block_info[local_id].block);
   OTHER_ASSERT(flat.size()==shape.product());
   return RawArray<const Vector<super_t,2>,4>(shape,flat.data());
 }
 
-void block_store_t::count_wins(int local_id) {
-  // Prepare
-  const auto flat_data = get_flat(local_id);
-  const auto& info = block_info[local_id];
-
-  // Count and store
-  const int section_id = partition->section_id.get(info.section);
-  const auto counts = count_block_wins(info.section,info.block,flat_data);
-  spin_t spin(section_counts_lock);
-  section_counts[section_id] += counts;
-}
+#endif
 
 Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<int,4> block, RawArray<const Vector<super_t,2>> flat_data) {
   // Prepare
   const auto base = block_size*block;
-  const auto shape = block_shape(section.shape(),block,block_size);
+  const auto shape = block_shape(section.shape(),block);
   const auto rmin0 = safe_rmin_slice(section.counts[0],base[0]+range(shape[0])),
              rmin1 = safe_rmin_slice(section.counts[1],base[1]+range(shape[1])),
              rmin2 = safe_rmin_slice(section.counts[2],base[2]+range(shape[2])),
@@ -155,7 +325,7 @@ void wrap_block_store() {
   typedef block_store_t Self;
   Class<Self>("block_store_t")
     .OTHER_METHOD(blocks)
+    .OTHER_METHOD(nodes)
     .OTHER_FIELD(section_counts)
-    .OTHER_FIELD(all_data)
     ;
 }

@@ -6,6 +6,10 @@
 #include <pentago/superscore.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
+#include <other/core/array/NestedArray.h>
+#ifdef PENTAGO_MPI_COMPRESS
+#include <pentago/mpi/sparse_store.h>
+#endif
 namespace pentago {
 namespace mpi {
 
@@ -35,7 +39,9 @@ namespace mpi {
 struct block_info_t {
   section_t section;
   Vector<int,4> block;
+#if !PENTAGO_MPI_COMPRESS
   int offset; // Local offset into all_data
+#endif
   mutable int missing_contributions; // How many incoming contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
@@ -49,15 +55,27 @@ public:
   const int rank;
   const Vector<uint64_t,2> first, last; // Ranges of block and node ids
   const Array<const block_info_t> block_info; // Information about each block we own, plus one sentinel
-  const Array<Vector<super_t,2>> all_data;
   const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
   const int required_contributions;
-  static const bool compressed = false; // For now, we're always uncompressed
   spinlock_t section_counts_lock;
-private:
 
-  // Allocate all blocks initialized to zero (loss), and initialize a window for one-sided accumulate ops.  Collective.
-  block_store_t(const partition_t& partition, const int rank, Array<const line_t> lines);
+#if PENTAGO_MPI_COMPRESS
+  sparse_store_t store;
+#else
+  const Array<Vector<super_t,2>> all_data;
+#endif
+
+  // Space for sparse samples (filled in as blocks complete).  These are stored in native
+  // block_store_t format, and must be transformed before being written to disk.
+  struct sample_t {
+    board_t board;
+    int index; // Index into flattened block data array
+    Vector<super_t,2> wins;
+  };
+  const NestedArray<sample_t> samples;
+
+private:
+  block_store_t(const partition_t& partition, const int rank, const int samples_per_section, Array<const line_t> lines);
 public:
   ~block_store_t();
 
@@ -66,23 +84,43 @@ public:
     return block_info.size()-1;
   }
 
-  // Estimate memory usage
-  uint64_t memory_usage() const;
+  // Total number of nodes
+  int nodes() const {
+    return last.y-first.y;
+  }
 
-  // Accumulate new data into a block.  This function is thread safe.
-  // If the block is complete, schedule a counting job.
-  void accumulate(int local_id, RawArray<const Vector<super_t,2>> new_data);
+  // Estimate current memory usage
+  uint64_t current_memory_usage() const;
 
-  // Access the data for a completed block
-  RawArray<const Vector<super_t,2>,4> get(section_t section, Vector<int,4> block) const;
+  // Estimate peak memory usage.  In compressed mode, this is based on a hard coded guess as to how well snappy compresses.
+  uint64_t estimate_peak_memory_usage() const;
 
-  // Same as above, but refer to blocks via *local* block id.
-  RawArray<const Vector<super_t,2>,4> get(int local_id) const;
-  RawArray<const Vector<super_t,2>> get_flat(int local_id) const;
+  // Print statistics about block compression
+  void print_compression_stats() const;
+
+  // Verify that we own the given block
+  void assert_contains(section_t section, Vector<int,4> block) const;
+
+  // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
+  void accumulate(int local_id, RawArray<Vector<super_t,2>> new_data);
+
+  // Access the data for a completed block, either by (section,block) or local block id.
+  // In uncompressed mode, these are O(1) and return views into all_data.  In compressed mode they must uncompress
+  // first, requiring O(n) time, and return new mutable buffers.  To make sure all callers know about these differences, we
+  // give the different versions different names.
+#if PENTAGO_MPI_COMPRESS
+  Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<int,4> block) const;
+  Array<Vector<super_t,2>,4> uncompress_and_get(int local_id) const;
+  Array<Vector<super_t,2>> uncompress_and_get_flat(int local_id, bool allow_incomplete=false) const; // allow_incomplete for internal use only
+  RawArray<const char> get_compressed(int local_id, bool allow_incomplete=false) const;
+#else
+  RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<int,4> block) const;
+  RawArray<const Vector<super_t,2>,4> get_raw(int local_id) const;
+  RawArray<const Vector<super_t,2>> get_raw_flat(int local_id) const;
+#endif
 
 private:
-  // Count wins and losses.  Normally scheduled automatically from accumulate.
-  void count_wins(int local_id);
+  uint64_t base_memory_usage() const;
 };
 
 // The kernel of count_wins factored out for use elsewhere

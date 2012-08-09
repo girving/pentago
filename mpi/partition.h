@@ -21,7 +21,6 @@ struct partition_t : public Object {
   OTHER_DECLARE_TYPE
 
   const int ranks;
-  const int block_size;
   const int slice; // Common number of stones in each section
   const Array<const section_t> sections;
   const Hashtable<section_t,int> section_id; // The inverse of sections
@@ -35,7 +34,7 @@ struct partition_t : public Object {
   const uint64_t max_rank_nodes; // Maximum number of nodes owned by a rank
 
 protected:
-  partition_t(const int ranks, const int block_size, const int slice, Array<const section_t> sections, bool save_work=false);
+  partition_t(const int ranks, const int slice, Array<const section_t> sections, bool save_work=false);
 public:
   ~partition_t();
 

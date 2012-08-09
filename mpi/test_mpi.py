@@ -14,11 +14,11 @@ def test_counts():
   for slice in xrange(5):
     with Log.scope('counting slice %d'%slice):
       sections = all_boards_sections(slice,8)
-      partition = partition_t(1,8,slice,sections,False)
-      blocks = meaningless_block_store(partition,0)
+      partition = partition_t(1,slice,sections,False)
+      blocks = meaningless_block_store(partition,0,0)
       good_blocks = sum(product(section_shape(s)) for s in sections)
-      Log.write('blocks = %d, correct = %d'%(len(blocks.all_data),good_blocks))
-      assert len(blocks.all_data)==good_blocks
+      Log.write('blocks = %d, correct = %d'%(blocks.nodes(),good_blocks))
+      assert blocks.nodes()==good_blocks
       bad_counts = sum_section_counts(sections,blocks.section_counts)
       good_counts = meaningless_counts(all_boards(slice,1))
       Log.write('bad counts  = %s\ngood counts = %s'%(bad_counts,good_counts))
@@ -39,8 +39,8 @@ def test_write(tmpdir):
     with Log.scope('test write %d'%slice):
       # Do the same computation locally
       sections = all_boards_sections(slice,8)
-      partition = partition_t(1,8,slice,sections,False)
-      blocks = meaningless_block_store(partition,0)
+      partition = partition_t(1,slice,sections,False)
+      blocks = meaningless_block_store(partition,0,0)
 
       # Compare counts
       counts = load('%s/counts-%d.npy'%(dir,slice))
@@ -55,6 +55,7 @@ def test_write(tmpdir):
       sparse = load('%s/sparse-%d.npy'%(dir,slice))
       boards = sparse[:,0].copy()
       data = sparse[:,1:].copy().reshape(-1,2,4)
+      assert len(data)==256*len(sections)
       compare_blocks_with_sparse_samples(blocks,boards,data)
 
       # Compare full data

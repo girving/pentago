@@ -1,6 +1,7 @@
 // MPI related utilities
 
 #include <pentago/mpi/utility.h>
+#include <pentago/utility/ceil_div.h>
 #include <pentago/utility/debug.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
@@ -49,8 +50,8 @@ scope_t::~scope_t() {
   Log::pop_scope();
 }
 
-Vector<int,4> section_blocks(section_t section, int block_size) {
-  return (section.shape()+block_size-1)/block_size;
+Vector<int,4> section_blocks(section_t section) {
+  return ceil_div(section.shape(),block_size);
 }
 
 int comm_size(MPI_Comm comm) {
@@ -74,8 +75,10 @@ MPI_Comm comm_dup(MPI_Comm comm) {
 int get_count(MPI_Status* status, MPI_Datatype datatype) {
   int count;
   CHECK(MPI_Get_count(status,datatype,&count));
-  if (count == MPI_UNDEFINED)
-    die("get_count: MPI_Get_count result is undefined");
+  if (count == MPI_UNDEFINED) {
+    CHECK(MPI_Get_count(status,MPI_BYTE,&count));
+    die(format("get_count: MPI_Get_count result is undefined, bytes = %d",count));
+  }
   return count;
 }
 

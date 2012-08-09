@@ -13,3 +13,17 @@
 
 // Uncomment to enable MPI tracing
 //#define PENTAGO_MPI_TRACING
+
+// Whether or not to store blocks compressed
+#define PENTAGO_MPI_COMPRESS 1
+
+namespace pentago {
+
+// We fix the block size at compile time for optimization reasons
+const int block_size = 8;
+const int block_shift = 3;
+
+// Hopefully conservative estimate of snappy's compression ratio on our data
+const double snappy_compression_estimate = .5;
+
+}

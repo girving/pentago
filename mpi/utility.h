@@ -33,9 +33,9 @@ struct scope_t : public thread_time_t {
   ~scope_t();
 };
 
-Vector<int,4> section_blocks(section_t section, int block_size);
+Vector<int,4> section_blocks(section_t section);
 
-template<int d> static inline Vector<int,d> block_shape(Vector<int,d> shape, Vector<int,d> block, int block_size) {
+template<int d> static inline Vector<int,d> block_shape(Vector<int,d> shape, Vector<int,d> block) {
   return Vector<int,d>::componentwise_min(shape,block_size*(block+1))-block_size*block;
 }
 

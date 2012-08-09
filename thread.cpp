@@ -147,7 +147,7 @@ public:
   ~thread_pool_t();
 
   void wait(); // wait for all jobs to complete
-  void schedule(const function<void()>& f); // schedule a job
+  void schedule(const function<void()>& f, bool soon=false); // schedule a job
   void schedule(const vector<function<void()>>& fs); // schedule many jobs
 
 private:
@@ -250,13 +250,16 @@ void* thread_pool_t::worker(void* pool_) {
   }
 }
 
-void thread_pool_t::schedule(const function<void()>& f) {
+void thread_pool_t::schedule(const function<void()>& f, bool soon) {
   OTHER_ASSERT(threads.size());
   lock_t lock(mutex);
   if (error)
     error.throw_();
   OTHER_ASSERT(!die);
-  jobs.push_back(f);
+  if (soon)
+    jobs.push_front(f);
+  else
+    jobs.push_back(f);
   if (waiting)
     worker_cond.signal();
 }
@@ -309,10 +312,10 @@ void init_threads(int cpu_threads, int io_threads) {
   time_info.total_start = time_info.local_start = time();
 }
 
-void threads_schedule(thread_type_t type, const function<void()>& f) {
+void threads_schedule(thread_type_t type, const function<void()>& f, bool soon) {
   OTHER_ASSERT(type==CPU || type==IO);
   if (type!=CPU) OTHER_ASSERT(io_pool);
-  (type==CPU?cpu_pool:io_pool)->schedule(f);
+  (type==CPU?cpu_pool:io_pool)->schedule(f,soon);
 }
 
 void threads_schedule(thread_type_t type, const vector<function<void()>>& fs) {

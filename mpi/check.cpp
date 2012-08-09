@@ -5,7 +5,9 @@
 #include <pentago/count.h>
 #include <pentago/supertensor.h>
 #include <pentago/symmetry.h>
+#include <pentago/utility/char_view.h>
 #include <pentago/utility/index.h>
+#include <pentago/utility/memory.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
 #include <other/core/utility/ProgressIndicator.h>
@@ -26,14 +28,18 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
 
   // Prepare
   const block_info_t* info = &self->block_info[local_id];
-  const auto flat_data = self->all_data.slice(info[0].offset,info[1].offset);
-  const auto base = self->partition->block_size*info->block;
-  const auto shape = block_shape(info->section.shape(),info->block,self->partition->block_size);
+  const auto base = block_size*info->block;
+  const auto shape = block_shape(info->section.shape(),info->block);
   const auto rmin0 = safe_rmin_slice(info->section.counts[0],base[0]+range(shape[0])),
              rmin1 = safe_rmin_slice(info->section.counts[1],base[1]+range(shape[1])),
              rmin2 = safe_rmin_slice(info->section.counts[2],base[2]+range(shape[2])),
              rmin3 = safe_rmin_slice(info->section.counts[3],base[3]+range(shape[3]));
+#if PENTAGO_MPI_COMPRESS
+  const auto flat_data = large_buffer<Vector<super_t,2>>(shape.product(),false);
+#else
+  const auto flat_data = self->all_data.slice(info[0].offset,info[1].offset);
   OTHER_ASSERT(shape.product()==flat_data.size());
+#endif
   const RawArray<Vector<super_t,2>,4> block_data(shape,flat_data.data());
 
   // Fill and count
@@ -54,21 +60,32 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
         }
   info->missing_contributions = 0;
 
+  // Sample
+  for (auto& sample : self->samples[local_id])
+    sample.wins = block_data.flat[sample.index];
+
+#if PENTAGO_MPI_COMPRESS
+  // Compress data into place
+  self->store.compress_and_set(local_id,char_view(flat_data));
+#endif
+
   // Add to section counts
   const int section_id = self->partition->section_id.get(info->section);
   spin_t spin(self->section_counts_lock);
   self->section_counts[section_id] += counts;
 }
 
-Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank) {
+Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank, const int samples_per_section) {
+  Log::Scope scope("meaningless");
+
   // Allocate block store
-  const auto self = new_<block_store_t>(partition,rank,partition.rank_lines(rank,true));
+  const auto self = new_<block_store_t>(partition,rank,samples_per_section,partition.rank_lines(rank,true));
 
   // Replace data with meaninglessness
   memset(self->section_counts.data(),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
   for (int local_id : range(self->blocks()))
     threads_schedule(CPU,boost::bind(meaningless_helper,&*self,local_id));
-  threads_wait_all();
+  threads_wait_all_help();
   return self;
 }
 
@@ -99,20 +116,36 @@ static Vector<int,4> standard_board_index(board_t board) {
 static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> data) {
   OTHER_ASSERT(boards.size()==data.size());
   const auto& partition = *blocks.partition;
-  const int block_size = partition.block_size;
+  OTHER_ASSERT(partition.ranks==1);
+
+  // Partition samples by block.  This is necessary to avoid repeatedly decompressing compressed blocks.
+  vector<Array<Tuple<int,Vector<int,4>>>> block_samples(blocks.blocks());
   for (int i=0;i<boards.size();i++) {
     const auto board = boards[i];
     check_board(board);
     const auto section = count(board);
     const auto index = standard_board_index(board);
     const auto block = index/block_size;
-    const auto block_data = blocks.get(section,block);
-    OTHER_ASSERT(block_data.valid(index-block_size*block));
-    auto entry = block_data[index-block_size*block];
-    entry.y = ~entry.y;
-    if (section.sum()&1)
-      swap(entry.x,entry.y);
-    OTHER_ASSERT(entry==data[i]);
+    const int local_block_id = partition.block_offsets(section,block).x;
+    block_samples[local_block_id].append(tuple(i,index-block_size*block));
+  }
+
+  // Check all samples
+  for (int b=0;b<block_samples.size();b++) {
+    const bool turn = blocks.block_info[b].section.sum()&1;
+#if PENTAGO_MPI_COMPRESS
+    const auto block_data = blocks.uncompress_and_get(b);
+#else
+    const auto block_data = blocks.get_raw(b);
+#endif
+    for (const auto& sample : block_samples[b]) {
+      OTHER_ASSERT(block_data.valid(sample.y));
+      auto entry = block_data[sample.y];
+      entry.y = ~entry.y;
+      if (turn)
+        swap(entry.x,entry.y);
+      OTHER_ASSERT(entry==data[sample.x]);
+    }
   }
 }
 
@@ -127,7 +160,7 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
       for (int i1 : range(shape[1]))
         for (int i2 : range(shape[2]))
           for (int i3 : range(shape[3]))
-            blocks.get(section,vec(i0,i1,i2,i3));
+            blocks.assert_contains(section,vec(i0,i1,i2,i3));
   }
   OTHER_ASSERT(blocks.blocks()==count);
 
@@ -144,7 +177,11 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
 
     // Verify that all data matches
     const auto read_data = reader.read_block(info.block).flat;
-    const auto good_data = blocks.get_flat(b);
+#if PENTAGO_MPI_COMPRESS
+    const auto good_data = blocks.uncompress_and_get_flat(b);
+#else
+    const auto good_data = blocks.get_raw_flat(b);
+#endif
     OTHER_ASSERT(read_data.size()==good_data.size());
     const bool turn = info.section.sum()&1;
     for (int i=0;i<read_data.size();i++) {
@@ -158,8 +195,6 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
 }
 
 namespace {
-const int block_size = 8;
-
 struct subcompare_t {
   Vector<int,4> block;
   spinlock_t lock;
@@ -178,7 +213,7 @@ struct compare_t : public boost::noncopyable {
   compare_t(const section_t section, const Ptr<const supertensor_reader_t> old_reader)
     : section(section)
     , old_reader(old_reader)
-    , progress(section_blocks(section,block_size).product(),true)
+    , progress(section_blocks(section).product(),true)
     , checked(0) {}
 };
 }

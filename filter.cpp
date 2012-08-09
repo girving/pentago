@@ -231,7 +231,7 @@ static inline void uncompact_chunk(Vector<super_t,2> dst[5], const uint8_t src[2
   }
 }
 
-// Compaction packs 5 win/loss/tie values into 1 bytes (3**5 < 2**8), destroying the original array
+// Compaction packs 5 win/loss/tie values into 1 byte (3**5 < 2**8), destroying the original array
 Array<uint8_t> compact(Array<Vector<super_t,2>> src) {
   Array<uint8_t> dst = char_view_own(src).slice_own(0,(256*src.size()+4)/5);
   const int chunks = src.size()/5,
