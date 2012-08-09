@@ -17,6 +17,9 @@
 // Whether or not to store blocks compressed
 #define PENTAGO_MPI_COMPRESS 1
 
+// Whether or not to use interleave filtered to precondition snappy
+#define PENTAGO_MPI_SNAPPY_FILTER 1
+
 namespace pentago {
 
 // We fix the block size at compile time for optimization reasons

@@ -66,7 +66,7 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
 
 #if PENTAGO_MPI_COMPRESS
   // Compress data into place
-  self->store.compress_and_set(local_id,char_view(flat_data));
+  self->store.compress_and_set(local_id,flat_data);
 #endif
 
   // Add to section counts

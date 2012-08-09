@@ -2,6 +2,7 @@
 
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/compute.h>
+#include <pentago/mpi/fast_compress.h>
 #include <pentago/mpi/ibarrier.h>
 #include <pentago/mpi/requests.h>
 #include <pentago/mpi/trace.h>
@@ -18,7 +19,6 @@
 #include <boost/noncopyable.hpp>
 #include <boost/bind.hpp>
 #include <tr1/unordered_map>
-#include <snappy.h>
 namespace pentago {
 namespace mpi {
 
@@ -327,7 +327,7 @@ void flow_t::post_response_recv() {
   PENTAGO_MPI_TRACE("post response recv");
   MPI_Request request;
   if (!response_buffer.size())
-    response_buffer = large_buffer<char>(snappy::MaxCompressedLength(sizeof(Vector<super_t,2>)*sqr(sqr(block_size))),false);
+    response_buffer = large_buffer<char>(max_fast_compressed_size,false);
   CHECK(MPI_Irecv(response_buffer.data(),response_buffer.size(),MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.response_comm,&request));
   requests.add(request,response_callback,true);
 }
@@ -345,10 +345,7 @@ static void absorb_response(block_request_t* request)
 
 #if PENTAGO_MPI_COMPRESS
   // Uncompress data into the first dependent line
-  size_t uncompressed_size;
-  OTHER_ASSERT(   snappy::GetUncompressedLength(compressed.data(),compressed.size(),&uncompressed_size)
-               && uncompressed_size==memory_usage(first_block_data));
-  OTHER_ASSERT(snappy::RawUncompress(compressed.data(),compressed.size(),(char*)first_block_data.data()));
+  fast_uncompress(compressed,first_block_data);
 #endif
 
   // Copy data to dependent lines other than the first

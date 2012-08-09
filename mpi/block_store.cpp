@@ -1,6 +1,7 @@
 // Data structure keeping track of all blocks we own
 
 #include <pentago/mpi/block_store.h>
+#include <pentago/mpi/fast_compress.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/count.h>
 #include <pentago/utility/char_view.h>
@@ -14,7 +15,6 @@
 #include <other/core/utility/Log.h>
 #include <tr1/unordered_map>
 #include <boost/bind.hpp>
-#include <snappy.h>
 namespace pentago {
 namespace mpi {
 
@@ -32,7 +32,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
   , section_counts(partition.sections.size())
   , required_contributions(0) // set below
 #if PENTAGO_MPI_COMPRESS
-  , store(last.x-first.x,snappy::MaxCompressedLength(64*sqr(sqr(block_size))))
+  , store(last.x-first.x,max_fast_compressed_size)
 #endif
 {
   // Make sure 32-bit array indices suffice
@@ -178,7 +178,8 @@ void block_store_t::print_compression_stats() const {
   const double dev = sqrt(sqr_compressed/uncompressed-sqr(mean));
   const double peak_mean = (double)peak_compressed/uncompressed;
   const double peak_dev = sqrt(peak_sqr_compressed/uncompressed-sqr(peak_mean));
-  cout << "compression ratio = "<<mean<<" +- "<<dev<<", peak = "<<peak_mean<<" +- "<<peak_dev<<endl; 
+  cout << "compression ratio      = "<<mean<<" +- "<<dev<<endl; 
+  cout << "peak compression ratio = "<<peak_mean<<" +- "<<peak_dev<<endl; 
 #endif
 }
 
@@ -221,7 +222,7 @@ void block_store_t::accumulate(int local_id, RawArray<Vector<super_t,2>> new_dat
     section_counts[section_id] += counts;
   }
   // Compress data into place
-  store.compress_and_set(local_id,char_view(new_data));
+  store.compress_and_set(local_id,new_data);
 #endif
 }
 
@@ -250,14 +251,10 @@ Array<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(int local_id, bo
   const auto compressed = get_compressed(local_id,allow_incomplete);
   const block_info_t& info = block_info[local_id];
   const int flat_size = block_shape(info.section.shape(),info.block).product();
-  // Check size
-  size_t uncompressed_size;
-  OTHER_ASSERT(   snappy::GetUncompressedLength(compressed.data(),compressed.size(),&uncompressed_size)
-               && uncompressed_size==sizeof(Vector<super_t,2>)*flat_size);
   // Uncompress into a temporary array.  For sake of simplicity, we'll hope that malloc manages to avoid fragmentation.
   // In the future, we may want to keep a list of temporary blocks around to eliminate fragmentation entirely.
   const auto flat = large_buffer<Vector<super_t,2>>(flat_size,false);
-  OTHER_ASSERT(snappy::RawUncompress(compressed.data(),compressed.size(),(char*)flat.data()));
+  fast_uncompress(compressed,flat);
   return flat;
 }
 

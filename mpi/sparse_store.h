@@ -18,6 +18,7 @@
  */
 
 #include <pentago/mpi/config.h>
+#include <pentago/superscore.h>
 #include <other/core/array/Array.h>
 #include <boost/noncopyable.hpp>
 namespace pentago {
@@ -65,8 +66,8 @@ public:
   // Get access to the correctly sized, currently allocated buffer.
   RawArray<char> current_buffer(int array) const;
 
-  // Replace the given array with the compressed version of the given buffer
-  void compress_and_set(int array, RawArray<const uint8_t> uncompressed);
+  // Replace the given array with the compressed version of the given buffer.  The input array is destroyed.
+  void compress_and_set(int array, RawArray<Vector<super_t,2>> uncompressed);
 };
 
 }

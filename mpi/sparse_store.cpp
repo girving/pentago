@@ -1,12 +1,12 @@
 // Sparse storage of a bunch of arrays taking advantage of virtual memory
 
 #include <pentago/mpi/sparse_store.h>
+#include <pentago/mpi/fast_compress.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/utility/ceil_div.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/memory.h>
 #include <sys/mman.h>
-#include <snappy.h>
 namespace pentago {
 namespace mpi {
 
@@ -58,11 +58,8 @@ RawArray<char> sparse_store_t::current_buffer(int array) const {
   return RawArray<char>(sizes[array].size,sparse_base+(size_t)max_array_size*array);
 }
 
-void sparse_store_t::compress_and_set(int array, RawArray<const uint8_t> uncompressed) {
-  OTHER_ASSERT(max_array_size>=snappy::MaxCompressedLength(uncompressed.size()));
-  size_t size;
-  snappy::RawCompress((const char*)uncompressed.data(),uncompressed.size(),sparse_base+(size_t)max_array_size*array,&size);
-  set_size(array,size);
+void sparse_store_t::compress_and_set(int array, RawArray<Vector<super_t,2>> uncompressed) {
+  set_size(array,fast_compress(uncompressed,whole_buffer(array)));
 }
 
 }
