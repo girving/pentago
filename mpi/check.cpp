@@ -131,7 +131,7 @@ static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawA
   }
 
   // Check all samples
-  for (int b=0;b<block_samples.size();b++) {
+  for (int b : range((int)block_samples.size())) {
     const bool turn = blocks.block_info[b].section.sum()&1;
 #if PENTAGO_MPI_COMPRESS
     const auto block_data = blocks.uncompress_and_get(b);

@@ -2,6 +2,7 @@
 
 from __future__ import division
 from pentago import *
+from other.core import *
 from other.core.utility import Log
 import subprocess
 
@@ -28,12 +29,20 @@ def run(cmd):
   Log.write(cmd)
   subprocess.check_call(cmd.split())
 
+@cache
+def mpirun():
+  cmds = 'mpirun','aprun'
+  for cmd in 'mpirun','aprun':
+    if not subprocess.call(['which','-s',cmd]):
+      return cmd
+  raise OSError('no mpirun found, tried %s'%cmds)
+
 def test_write(tmpdir):
   init_threads(-1,-1)
   for slice in 3,4:
     # Write out meaningless data from MPI
     dir = '%s/write-%d'%(tmpdir,slice)
-    run('mpirun -np 2 endgame-mpi --threads 3 --dir %s --test write-%d'%(dir,slice))
+    run('%s -n 2 endgame-mpi --threads 3 --dir %s --test write-%d'%(mpirun(),dir,slice))
 
     # Check
     with Log.scope('test write %d'%slice):
@@ -73,7 +82,7 @@ def test_meaningless(tmpdir):
   for slice in 4,5:
     # Compute small count slices based on meaningless data
     dir = '%s/meaningless-%d'%(tmpdir,slice)
-    run('mpirun -np 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d 00000000 --dir %s'%(slice,dir))
+    run('%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d 00000000 --dir %s'%(mpirun(),slice,dir))
     # Check validity
     run('%s/check --meaningless %d %s'%(os.path.dirname(__file__),slice,dir))
 
@@ -83,5 +92,5 @@ if __name__=='__main__':
     os.mkdir('tmp')
   test_write('tmp')
   test_counts()
-  test_meaningless()
+  test_meaningless('tmp')
   partition_test()

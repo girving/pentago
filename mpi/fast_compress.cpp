@@ -17,7 +17,7 @@ int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<char> compr
   interleave(uncompressed);
 #endif
   // Compress
-  OTHER_ASSERT(compressed.size()>=snappy::MaxCompressedLength(uncompressed.size()));
+  OTHER_ASSERT((size_t)compressed.size()>=snappy::MaxCompressedLength(uncompressed.size()));
   size_t size;
   snappy::RawCompress((const char*)uncompressed.data(),sizeof(Vector<super_t,2>)*uncompressed.size(),compressed.data(),&size);
   return size;
