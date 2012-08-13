@@ -27,7 +27,10 @@ void requests_t::checksome(bool wait) {
     int indices[n];
     int finished;
     const auto check = wait?MPI_Waitsome:MPI_Testsome;
-    CHECK(check(n,requests.data(),&finished,indices,statuses));
+    {
+      thread_time_t time("wait");
+      CHECK(check(n,requests.data(),&finished,indices,statuses));
+    }
     // Add requested callback to pending list
     pending.resize(finished);
     for (int i=0;i<finished;i++) {
