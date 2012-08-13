@@ -12,7 +12,7 @@
 //#define PENTAGO_MPI_DEBUG
 
 // Uncomment to enable MPI tracing
-#define PENTAGO_MPI_TRACING
+//#define PENTAGO_MPI_TRACING
 
 // Whether or not to store blocks compressed
 #define PENTAGO_MPI_COMPRESS 1
