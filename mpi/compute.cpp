@@ -78,6 +78,7 @@ struct allocated_t : public boost::noncopyable {
 
   // When computation is complete, send a wakeup message here
   const MPI_Comm wakeup_comm;
+  const line_data_t* const self; // Pointer back to containing line for use as a send buffer
 
   allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm);
 };
@@ -114,7 +115,8 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
   , input(large_buffer<Vector<super_t,2>>(self.input_shape.product()+self.output_shape.product(),false))
 
   // When computation is complete, send a wakeup message here
-  , wakeup_comm(wakeup_comm) {
+  , wakeup_comm(wakeup_comm)
+  , self(&self) {
 
   // Split buffer into two pieces
   const int split = self.input_shape.product();
@@ -360,8 +362,9 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
   if (!--rest.missing_microlines) {
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
-    line_data_t* pointer = line;
-    CHECK(MPI_Send(&pointer,1,MPI_LONG_LONG_INT,0,wakeup_tag,rest.wakeup_comm));
+    MPI_Request request;
+    CHECK(MPI_Isend((void*)&rest.self,1,MPI_LONG_LONG_INT,0,wakeup_tag,rest.wakeup_comm,&request));
+    CHECK(MPI_Request_free(&request));
     PENTAGO_MPI_TRACE("sent wakeup for %s",str(line->line));
   }
 }

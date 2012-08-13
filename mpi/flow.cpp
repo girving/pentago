@@ -175,6 +175,7 @@ void flow_t::schedule_lines() {
     if (free_memory < line_memory)
       break;
     // Schedule the line
+    thread_time_t time("schedule");
     unscheduled_lines.pop();
     free_memory -= line_memory;
     line->allocate(comms.wakeup_comm);
@@ -196,7 +197,7 @@ void flow_t::schedule_lines() {
           const int owner = input_blocks->partition->block_to_rank(child_section,block);
           const auto owner_offsets = input_blocks->partition->rank_offsets(owner);
           const int owner_block_id = block_id-owner_offsets.x;
-          CHECK(MPI_Send(0,0,MPI_INT,owner,owner_block_id,comms.request_comm));
+          send_empty(owner,owner_block_id,comms.request_comm);
           PENTAGO_MPI_TRACE("block request: owner %d, owner block id %d",owner,owner_block_id);
           it = block_requests.insert(make_pair(block_id,block_request)).first;
 #if !PENTAGO_MPI_COMPRESS
@@ -339,7 +340,8 @@ static void absorb_response(block_request_t* request, RawArray<char> compressed)
 static void absorb_response(block_request_t* request)
 #endif
 {
-  OTHER_ASSERT(request->dependent_lines.size());
+  const int lines = request->dependent_lines.size();
+  OTHER_ASSERT(lines);
   const auto first_line = request->dependent_lines[0];
   const auto first_block_data = first_line->input_block_data(request->block);
 
@@ -349,12 +351,15 @@ static void absorb_response(block_request_t* request)
 #endif
 
   // Copy data to dependent lines other than the first
-  for (int i=1;i<(int)request->dependent_lines.size();i++) {
-    const auto& line = request->dependent_lines[i];
-    const auto block_data = line->input_block_data(request->block);
-    OTHER_ASSERT(block_data.size()==first_block_data.size());
-    memcpy(block_data.data(),first_block_data.data(),sizeof(Vector<super_t,2>)*first_block_data.size());
-    line->decrement_missing_input_blocks();
+  if (lines>1) {
+    thread_time_t time("copy");
+    for (int i=1;i<lines;i++) {
+      const auto& line = request->dependent_lines[i];
+      const auto block_data = line->input_block_data(request->block);
+      OTHER_ASSERT(block_data.size()==first_block_data.size());
+      memcpy(block_data.data(),first_block_data.data(),sizeof(Vector<super_t,2>)*first_block_data.size());
+      line->decrement_missing_input_blocks();
+    }
   }
 
   // Decrement here so that the line doesn't deallocate itself before we copy the data to other lines

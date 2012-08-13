@@ -71,9 +71,9 @@ void ibarrier_t::decrement() {
     if (!rank) { // We're the root, so all ranks have called start.  Begin upwards phase.
       set_done();
       // Send an extra message to ourselves so that it suffices to check done() only after recv()
-      CHECK(MPI_Send(0,0,MPI_INT,0,tag,comm));
+      send_empty(0,tag,comm);
     } else // Send started messages downwards
-      CHECK(MPI_Send(0,0,MPI_INT,parent(rank),tag,comm));
+      send_empty(parent(rank),tag,comm);
   }
 }
 
@@ -82,7 +82,7 @@ void ibarrier_t::set_done() {
   done_ = true;
   // Send done messages upwards
   for (int jump = 1; rank+jump<ranks && !(rank&jump); jump *= 2)
-    CHECK(MPI_Send(0,0,MPI_INT,rank+jump,tag,comm));
+    send_empty(rank+jump,tag,comm);
 }
 
 /********************** ibarrier_countdown_t ***********************/

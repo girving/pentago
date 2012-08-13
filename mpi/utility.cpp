@@ -82,6 +82,12 @@ int get_count(MPI_Status* status, MPI_Datatype datatype) {
   return count;
 }
 
+void send_empty(int rank, int tag, MPI_Comm comm) {
+  MPI_Request request;
+  CHECK(MPI_Isend(0,0,MPI_INT,rank,tag,comm,&request));
+  CHECK(MPI_Request_free(&request));
+}
+
 mpi_world_t::mpi_world_t(int& argc, char**& argv) {
   int provided;
   CHECK(MPI_Init_thread(&argc,&argv,MPI_THREAD_MULTIPLE,&provided));
