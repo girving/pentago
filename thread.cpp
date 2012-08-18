@@ -7,11 +7,11 @@
 #include <other/core/random/counter.h>
 #include <other/core/structure/HashtableIterator.h>
 #include <other/core/structure/Tuple.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <other/core/utility/stl.h>
 #include <other/core/vector/Interval.h>
-#include <boost/bind.hpp>
 #include <deque>
 #include <set>
 namespace pentago {
@@ -41,21 +41,23 @@ static bool is_master() {
 
 /****************** thread_time_t *****************/
 
-static bool history = false;
+// Flip to enable history tracking
+#define HISTORY 0 
 
 struct time_entry_t {
-  int id;
   double total, local, start;
-  Array<Vector<double,2>> history;
+#ifdef HISTORY
+  Array<double> history;
+#endif
 
-  time_entry_t() {}
-  time_entry_t(int id) : id(id), total(0), local(0), start(0) {}
+  time_entry_t()
+    : total(0), local(0), start(0) {}
 };
 
 struct time_table_t {
   thread_type_t type;
   int thread_id;
-  Hashtable<const void*,time_entry_t> times;
+  time_entry_t times[_time_kinds];
 };
 vector<time_table_t*> time_tables;
 static mutex_t time_mutex;
@@ -90,14 +92,10 @@ thread_type_t thread_type() {
   return table->type;
 }
 
-static inline time_entry_t& time_entry(const char* name) {
+static inline time_entry_t& time_entry(time_kind_t kind) {
   auto table = (time_table_t*)pthread_getspecific(time_info.key);
   OTHER_ASSERT(table);
-  time_entry_t* entry = table->times.get_pointer((void*)name);
-  if (entry)
-    return *entry;
-  table->times.set((void*)name,time_entry_t(table->times.size()));
-  return table->times.get((void*)name);
+  return table->times[kind];
 }
 
 static inline double time() {
@@ -106,15 +104,16 @@ static inline double time() {
   return (double)tv.tv_sec+1e-6*tv.tv_usec;
 }
 
-thread_time_t::thread_time_t(const char* name)
-  : entry(time_entry(name)) {
+thread_time_t::thread_time_t(time_kind_t kind)
+  : entry(time_entry(kind)) {
   entry.start = time();
 }
 
 thread_time_t::~thread_time_t() {
   double now = time();
-  if (history)
-    entry.history.append(vec(entry.start,now));
+#if HISTORY
+  entry.history.append(vec(entry.start,now));
+#endif
   entry.local += now-entry.start;
   entry.start = 0;
 }
@@ -129,7 +128,6 @@ public:
 
   const thread_type_t type;
   const int count;
-  const string idle_name;
 private:
   vector<pthread_t> threads;
   mutex_t mutex;
@@ -160,7 +158,6 @@ OTHER_DEFINE_TYPE(thread_pool_t)
 thread_pool_t::thread_pool_t(thread_type_t type, int count, int delta_priority)
   : type(type)
   , count(count)
-  , idle_name(type==CPU?"cpu-idle":type==IO?"io-idle":"unknown-idle")
   , master_cond(mutex)
   , worker_cond(mutex)
   , waiting(0)
@@ -213,11 +210,13 @@ void thread_pool_t::shutdown() {
 void* thread_pool_t::worker(void* pool_) {
   thread_pool_t& pool = *(thread_pool_t*)pool_;
   time_info.init_thread(pool.type);
+  time_kind_t idle = pool.type==CPU?cpu_idle_kind:pool.type==IO?io_idle_kind:_time_kinds;
+  OTHER_ASSERT(idle!=_time_kinds);
   for (;;) {
     // Grab a job
     function<void()> f;
     {
-      thread_time_t time(pool.idle_name.c_str());
+      thread_time_t time(idle);
       lock_t lock(pool.mutex);
       while (!f) {
         if (pool.die)
@@ -277,7 +276,7 @@ void thread_pool_t::schedule(const vector<function<void()>>& fs) {
 
 void thread_pool_t::wait() {
   OTHER_ASSERT(is_master());
-  thread_time_t time("master-idle");
+  thread_time_t time(master_idle_kind);
   lock_t lock(mutex);
   while (!die && (jobs.size() || waiting<count))
     master_cond.wait();
@@ -289,10 +288,6 @@ void thread_pool_t::wait() {
 Ptr<thread_pool_t> cpu_pool;
 Ptr<thread_pool_t> io_pool;
 
-}
-
-void set_thread_history(bool flag) {
-  history = flag;
 }
 
 void init_threads(int cpu_threads, int io_threads) {
@@ -382,101 +377,103 @@ void threads_wait_all_help() {
 
 /****************** time reports *****************/
 
-void clear_thread_times() {
+Array<double> clear_thread_times() {
   OTHER_ASSERT(is_master());
   threads_wait_all();
   lock_t lock(time_mutex);
   double now = time();
-  for (auto table : time_tables)
-    for (HashtableIterator<const void*,time_entry_t> it(table->times);it.valid();it.next()) {
-      time_entry_t& entry = it.data();
+  Array<double> result(_time_kinds);
+  for (auto table : time_tables) {
+    // Compute missing time
+    auto& missing = table->times[master_missing_kind+table->type];
+    missing.local = now-time_info.local_start;
+    for (int k : range((int)master_missing_kind))
+      missing.local -= table->times[k].local;
+    // Clear local times
+    for (int k : range((int)_time_kinds)) {
+      auto& entry = table->times[k];
       if (entry.start) {
-        if (history)
-          entry.history.append(vec(entry.start,now));
+#if HISTORY
+        entry.history.append(vec(entry.start,now));
+#endif
         entry.local += now-entry.start;
         entry.start = now;
       }
+      result[k] += entry.local;
       entry.total += entry.local;
       entry.local = 0;
     }
+  }
+  time_info.local_start = now;
+  return result;
+}
+
+Array<double> total_thread_times() {
+  clear_thread_times();
+  lock_t lock(time_mutex);
+  Array<double> result(_time_kinds);
+  for (auto table : time_tables)
+    for (int k : range((int)_time_kinds))
+      result[k] += table->times[k].total;
+  return result;
 }
 
 static const char* sanitize_name(const string& name) {
   return name.size()?name.c_str():"<empty>";
 }
 
-void report_thread_times(bool total) {
-  OTHER_ASSERT(is_master());
-  threads_wait_all();
-  lock_t lock(time_mutex);
-  double totals[3] = {0,0,0};
-  const double now = time(),
-               start = total?time_info.total_start:time_info.local_start,
-               elapsed = now-start;
-  OTHER_ASSERT(start);
-  time_info.local_start = now;
-  Hashtable<string,Tuple<int,double>> times;
-  Hashtable<string> type_to_name[3];
-  for (auto table : time_tables)
-    for (HashtableIterator<const void*,time_entry_t> it(table->times);it.valid();it.next()) {
-      const string name = (const char*)it.key();
-      time_entry_t& entry = it.data();
-      if (total)
-        type_to_name[table->type].set(name);
-      if (entry.start) {
-        if (history)
-          entry.history.append(vec(entry.start,now));
-        entry.local += now-entry.start;
-        entry.start = now;
-      }
-      auto& time = times.get_or_insert(name,tuple(10000,0.));
-      time.x = min(time.x,entry.id);
-      entry.total += entry.local;
-      double t = total?entry.total:entry.local;
-      entry.local = 0;
-      time.y += t;
-      totals[table->type] += t;
-    }
+void report_thread_times(RawArray<const double> times) {
+  OTHER_ASSERT(times.size()==_time_kinds);
 
-  // Sort by id
-  set<Tuple<int,string>> order;
-  for (HashtableIterator<string,Tuple<int,double>> it(times);it.valid();it.next())
-    order.insert(tuple(it.data().x,it.key()));
+  // Collect names
+  const char* names[_time_kinds] = {0};
+  #define FIELD(kind) names[kind##_kind] = #kind;
+  FIELD(compress)
+  FIELD(decompress)
+  FIELD(snappy)
+  FIELD(unsnappy)
+  FIELD(filter)
+  FIELD(copy)
+  FIELD(schedule)
+  FIELD(wait)
+  FIELD(partition)
+  FIELD(compute)
+  FIELD(accumulate)
+  FIELD(count)
+  FIELD(meaningless)
+  FIELD(read)
+  FIELD(write)
+  FIELD(write_sections)
+  FIELD(write_counts)
+  FIELD(write_sparse)
+  FIELD(master_idle)
+  FIELD(cpu_idle)
+  FIELD(io_idle)
 
   // Print times
   cout << "timing\n";
-  for (auto& iname : order)
-    cout << format("  %-20s %10.4f s\n",sanitize_name(iname.y.c_str()),times.get(iname.y.c_str()).y);
+  for (int k : range((int)master_missing_kind))
+    if (times[k])
+      cout << format("  %-20s %10.4f s\n",sanitize_name(names[k]),times[k]);
   if (io_pool)
-    cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",elapsed-totals[MASTER],cpu_pool->count*elapsed-totals[CPU],io_pool->count*elapsed-totals[IO]);
+    cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",times[master_missing_kind],times[cpu_missing_kind],times[io_missing_kind]);
   else
-    cout << format("  missing: master %.4f, cpu %.4f\n",elapsed-totals[MASTER],cpu_pool->count*elapsed-totals[CPU]);
+    cout << format("  missing: master %.4f, cpu %.4f\n",times[master_missing_kind],times[cpu_missing_kind]);
   cout << flush;
-
-  // Show which jobs ran on which type of thread
-  if (total) {
-    cout << "job types\n";
-    for (int i=0;i<3;i++)
-      if (type_to_name[i].size()) {
-        cout << (i==MASTER?"  master = ":i==CPU?"  cpu = ":i==IO?"  io = ":"  ? = ");
-        for (HashtableIterator<string> it(type_to_name[i]);it.valid();it.next())
-          cout << sanitize_name(it.key())<<' ';
-        cout << endl;
-      }
-  }
 }
 
 vector<Tuple<int,vector<Tuple<string,Array<Vector<double,2>>>>>> thread_history() {
   clear_thread_times();
   lock_t lock(time_mutex);
   vector<Tuple<int,vector<Tuple<string,Array<Vector<double,2>>>>>> data(time_tables.size());
-  if (history)
-    for (int t=0;t<(int)data.size();t++) {
-      auto& table = *time_tables[t];
-      data[t].x = table.thread_id;
-      for (HashtableIterator<const void*,time_entry_t> it(table.times);it.valid();it.next())
-        data[t].y.push_back(tuple(string((const char*)it.key()),it.data().history));
-    }
+#if HISTORY
+  for (int t=0;t<(int)data.size();t++) {
+    auto& table = *time_tables[t];
+    data[t].x = table.thread_id;
+    for (HashtableIterator<const void*,time_entry_t> it(table.times);it.valid();it.next())
+      data[t].y.push_back(tuple(string((const char*)it.key()),it.data().history));
+  }
+#endif
   return data;
 }
 
@@ -488,7 +485,7 @@ static void add_noise(Array<uint128_t> data, int key, mutex_t* mutex) {
     data[i] += threefry(key,i);
   }
   if (thread_type()==CPU)
-    io_pool->schedule(boost::bind(add_noise,data,key+1,mutex));
+    io_pool->schedule(curry(add_noise,data,key+1,mutex));
 }
 
 static void thread_pool_test() {
@@ -504,7 +501,7 @@ static void thread_pool_test() {
     mutex_t mutex;
     Array<uint128_t> parallel(serial.size());
     for (int i=0;i<jobs;i++)
-      cpu_pool->schedule(boost::bind(add_noise,parallel,2*i,&mutex));
+      cpu_pool->schedule(curry(add_noise,parallel,2*i,&mutex));
     threads_wait_all();
 
     // Compare
@@ -516,10 +513,10 @@ static void thread_pool_test() {
 using namespace pentago;
 
 void wrap_thread() {
-  OTHER_FUNCTION(set_thread_history)
   OTHER_FUNCTION(init_threads)
   OTHER_FUNCTION(thread_pool_test)
   OTHER_FUNCTION(clear_thread_times)
+  OTHER_FUNCTION(total_thread_times)
   OTHER_FUNCTION(report_thread_times)
   OTHER_FUNCTION(thread_history)
 }

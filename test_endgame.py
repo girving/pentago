@@ -55,7 +55,7 @@ def test_supertensor():
             b = i,j,k,l
             block = reader.read_block(b)
             assert all(block==data[b])
-  report_thread_times(True)
+  report_thread_times(total_thread_times())
 
 def test_popcounts_over_stabilizers():
   popcounts_over_stabilizers_test(1024)

@@ -10,11 +10,11 @@
 #include <pentago/utility/memory.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/ProgressIndicator.h>
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/Log.h>
 #include <tr1/unordered_map>
-#include <boost/bind.hpp>
 namespace pentago {
 namespace mpi {
 
@@ -24,7 +24,7 @@ using std::flush;
 using std::tr1::unordered_map;
 
 static void meaningless_helper(block_store_t* const self, const int local_id) {
-  thread_time_t time("meaningless");
+  thread_time_t time(meaningless_kind);
 
   // Prepare
   const block_info_t* info = &self->block_info[local_id];
@@ -84,7 +84,7 @@ Ref<block_store_t> meaningless_block_store(const partition_t& partition, const i
   // Replace data with meaninglessness
   memset(self->section_counts.data(),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
   for (int local_id : range(self->blocks()))
-    threads_schedule(CPU,boost::bind(meaningless_helper,&*self,local_id));
+    threads_schedule(CPU,curry(meaningless_helper,&*self,local_id));
   threads_wait_all_help();
   return self;
 }
@@ -281,7 +281,7 @@ static Tuple<Vector<uint64_t,3>,int> compare_readers_and_samples(const supertens
         for (int i3 : range(blocks[3])) {
           auto sub = new subcompare_t;
           auto block = sub->block = vec(i0,i1,i2,i3);
-          const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)> process = boost::bind(process_data,&self,sub,block_samples.at(index(blocks,block)).raw(),_1,_2);
+          const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)> process = curry(process_data,&self,sub,block_samples.at(index(blocks,block)).raw());
           reader.schedule_read_block(block,process);
           if (old_reader)
             old_reader->schedule_read_block(block,process);

@@ -14,7 +14,6 @@
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/Log.h>
 #include <tr1/unordered_map>
-#include <boost/bind.hpp>
 namespace pentago {
 namespace mpi {
 
@@ -212,14 +211,14 @@ void block_store_t::accumulate(int local_id, RawArray<Vector<super_t,2>> new_dat
   // If previous contributions exist, uncompress the old data and combine it with the new
   if (store.size(local_id)) {
     const auto old_data = uncompress_and_get_flat(local_id,true);
-    thread_time_t time("accumulate");
+    thread_time_t time(accumulate_kind);
     OTHER_ASSERT(new_data.size()==old_data.size());
     for (int i=0;i<new_data.size();i++)
       new_data[i] |= old_data[i];
   }
   // If all contributions are in place, count and sample
   if (!--info->missing_contributions) {
-    thread_time_t time("count");
+    thread_time_t time(count_kind);
     for (auto& sample : samples[local_id])
       sample.wins = new_data[sample.index];
     const auto counts = count_block_wins(info->section,info->block,new_data);

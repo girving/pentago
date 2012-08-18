@@ -28,11 +28,6 @@ void OTHER_NORETURN(check_failed(const char* file, const char* function, int lin
 // Convert an error code into a string
 string error_string(int code);
 
-struct scope_t : public thread_time_t {
-  scope_t(const char* name);
-  ~scope_t();
-};
-
 Vector<int,4> section_blocks(section_t section);
 
 template<int d> static inline Vector<int,d> block_shape(Vector<int,d> shape, Vector<int,d> block) {

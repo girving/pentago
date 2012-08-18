@@ -5,6 +5,7 @@
 #include <pentago/mpi/flow.h>
 #include <pentago/utility/memory.h>
 #include <other/core/python/module.h>
+#include <other/core/python/Ptr.h>
 namespace pentago {
 namespace mpi {
 

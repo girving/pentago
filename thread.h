@@ -1,6 +1,7 @@
 // Thread utilities
 #pragma once
 
+#include <other/core/array/Array.h>
 #include <other/core/python/Ptr.h>
 #include <other/core/python/Object.h>
 #include <other/core/python/ExceptionValue.h>
@@ -66,15 +67,58 @@ struct cond_t : public boost::noncopyable {
   }
 };
 
+/* Our goals are to make timing (1) as fast as possible and (2) easy
+ * to share across different ranks in an MPI run.  Therefore, we make
+ * the questionable and perhaps temporary decision to use a fixed
+ * enum for the kinds of operations which can be timed.  This lets us
+ * store timing information in a simple array.
+ */
+
+enum time_kind_t {
+  compress_kind,
+  decompress_kind,
+  snappy_kind,
+  unsnappy_kind,
+  filter_kind,
+  copy_kind,
+  schedule_kind,
+  wait_kind,
+  partition_kind,
+  compute_kind,
+  accumulate_kind,
+  count_kind,
+  meaningless_kind,
+  read_kind,
+  write_kind,
+  write_sections_kind,
+  write_counts_kind,
+  write_sparse_kind,
+  master_idle_kind,
+  cpu_idle_kind,
+  io_idle_kind,
+  // Internal use only
+  master_missing_kind,
+  cpu_missing_kind,
+  io_missing_kind,
+  // Count the number of kinds
+  _time_kinds
+};
+
 class thread_time_t : public boost::noncopyable {
   time_entry_t& entry;
 public:
-  thread_time_t(const char* name);
+  thread_time_t(time_kind_t kind);
   ~thread_time_t();
 };
 
-void clear_thread_times();
-void report_thread_times(bool total);
+// Extract local times and reset them to zero
+Array<double> clear_thread_times();
+
+// Extract total thread times
+Array<double> total_thread_times();
+
+// Print a timing report
+void report_thread_times(RawArray<const double> times);
 
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
 thread_type_t thread_type();

@@ -18,11 +18,11 @@
 #include <other/core/python/Class.h>
 #include <other/core/python/ExceptionValue.h>
 #include <other/core/random/Random.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/interrupts.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/const_cast.h>
 #include <other/core/utility/ProgressIndicator.h>
-#include <boost/bind.hpp>
 namespace pentago {
 
 using Log::cout;
@@ -188,7 +188,7 @@ struct read_helper_t : public boost::noncopyable {
   }
 
   void process_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> block_data) {
-    thread_time_t time("copy");
+    thread_time_t time(copy_kind);
     OTHER_ASSERT(block[reorder[0]]==i && block[reorder[1]]==j);
     const int k = block[reorder[2]], l = block[reorder[3]];
     OTHER_ASSERT(block_data.shape==reader.header.block_shape(block));
@@ -224,7 +224,7 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
   for (const int k : range(helper.slice_blocks[0]))
     for (const int l : range(helper.slice_blocks[1]))
       slice.append(in_order(helper.reorder,vec(i,j,k,l)));
-  reader.schedule_read_blocks(slice,boost::bind(&read_helper_t::process_block,&helper,_1,_2));
+  reader.schedule_read_blocks(slice,curry(&read_helper_t::process_block,&helper));
   threads_wait_all();
 }
 
@@ -331,7 +331,7 @@ struct write_helper_t : public boost::noncopyable {
   }
 
   void process_block(Vector<int,4> block, Array<Vector<super_t,2>,4> first_pass_data) {
-    thread_time_t time("copy");
+    thread_time_t time(copy_kind);
     OTHER_ASSERT(block[order[0]]==i && block[order[1]]==j);
     const int k = block[order[2]], l = block[order[3]];
     const Vector<int,4> block_shape = writer.header.block_shape(block);
@@ -397,7 +397,7 @@ static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<superten
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1])) {
         const Vector<int,4> block = in_order(order,vec(i,j,k,l));
-        jobs.push_back(boost::bind(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
+        jobs.push_back(curry(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
       }
     threads_schedule(CPU,jobs);
   } else {
@@ -405,7 +405,7 @@ static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<superten
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1]))
         slice.append(in_order(order,vec(i,j,k,l)));
-    first_pass->schedule_read_blocks(slice,boost::bind(&write_helper_t::process_block,&helper,_1,_2));
+    first_pass->schedule_read_blocks(slice,curry(&write_helper_t::process_block,&helper));
   }
   threads_wait_all();
 }
@@ -445,7 +445,7 @@ template<bool turn,bool final> struct compute_helper_t {
 
   void compute_slice(int ii, int jj) {
     // Run inner two dimensions sequentially.  Hopefully this produces nice cache behavior.
-    thread_time_t time("compute");
+    thread_time_t time(compute_kind);
     Vector<uint64_t,3> win_counts;
     for (int kk=0;kk<dest.shape[2];kk++)
       for (int ll=0;ll<dest.shape[3];ll++) {
@@ -510,7 +510,7 @@ template<bool turn,bool final> static Vector<uint64_t,3> endgame_compute_block_s
   vector<function<void()>> jobs;
   for (const int ii : range(dest.shape[0]))
     for (const int jj : range(dest.shape[1]))
-      jobs.push_back(boost::bind(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
+      jobs.push_back(curry(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
   threads_schedule(CPU,jobs);
   threads_wait_all();
   return helper.win_counts;

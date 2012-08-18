@@ -23,7 +23,7 @@ using Log::cout;
 using std::endl;
 
 vector<Array<const section_t>> descendent_sections(const section_t root, const int max_slice) {
-  scope_t scope("dependents");
+  Log::Scope scope("dependents");
   OTHER_ASSERT(0<=max_slice && max_slice<=35);
   OTHER_ASSERT(root.sum()<=max_slice);
 
@@ -81,7 +81,8 @@ partition_t::partition_t(const int ranks, const int slice, Array<const section_t
   , owner_excess(inf), total_excess(inf)
   , total_blocks(0), total_nodes(0), max_rank_blocks(0), max_rank_nodes(0) {
   OTHER_ASSERT(ranks>0);
-  scope_t scope("partition");
+  Log::Scope scope("partition");
+  thread_time_t time(partition_kind);
 
   // Verify that caller didn't lie about slice
   for (const auto& section : sections)

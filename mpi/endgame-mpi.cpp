@@ -50,19 +50,29 @@ static section_t parse_section(const string& s) {
     cerr << argv[0] << ": " << format(__VA_ARGS__) << endl; \
   return 1; })
 
-static void report(const char* name) {
-  cout << "memory "<<name<<": "<<memory_report()<<endl;
+static void report(MPI_Comm comm, const char* name) {
+  const int rank = comm_rank(comm);
+  Array<uint64_t> info = memory_info();
+  CHECK(MPI_Reduce(rank?info.data():MPI_IN_PLACE,info.data(),info.size(),MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+  if (!rank)
+    cout << "memory "<<name<<": "<<memory_report(info)<<endl;
+}
+
+static void report_mpi_times(MPI_Comm comm, RawArray<double> times) {
+  const int rank = comm_rank(comm);
+  CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_DOUBLE,MPI_SUM,0,comm));
+  if (!rank)
+    report_thread_times(times);
 }
 
 int main(int argc, char** argv) {
   // Initialize MPI
-  report("start");
   mpi_world_t world(argc,argv);
   MPI_Comm comm = MPI_COMM_WORLD;
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   set_verbose(!rank);
-  report("mpi");
+  report(comm,"mpi");
 
   // Parse command line options
   int save = -100;
@@ -193,7 +203,7 @@ int main(int argc, char** argv) {
   // Allocate thread pool
   const int workers = threads-1;
   init_threads(workers,0);
-  report("threads");
+  report(comm,"threads");
 
   // Make sure the compression level is valid
   if (!rank) {
@@ -251,7 +261,7 @@ int main(int argc, char** argv) {
 
   // Allocate communicators
   flow_comms_t comms(comm);
-  report("base");
+  report(comm,"base");
 
   // Compute each slice in turn
   {
@@ -290,7 +300,7 @@ int main(int argc, char** argv) {
       const auto free_memory = memory_limit-base_memory;
       cout << "memory usage: partitions = "<<partition_memory<<", blocks = "<<large(block_memory)<<", lines = "<<line_memory<<", total = "<<large(base_memory)<<endl;
       cout << "maximum line parallelism = "<<free_memory/(2*13762560)<<endl;
-      report("compute");
+      report(comm,"compute");
 
       // Compute (and communicate)
       {
@@ -303,7 +313,7 @@ int main(int argc, char** argv) {
       prev_partition = partition;
       prev_blocks = blocks;
       lines.clean_memory();
-      report("free");
+      report(comm,"free");
 
       // Write various information to disk
       {
@@ -315,14 +325,12 @@ int main(int argc, char** argv) {
       }
 
       // Dump timing
-      // TODO: synchronize all processes
-      report_thread_times(false);
+      report_mpi_times(comm,clear_thread_times());
     }
   }
 
   // Dump total timing
-  // TODO: synchronize all processes
-  report_thread_times(true);
-  report("final");
+  report_mpi_times(comm,total_thread_times());
+  report(comm,"final");
   return 0;
 }

@@ -13,11 +13,11 @@
 #include <other/core/array/Array4d.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/utility/const_cast.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/ProgressIndicator.h>
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/Log.h>
 #include <boost/noncopyable.hpp>
-#include <boost/bind.hpp>
 #include <tr1/unordered_map>
 namespace pentago {
 namespace mpi {
@@ -126,11 +126,11 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , countdown(comms.barrier_comm,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
   , progress(countdown.remaining(),false)
   , free_memory(memory_limit)
-  , barrier_callback(boost::bind(&flow_t::process_barrier,this,_1))
-  , request_callback(boost::bind(&flow_t::process_request,this,_1))
-  , output_callback(boost::bind(&flow_t::process_output,this,_1))
-  , wakeup_callback(boost::bind(&flow_t::process_wakeup,this,_1))
-  , response_callback(boost::bind(&flow_t::process_response,this,_1)) {
+  , barrier_callback(curry(&flow_t::process_barrier,this))
+  , request_callback(curry(&flow_t::process_request,this))
+  , output_callback(curry(&flow_t::process_output,this))
+  , wakeup_callback(curry(&flow_t::process_wakeup,this))
+  , response_callback(curry(&flow_t::process_response,this)) {
 
   // Compute information about each line
   unscheduled_lines.preallocate(lines.size());
@@ -175,7 +175,7 @@ void flow_t::schedule_lines() {
     if (free_memory < line_memory)
       break;
     // Schedule the line
-    thread_time_t time("schedule");
+    thread_time_t time(schedule_kind);
     unscheduled_lines.pop();
     free_memory -= line_memory;
     line->allocate(comms.wakeup_comm);
@@ -272,7 +272,7 @@ void flow_t::process_output(MPI_Status* status) {
   const auto block_data = output_buffer.slice_own(0,count/8);
   output_buffer.clean_memory();
   // Schedule an accumulate as soon as possible to conserve memory
-  threads_schedule(CPU,boost::bind(&block_store_t::accumulate,&output_blocks,status->MPI_TAG,block_data),true);
+  threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,status->MPI_TAG,block_data),true);
   // One step closer...
   progress.progress();
   countdown.decrement();
@@ -292,7 +292,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
   OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
   line_data_t* const line = (line_data_t*)wakeup_buffer; 
   PENTAGO_MPI_TRACE("process wakeup %s",str(line->line));
-  const function<void(MPI_Status*)> callback(boost::bind(&flow_t::finish_output_send,this,line,_1));
+  const function<void(MPI_Status*)> callback(curry(&flow_t::finish_output_send,this,line));
   for (int b=0;b<line->line.length;b++) {
     const auto block = line->line.block(b);
     const auto block_id = output_blocks.partition->block_offsets(line->line.section,block).x;
@@ -352,7 +352,7 @@ static void absorb_response(block_request_t* request)
 
   // Copy data to dependent lines other than the first
   if (lines>1) {
-    thread_time_t time("copy");
+    thread_time_t time(copy_kind);
     for (int i=1;i<lines;i++) {
       const auto& line = request->dependent_lines[i];
       const auto block_data = line->input_block_data(request->block);
@@ -384,11 +384,11 @@ void flow_t::process_response(MPI_Status* status) {
   // Schedule decompression task at the head of the job queue (to free memory as soon as possible)
   const auto compressed = response_buffer.slice_own(0,get_count(status,MPI_BYTE));
   response_buffer.clean_memory();
-  threads_schedule(CPU,boost::bind(absorb_response,request,compressed),true);
+  threads_schedule(CPU,curry(absorb_response,request,compressed),true);
   post_response_recv();
 #else
   // Data has already been received into the first dependent line.  Schedule a pure copying job
-  threads_schedule(CPU,boost::bind(absorb_response,request));
+  threads_schedule(CPU,curry(absorb_response,request));
 #endif
 }
 

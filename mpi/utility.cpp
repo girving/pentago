@@ -41,15 +41,6 @@ string error_string(int code) {
   return error;
 }
 
-scope_t::scope_t(const char* name)
-  : thread_time_t(name) {
-  Log::push_scope(name);
-}
-
-scope_t::~scope_t() {
-  Log::pop_scope();
-}
-
 Vector<int,4> section_blocks(section_t section) {
   return ceil_div(section.shape(),block_size);
 }

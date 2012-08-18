@@ -1,8 +1,8 @@
 // Insertion sort
-
 #pragma once
 
 #include <other/core/structure/Tuple.h>
+#include <other/core/utility/pass.h>
 namespace pentago {
 
 using namespace other;

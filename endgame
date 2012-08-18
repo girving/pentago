@@ -72,7 +72,7 @@ def compute_pass(writer,first_pass,readers,order):
           endgame_read_block_slice(child_section(section,order[3]),reader3,order,i,j,src3_part)
         counts += endgame_compute_block_slice(writer,order,i,j,dest_part,src2_part,src3_part,bool(first_pass))
         endgame_write_block_slice(writer,first_pass,order,i,j,dest_part,sparse)
-        report_thread_times(False)
+        report_thread_times(clear_thread_times())
 
   # Done with this pass!
   writer.finalize()
@@ -213,7 +213,7 @@ def main():
     try:
       compute(section)
     finally:
-      report_thread_times(True)
+      report_thread_times(total_thread_times())
       if history:
         Log.write('saving thread history to %s'%history)
         tryfile.write(history,thread_history())

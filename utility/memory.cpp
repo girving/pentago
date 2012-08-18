@@ -30,30 +30,57 @@ static Vector<ssize_t,2> known() {
 
 #ifdef __linux__
 
-string memory_report() {
-  const char* statm = "/proc/self/statm";
-  FILE* file = fopen(statm,"r");
+Array<uint64_t> memory_info() {
+  FILE* file = fopen("/proc/self/statm","r");
   if (!file)
-    return format("failed to open %s",statm);
+    return Array<uint64_t>();
   size_t size,resident,share,text,lib,data,dt;
   int r = fscanf(file,"%zu %zu %zu %zu %zu %zu %zu",&size,&resident,&share,&text,&lib,&data,&dt);
   fclose(file);
   if (r != 7)
-    return format("failed to parse %s",statm);
+    return Array<uint64_t>();
   const int page = getpagesize();
   const auto known = pentago::known();
-  return format("virtual %s, resident %s, share %s, text %s, peak known %s, known %s, data %s",large(page*size),large(page*resident),large(page*share),large(page*text),large(known.y),large(known.x),large(page*data));
+  Array<uint64_t> result(7,false);
+  result[0] = page*size;
+  result[1] = page*resident;
+  result[2] = page*share;
+  result[3] = page*text;
+  result[4] = known.y;
+  result[5] = known.x;
+  result[6] = page*data;
+  return result;
+}
+
+string memory_report(RawArray<const uint64_t> info) {
+  if (!info.size())
+    return "failed to parse /proc/self/statm";
+  OTHER_ASSERT(info.size()==7);
+  return format("virtual %s, resident %s, share %s, text %s, peak known %s, known %s, data %s",large(info[0]),large(info[1]),large(info[2]),large(info[3]),large(info[4]),large(info[5]),large(info[6]));
 }
 
 #elif defined(__APPLE__)
 
-string memory_report() {
+Array<uint64_t> memory_info() {
   struct mach_task_basic_info info;
   mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
   if (KERN_SUCCESS != task_info(mach_task_self(),MACH_TASK_BASIC_INFO,(task_info_t)&info,&count))
-    return "failed";
+    return Array<uint64_t>();
   const auto known = pentago::known();
-  return format("virtual %s, peak %s, peak known %s, known %s, resident %s",large(info.virtual_size),large(info.resident_size_max),large(known.y),large(known.x),large(info.resident_size));
+  Array<uint64_t> result(5,false);
+  result[0] = info.virtual_size;
+  result[1] = info.resident_size_max;
+  result[2] = known.y;
+  result[3] = known.x;
+  result[4] = info.resident_size;
+  return result;
+}
+
+string memory_report(RawArray<const uint64_t> info) {
+  if (!info.size())
+    return "failed";
+  OTHER_ASSERT(info.size()==5);
+  return format("virtual %s, peak %s, peak known %s, known %s, resident %s",large(info[0]),large(info[1]),large(info[2]),large(info[3]),large(info[4]));
 }
 
 #else

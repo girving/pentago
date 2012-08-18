@@ -11,9 +11,10 @@
 #include <pentago/utility/memory.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
+#include <other/core/python/Ptr.h>
 #include <other/core/utility/const_cast.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>
-#include <boost/bind.hpp>
 namespace pentago {
 namespace mpi {
 
@@ -222,7 +223,7 @@ static OTHER_UNUSED void slow_verify(const char* prefix, const board_t board, co
 // Compute a single 1D line through a section (a 1D component of a block line)
 template<bool slice_35> static void compute_microline(line_data_t* const line, const Vector<int,3> base) {
   // Prepare
-  thread_time_t time("compute");
+  thread_time_t time(compute_kind);
   const int dim = line->line.dimension & 3; // Tell compiler that 0<=dim<4
   const int length = line->line.length;
   const int child_dim = line->rest->child_dimension & 3;
@@ -399,7 +400,7 @@ void schedule_compute_line(line_data_t& line) {
   for (int i=0;i<cross_section[0];i++)
     for (int j=0;j<cross_section[1];j++)
       for (int k=0;k<cross_section[2];k++)
-        threads_schedule(CPU,boost::bind(compute,&line,vec(i,j,k)));
+        threads_schedule(CPU,curry(compute,&line,vec(i,j,k)));
 }
 
 }
