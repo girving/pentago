@@ -392,15 +392,13 @@ struct write_helper_t : public boost::noncopyable {
 
 static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<supertensor_reader_t> first_pass, Vector<int,4> order, int i, int j, RawArray<const Vector<super_t,2>,4> data, Ptr<sparse_sample_t> sparse) {
   write_helper_t helper(writer,first_pass,order,i,j,data,sparse);
-  if (!first_pass) {
-    vector<function<void()>> jobs;
+  if (!first_pass)
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1])) {
         const Vector<int,4> block = in_order(order,vec(i,j,k,l));
-        jobs.push_back(curry(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
+        threads_schedule(CPU,curry(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
       }
-    threads_schedule(CPU,jobs);
-  } else {
+  else {
     Array<Vector<int,4>> slice;
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1]))
@@ -507,11 +505,9 @@ template<bool turn,bool final> struct compute_helper_t {
 template<bool turn,bool final> static Vector<uint64_t,3> endgame_compute_block_slice_helper(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j,
                                                                                             RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count) {
   compute_helper_t<turn,final> helper(writer,order,i,j,dest,src2,src3,count);
-  vector<function<void()>> jobs;
   for (const int ii : range(dest.shape[0]))
     for (const int jj : range(dest.shape[1]))
-      jobs.push_back(curry(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
-  threads_schedule(CPU,jobs);
+      threads_schedule(CPU,curry(&compute_helper_t<turn,final>::compute_slice,&helper,ii,jj));
   threads_wait_all();
   return helper.win_counts;
 }

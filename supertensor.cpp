@@ -258,12 +258,10 @@ void supertensor_reader_t::schedule_read_block(Vector<int,4> block, const functi
 }
 
 void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<int,4>> blocks, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const {
-  vector<function<void()>> jobs;
   for (auto block : blocks) {
     OTHER_ASSERT(index.valid(block));
-    jobs.push_back(curry(read_and_uncompress,fd->fd,index[block],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
+    threads_schedule(IO,curry(read_and_uncompress,fd->fd,index[block],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
   }
-  threads_schedule(IO,jobs);
 }
 
 uint64_t supertensor_reader_t::total_size() const {

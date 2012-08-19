@@ -1,6 +1,7 @@
 // Thread utilities
 #pragma once
 
+#include <pentago/utility/job.h>
 #include <other/core/array/Array.h>
 #include <other/core/python/Ptr.h>
 #include <other/core/python/Object.h>
@@ -127,10 +128,7 @@ thread_type_t thread_type();
 void init_threads(int cpu_threads, int io_threads);
 
 // Schedule a job.  Schedule at the back of the queue if !soon, or the front if soon.
-void threads_schedule(thread_type_t type, const function<void()>& f, bool soon=false);
-
-// Schedule many jobs
-void threads_schedule(thread_type_t type, const vector<function<void()>>& fs);
+void threads_schedule(thread_type_t type, job_t&& f, bool soon=false);
 
 // Wait for all jobs to complete
 void threads_wait_all();

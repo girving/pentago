@@ -132,7 +132,7 @@ private:
   vector<pthread_t> threads;
   mutex_t mutex;
   cond_t master_cond, worker_cond;
-  deque<function<void()>> jobs;
+  deque<job_base_t*> jobs;
   ExceptionValue error;
   int waiting;
   bool die;
@@ -144,9 +144,8 @@ private:
 public:
   ~thread_pool_t();
 
-  void wait(); // wait for all jobs to complete
-  void schedule(const function<void()>& f, bool soon=false); // schedule a job
-  void schedule(const vector<function<void()>>& fs); // schedule many jobs
+  void wait(); // Wait for all jobs to complete
+  void schedule(job_t&& f, bool soon=false); // Schedule a job
 
 private:
   static void* worker(void* pool);
@@ -199,12 +198,14 @@ thread_pool_t::~thread_pool_t() {
 void thread_pool_t::shutdown() {
   {
     lock_t lock(mutex);
-    jobs.clear();
     die = true;
     worker_cond.broadcast();
   }
   for (pthread_t& thread : threads)
     CHECK(pthread_join(thread,0));
+  for (auto job : jobs)
+    delete job;
+  jobs.clear();
 }
 
 void* thread_pool_t::worker(void* pool_) {
@@ -214,7 +215,7 @@ void* thread_pool_t::worker(void* pool_) {
   OTHER_ASSERT(idle!=_time_kinds);
   for (;;) {
     // Grab a job
-    function<void()> f;
+    job_t f;
     {
       thread_time_t time(idle);
       lock_t lock(pool.mutex);
@@ -222,7 +223,7 @@ void* thread_pool_t::worker(void* pool_) {
         if (pool.die)
           return 0;
         else if (pool.jobs.size()) {
-          swap(f,pool.jobs.front());
+          f.reset(pool.jobs.front());
           pool.jobs.pop_front();
         } else {
           pool.master_cond.signal();
@@ -249,29 +250,18 @@ void* thread_pool_t::worker(void* pool_) {
   }
 }
 
-void thread_pool_t::schedule(const function<void()>& f, bool soon) {
+void thread_pool_t::schedule(job_t&& f, bool soon) {
   OTHER_ASSERT(threads.size());
   lock_t lock(mutex);
   if (error)
     error.throw_();
   OTHER_ASSERT(!die);
   if (soon)
-    jobs.push_front(f);
+    jobs.push_front(f.release());
   else
-    jobs.push_back(f);
+    jobs.push_back(f.release());
   if (waiting)
     worker_cond.signal();
-}
-
-void thread_pool_t::schedule(const vector<function<void()>>& fs) {
-  OTHER_ASSERT(threads.size());
-  lock_t lock(mutex);
-  if (error)
-    error.throw_();
-  OTHER_ASSERT(!die);
-  extend(jobs,fs);
-  if (waiting)
-    worker_cond.broadcast();
 }
 
 void thread_pool_t::wait() {
@@ -307,16 +297,10 @@ void init_threads(int cpu_threads, int io_threads) {
   time_info.total_start = time_info.local_start = time();
 }
 
-void threads_schedule(thread_type_t type, const function<void()>& f, bool soon) {
+void threads_schedule(thread_type_t type, job_t&& f, bool soon) {
   OTHER_ASSERT(type==CPU || type==IO);
   if (type!=CPU) OTHER_ASSERT(io_pool);
-  (type==CPU?cpu_pool:io_pool)->schedule(f,soon);
-}
-
-void threads_schedule(thread_type_t type, const vector<function<void()>>& fs) {
-  OTHER_ASSERT(type==CPU || type==IO);
-  if (type!=CPU) OTHER_ASSERT(io_pool);
-  (type==CPU?cpu_pool:io_pool)->schedule(fs);
+  (type==CPU?cpu_pool:io_pool)->schedule(other::move(f),soon);
 }
 
 void threads_wait_all() {
@@ -347,13 +331,13 @@ void threads_wait_all_help() {
   auto& pool = *cpu_pool;
   for (;;) {
     // Grab a job
-    function<void()> f;
+    job_t f;
     {
       lock_t lock(pool.mutex);
       if (pool.die || !pool.jobs.size())
         goto wait;
       else {
-        swap(f,pool.jobs.front());
+        f.reset(pool.jobs.front());
         pool.jobs.pop_front();
       }
     }
