@@ -420,6 +420,7 @@ void report_thread_times(RawArray<const double> times) {
   FIELD(copy)
   FIELD(schedule)
   FIELD(wait)
+  FIELD(mpi)
   FIELD(partition)
   FIELD(compute)
   FIELD(accumulate)

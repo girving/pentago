@@ -259,7 +259,10 @@ void flow_t::post_output_recv() {
   MPI_Request request;
   if (!output_buffer.size())
     output_buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size)),false);
-  CHECK(MPI_Irecv(output_buffer.data(),8*output_buffer.size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
+  {
+    thread_time_t time(mpi_kind);
+    CHECK(MPI_Irecv(output_buffer.data(),8*output_buffer.size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
+  }
   requests.add(request,output_callback,true);
 }
 

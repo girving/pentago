@@ -84,6 +84,7 @@ enum time_kind_t {
   copy_kind,
   schedule_kind,
   wait_kind,
+  mpi_kind,
   partition_kind,
   compute_kind,
   accumulate_kind,
