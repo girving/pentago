@@ -298,8 +298,14 @@ int main(int argc, char** argv) {
       if (memory_limit < base_memory)
         die(format("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit)));
       const auto free_memory = memory_limit-base_memory;
-      cout << "memory usage: partitions = "<<partition_memory<<", blocks = "<<large(block_memory)<<", lines = "<<line_memory<<", total = "<<large(base_memory)<<endl;
-      cout << "maximum line parallelism = "<<free_memory/(2*13762560)<<endl;
+      {
+        uint64_t numbers[5] = {partition_memory,block_memory,line_memory,base_memory,-free_memory/(2*13762560)};
+        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+        if (!rank) {
+          cout << "memory usage: partitions = "<<numbers[0]<<", blocks = "<<large(numbers[1])<<", lines = "<<numbers[2]<<", total = "<<large(numbers[3])<<endl;
+          cout << "line parallelism = "<<-numbers[4]<<endl;
+        }
+      }
       report(comm,"compute");
 
       // Compute (and communicate)
@@ -307,7 +313,7 @@ int main(int argc, char** argv) {
         Log::Scope scope("compute");
         compute_lines(comms,prev_blocks,blocks,lines,free_memory);
       }
-      blocks->print_compression_stats();
+      blocks->print_compression_stats(comm);
 
       // Deallocate obsolete slice
       prev_partition = partition;

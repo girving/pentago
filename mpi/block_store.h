@@ -96,7 +96,7 @@ public:
   uint64_t estimate_peak_memory_usage() const;
 
   // Print statistics about block compression
-  void print_compression_stats() const;
+  void print_compression_stats(MPI_Comm comm) const;
 
   // Verify that we own the given block
   void assert_contains(section_t section, Vector<int,4> block) const;

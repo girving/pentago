@@ -157,28 +157,41 @@ uint64_t block_store_t::estimate_peak_memory_usage() const {
 #endif
 }
 
-void block_store_t::print_compression_stats() const {
+void block_store_t::print_compression_stats(MPI_Comm comm) const {
 #if PENTAGO_MPI_COMPRESS
   // We're going to compute the mean and variance of the compression ratio for a randomly chosen *byte*.
   // First integrate moments 0, 1, and 2.
-  uint64_t uncompressed = 0;
-  uint64_t compressed = 0, peak_compressed = 0;
-  double sqr_compressed = 0, peak_sqr_compressed = 0;
+  uint64_t uncompressed_ = 0;
+  uint64_t compressed_ = 0,
+           peak_compressed_ = 0;
+  double sqr_compressed = 0,
+         peak_sqr_compressed = 0;
   for (int b : range(blocks())) {
     const int k = 64*block_shape(block_info[b].section.shape(),block_info[b].block).product();
-    uncompressed += k;
-    compressed += store.size(b);
-    peak_compressed += store.peak_size(b);
+    uncompressed_ += k;
+    compressed_ += store.size(b);
+    peak_compressed_ += store.peak_size(b);
     sqr_compressed += sqr((double)store.size(b))/k;
     peak_sqr_compressed += sqr((double)store.peak_size(b))/k;
   }
+  // Reduce to rank 0
+  double numbers[5] = {(double)uncompressed_,(double)compressed_,(double)peak_compressed_,sqr_compressed,peak_sqr_compressed};
+  const int rank = comm_rank(comm);
+  CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,MPI_DOUBLE,MPI_SUM,0,comm));
   // Compute statistics
-  const double mean = (double)compressed/uncompressed;
-  const double dev = sqrt(sqr_compressed/uncompressed-sqr(mean));
-  const double peak_mean = (double)peak_compressed/uncompressed;
-  const double peak_dev = sqrt(peak_sqr_compressed/uncompressed-sqr(peak_mean));
-  cout << "compression ratio      = "<<mean<<" +- "<<dev<<endl; 
-  cout << "peak compression ratio = "<<peak_mean<<" +- "<<peak_dev<<endl; 
+  if (!rank) {
+    const double uncompressed = numbers[0],
+                 compressed = numbers[1],
+                 peak_compressed = numbers[2];
+    sqr_compressed = numbers[3];
+    peak_sqr_compressed = numbers[4];
+    const double mean = compressed/uncompressed,
+                 dev = sqrt(sqr_compressed/uncompressed-sqr(mean)),
+                 peak_mean = peak_compressed/uncompressed,
+                 peak_dev = sqrt(peak_sqr_compressed/uncompressed-sqr(peak_mean));
+    cout << "compression ratio      = "<<mean<<" +- "<<dev<<endl; 
+    cout << "peak compression ratio = "<<peak_mean<<" +- "<<peak_dev<<endl; 
+  }
 #endif
 }
 
