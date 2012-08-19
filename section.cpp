@@ -83,6 +83,9 @@ template<int symmetries> Tuple<section_t,uint8_t> section_t::standardize() const
   return tuple(best,best_g);
 }
 
+template Tuple<section_t,uint8_t> section_t::standardize<4>() const;
+template Tuple<section_t,uint8_t> section_t::standardize<8>() const;
+
 Vector<int,4> section_t::quadrant_permutation(uint8_t symmetry) {
   OTHER_ASSERT(symmetry<8);
   typedef Vector<uint8_t,2> CV;

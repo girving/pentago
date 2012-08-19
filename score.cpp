@@ -74,7 +74,6 @@ int rotated_win_closeness(side_t black, side_t white) {
 }
 
 // Same as above, except using unrotated_win_distances or arbitrarily_rotated instead of rotated_win_distances (and therefore using 2 subfields instead of 4)
-template<bool rotated> static int win_closeness(side_t black, side_t white) OTHER_ALWAYS_INLINE;
 template<bool rotated> static int win_closeness(side_t black, side_t white) {
   // Transpose into packed quadrants
   const quadrant_t q0 = pack(quadrant(black,0),quadrant(white,0)),

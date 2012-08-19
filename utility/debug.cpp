@@ -1,7 +1,7 @@
 // Wrapper around C++ exceptions so that we can turn them off during MPI
 
 #include <pentago/utility/debug.h>
-#include <other/core/python/Exceptions.h>
+#include <other/core/python/exceptions.h>
 namespace pentago {
 
 using std::bad_alloc;
