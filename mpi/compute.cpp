@@ -389,8 +389,7 @@ template void compute_microline<false>(line_data_t* const,const Vector<int,3>);
  *
  * According to Jeff Dean, a lock/unlock takes around 100 ns, which gives us a safety margin of 1000.
  * Most microlines are significantly larger than 20, so this seems like plenty of room.  One microline
- * per job it is.  However, I may need (want?) to write a thread pool class that scales to a large
- * number of threads.  Yes, I clearly want to do that.  TODO: Say whether I did this.
+ * per job it is.
  */
 void schedule_compute_line(line_data_t& line) {
   PENTAGO_MPI_TRACE("schedule compute line %s",str(line.line));

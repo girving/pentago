@@ -324,7 +324,7 @@ void threads_wait_all() {
     }
 }
 
-// TODO: This function doesn't account for the case when the pool temporarily
+// Note: This function doesn't account for the case when the pool temporarily
 // runs out of jobs, but currently running jobs schedule a bunch more.  If
 // that happens, it safely but stupidly reverts to wait().
 void threads_wait_all_help() {
