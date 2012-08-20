@@ -33,7 +33,7 @@ static int stone_depth; // Current search depth + stone count
 
 void trace_restart() {
   stone_depth = -1;
-  errors.remove_all();
+  errors.clear();
 }
 
 bool traced(bool aggressive, board_t board) {

@@ -64,8 +64,8 @@ void requests_t::cancel_and_waitall() {
     CHECK(MPI_Cancel(&requests[i]));
   }
   CHECK(MPI_Waitall(requests.size(),requests.data(),MPI_STATUSES_IGNORE));
-  requests.remove_all();
-  cancellables.remove_all();
+  requests.clear();
+  cancellables.clear();
 }
 
 }

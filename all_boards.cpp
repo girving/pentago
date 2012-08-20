@@ -115,7 +115,7 @@ template<int symmetries> static Array<board_t> all_boards_helper(int n) {
   {
     Hashtable<board_t> board_set;
     for (board_t black : black_boards) {
-      board_set.delete_all_entries();
+      board_set.clear();
       // Make a list of occupied singleton boards
       board_t occupied[n];
       int c = 0;

@@ -11,7 +11,7 @@
 #include <pentago/utility/sort.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
-#include <other/core/structure/HashtableIterator.h>
+#include <other/core/structure/Hashtable.h>
 #include <other/core/structure/Tuple.h>
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/interrupts.h>

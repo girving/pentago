@@ -11,7 +11,6 @@
 #include <other/core/python/to_python.h>
 #include <other/core/python/stl.h>
 #include <other/core/random/Random.h>
-#include <other/core/structure/HashtableIterator.h>
 #include <other/core/utility/compose.h>
 #include <other/core/utility/const_cast.h>
 #include <other/core/utility/curry.h>

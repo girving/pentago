@@ -5,7 +5,6 @@
 #include <other/core/python/Class.h>
 #include <other/core/python/stl.h>
 #include <other/core/random/counter.h>
-#include <other/core/structure/HashtableIterator.h>
 #include <other/core/structure/Tuple.h>
 #include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>

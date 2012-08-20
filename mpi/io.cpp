@@ -10,7 +10,7 @@
 #include <pentago/utility/memory.h>
 #include <other/core/python/numpy.h>
 #include <other/core/random/Random.h>
-#include <other/core/structure/HashtableIterator.h>
+#include <other/core/structure/Hashtable.h>
 #include <other/core/utility/curry.h>
 #include <other/core/utility/ProgressIndicator.h>
 #include <other/core/utility/Hasher.h>
@@ -196,9 +196,9 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
     // Send our size information to the appropriate processor
     Array<MPI_Request> requests;
-    for (HashtableIterator<int,Array<block_blob_t>> it(local_block_blobs);it.valid();it.next()) {
-      const int sid = it.key();
-      RawArray<const block_blob_t> blobs = it.data();
+    for (auto& it : local_block_blobs) {
+      const int sid = it.key;
+      RawArray<const block_blob_t> blobs = it.data;
       const int rank = partition.block_to_rank(sections[sid],Vector<int,4>());
       MPI_Request request; 
       // Use the section id as the tag for identification purposes 
@@ -235,12 +235,12 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   thread_time_t time(write_sections_kind);
   vector<Tuple<int,Array<uint8_t>>> compressed_block_indexes;
   compressed_block_indexes.reserve(block_indexes.size());
-  for (HashtableIterator<int,Array<supertensor_blob_t,4>> it(block_indexes);it.valid();it.next()) {
-    compressed_block_indexes.push_back(tuple(it.key(),Array<uint8_t>()));
-    threads_schedule(CPU,curry(compress_and_store,&compressed_block_indexes.back().y,char_view(it.data().flat),level));
+  for (auto& it : block_indexes) {
+    compressed_block_indexes.push_back(tuple(it.key,Array<uint8_t>()));
+    threads_schedule(CPU,curry(compress_and_store,&compressed_block_indexes.back().y,char_view(it.data.flat),level));
   }
   threads_wait_all_help();
-  Hashtable<int,Array<supertensor_blob_t,4>>().swap(block_indexes); // Deallocate
+  block_indexes.clean_memory();
   #define block_indexes hide_block_indexes
 
   // Compute block index offsets
@@ -277,7 +277,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
   // Write all block indexes
   CHECK(MPI_File_write_at_all(file,local_block_index_start,all_block_indexes.data(),all_block_indexes.size(),MPI_BYTE,MPI_STATUS_IGNORE));
-  all_block_indexes = Array<uint8_t>(); // Deallocate
+  all_block_indexes.clean_memory();
   #define all_block_indexes hide_all_block_indexes
  
   // On rank 0, write all section headers

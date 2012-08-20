@@ -279,7 +279,7 @@ static void popcounts_over_stabilizers_test(int steps) {
     OTHER_ASSERT(fast.x+fast.y==fast.z);
     // Count the slow way 
     Vector<uint16_t,3> slow;
-    seen.delete_all_entries(); 
+    seen.clear(); 
     for (int g=0;g<8;g++)
       for (int l=0;l<256;l++) {
         const board_t b = transform_board(symmetry_t(g,l),board);
