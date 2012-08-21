@@ -1,11 +1,11 @@
-Swivel: A simple pentago solver
-===============================
+A brute force pentago solver
+============================
 
-The goal of the Swivel project is a strong solution of the board game pentago,
-which means a practical algorithm for perfect play starting from any position.
+The goal of this project is a strong solution of the board game pentago, which
+means a practical algorithm for perfect play starting from any position.
 For the rules of pentago, see http://en.wikipedia.org/wiki/Pentago.
 
-Swivel consists of two parts: a serial forward engine capable of search out to
+The code consists of two parts: a serial forward engine capable of search out to
 depth 17, and a parallel out-of-core backward engine suitable for endgame
 database computation on hundreds to thousands of machines.  The main features
 of the forward engine are
@@ -31,28 +31,37 @@ described in more detail once it I try it out on a suitable supercomputer.
 
 ### Dependencies
 
-The core engine is written in C++ and exposed to Python as an extension module.
-The rest of the code (tests, interface, etc.) is in Python.  The single direct
-dependency is on the Otherlab core libraries (`other`).  Unfortunately, while the
-used portion of `other` may be open source at some point, it is not publically
-available at this time.
+The code is a mix of pure C++ (for MPI code), C++ routines exposed to Python, and
+Python code for tests, interfaces, etc.  The direct dependencies are
+
+* [other/core](https://github.com/otherlab/core): Otherlab core utilities and Python bindings
+* [mpi](http://en.wikipedia.org/wiki/Message_Passing_Interface): OpenMPI, MPICH2, etc.
+* [zlib](http://zlib.net): Okay but slow lossless compression.
+* [xz](http://tukaani.org/xz): Good but slower lossless compression
+* [snappy](http://code.google.com/p/snappy): Fast but poor lossless compression
+
+other/core has a few additional indirect dependencies (python, numpy, boost).
+
+### Setup
+
+1. Install `other/core` and the other dependencies.
+2. Configure `other/core` to be reference-count thread safe, by adding
+
+        thread_safe = 1
+
+   to `other/config.py`.  Rebuild `other/core` if necessary.
+
+3. Setup and build `pentago`:
+
+        cd pentago
+        $OTHER/core/build/setup
+        scons -j 5
+
+4. Test.  Note that the mpi tests will fail if mpirun/aprun does not exist on the host machine.
+
+        py.test
 
 ### Usage
-
-To configure, simply symlink the build system over from `other`:
-
-    cd pentago
-    ln -s $OTHER/SConstruct
-    ln -s $OTHER/SConstruct.options # optional
-    ln -s $OTHER/site_scons
-
-To build, run
-
-    scons
-
-To run the unit tests, install [py.test](http://pytest.org) and run
-
-    py.test
 
 The interface consists of a variety of python scripts.  I'll give a few
 examples of their usage here; for more details run "script -h".
