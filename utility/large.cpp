@@ -4,6 +4,7 @@
 #include <other/core/utility/format.h>
 namespace pentago {
 
+using std::abs;
 using namespace other;
 
 string large(uint64_t x) {
@@ -16,6 +17,11 @@ string large(uint64_t x) {
     r.push_back(s[i]);
   }
   return r;
+}
+
+string large(int64_t x) {
+  auto s = large(uint64_t(abs(x)));
+  return x<0?"-"+s:s;
 }
 
 }

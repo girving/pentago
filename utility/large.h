@@ -6,6 +6,7 @@ namespace pentago {
 
 using std::string;
 
+string large(int64_t x);
 string large(uint64_t x);
 
 }

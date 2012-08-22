@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
   int save = -100;
   int specified_block_size = 8;
   int level = 26;
-  uint64_t memory_limit = 0;
+  int64_t memory_limit = 0;
   int samples = 256;
   int specified_ranks = -1;
   string dir;
@@ -254,6 +254,7 @@ int main(int argc, char** argv) {
          << "\nsaved slices = "<<save
          << "\nlevel = "<<level
          << "\nmemory limit = "<<large(memory_limit)
+         << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
          << endl;
 #ifdef PENTAGO_MPI_DEBUG
     cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 
@@ -307,19 +308,19 @@ int main(int argc, char** argv) {
       lines.append_elements(partition->rank_lines(rank,false));
 
       // Estimate peak memory usage ignoring active lines
-      const auto partition_memory = memory_usage(prev_partition)+memory_usage(partition),
-                 block_memory = (prev_blocks?prev_blocks->estimate_peak_memory_usage():0)+blocks->estimate_peak_memory_usage(),
-                 line_memory = memory_usage(lines)+base_compute_memory_usage(lines.size()),
-                 base_memory = partition_memory+block_memory+line_memory;
-      if (memory_limit < base_memory)
+      const int64_t partition_memory = memory_usage(prev_partition)+memory_usage(partition),
+                    block_memory = (prev_blocks?prev_blocks->estimate_peak_memory_usage():0)+blocks->estimate_peak_memory_usage(),
+                    line_memory = memory_usage(lines)+base_compute_memory_usage(lines.size()),
+                    base_memory = partition_memory+block_memory+line_memory;
+      if (memory_limit <= base_memory)
         die(format("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit)));
-      const auto free_memory = memory_limit-base_memory;
+      const int64_t free_memory = memory_limit-base_memory;
       {
-        uint64_t numbers[5] = {partition_memory,block_memory,line_memory,base_memory,-free_memory/(2*13762560)};
-        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+        int64_t numbers[6] = {partition_memory,block_memory,line_memory,base_memory,-free_memory,-free_memory/(2*13762560)};
+        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,6,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
         if (!rank) {
-          cout << "memory usage: partitions = "<<numbers[0]<<", blocks = "<<large(numbers[1])<<", lines = "<<numbers[2]<<", total = "<<large(numbers[3])<<endl;
-          cout << "line parallelism = "<<-numbers[4]<<endl;
+          cout << "memory usage: partitions = "<<numbers[0]<<", blocks = "<<large(numbers[1])<<", lines = "<<numbers[2]<<", total = "<<large(numbers[3])<<", free = "<<large(-numbers[4])<<endl;
+          cout << "line parallelism = "<<-numbers[5]<<endl;
         }
       }
       report(comm,"compute");

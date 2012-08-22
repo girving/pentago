@@ -106,9 +106,3 @@ with Log.scope('summary'):
   Log.write('total memory = %s'%large(max_total_memory))
   Log.write('save memory = %s'%large(max_save_memory))
   Log.write('time estimate = %g s'%((total_outputs+total_inputs)/speed_estimate/ranks/threads))
-
-# Example runs:
-#
-# Meaningless: ./predict --ranks 1 --threads 8 --save 20 --memory 3G --meaningless 4 00000000
-# Test: ./predict --ranks 1 --threads 8 --save 34 --memory 3G 44444554
-# Mira (Blue Gene/Q): ./predict --ranks 49152 --threads 64 --save 18 --memory 8G 00000000

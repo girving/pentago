@@ -5,6 +5,7 @@
 #include <pentago/utility/spinlock.h>
 #include <other/core/math/max.h>
 #include <other/core/utility/format.h>
+#include <other/core/utility/Log.h>
 #include <other/core/vector/Vector.h>
 #ifdef __APPLE__
 #include <mach/mach.h>
@@ -12,14 +13,29 @@
 #endif
 namespace pentago {
 
+using Log::cout;
+using std::endl;
+
 static spinlock_t lock = spinlock_t();
 static ssize_t total = 0;
 static ssize_t peak = 0;
 
+static const ssize_t peak_step = 214748365;
+static ssize_t next_peak = peak_step;
+
 void report_large_alloc(ssize_t change) {
-  spin_t spin(lock);
-  total += change;
-  peak = max(peak,total);
+  ssize_t show = 0;
+  {
+    spin_t spin(lock);
+    total += change;
+    peak = max(peak,total);
+    if (peak >= next_peak) {
+      show = peak;
+      next_peak = (peak/peak_step+1)*peak_step;
+    }
+  }
+  if (show)
+    cout << format("(peak %.1fG)\n",show*10/(1<<30)*.1);
 }
 
 // Returns (total,peak)
