@@ -35,7 +35,7 @@ def mpirun():
   for cmd in 'mpirun','aprun':
     if not subprocess.call(['which','-s',cmd]):
       return cmd
-  raise OSError('no mpirun found, tried %s'%cmds)
+  raise OSError('no mpirun found, tried %s'%', '.join(cmds))
 
 def test_write(tmpdir):
   init_threads(-1,-1)
