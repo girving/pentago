@@ -2,6 +2,7 @@
 
 #include <pentago/thread.h>
 #include <pentago/utility/debug.h>
+#include <pentago/utility/time.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/stl.h>
 #include <other/core/random/counter.h>
@@ -95,12 +96,6 @@ static inline time_entry_t& time_entry(time_kind_t kind) {
   auto table = (time_table_t*)pthread_getspecific(time_info.key);
   OTHER_ASSERT(table);
   return table->times[kind];
-}
-
-static inline double time() {
-  timeval tv;
-  gettimeofday(&tv,0);
-  return (double)tv.tv_sec+1e-6*tv.tv_usec;
 }
 
 thread_time_t::thread_time_t(time_kind_t kind)

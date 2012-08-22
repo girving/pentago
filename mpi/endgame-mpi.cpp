@@ -16,6 +16,7 @@
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
+#include <pentago/utility/time.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <sys/resource.h>
@@ -28,6 +29,9 @@ using Log::cout;
 using Log::cerr;
 using std::endl;
 using std::flush;
+
+// File scope for use in report_mpi_times
+static int threads = 0;
 
 static const section_t bad_section(Vector<Vector<uint8_t,2>,4>(Vector<uint8_t,2>(255,0),Vector<uint8_t,2>(),Vector<uint8_t,2>(),Vector<uint8_t,2>()));
 
@@ -58,11 +62,19 @@ static void report(MPI_Comm comm, const char* name) {
     cout << "memory "<<name<<": "<<memory_report(info)<<endl;
 }
 
-static void report_mpi_times(MPI_Comm comm, RawArray<double> times) {
+static void report_mpi_times(MPI_Comm comm, RawArray<double> times, double elapsed, uint64_t outputs, uint64_t inputs) {
   const int rank = comm_rank(comm);
   CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_DOUBLE,MPI_SUM,0,comm));
-  if (!rank)
+  if (!rank) {
     report_thread_times(times);
+    const double core_time = elapsed*threads*comm_size(comm);
+    const double output_speed = outputs/core_time,
+                 input_speed = inputs/core_time,
+                 speed = output_speed+input_speed;
+    const uint64_t all_nodes = 13540337135288;
+    cout << format("speeds\n  elapsed = %g, output nodes = %s, input nodes = %s\n  speeds (nodes/second/core): output = %g, input = %g, output+input = %g\n  grand estimate = %s core-hours",
+                   elapsed,large(outputs),large(inputs),output_speed,input_speed,speed,large(uint64_t(2*all_nodes/speed/3600)))<<endl;
+  }
 }
 
 int main(int argc, char** argv) {
@@ -76,7 +88,6 @@ int main(int argc, char** argv) {
 
   // Parse command line options
   int save = -100;
-  int threads = 0;
   int specified_block_size = 8;
   int level = 26;
   uint64_t memory_limit = 0;
@@ -264,6 +275,9 @@ int main(int argc, char** argv) {
   report(comm,"base");
 
   // Compute each slice in turn
+  double total_elapsed = 0;
+  uint64_t total_outputs = 0,
+           total_inputs = 0;
   {
     Ptr<partition_t> prev_partition;
     Ptr<block_store_t> prev_blocks;
@@ -272,6 +286,7 @@ int main(int argc, char** argv) {
       if (!slices[slice].size())
         break;
       Log::Scope scope(format("slice %d",slice));
+      const double start = time();
 
       // Allocate meaningless data if necessary
       if (slice+1==meaningless) {
@@ -314,6 +329,10 @@ int main(int argc, char** argv) {
         compute_lines(comms,prev_blocks,blocks,lines,free_memory);
       }
       blocks->print_compression_stats(comm);
+      const auto outputs = partition->total_nodes,
+                 inputs = prev_partition?prev_partition->total_nodes:0;
+      total_outputs += outputs;
+      total_inputs += inputs;
 
       // Deallocate obsolete slice
       prev_partition = partition;
@@ -331,12 +350,14 @@ int main(int argc, char** argv) {
       }
 
       // Dump timing
-      report_mpi_times(comm,clear_thread_times());
+      const double elapsed = time()-start;
+      total_elapsed += elapsed;
+      report_mpi_times(comm,clear_thread_times(),elapsed,outputs,inputs);
     }
   }
 
   // Dump total timing
-  report_mpi_times(comm,total_thread_times());
+  report_mpi_times(comm,total_thread_times(),total_elapsed,total_outputs,total_inputs);
   report(comm,"final");
   return 0;
 }
