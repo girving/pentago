@@ -316,11 +316,11 @@ int main(int argc, char** argv) {
         die(format("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit)));
       const int64_t free_memory = memory_limit-base_memory;
       {
-        int64_t numbers[6] = {partition_memory,block_memory,line_memory,base_memory,-free_memory,-free_memory/(2*13762560)};
-        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,6,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+        int64_t numbers[5] = {partition_memory,block_memory,line_memory,base_memory,-free_memory};
+        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
         if (!rank) {
           cout << "memory usage: partitions = "<<numbers[0]<<", blocks = "<<large(numbers[1])<<", lines = "<<numbers[2]<<", total = "<<large(numbers[3])<<", free = "<<large(-numbers[4])<<endl;
-          cout << "line parallelism = "<<-numbers[5]<<endl;
+          cout << "line parallelism = "<<-numbers[4]/(2*13762560)<<endl;
         }
       }
       report(comm,"compute");
