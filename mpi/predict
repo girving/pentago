@@ -52,6 +52,7 @@ init_threads(1,0)
 # Dump general information
 with Log.scope('parameters'):
   Log.write('ranks = %d'%ranks)
+  Log.write('cores = %d'%(ranks*threads))
   Log.write('threads / rank = %d'%threads)
   Log.write('section = %s'%show_section(section))
   Log.write('block size = %d'%block_size)
@@ -61,6 +62,7 @@ with Log.scope('parameters'):
 line_cost = 2*64*8**3*420
 def line_parallelism(base_memory):
   return (memory-base_memory)/line_cost
+speed_estimate = 455092
 
 # Simulate execution
 slices = descendent_sections(section,35)
@@ -70,15 +72,19 @@ max_base_memory = 0
 min_lines = 1<<30
 max_total_memory = 0
 max_save_memory = 0
+total_outputs = total_inputs = 0
 for slice in reversed(xrange(len(slices))):
   if not len(slices[slice]):
     break
   with Log.scope('slice %d'%slice):
     partition = partition_t(ranks,slice,slices[slice],True)
+    total_outputs += partition.total_nodes
+    total_inputs += prev_partition.total_nodes if prev_partition else 0
     Log.write('blocks = %d'%partition.max_rank_blocks)
     Log.write('nodes = %d'%partition.max_rank_nodes)
     max_blocks = max(max_blocks,partition.max_rank_blocks)
-    assert partition.max_rank_blocks<32767
+    if partition.max_rank_blocks>=32767:
+      raise RuntimeError('max rank blocks = %d > 32767'%partition.max_rank_blocks)
     base_memory = max_rank_memory_usage(prev_partition,partition)
     max_base_memory = max(max_base_memory,base_memory)
     Log.write('base memory = %s'%large(base_memory))
@@ -99,6 +105,7 @@ with Log.scope('summary'):
   Log.write('line parallelism = %g'%min_lines)
   Log.write('total memory = %s'%large(max_total_memory))
   Log.write('save memory = %s'%large(max_save_memory))
+  Log.write('time estimate = %g s'%((total_outputs+total_inputs)/speed_estimate/ranks/threads))
 
 # Example runs:
 #

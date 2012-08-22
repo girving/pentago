@@ -529,5 +529,6 @@ void wrap_partition() {
     .OTHER_FIELD(max_rank_nodes)
     .OTHER_FIELD(owner_starts)
     .OTHER_FIELD(other_starts)
+    .OTHER_FIELD(total_nodes)
     ;
 }
