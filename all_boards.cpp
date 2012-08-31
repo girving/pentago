@@ -15,7 +15,7 @@
 #include <other/core/utility/interrupts.h>
 #include <other/core/utility/const_cast.h>
 #include <other/core/utility/str.h>
-#include <other/core/vector/Interval.h>
+#include <other/core/geometry/Box.h>
 namespace pentago {
 
 using namespace other;
@@ -186,15 +186,15 @@ Array<section_t> all_boards_sections(int n, int symmetries) {
     for (int w3=0;w3<=min(white,9-b3);w3++) {
       const Vector<int,2> left3(black-b3,white-w3);
       // Loop over possible counts in quadrant 2
-      const Interval<int> range_b2(0,min(left3.x,9));
+      const Box<int> range_b2(0,min(left3.x,9));
       for (int b2=range_b2.min;b2<=range_b2.max;b2++) {
-        const Interval<int> range_w2(max(0,left3.y-(18-(left3.x-b2))),min(left3.y,9-b2));
+        const Box<int> range_w2(max(0,left3.y-(18-(left3.x-b2))),min(left3.y,9-b2));
         for (int w2=range_w2.min;w2<=range_w2.max;w2++) {
           const Vector<int,2> left2 = left3-vec(b2,w2);
           // Loop over possible counts in quadrant 1
-          const Interval<int> range_b1(max(0,left2.x-9),min(left2.x,9));
+          const Box<int> range_b1(max(0,left2.x-9),min(left2.x,9));
           for (int b1=range_b1.min;b1<=range_b1.max;b1++) {
-            const Interval<int> range_w1(max(0,left2.y-(9-left2.x+b1)),min(left2.y,9-b1));
+            const Box<int> range_w1(max(0,left2.y-(9-left2.x+b1)),min(left2.y,9-b1));
             for (int w1=range_w1.min;w1<=range_w1.max;w1++) {
               const Vector<int,2> left1 = left2-vec(b1,w1);
               // Quadrant 0's counts are now uniquely determined
@@ -228,9 +228,9 @@ uint64_t all_boards_stats(int n, int symmetries) {
   Array<section_t> sections = all_boards_sections(n,1);
   int reduced_sections = 0;
   uint64_t max_section = 0;
-  Interval<uint64_t> blocks = 0;
-  Interval<uint64_t> slices1 = 0;
-  Interval<uint64_t> slices2 = 0;
+  Box<uint64_t> blocks = 0;
+  Box<uint64_t> slices1 = 0;
+  Box<uint64_t> slices2 = 0;
   uint64_t total = 0;
   uint64_t reduced_total = 0;
   for (section_t s : sections) {

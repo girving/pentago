@@ -170,7 +170,7 @@ flow_t::~flow_t() {}
 void flow_t::schedule_lines() {
   // If there are unscheduled lines, try to schedule them
   while (unscheduled_lines.size()) {
-    const auto line = unscheduled_lines.last();
+    const auto line = unscheduled_lines.back();
     const auto line_memory = line->memory_usage();
     if (free_memory < line_memory)
       break;

@@ -13,7 +13,7 @@
 #include <other/core/random/Random.h>
 #include <other/core/math/constants.h>
 #include <other/core/utility/const_cast.h>
-#include <other/core/vector/Interval.h>
+#include <other/core/geometry/Box.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/str.h>
 namespace pentago {
@@ -291,7 +291,7 @@ Array<const Vector<int,2>> partition_t::partition_lines(RawArray<uint64_t> work_
   Array<Vector<int,2>> starts(ranks+1,false);
   bool success = fit<true>(work_nodes,work_penalties,lines,hi,starts);
   OTHER_ASSERT(success);
-  OTHER_ASSERT(starts.last()==vec(lines.size(),0));
+  OTHER_ASSERT(starts.back()==vec(lines.size(),0));
   return starts;
 }
 
@@ -430,7 +430,7 @@ static void partition_test() {
     if (other==(uint64_t)-1)
       other = o;
     OTHER_ASSERT(other==o);
-    const Interval<double> excess(1,1.06);
+    const Box<double> excess(1,1.06);
     OTHER_ASSERT(excess.contains(partition->owner_excess));
     OTHER_ASSERT(excess.contains(partition->total_excess));
 

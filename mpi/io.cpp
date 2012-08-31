@@ -146,7 +146,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
       block_blobs[b].uncompressed_size = sizeof(Vector<super_t,2>)*block_shape(info.section.shape(),info.block).product();
       block_blobs[b+1].offset = block_blobs[b].offset+compressed[b].size();
     }
-    OTHER_ASSERT(block_blobs.last().offset==header_size+previous+local_size);
+    OTHER_ASSERT(block_blobs.back().offset==header_size+previous+local_size);
   }
 
   // Concatenate local data into a single buffer

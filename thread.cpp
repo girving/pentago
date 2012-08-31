@@ -11,7 +11,7 @@
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <other/core/utility/stl.h>
-#include <other/core/vector/Interval.h>
+#include <other/core/geometry/Box.h>
 #include <deque>
 #include <set>
 namespace pentago {
@@ -165,7 +165,7 @@ thread_pool_t::thread_pool_t(thread_type_t type, int count, int delta_priority)
   int policy;
   CHECK(pthread_attr_getschedpolicy(&attr,&policy));
   int old_priority = sched.sched_priority;
-  Interval<int> range(sched_get_priority_min(policy),sched_get_priority_max(policy));
+  Box<int> range(sched_get_priority_min(policy),sched_get_priority_max(policy));
   sched.sched_priority = range.clamp(old_priority+delta_priority);
   cout << (type==CPU?"cpu":type==IO?"io":"<unknown>")<<" thread pool: threads = "<<count<<", priority = "<<sched.sched_priority<<endl;
   CHECK(pthread_attr_setschedparam(&attr,&sched));

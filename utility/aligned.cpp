@@ -113,7 +113,7 @@ static void aligned_test() {
     auto x = aligned_buffer<int>(10);
     x.zero();
     x[0] = 1;
-    x.last() = 2;
+    x.back() = 2;
     OTHER_ASSERT(x.sum()==3);
     buffers.push_back(char_view_own(x));
 

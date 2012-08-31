@@ -32,7 +32,7 @@ void check_board(board_t board) {
 }
 
 static NdArray<board_t> pack_py(NdArray<const side_t> sides) {
-  OTHER_ASSERT(sides.rank()>=1 && sides.shape.last()==2);
+  OTHER_ASSERT(sides.rank()>=1 && sides.shape.back()==2);
   NdArray<board_t> boards(sides.shape.slice(0,sides.rank()-1).copy(),false);
   for (int b=0;b<boards.flat.size();b++) {
     const side_t side0 = sides.flat[2*b],
