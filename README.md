@@ -203,7 +203,7 @@ a given start board.
 3. endgame.cpp: Read/compute/write routines for block slices of supertensor files.
    Parallelized using the thread pools defined in `thread.h`.
 
-4. endgame: Python drive routine for endgame computation.
+4. endgame: Python driver routine for endgame computation.
 
 ##### Precomputation
 
