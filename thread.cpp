@@ -2,7 +2,7 @@
 
 #include <pentago/thread.h>
 #include <pentago/utility/debug.h>
-#include <pentago/utility/time.h>
+#include <pentago/utility/wall_time.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/stl.h>
 #include <other/core/random/counter.h>
@@ -100,11 +100,11 @@ static inline time_entry_t& time_entry(time_kind_t kind) {
 
 thread_time_t::thread_time_t(time_kind_t kind)
   : entry(time_entry(kind)) {
-  entry.start = time();
+  entry.start = wall_time();
 }
 
 thread_time_t::~thread_time_t() {
-  double now = time();
+  double now = wall_time();
 #if HISTORY
   entry.history.append(vec(entry.start,now));
 #endif
@@ -288,7 +288,7 @@ void init_threads(int cpu_threads, int io_threads) {
   cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);
   if (io_threads)
     io_pool = new_<thread_pool_t>(IO,io_threads,1000);
-  time_info.total_start = time_info.local_start = time();
+  time_info.total_start = time_info.local_start = wall_time();
 }
 
 void threads_schedule(thread_type_t type, job_t&& f, bool soon) {
@@ -359,7 +359,7 @@ Array<double> clear_thread_times() {
   OTHER_ASSERT(is_master());
   threads_wait_all();
   lock_t lock(time_mutex);
-  double now = time();
+  double now = wall_time();
   Array<double> result(_time_kinds);
   for (auto table : time_tables) {
     // Compute missing time

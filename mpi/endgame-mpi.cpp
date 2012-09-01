@@ -16,7 +16,7 @@
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
-#include <pentago/utility/time.h>
+#include <pentago/utility/wall_time.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <sys/resource.h>
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
       if (!slices[slice].size())
         break;
       Log::Scope scope(format("slice %d",slice));
-      const double start = time();
+      const double start = wall_time();
 
       // Allocate meaningless data if necessary
       if (slice+1==meaningless) {
@@ -352,7 +352,7 @@ int main(int argc, char** argv) {
       }
 
       // Dump timing
-      const double elapsed = time()-start;
+      const double elapsed = wall_time()-start;
       total_elapsed += elapsed;
       report_mpi_times(comm,clear_thread_times(),elapsed,outputs,inputs);
     }
