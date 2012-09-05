@@ -76,7 +76,7 @@ void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t>
 
   // Choose offset
   {
-    lock_t lock(offset_mutex);
+    spin_t spin(offset_lock);
     blob->offset = next_offset;
     next_offset += data.size();
   }

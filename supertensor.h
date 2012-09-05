@@ -53,6 +53,7 @@
 #include <pentago/superscore.h>
 #include <pentago/section.h>
 #include <pentago/thread.h>
+#include <pentago/utility/spinlock.h>
 #include <other/core/array/Array4d.h>
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
@@ -149,7 +150,7 @@ struct supertensor_writer_t : public Object {
   const int level; // zlib compression level
   const Array<supertensor_blob_t,4> index;
   uint64_t next_offset;
-  mutable mutex_t offset_mutex;
+  mutable spinlock_t offset_lock;
 
 protected:
   supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level);

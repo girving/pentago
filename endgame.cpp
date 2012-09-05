@@ -418,7 +418,7 @@ template<bool turn,bool final> struct compute_helper_t {
   const Vector<uint8_t,2> move;
   const Vector<RawArray<const quadrant_t>,4> rmin;
   const bool count;
-  mutex_t win_counts_mutex;
+  spinlock_t win_counts_lock;
   Vector<uint64_t,3> win_counts;
 
   compute_helper_t(const supertensor_writer_t& writer, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> dest, RawArray<const Vector<super_t,2>,4> src2, RawArray<const Vector<super_t,2>,4> src3, bool count)
@@ -494,7 +494,7 @@ template<bool turn,bool final> struct compute_helper_t {
       }
     // Contribute to counts
     if (count) {
-      lock_t lock(win_counts_mutex);
+      spin_t spin(win_counts_lock);
       this->win_counts += win_counts;
     }
   }
