@@ -66,6 +66,7 @@ struct allocated_t : public boost::noncopyable {
   const Vector<int,5> reflection_symmetry_offsets;
 
   // Number of blocks we need before input is ready, microlines left to compute, and output blocks left to send.
+  int missing_input_responses;
   counter_t missing_input_blocks;
   counter_t missing_microlines;
   counter_t unsent_output_blocks;
@@ -108,6 +109,7 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
          rotation_minimal_quadrants(self.line.section.counts[3]).x)
 
   // Numbers of steps to complete
+  , missing_input_responses(child_length)
   , missing_input_blocks(child_length)
   , missing_microlines(self.output_shape.remove_index(self.line.dimension).product())
   , unsent_output_blocks(self.line.length)
@@ -186,6 +188,10 @@ RawArray<const Vector<super_t,2>> line_data_t::output_block_data(int k) const {
   OTHER_ASSERT(0<=k && k<line.length);
   const int start = line.node_step*k;
   return rest->output.slice(start,min(start+line.node_step,rest->output.size()));
+}
+
+int line_data_t::decrement_input_responses() {
+  return --rest->missing_input_responses;
 }
 
 void line_data_t::decrement_missing_input_blocks() {

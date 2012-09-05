@@ -60,6 +60,11 @@ struct line_data_t : public boost::noncopyable {
   RawArray<Vector<super_t,2>> input_block_data(Vector<int,4> block) const;
   RawArray<const Vector<super_t,2>> output_block_data(int k) const;
 
+  // Call this whenever a new input response arrives, but possibly *before* the data has been moved into place.
+  // Returns the number of messages remaining.  Used by flow.cpp to throttle the number of simultaneous line gathers.
+  // Warning: *Not* thread safe, so call only from flow.cpp.
+  int decrement_input_responses();
+
   // Call this whenever a new block is in place.  Used as a request callback for when MPI_Irecv's finish.
   // When the count hits zero, the line will be automatically schedule.
   void decrement_missing_input_blocks();

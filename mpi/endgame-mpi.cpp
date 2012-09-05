@@ -91,6 +91,8 @@ int main(int argc, char** argv) {
   int specified_block_size = 8;
   int level = 26;
   int64_t memory_limit = 0;
+  int gather_limit = 100;
+  int line_limit = 100;
   int samples = 256;
   int specified_ranks = -1;
   string dir;
@@ -104,6 +106,8 @@ int main(int argc, char** argv) {
     {"dir",required_argument,0,'d'},
     {"level",required_argument,0,'l'},
     {"memory",required_argument,0,'m'},
+    {"gather-limit",required_argument,0,'g'},
+    {"line-limit",required_argument,0,'L'},
     {"samples",required_argument,0,'p'},
     {"ranks",required_argument,0,'r'},
     {"test",required_argument,0,'u'},
@@ -111,7 +115,7 @@ int main(int argc, char** argv) {
     {0,0,0,0}};
   for (;;) {
     int option = 0;
-    int c = getopt_long(argc,argv,"ht:b:s:d:l:m:",options,&option);
+    int c = getopt_long(argc,argv,"ht:b:s:d:m:",options,&option);
     if (c == -1) // Are we out of options?
       break;
     char* end;
@@ -125,8 +129,10 @@ int main(int argc, char** argv) {
                   "  -b, --block-size <size>    4D block size for each section (default "<<block_size<<")\n"
                   "  -s, --save <n>             Save all slices with n stones for fewer (required)\n"
                   "  -d, --dir <dir>            Save and log to given new directory (required)\n"
-                  "  -l, --level <n>            Compression level: 1-9 is zlib, 20-29 is xz (default "<<level<<")\n"
+                  "      --level <n>            Compression level: 1-9 is zlib, 20-29 is xz (default "<<level<<")\n"
                   "  -m, --memory <n>           Approximate memory usage limit per *rank* (required)\n"
+                  "      --gather-limit <n>     Maximum number of simultaneous active line gathers (default "<<gather_limit<<")\n"
+                  "      --line-limit <n>       Maximum number of simultaneously allocated lines (default "<<line_limit<<")\n"
                   "      --samples <n>          Number of sparse samples to save per section (default "<<samples<<")\n"
                   "      --ranks <n>            Allowed for compatibility with predict, but must match mpirun --np\n"
                   "      --test <name>          Run the MPI side of one of the unit tests\n"
@@ -148,6 +154,8 @@ int main(int argc, char** argv) {
       INT_ARG('p',samples,samples)
       INT_ARG('r',ranks,specified_ranks)
       INT_ARG('n',meaningless,meaningless)
+      INT_ARG('g',gather_limit,gather_limit)
+      INT_ARG('L',line_limit,line_limit)
       case 'm': {
         double memory = strtod(optarg,&end);
         if (!strcmp(end,"MB") || !strcmp(end,"M"))
@@ -179,6 +187,10 @@ int main(int argc, char** argv) {
     error("invalid block size %d",block_size);
   if (block_size != 8)
     error("for now, block size is hard coded to 8 (see compute.cpp)");
+  if (gather_limit < 1)
+    error("--gather-limit %d must be at least 1",gather_limit);
+  if (line_limit < 2)
+    error("--line-limit %d must be at least 2",line_limit);
   if (samples < 0)
     error("must specify positive value for --samples, not %d",samples);
   if (save == -100 && !test.size())
@@ -254,6 +266,8 @@ int main(int argc, char** argv) {
          << "\nsaved slices = "<<save
          << "\nlevel = "<<level
          << "\nmemory limit = "<<large(memory_limit)
+         << "\ngather limit = "<<gather_limit
+         << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
          << endl;
 #ifdef PENTAGO_MPI_DEBUG
@@ -328,7 +342,7 @@ int main(int argc, char** argv) {
       // Compute (and communicate)
       {
         Log::Scope scope("compute");
-        compute_lines(comms,prev_blocks,blocks,lines,free_memory);
+        compute_lines(comms,prev_blocks,blocks,lines,free_memory,gather_limit,line_limit);
       }
       blocks->print_compression_stats(comm);
       const auto outputs = partition->total_nodes,

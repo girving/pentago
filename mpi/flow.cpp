@@ -87,8 +87,10 @@ struct flow_t {
   ibarrier_countdown_t countdown;
   ProgressIndicator progress;
 
-  // Current free memory
+  // Current free memory, line gathers (lines whose input requests have been sent out), and allocated lines
   uint64_t free_memory;
+  int free_line_gathers;
+  int free_lines;
 
   // Space for persistent message requests
   Array<Vector<super_t,2>> output_buffer;
@@ -100,7 +102,7 @@ struct flow_t {
   // Wildcard callbacks
   function<void(MPI_Status*)> barrier_callback, request_callback, output_callback, wakeup_callback, response_callback;
 
-  flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit);
+  flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
   ~flow_t();
 
   void schedule_lines();
@@ -119,18 +121,22 @@ struct flow_t {
   void finish_output_send(line_data_t* const line, MPI_Status* status);
 };
 
-flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit)
+flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit)
   : comms(comms)
   , input_blocks(input_blocks)
   , output_blocks(output_blocks)
   , countdown(comms.barrier_comm,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
   , progress(countdown.remaining(),false)
   , free_memory(memory_limit)
+  , free_line_gathers(line_gather_limit)
+  , free_lines(line_limit)
   , barrier_callback(curry(&flow_t::process_barrier,this))
   , request_callback(curry(&flow_t::process_request,this))
   , output_callback(curry(&flow_t::process_output,this))
   , wakeup_callback(curry(&flow_t::process_wakeup,this))
   , response_callback(curry(&flow_t::process_response,this)) {
+
+  OTHER_ASSERT(free_line_gathers>=1);
 
   // Compute information about each line
   unscheduled_lines.preallocate(lines.size());
@@ -169,7 +175,7 @@ flow_t::~flow_t() {}
 
 void flow_t::schedule_lines() {
   // If there are unscheduled lines, try to schedule them
-  while (unscheduled_lines.size()) {
+  while (free_lines && free_line_gathers && unscheduled_lines.size()) {
     const auto line = unscheduled_lines.back();
     const auto line_memory = line->memory_usage();
     if (free_memory < line_memory)
@@ -178,6 +184,7 @@ void flow_t::schedule_lines() {
     thread_time_t time(schedule_kind);
     unscheduled_lines.pop();
     free_memory -= line_memory;
+    free_lines--;
     line->allocate(comms.wakeup_comm);
     PENTAGO_MPI_TRACE("allocate line %s",str(line->line));
     // Request all input blocks
@@ -186,6 +193,7 @@ void flow_t::schedule_lines() {
       schedule_compute_line(*line);
     else {
       OTHER_ASSERT(input_blocks);
+      free_line_gathers--;
       const auto child_section = line->standard_child_section();
       for (int b : range(input_count)) {
         const auto block = line->input_block(b);
@@ -318,6 +326,7 @@ void flow_t::finish_output_send(line_data_t* const line, MPI_Status* status) {
     PENTAGO_MPI_TRACE("deallocate line %s",str(line->line));
     const auto line_memory = line->memory_usage();
     delete line;
+    free_lines++;
     free_memory += line_memory;
     schedule_lines();
   }
@@ -383,6 +392,11 @@ void flow_t::process_response(MPI_Status* status) {
   block_requests.erase(it);
   PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d",status->MPI_SOURCE,status->MPI_TAG);
 
+  // Decrement input response counters
+  for (auto line : request->dependent_lines)
+    if (!line->decrement_input_responses())
+      free_line_gathers++;
+
 #if PENTAGO_MPI_COMPRESS
   // Schedule decompression task at the head of the job queue (to free memory as soon as possible)
   const auto compressed = response_buffer.slice_own(0,get_count(status,MPI_BYTE));
@@ -393,11 +407,14 @@ void flow_t::process_response(MPI_Status* status) {
   // Data has already been received into the first dependent line.  Schedule a pure copying job
   threads_schedule(CPU,curry(absorb_response,request));
 #endif
+
+  // We may be able to schedule more lines if any line gathers completed
+  schedule_lines();
 }
 
-void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit) {
+void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit) {
   // Everything happens in this helper class
-  flow_t(comms,input_blocks,output_blocks,lines,memory_limit);
+  flow_t(comms,input_blocks,output_blocks,lines,memory_limit,line_gather_limit,line_limit);
 }
 
 }

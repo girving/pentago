@@ -36,8 +36,9 @@ const int wakeup_tag = 2222; // data = &line, type = MPI_LONG_LONG_INT
 // sequential, but in case communication occurs in a strange order we speculatively ask for inputs
 // for a number of lines in parallel, and compute whenever inputs are ready.
 //
-// The number of lines to speculate is controlled by an arbitrary memory limit in bytes.
-void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit);
+// The number of lines to speculate is controlled by (1) an arbitrary memory limit in bytes and
+// (2) a limit on the number of lines in communication at any given time.
+void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
 
 }
 }
