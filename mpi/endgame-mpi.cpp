@@ -17,6 +17,7 @@
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
 #include <pentago/utility/wall_time.h>
+#include <other/core/array/Array2d.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <sys/resource.h>
@@ -32,6 +33,7 @@ using std::flush;
 
 // File scope for use in report_mpi_times
 static int threads = 0;
+static bool per_rank_times = false;
 
 static const section_t bad_section(Vector<Vector<uint8_t,2>,4>(Vector<uint8_t,2>(255,0),Vector<uint8_t,2>(),Vector<uint8_t,2>(),Vector<uint8_t,2>()));
 
@@ -63,7 +65,17 @@ static void report(MPI_Comm comm, const char* name) {
 }
 
 static void report_mpi_times(MPI_Comm comm, RawArray<double> times, double elapsed, uint64_t outputs, uint64_t inputs) {
-  const int rank = comm_rank(comm);
+  const int rank = comm_rank(comm),
+            ranks = comm_size(comm);
+  if (per_rank_times && ranks>1) {
+    Array<double,2> all_times(ranks,times.size(),false);
+    CHECK(MPI_Gather(times.data(),times.size(),MPI_DOUBLE,all_times.data(),times.size(),MPI_DOUBLE,0,comm));
+    if (!rank) {
+      Log::Scope scope("per rank times");
+      for (int r=0;r<ranks;r++)
+        report_thread_times(all_times[r]);
+    }
+  }
   CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_DOUBLE,MPI_SUM,0,comm));
   if (!rank) {
     report_thread_times(times);
@@ -112,6 +124,7 @@ int main(int argc, char** argv) {
     {"ranks",required_argument,0,'r'},
     {"test",required_argument,0,'u'},
     {"meaningless",required_argument,0,'n'},
+    {"per-rank-times",no_argument,0,'z'},
     {0,0,0,0}};
   for (;;) {
     int option = 0;
@@ -137,6 +150,7 @@ int main(int argc, char** argv) {
                   "      --ranks <n>            Allowed for compatibility with predict, but must match mpirun --np\n"
                   "      --test <name>          Run the MPI side of one of the unit tests\n"
                   "      --meaningless <n>      Use meaningless values the given slice\n"
+                  "      --per-rank-times       Print a timing report for each rank\n"
                << flush;
         }
         return 0;
@@ -170,6 +184,9 @@ int main(int argc, char** argv) {
         break;
       case 'u':
         test = optarg;
+        break;
+      case 'z':
+        per_rank_times = true;
         break;
       default:
         MPI_Abort(MPI_COMM_WORLD,1);
