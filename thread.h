@@ -138,4 +138,8 @@ void threads_wait_all();
 // Join the CPU thread pool until all jobs complete
 void threads_wait_all_help();
 
+// Operations on tracked history.  If history is untracked, these are trivial.
+vector<vector<Array<const Vector<wall_time_t,2>>>> thread_history();
+void write_thread_history(const string& filename);
+
 }

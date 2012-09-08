@@ -398,5 +398,6 @@ int main(int argc, char** argv) {
   // Dump total timing
   report_mpi_times(comm,total_thread_times(),total_elapsed,total_outputs,total_inputs);
   report(comm,"final");
+  write_thread_history(format("%s/history-r%d",dir,rank));
   return 0;
 }

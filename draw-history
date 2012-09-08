@@ -1,37 +1,83 @@
 #!/usr/bin/env python
 
 from __future__ import division
+from pentago import *
 from other.core import *
 from other.core.value import parser
 from other.core.utility import tryfile
 from interface import *
+import glob
 
 # Parse arguments
 history = PropManager.add('history','').set_required(True).set_help('record thread execution history to given file')
+short = PropManager.add('short',1).set_help('events separated by less than this number of milliseconds will be merged')
 parser.parse('Thread history visualization',positional=[history])
 
 def draw_history(history):
   import pylab
-  colors = list('bgrcmyk'*4)
-  start = min(times.min() for n,entries in history for _,times in entries)
+  axes = pylab.figure().add_subplot(111)
+
+  # Use distinguishable colors for important entries, black for the rest
+  with Log.scope('colors'):
+    most = 7
+    base_colors = wheel_color(arange(most)/most)
+    random.seed(842953)
+    random.shuffle(base_colors)
+    kind_names = time_kind_names()
+    sums = zeros(len(kind_names))
+    for k in xrange(len(kind_names)):
+      if 'idle' not in kind_names[k]:
+        sums[k] = sum(sum(thread[k][:,1]-thread[k][:,0]) for thread in history)
+    order = argsort(-sums)
+    Log.write('most important kinds = %s'%[kind_names[o] for o in order[:most]])
+    colors = [None]*len(kind_names)
+    for c,k in enumerate(order):
+      try:
+        colors[k] = base_colors[c]
+        pylab.plot([0],[0],color=colors[k],label=kind_names[k],linewidth=5)
+      except IndexError:
+        colors[k] = 'k'
+    pylab.plot([0],[0],color='k',label='other',linewidth=5)
+
+  # Plot history
+  start = min(times.min() for thread in history for times in thread if len(times))
+  for thread in history:
+    for times in thread:
+      times -= start
   legend_artists = []
   legend_labels = []
-  name_to_color = {}
-  axes = pylab.figure().add_subplot(111)
-  for n,entries in history:
-    for name,times in entries:
-      if 'idle' not in name:
-        if name not in name_to_color:
-          color = name_to_color[name] = colors.pop()
-          pylab.plot([0],[0],color=color,label=name,linewidth=5)
-        else:
-          color = name_to_color[name]
-        lo = len(history)-n
-        times = times.copy()
-        times[:,1] -= times[:,0]
-        times[:,0] -= start
-        axes.broken_barh(times,(lo,.8),edgecolor=color,facecolor=color,label=name)
+  for n,thread in enumerate(history):
+    with Log.scope('thread %d'%n):
+      levels = {}
+      for k,times in [(o,thread[o]) for o in order]:
+        if len(times) and colors[k]!='k':
+          levels[k] = len(levels)
+      height = .8/(len(levels)+1)
+      for k,times in enumerate(thread):
+        name = kind_names[k]
+        if len(times) and 'idle' not in name:
+          assert all(times[:-1,1]<=times[1:,0])
+          simple = simplify_history(times,short())
+          simple[:,1] -= simple[:,0]
+          Log.write('%s: count %d, reduced %d, total %g'%(name,len(times),len(simple),sum(1e-6*times[:,1])))
+          color = colors[k]
+          level = levels[k] if color!='k' else len(levels)
+          axes.broken_barh(1e-6*simple,(n+.1+height*level,height),edgecolor=color,facecolor=color,label=name)
   axes.legend()
   pylab.show()
 
-draw_history(tryfile.read(history()))
+# Read history
+Log.configure('draw history',0,0,100)
+if history().endswith('.try'):
+  draw_history(tryfile.read(history()))
+else:
+  with Log.scope('read'):
+    names = glob.glob(history()+'/history-r*')
+    ranks = [None]*len(names)
+    for name in names:
+      m = re.search(r'history-r(\d+)',name)
+      rank = int(m.group(1))
+      data = fromfile(name,dtype=int64).reshape(-1,2)
+      threads,kinds = data[0]
+      ranks[rank] = [[data[data[i][0]:data[i][1]] for kind in xrange(kinds) for i in (1+thread*kinds+kind,)] for thread in xrange(threads)]
+  draw_history([thread for rank in ranks for thread in rank])

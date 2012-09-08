@@ -2,6 +2,8 @@
 
 #include <pentago/section.h>
 #include <pentago/superscore.h>
+#include <pentago/utility/wall_time.h>
+#include <other/core/array/Array.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/range.h>
@@ -24,9 +26,23 @@ Vector<int,4> sample_immediate_endings(Random& random, section_t section, int sa
   return counts;
 }
 
+// Merge consecutive time intervals separated by at most a threshold
+Array<Vector<wall_time_t,2>> simplify_history(RawArray<const Vector<wall_time_t,2>> history, int threshold) {
+  Array<Vector<wall_time_t,2>> merged;
+  for (int i=0;i<history.size();i++) {
+    wall_time_t start,end;
+    history[i].get(start,end);
+    while (history.valid(i+1) && (history[i+1].x-end).us<=threshold)
+      end = history[++i].y;
+    merged.append(vec(start,end));
+  }
+  return merged;
+}
+
 }
 using namespace pentago;
 
 void wrap_analyze() {
   OTHER_FUNCTION(sample_immediate_endings)
+  OTHER_FUNCTION(simplify_history)
 }

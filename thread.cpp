@@ -42,12 +42,12 @@ static bool is_master() {
 /****************** thread_time_t *****************/
 
 // Flip to enable history tracking
-#define HISTORY 0 
+#define HISTORY 0
 
 struct time_entry_t {
   wall_time_t total, local, start;
 #ifdef HISTORY
-  Array<wall_time_t> history;
+  Array<Vector<wall_time_t,2>> history;
 #endif
 
   time_entry_t()
@@ -56,7 +56,6 @@ struct time_entry_t {
 
 struct time_table_t {
   thread_type_t type;
-  int thread_id;
   time_entry_t times[_time_kinds];
 };
 vector<time_table_t*> time_tables;
@@ -64,11 +63,10 @@ static mutex_t time_mutex;
 
 struct time_info_t {
   pthread_key_t key;
-  int next_thread_id;
   wall_time_t total_start, local_start;
 
   time_info_t()
-    : next_thread_id(0), total_start(0), local_start(0) {
+    : total_start(0), local_start(0) {
     pthread_key_create(&key,0);
   }
 
@@ -77,7 +75,6 @@ struct time_info_t {
       lock_t lock(time_mutex);
       auto table = new time_table_t;
       table->type = type;
-      table->thread_id = next_thread_id++;
       time_tables.push_back(table);
       pthread_setspecific(key,time_tables.back());
     }
@@ -448,19 +445,40 @@ void report_thread_times(RawArray<const wall_time_t> times, const string& name) 
   cout << flush;
 }
 
-vector<Tuple<int,vector<Tuple<string,Array<Vector<double,2>>>>>> thread_history() {
+vector<vector<Array<const Vector<wall_time_t,2>>>> thread_history() {
   clear_thread_times();
   lock_t lock(time_mutex);
-  vector<Tuple<int,vector<Tuple<string,Array<Vector<double,2>>>>>> data(time_tables.size());
+  vector<vector<Array<const Vector<wall_time_t,2>>>> data(time_tables.size());
 #if HISTORY
-  for (int t=0;t<(int)data.size();t++) {
+  for (int t : range((int)data.size())) {
     auto& table = *time_tables[t];
-    data[t].x = table.thread_id;
-    for (HashtableIterator<const void*,time_entry_t> it(table.times);it.valid();it.next())
-      data[t].y.push_back(tuple(string((const char*)it.key()),it.data().history));
+    for (int k : range((int)master_missing_kind))
+      data[t].push_back(table.times[k].history.const_());
   }
 #endif
   return data;
+}
+
+void write_thread_history(const string& filename) {
+  typedef Vector<int64_t,2> Elem;
+  const auto history = thread_history();
+  if (!history.size())
+    return;
+  FILE* file = fopen(filename.c_str(),"w");
+  OTHER_ASSERT(file);
+  int offset = 1+history.size()*history[0].size();
+  Array<Elem> header;
+  header.append(Elem(history.size(),history[0].size()));
+  for (const auto& thread : history)
+    for (const auto& trace : thread) {
+      header.append(Elem(offset,offset+trace.size()));
+      offset += trace.size();
+    }
+  fwrite(header.data(),sizeof(Elem),header.size(),file);
+  for (const auto& thread : history)
+    for (const auto& trace : thread)
+      fwrite(trace.data(),sizeof(Elem),trace.size(),file);
+  fclose(file); 
 }
 
 /****************** testing *****************/
