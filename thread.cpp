@@ -45,9 +45,9 @@ static bool is_master() {
 #define HISTORY 0 
 
 struct time_entry_t {
-  double total, local, start;
+  wall_time_t total, local, start;
 #ifdef HISTORY
-  Array<double> history;
+  Array<wall_time_t> history;
 #endif
 
   time_entry_t()
@@ -65,12 +65,11 @@ static mutex_t time_mutex;
 struct time_info_t {
   pthread_key_t key;
   int next_thread_id;
-  double total_start, local_start;
+  wall_time_t total_start, local_start;
 
-  time_info_t() {
+  time_info_t()
+    : next_thread_id(0), total_start(0), local_start(0) {
     pthread_key_create(&key,0);
-    next_thread_id = 0;
-    total_start = local_start = 0;
   }
 
   void init_thread(thread_type_t type) {
@@ -104,12 +103,12 @@ thread_time_t::thread_time_t(time_kind_t kind)
 }
 
 thread_time_t::~thread_time_t() {
-  double now = wall_time();
+  wall_time_t now = wall_time();
 #if HISTORY
   entry.history.append(vec(entry.start,now));
 #endif
   entry.local += now-entry.start;
-  entry.start = 0;
+  entry.start = wall_time_t(0);
 }
 
 /****************** thread_pool_t *****************/
@@ -355,12 +354,12 @@ void threads_wait_all_help() {
 
 /****************** time reports *****************/
 
-Array<double> clear_thread_times() {
+Array<wall_time_t> clear_thread_times() {
   OTHER_ASSERT(is_master());
   threads_wait_all();
   lock_t lock(time_mutex);
-  double now = wall_time();
-  Array<double> result(_time_kinds);
+  wall_time_t now = wall_time();
+  Array<wall_time_t> result(_time_kinds);
   for (auto table : time_tables) {
     // Account for any active timers (which should all be idle)
     for (int k : range((int)master_missing_kind)) {
@@ -374,7 +373,7 @@ Array<double> clear_thread_times() {
       }
     }
     // Compute missing time
-    double missing = now-time_info.local_start;
+    wall_time_t missing = now-time_info.local_start;
     for (int k : range((int)master_missing_kind))
       missing -= table->times[k].local;
     const int missing_kind = master_missing_kind+table->type;
@@ -385,32 +384,25 @@ Array<double> clear_thread_times() {
       auto& entry = table->times[k];
       result[k] += entry.local;
       entry.total += entry.local;
-      entry.local = 0;
+      entry.local = wall_time_t(0);
     }
   }
   time_info.local_start = now;
   return result;
 }
 
-Array<double> total_thread_times() {
+Array<wall_time_t> total_thread_times() {
   clear_thread_times();
   lock_t lock(time_mutex);
-  Array<double> result(_time_kinds);
+  Array<wall_time_t> result(_time_kinds);
   for (auto table : time_tables)
     for (int k : range((int)_time_kinds))
       result[k] += table->times[k].total;
   return result;
 }
 
-static const char* sanitize_name(const string& name) {
-  return name.size()?name.c_str():"<empty>";
-}
-
-void report_thread_times(RawArray<const double> times, const string& name) {
-  OTHER_ASSERT(times.size()==_time_kinds);
-
-  // Collect names
-  const char* names[_time_kinds] = {0};
+static vector<const char*> time_kind_names() {
+  vector<const char*> names(master_missing_kind);
   #define FIELD(kind) names[kind##_kind] = #kind;
   FIELD(compress)
   FIELD(decompress)
@@ -434,17 +426,25 @@ void report_thread_times(RawArray<const double> times, const string& name) {
   FIELD(master_idle)
   FIELD(cpu_idle)
   FIELD(io_idle)
+  for (int k : range((int)master_missing_kind))
+    OTHER_ASSERT(names[k],format("missing name for kind %d",k));
+  return names;
+}
+
+void report_thread_times(RawArray<const wall_time_t> times, const string& name) {
+  OTHER_ASSERT(times.size()==_time_kinds);
+  vector<const char*> names = time_kind_names();
 
   // Print times
   cout << "timing "<<name<<"\n";
   for (int k : range((int)master_missing_kind))
     if (times[k])
-      cout << format("  %-20s %10.4f s\n",sanitize_name(names[k]),times[k]);
+      cout << format("  %-20s %10.4f s\n",names[k],times[k].seconds());
   if (io_pool)
-    cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",times[master_missing_kind],times[cpu_missing_kind],times[io_missing_kind]);
+    cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",times[master_missing_kind].seconds(),times[cpu_missing_kind].seconds(),times[io_missing_kind].seconds());
   else
-    cout << format("  missing: master %.4f, cpu %.4f\n",times[master_missing_kind],times[cpu_missing_kind]);
-  cout << format("  total %.4f\n",times.sum());
+    cout << format("  missing: master %.4f, cpu %.4f\n",times[master_missing_kind].seconds(),times[cpu_missing_kind].seconds());
+  cout << format("  total %.4f\n",times.sum().seconds());
   cout << flush;
 }
 
@@ -505,4 +505,5 @@ void wrap_thread() {
   OTHER_FUNCTION(total_thread_times)
   OTHER_FUNCTION(report_thread_times)
   OTHER_FUNCTION(thread_history)
+  OTHER_FUNCTION(time_kind_names)
 }

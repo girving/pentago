@@ -2,14 +2,15 @@
 #pragma once
 
 #include <pentago/utility/job.h>
+#include <pentago/utility/wall_time.h>
 #include <other/core/array/Array.h>
 #include <other/core/python/Ptr.h>
 #include <other/core/python/Object.h>
 #include <other/core/python/ExceptionValue.h>
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
-#include <vector>
 #include <pthread.h>
+#include <vector>
 namespace pentago {
 
 using namespace other;
@@ -114,13 +115,13 @@ public:
 };
 
 // Extract local times and reset them to zero
-Array<double> clear_thread_times();
+Array<wall_time_t> clear_thread_times();
 
 // Extract total thread times
-Array<double> total_thread_times();
+Array<wall_time_t> total_thread_times();
 
 // Print a timing report
-void report_thread_times(RawArray<const double> times, const string& name="");
+void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
 
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
 thread_type_t thread_type();

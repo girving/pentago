@@ -2,6 +2,7 @@
 
 #include <pentago/section.h>
 #include <pentago/superscore.h>
+#include <pentago/utility/wall_time.h>
 #include <other/core/array/convert.h>
 #include <other/core/vector/convert.h>
 namespace other {
@@ -18,12 +19,16 @@ template<> struct NumpyInfo<super_t> { static void dimensions(npy_intp* dimensio
   dimensions[0] = 4;
 }};
 
-// section_t is just a thin wrapper around a Vector
+// section_t is a thin wrapper around a Vector
 typedef Vector<Vector<uint8_t,2>,4> CV;
 template<> struct NumpyDescr<section_t> : public NumpyDescr<CV> {};
 template<> struct NumpyIsStatic<section_t> : public NumpyIsStatic<CV> {};
 template<> struct NumpyRank<section_t> : public NumpyRank<CV> {};
 template<> struct NumpyInfo<section_t> : public NumpyInfo<CV> {};
+
+// wall_time_t is a thin wrapper around an int64_t
+template<> struct NumpyDescr<wall_time_t> : public NumpyDescr<int64_t> {};
+template<> struct NumpyIsScalar<wall_time_t> : public mpl::true_ {};
 
 }
 
@@ -32,6 +37,7 @@ VECTOR_CONVERSIONS(3,uint64_t)
 VECTOR_CONVERSIONS(4,uint16_t)
 VECTOR_CONVERSIONS(4,Vector<uint8_t,2>)
 ARRAY_CONVERSIONS(1,uint8_t)
+ARRAY_CONVERSIONS(1,wall_time_t)
 ARRAY_CONVERSIONS(1,super_t)
 ARRAY_CONVERSIONS(4,super_t)
 ARRAY_CONVERSIONS(1,Vector<uint64_t,3>)

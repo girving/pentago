@@ -64,28 +64,28 @@ static void report(MPI_Comm comm, const char* name) {
     cout << "memory "<<name<<": "<<memory_report(info)<<endl;
 }
 
-static void report_mpi_times(MPI_Comm comm, RawArray<double> times, double elapsed, uint64_t outputs, uint64_t inputs) {
+static void report_mpi_times(MPI_Comm comm, RawArray<wall_time_t> times, wall_time_t elapsed, uint64_t outputs, uint64_t inputs) {
   const int rank = comm_rank(comm),
             ranks = comm_size(comm);
   if (per_rank_times && ranks>1) {
-    Array<double,2> all_times(ranks,times.size(),false);
-    CHECK(MPI_Gather(times.data(),times.size(),MPI_DOUBLE,all_times.data(),times.size(),MPI_DOUBLE,0,comm));
+    Array<wall_time_t,2> all_times(ranks,times.size(),false);
+    CHECK(MPI_Gather(times.data(),times.size(),MPI_LONG_LONG_INT,all_times.data(),times.size(),MPI_LONG_LONG_INT,0,comm));
     if (!rank) {
       Log::Scope scope("per rank times");
       for (int r=0;r<ranks;r++)
         report_thread_times(all_times[r],format("%d",r));
     }
   }
-  CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_DOUBLE,MPI_SUM,0,comm));
+  CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
   if (!rank) {
     report_thread_times(times);
-    const double core_time = elapsed*threads*comm_size(comm);
+    const double core_time = elapsed.seconds()*threads*comm_size(comm);
     const double output_speed = outputs/core_time,
                  input_speed = inputs/core_time,
                  speed = output_speed+input_speed;
     const uint64_t all_nodes = 13540337135288;
     cout << format("speeds\n  elapsed = %g, output nodes = %s, input nodes = %s\n  speeds (nodes/second/core): output = %g, input = %g, output+input = %g\n  grand estimate = %s core-hours",
-                   elapsed,large(outputs),large(inputs),output_speed,input_speed,speed,large(uint64_t(2*all_nodes/speed/3600)))<<endl;
+                   elapsed.seconds(),large(outputs),large(inputs),output_speed,input_speed,speed,large(uint64_t(2*all_nodes/speed/3600)))<<endl;
   }
 }
 
@@ -314,7 +314,7 @@ int main(int argc, char** argv) {
   report(comm,"base");
 
   // Compute each slice in turn
-  double total_elapsed = 0;
+  wall_time_t total_elapsed;
   uint64_t total_outputs = 0,
            total_inputs = 0;
   {
@@ -325,7 +325,7 @@ int main(int argc, char** argv) {
       if (!slices[slice].size())
         break;
       Log::Scope scope(format("slice %d",slice));
-      const double start = wall_time();
+      const auto start = wall_time();
 
       // Allocate meaningless data if necessary
       if (slice+1==meaningless) {
@@ -389,7 +389,7 @@ int main(int argc, char** argv) {
       }
 
       // Dump timing
-      const double elapsed = wall_time()-start;
+      const auto elapsed = wall_time()-start;
       total_elapsed += elapsed;
       report_mpi_times(comm,clear_thread_times(),elapsed,outputs,inputs);
     }
