@@ -205,7 +205,7 @@ void thread_pool_t::shutdown() {
 void* thread_pool_t::worker(void* pool_) {
   thread_pool_t& pool = *(thread_pool_t*)pool_;
   time_info.init_thread(pool.type);
-  time_kind_t idle = pool.type==CPU?cpu_idle_kind:pool.type==IO?io_idle_kind:_time_kinds;
+  const time_kind_t idle = pool.type==CPU?cpu_idle_kind:pool.type==IO?io_idle_kind:_time_kinds;
   OTHER_ASSERT(idle!=_time_kinds);
   for (;;) {
     // Grab a job
@@ -362,13 +362,8 @@ Array<double> clear_thread_times() {
   double now = wall_time();
   Array<double> result(_time_kinds);
   for (auto table : time_tables) {
-    // Compute missing time
-    auto& missing = table->times[master_missing_kind+table->type];
-    missing.local = now-time_info.local_start;
-    for (int k : range((int)master_missing_kind))
-      missing.local -= table->times[k].local;
-    // Clear local times
-    for (int k : range((int)_time_kinds)) {
+    // Account for any active timers (which should all be idle)
+    for (int k : range((int)master_missing_kind)) {
       auto& entry = table->times[k];
       if (entry.start) {
 #if HISTORY
@@ -377,6 +372,17 @@ Array<double> clear_thread_times() {
         entry.local += now-entry.start;
         entry.start = now;
       }
+    }
+    // Compute missing time
+    double missing = now-time_info.local_start;
+    for (int k : range((int)master_missing_kind))
+      missing -= table->times[k].local;
+    const int missing_kind = master_missing_kind+table->type;
+    result[missing_kind] += missing;
+    table->times[missing_kind].total += missing;
+    // Clear local times
+    for (int k : range((int)master_missing_kind)) {
+      auto& entry = table->times[k];
       result[k] += entry.local;
       entry.total += entry.local;
       entry.local = 0;
