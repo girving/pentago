@@ -120,7 +120,7 @@ Array<double> clear_thread_times();
 Array<double> total_thread_times();
 
 // Print a timing report
-void report_thread_times(RawArray<const double> times);
+void report_thread_times(RawArray<const double> times, const string& name="");
 
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
 thread_type_t thread_type();

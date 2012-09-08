@@ -406,7 +406,7 @@ static const char* sanitize_name(const string& name) {
   return name.size()?name.c_str():"<empty>";
 }
 
-void report_thread_times(RawArray<const double> times) {
+void report_thread_times(RawArray<const double> times, const string& name) {
   OTHER_ASSERT(times.size()==_time_kinds);
 
   // Collect names
@@ -436,7 +436,7 @@ void report_thread_times(RawArray<const double> times) {
   FIELD(io_idle)
 
   // Print times
-  cout << "timing\n";
+  cout << "timing "<<name<<"\n";
   for (int k : range((int)master_missing_kind))
     if (times[k])
       cout << format("  %-20s %10.4f s\n",sanitize_name(names[k]),times[k]);
@@ -444,6 +444,7 @@ void report_thread_times(RawArray<const double> times) {
     cout << format("  missing: master %.4f, cpu %.4f, io %.4f\n",times[master_missing_kind],times[cpu_missing_kind],times[io_missing_kind]);
   else
     cout << format("  missing: master %.4f, cpu %.4f\n",times[master_missing_kind],times[cpu_missing_kind]);
+  cout << format("  total %.4f\n",times.sum());
   cout << flush;
 }
 

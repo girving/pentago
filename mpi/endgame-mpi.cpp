@@ -73,7 +73,7 @@ static void report_mpi_times(MPI_Comm comm, RawArray<double> times, double elaps
     if (!rank) {
       Log::Scope scope("per rank times");
       for (int r=0;r<ranks;r++)
-        report_thread_times(all_times[r]);
+        report_thread_times(all_times[r],format("%d",r));
     }
   }
   CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_DOUBLE,MPI_SUM,0,comm));
@@ -110,6 +110,7 @@ int main(int argc, char** argv) {
   string dir;
   string test;
   int meaningless = 0;
+  int stop_after = 0;
   static const option options[] = {
     {"help",no_argument,0,'h'},
     {"threads",required_argument,0,'t'},
@@ -125,6 +126,7 @@ int main(int argc, char** argv) {
     {"test",required_argument,0,'u'},
     {"meaningless",required_argument,0,'n'},
     {"per-rank-times",no_argument,0,'z'},
+    {"stop-after",required_argument,0,'S'},
     {0,0,0,0}};
   for (;;) {
     int option = 0;
@@ -151,6 +153,7 @@ int main(int argc, char** argv) {
                   "      --test <name>          Run the MPI side of one of the unit tests\n"
                   "      --meaningless <n>      Use meaningless values the given slice\n"
                   "      --per-rank-times       Print a timing report for each rank\n"
+                  "      --stop-after <n>       Stop after computing the given slice\n"
                << flush;
         }
         return 0;
@@ -168,8 +171,9 @@ int main(int argc, char** argv) {
       INT_ARG('p',samples,samples)
       INT_ARG('r',ranks,specified_ranks)
       INT_ARG('n',meaningless,meaningless)
-      INT_ARG('g',gather_limit,gather_limit)
-      INT_ARG('L',line_limit,line_limit)
+      INT_ARG('g',gather-limit,gather_limit)
+      INT_ARG('L',line-limit,line_limit)
+      INT_ARG('S',stop-after,stop_after)
       case 'm': {
         double memory = strtod(optarg,&end);
         if (!strcmp(end,"MB") || !strcmp(end,"M"))
@@ -214,6 +218,8 @@ int main(int argc, char** argv) {
     error("must specify how many slices to save with --save");
   if (specified_ranks>=0 && specified_ranks!=ranks)
     error("--ranks %d doesn't match actual number of ranks %d",specified_ranks,ranks);
+  if (stop_after<0)
+    error("--stop-after %d should be nonnegative",stop_after);
   if (!dir.size())
     error("must specify --dir",dir);
   if (meaningless>9)
@@ -315,7 +321,7 @@ int main(int argc, char** argv) {
     Ptr<partition_t> prev_partition;
     Ptr<block_store_t> prev_blocks;
     const int first_slice = meaningless?meaningless-1:(int)slices.size()-1;
-    for (int slice=first_slice;slice>=0;slice--) {
+    for (int slice=first_slice;slice>=stop_after;slice--) {
       if (!slices[slice].size())
         break;
       Log::Scope scope(format("slice %d",slice));
