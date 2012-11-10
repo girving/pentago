@@ -2,7 +2,7 @@
 
 from __future__ import division
 from other.core import *
-from interface import *
+from pentago import *
 import tempfile
 
 def test_supertensor():
