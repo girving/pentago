@@ -6,8 +6,11 @@ from other.core import *
 from other.core.value import parser
 from pentago import *
 
-data_dir = PropManager.add('dir','data').set_help('top level data directory')
-symmetries = PropManager.add('symmetries',8).set_help('number of symmetries used to standardize sections')
+data_dir,symmetries = None,None
+def add_section_props(props):
+  global data_dir,symmetries
+  data_dir = props.add('dir','data').set_help('top level data directory')
+  symmetries = props.add('symmetries',8).set_help('number of symmetries used to standardize sections')
 
 def show_section(s):
   return '%d-'%sum(s)+''.join(map(str,ravel(s)))

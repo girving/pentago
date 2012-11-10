@@ -147,6 +147,7 @@ def list():
   print 'available commands = %s'%' '.join(commands.keys())
 
 if __name__=='__main__':
-  command = PropManager.add('command','list').set_allowed(commands.keys())
-  parser.parse('Endgame related stuff',positional=[command])
+  props = PropManager()
+  command = props.add('command','list').set_allowed(commands.keys())
+  parser.parse(props,'Endgame related stuff',positional=[command])
   commands[command()]()

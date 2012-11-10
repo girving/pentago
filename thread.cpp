@@ -460,6 +460,7 @@ vector<vector<Array<const Vector<wall_time_t,2>>>> thread_history() {
 }
 
 void write_thread_history(const string& filename) {
+#if HISTORY
   typedef Vector<int64_t,2> Elem;
   const auto history = thread_history();
   if (!history.size())
@@ -479,6 +480,7 @@ void write_thread_history(const string& filename) {
     for (const auto& trace : thread)
       fwrite(trace.data(),sizeof(Elem),trace.size(),file);
   fclose(file); 
+#endif
 }
 
 /****************** testing *****************/

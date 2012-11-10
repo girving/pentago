@@ -7,11 +7,13 @@ from section import *
 from collections import defaultdict
 
 # Parse command line
-command = PropManager.add('command','').set_allowed('test'.split()).set_required(1).set_help('what to do')
-save = PropManager.add('save',18).set_help('largest slice to save')
-seed = PropManager.add('seed',-1).set_help('random seed, or negative for nondeterministic')
-end = PropManager.add('end',36).set_help('pretend the game ends earlier for debugging purposes')
-parser.parse('Pentago cluster submission script',positional=[command])
+props = PropManager()
+add_section_props(props)
+command = props.add('command','').set_allowed('test'.split()).set_required(1).set_help('what to do')
+save = props.add('save',18).set_help('largest slice to save')
+seed = props.add('seed',-1).set_help('random seed, or negative for nondeterministic')
+end = props.add('end',36).set_help('pretend the game ends earlier for debugging purposes')
+parser.parse(props,'Pentago cluster submission script',positional=[command])
 command = command()
 save = save()
 end = end()

@@ -6,11 +6,12 @@ from other.core.value import parser
 from interface import *
 import time
 
-level = PropManager.add('level',21)
-do_count = PropManager.add('count',False)
-do_lowrank = PropManager.add('lowrank',False)
-plot = PropManager.add('plot',0)
-parser.parse('Pentago filter benchmarks')
+props = PropManager()
+level = props.add('level',21)
+do_count = props.add('count',False)
+do_lowrank = props.add('lowrank',False)
+plot = props.add('plot',0)
+parser.parse(props,'Pentago filter benchmarks')
 level = level()
 
 def count(data):

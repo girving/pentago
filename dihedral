@@ -7,9 +7,10 @@ import sys
 from other.core import *
 from other.core.value import parser
 
-adjacent = PropManager.add('adjacent',False).set_help('require adjacent transpositions')
-avoid_hard = PropManager.add('avoid_hard',False).set_help('avoid hard transpositions')
-parser.parse('Explorations of the dihedral group')
+props = PropManager()
+adjacent = props.add('adjacent',False).set_help('require adjacent transpositions')
+avoid_hard = props.add('avoid_hard',False).set_help('avoid hard transpositions')
+parser.parse(props,'Explorations of the dihedral group')
 
 identity = asmatrix(eye(4,dtype=int))
 

@@ -11,13 +11,14 @@ from interface import *
 from utility.ashelve import *
 
 # Properties
-game = PropManager.add('game','defense').set_allowed('defense'.split())
-jobs = PropManager.add('jobs',1).set_abbrev('j')
-stones = PropManager.add('stones',6).set_abbrev('n')
-bits = PropManager.add('bits',26).set_abbrev('b')
-verbose = PropManager.add('verbose',True).set_abbrev('v')
-action = PropManager.add('action','list').set_allowed('gen list missing cleanup dump'.split())
-parser.parse('Opening book generator',positional=[action])
+props = PropManager()
+game = props.add('game','defense').set_allowed('defense'.split())
+jobs = props.add('jobs',1).set_abbrev('j')
+stones = props.add('stones',6).set_abbrev('n')
+bits = props.add('bits',26).set_abbrev('b')
+verbose = props.add('verbose',True).set_abbrev('v')
+action = props.add('action','list').set_allowed('gen list missing cleanup dump'.split())
+parser.parse(props,'Opening book generator',positional=[action])
 
 # Fork if desired
 assert 1<=jobs()<32

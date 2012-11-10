@@ -10,21 +10,22 @@ from other.core import *
 from other.core.value import parser
 
 # Properties
-bits = PropManager.add('bits',-1).set_abbrev('b').set_help('size of transposition table in bits (default 21 for super, 24 otherwise)')
-depth = PropManager.add('depth',3).set_abbrev('d').set_help('search depth (default %default)')
-seed = PropManager.add('seed',711170497).set_help('random seed (default %default)')
-record = PropManager.add('record','').set_help('append random game records to the given file')
-start = PropManager.add('start','0,0').set_help('comma separated starting board (and optional rotation vector) and turn')
-manual = PropManager.add('manual',-1).set_abbrev('m').set_help('play the given side manually')
-limit = PropManager.add('limit',36).set_help('limit black\' choices to the given number of moves')
-debug = PropManager.add('debug',False).set_help('turn on debugging (may cause massive slowdowns)')
-brief = PropManager.add('brief',36).set_help('stop after the given number of moves')
-trace = PropManager.add('trace',False).set_help('diagnose tree evaluation errors using iterated tracing')
-full = PropManager.add('full',False).set_help('play to the end even in record mode')
-engine_type = PropManager.add('engine','super').set_allowed('normal simple super'.split()).set_help('engine variant')
-parser.parse('Pentago solver',positional=[engine_type])
+props = PropManager()
+bits = props.add('bits',-1).set_abbrev('b').set_help('size of transposition table in bits (default 21 for super, 24 otherwise)')
+depth = props.add('depth',3).set_abbrev('d').set_help('search depth (default %default)')
+seed = props.add('seed',711170497).set_help('random seed (default %default)')
+record = props.add('record','').set_help('append random game records to the given file')
+start = props.add('start','0,0').set_help('comma separated starting board (and optional rotation vector) and turn')
+manual = props.add('manual',-1).set_abbrev('m').set_help('play the given side manually')
+limit = props.add('limit',36).set_help('limit black\' choices to the given number of moves')
+debug = props.add('debug',False).set_help('turn on debugging (may cause massive slowdowns)')
+brief = props.add('brief',36).set_help('stop after the given number of moves')
+trace = props.add('trace',False).set_help('diagnose tree evaluation errors using iterated tracing')
+full = props.add('full',False).set_help('play to the end even in record mode')
+engine_type = props.add('engine','super').set_allowed('normal simple super'.split()).set_help('engine variant')
+parser.parse(props,'Pentago solver',positional=[engine_type])
 
-print 'command = %s'%parser.command()
+print 'command = %s'%parser.command(props)
 
 if engine_type()=='super':
   engine.init_supertable(bits() if bits()>0 else 21)

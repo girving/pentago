@@ -6,9 +6,6 @@
 #include <other/core/python/forward.h>
 #include <other/core/structure/forward.h>
 #include <string>
-namespace other {
-template<class TK,class T> struct HashtableEntry;
-}
 namespace pentago {
 
 using namespace other;

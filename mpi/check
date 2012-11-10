@@ -9,10 +9,11 @@ from other.core.utility import Log
 from other.core.value import parser
 
 # Parse properties
-old_dir = PropManager.add('old','../old-data-15july2012')
-dir = PropManager.add('dir','data').set_required(1)
-meaningless = PropManager.add('meaningless',0)
-parser.parse('Compare MPI results with out-of-core results',positional=[dir])
+props = PropManager()
+old_dir = props.add('old','../old-data-15july2012')
+dir = props.add('dir','data').set_required(1)
+meaningless = props.add('meaningless',0)
+parser.parse(props,'Compare MPI results with out-of-core results',positional=[dir])
 old_dir = old_dir()
 dir = os.path.normpath(dir())
 meaningless = meaningless()
@@ -30,7 +31,7 @@ if meaningless:
   set_block_cache(cache)
 
 # Process each slice that exists, keeping track of which files we've checked
-unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if f not in 'log empty.pentago')
+unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if f not in 'log empty.pentago' and not f.startswith('history'))
 random = Random(8183131)
 init_supertable(16)
 for slice in arange(36):
@@ -81,5 +82,5 @@ for slice in arange(36):
 
 # Yell if any files remain
 if unchecked:
-  print 'strange files: '%' '.join(sorted(unchecked))
+  print 'strange files: %s'%' '.join(sorted(unchecked))
   assert False

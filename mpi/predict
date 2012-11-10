@@ -8,17 +8,18 @@ from pentago.section import *
 import re
 
 # Mimic options to endgame-mpi
-ranks = PropManager.add('ranks',0).set_required(True)
-threads = PropManager.add('threads',0).set_required(True)
-block_size = PropManager.add('block_size',8)
-save = PropManager.add('save',0).set_required(True)
-dir = PropManager.add('dir','data')
-level = PropManager.add('level',26)
-memory = PropManager.add('memory','').set_required(True)
-section = PropManager.add('section','').set_required(True)
-samples = PropManager.add('samples',128)
-meaningless = PropManager.add('meaningless',0)
-parser.parse('Endgame prediction script',positional=[section])
+props = PropManager()
+ranks = props.add('ranks',0).set_required(True)
+threads = props.add('threads',0).set_required(True)
+block_size = props.add('block_size',8)
+save = props.add('save',0).set_required(True)
+dir = props.add('dir','data')
+level = props.add('level',26)
+memory = props.add('memory','').set_required(True)
+section = props.add('section','').set_required(True)
+samples = props.add('samples',128)
+meaningless = props.add('meaningless',0)
+parser.parse(props,'Endgame prediction script',positional=[section])
 
 # 'Parse' simple properties
 ranks = ranks()
@@ -46,7 +47,7 @@ section = asarray(map(int,m.group(1))).reshape(4,2)
 
 # Configure logging and threads
 Log.configure('predict',0,0,100)
-Log.write('command = %s'%parser.command())
+Log.write('command = %s'%parser.command(props))
 init_threads(1,0)
 
 # Dump general information
