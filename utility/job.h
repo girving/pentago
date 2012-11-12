@@ -36,11 +36,11 @@ template<class F> struct job_helper_t : public job_base_t {
 };
 }
 
-struct job_t : public unique<job_base_t> {
+struct job_t : public Unique<job_base_t> {
   job_t() {}
 
   template<class F> job_t(F&& f)
-    : unique<job_base_t>(new job_helper_t<F>(other::move(f))) {}
+    : Unique<job_base_t>(new job_helper_t<F>(other::move(f))) {}
 
   void operator()() const {
     OTHER_ASSERT(get());
