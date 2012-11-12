@@ -31,7 +31,7 @@ namespace {
 struct block_request_t : public boost::noncopyable {
   // The section is determined by the dependent line, so we don't need to store it
   const Vector<int,4> block;
-  vector<line_data_t*> dependent_lines;
+  vector<line_details_t*> dependent_lines;
 
   block_request_t(Vector<int,4> block)
     : block(block) {}
@@ -118,7 +118,7 @@ struct flow_t {
   void process_output(MPI_Status* status);
   void process_wakeup(MPI_Status* status);
   void process_response(MPI_Status* status);
-  void finish_output_send(line_data_t* const line, MPI_Status* status);
+  void finish_output_send(line_details_t* const line, MPI_Status* status);
 };
 
 flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit)
@@ -176,8 +176,8 @@ flow_t::~flow_t() {}
 void flow_t::schedule_lines() {
   // If there are unscheduled lines, try to schedule them
   while (free_lines && free_line_gathers && unscheduled_lines.size()) {
-    const auto line = unscheduled_lines.back();
-    const auto line_memory = line->memory_usage();
+    const line_data_t* preline = unscheduled_lines.back();
+    const auto line_memory = preline->memory_usage();
     if (free_memory < line_memory)
       break;
     // Schedule the line
@@ -185,24 +185,24 @@ void flow_t::schedule_lines() {
     unscheduled_lines.pop();
     free_memory -= line_memory;
     free_lines--;
-    line->allocate(comms.wakeup_comm);
+    line_details_t* line = new line_details_t(*preline,comms.wakeup_comm);
+    delete preline;
+    #define preline freed
     PENTAGO_MPI_TRACE("allocate line %s",str(line->line));
     // Request all input blocks
-    const int input_count = line->input_blocks();
-    if (!input_count)
+    if (!line->input_blocks)
       schedule_compute_line(*line);
     else {
       OTHER_ASSERT(input_blocks);
       free_line_gathers--;
-      const auto child_section = line->standard_child_section();
-      for (int b : range(input_count)) {
+      for (int b : range(line->input_blocks)) {
         const auto block = line->input_block(b);
-        const auto block_id = input_blocks->partition->block_offsets(child_section,block).x;
+        const auto block_id = input_blocks->partition->block_offsets(line->standard_child_section,block).x;
         auto it = block_requests.find(block_id);
         if (it == block_requests.end()) {
           // Send a block request message
           const auto block_request = new block_request_t(block);
-          const int owner = input_blocks->partition->block_to_rank(child_section,block);
+          const int owner = input_blocks->partition->block_to_rank(line->standard_child_section,block);
           const auto owner_offsets = input_blocks->partition->rank_offsets(owner);
           const int owner_block_id = block_id-owner_offsets.x;
           send_empty(owner,owner_block_id,comms.request_comm);
@@ -299,16 +299,16 @@ void flow_t::post_wakeup_recv() {
 
 // Line line has finished; post sends for all output blocks
 void flow_t::process_wakeup(MPI_Status* status) {
-  BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
+  BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
   OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
-  line_data_t* const line = (line_data_t*)wakeup_buffer; 
+  line_details_t* const line = (line_details_t*)wakeup_buffer; 
   PENTAGO_MPI_TRACE("process wakeup %s",str(line->line));
   const function<void(MPI_Status*)> callback(curry(&flow_t::finish_output_send,this,line));
-  for (int b=0;b<line->line.length;b++) {
-    const auto block = line->line.block(b);
-    const auto block_id = output_blocks.partition->block_offsets(line->line.section,block).x;
+  for (int b=0;b<line->pre.line.length;b++) {
+    const auto block = line->pre.line.block(b);
+    const auto block_id = output_blocks.partition->block_offsets(line->pre.line.section,block).x;
     const auto block_data = line->output_block_data(b);
-    const int owner = output_blocks.partition->block_to_rank(line->line.section,block);
+    const int owner = output_blocks.partition->block_to_rank(line->pre.line.section,block);
     const auto owner_offsets = output_blocks.partition->rank_offsets(owner);
     const int owner_block_id = block_id-owner_offsets.x;
     MPI_Request request;
@@ -319,12 +319,12 @@ void flow_t::process_wakeup(MPI_Status* status) {
   post_wakeup_recv();
 }
 
-void flow_t::finish_output_send(line_data_t* const line, MPI_Status* status) {
+void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) {
   const int remaining = line->decrement_unsent_output_blocks();
   PENTAGO_MPI_TRACE("finish output send %s: remaining %d",str(line->line),remaining);
   if (!remaining) {
     PENTAGO_MPI_TRACE("deallocate line %s",str(line->line));
-    const auto line_memory = line->memory_usage();
+    const auto line_memory = line->pre.memory_usage();
     delete line;
     free_lines++;
     free_memory += line_memory;

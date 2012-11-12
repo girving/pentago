@@ -4,16 +4,14 @@
 #include <pentago/mpi/line.h>
 #include <pentago/mpi/config.h>
 #include <pentago/symmetry.h>
+#include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
 #include <other/core/array/Array4d.h>
 #include <boost/noncopyable.hpp>
-#include <boost/scoped_ptr.hpp>
 namespace pentago {
 namespace mpi {
 
 using namespace other;
-using boost::scoped_ptr;
-struct allocated_t;
 
 /* Notes:
  *
@@ -30,29 +28,59 @@ struct allocated_t;
  *    Deallocation: All output sends complete, so the line is deallocated.
  */
 
-struct line_data_t : public boost::noncopyable {
+struct line_data_t {
   // Line and child line data
   const line_t& line;
   const Vector<int,4> input_shape; // Unstandardized
   const Vector<int,4> output_shape;
 
-  // Valid only after allocate is called
-  scoped_ptr<allocated_t> rest;
-
   line_data_t(const line_t& line);
   ~line_data_t();
 
-  // Valid before allocate is called
+  // Estimate memory usage of corresponding line details
   uint64_t memory_usage() const;
+};
 
-  // Prepare to compute.
-  void allocate(MPI_Comm wakeup_comm);
+struct line_details_t : public boost::noncopyable {
+  // Initial information
+  const line_data_t pre;
 
-  // Information about the child
-  section_t standard_child_section() const;
+  // Standardization
+  const section_t standard_child_section;
+  const uint8_t section_transform; // Maps output space to input (child) space
+  const Vector<int,4> permutation; // Child quadrant i maps to quadrant permutation[i]
+  const int child_dimension;
+  const int input_blocks;
+  const Vector<int,4> first_child_block; // First child block
+  const symmetry_t inverse_transform;
+
+  // Rotation minimal quadrants
+  const Vector<RawArray<const quadrant_t>,4> rmin;
+
+  // Symmetries needed to restore minimality after reflection
+  const Array<const local_symmetry_t> all_reflection_symmetries;
+  const Vector<int,5> reflection_symmetry_offsets;
+
+  // Number of blocks we need before input is ready, microlines left to compute, and output blocks left to send.
+  int missing_input_responses;
+  counter_t missing_input_blocks;
+  counter_t missing_microlines;
+  counter_t unsent_output_blocks;
+
+  // Information needed to account for reflections in input block data
+  const Vector<int,4> reflection_moves;
+
+  // Input and output data.  Both are stored in 5D order where the first dimension
+  // is the block, to avoid copying before and after compute.
+  const Array<Vector<super_t,2>> input, output;
+
+  // When computation is complete, send a wakeup message here
+  const MPI_Comm wakeup_comm;
+
+  line_details_t(const line_data_t& pre, const MPI_Comm wakeup_comm);
+  ~line_details_t();
 
   // Get the kth input block
-  int input_blocks() const;
   Vector<int,4> input_block(int k) const;
 
   // Extract the data for the kth block of either the input or output array
@@ -74,7 +102,7 @@ struct line_data_t : public boost::noncopyable {
 };
 
 // Schedule a line computation (called once all input blocks are in place)
-void schedule_compute_line(line_data_t& line);
+void schedule_compute_line(line_details_t& line);
 
 }
 }

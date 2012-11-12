@@ -6,7 +6,6 @@
 #include <pentago/mpi/trace.h>
 #include <pentago/endgame.h>
 #include <pentago/utility/ceil_div.h>
-#include <pentago/utility/counter.h>
 #include <pentago/utility/index.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/IndirectArray.h>
@@ -48,81 +47,45 @@ uint64_t line_data_t::memory_usage() const {
   return sizeof(Vector<super_t,2>)*(input_shape.product()+output_shape.product());
 }
 
-struct allocated_t : public boost::noncopyable {
-  // Standardization
-  const section_t standard_child_section;
-  const uint8_t section_transform; // Maps output space to input (child) space
-  const Vector<int,4> permutation; // Child quadrant i maps to quadrant permutation[i]
-  const int child_dimension;
-  const int child_length;
-  const Vector<int,4> first_child_block; // First child block
-  const symmetry_t inverse_transform;
-
-  // Rotation minimal quadrants
-  const Vector<RawArray<const quadrant_t>,4> rmin;
-
-  // Symmetries needed to restore minimality after reflection
-  const Array<const local_symmetry_t> all_reflection_symmetries;
-  const Vector<int,5> reflection_symmetry_offsets;
-
-  // Number of blocks we need before input is ready, microlines left to compute, and output blocks left to send.
-  int missing_input_responses;
-  counter_t missing_input_blocks;
-  counter_t missing_microlines;
-  counter_t unsent_output_blocks;
-
-  // Information needed to account for reflections in input block data
-  const Vector<int,4> reflection_moves;
-
-  // Input and output data.  Both are stored in 5D order where the first dimension
-  // is the block, to avoid copying before and after compute.
-  const Array<Vector<super_t,2>> input, output;
-
-  // When computation is complete, send a wakeup message here
-  const MPI_Comm wakeup_comm;
-  const line_data_t* const self; // Pointer back to containing line for use as a send buffer
-
-  allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm);
-};
-
-// Mark this const so that the two identical calls in allocated_t's constructor can be CSE'ed
+// Mark this const so that the two identical calls in line_details_t's constructor can be CSE'ed
 OTHER_CONST static inline Tuple<section_t,uint8_t> standardize_child_section(section_t section, int dimension) {
   return section.child(dimension).standardize<8>();
 }
 
-allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
+line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_comm)
+  : pre(pre)
+
   // Standardize
-  : standard_child_section(standardize_child_section(self.line.section,self.line.dimension).x)
-  , section_transform(     standardize_child_section(self.line.section,self.line.dimension).y)
+  , standard_child_section(standardize_child_section(pre.line.section,pre.line.dimension).x)
+  , section_transform(     standardize_child_section(pre.line.section,pre.line.dimension).y)
   , permutation(section_t::quadrant_permutation(symmetry_t::invert_global(section_transform)))
-  , child_dimension(permutation.find(self.line.dimension&3))
-  , child_length(ceil_div(self.input_shape[self.line.dimension],block_size))
-  , first_child_block(self.line.block_base.insert(0,self.line.dimension&3).subset(permutation))
+  , child_dimension(permutation.find(pre.line.dimension&3))
+  , input_blocks(ceil_div(pre.input_shape[pre.line.dimension],block_size))
+  , first_child_block(pre.line.block_base.insert(0,pre.line.dimension&3).subset(permutation))
 
   // Prepare a transform that rotates quadrants globally while preserving their orientation, reflecting first if necessary.
   , inverse_transform(symmetry_t((4-(section_transform&3))&3,(1+4+16+64)*(section_transform&3))*symmetry_t(section_transform&4,0))
 
   // Rotation minimal quadrants
-  , rmin(rotation_minimal_quadrants(self.line.section.counts[0]).x,
-         rotation_minimal_quadrants(self.line.section.counts[1]).x,
-         rotation_minimal_quadrants(self.line.section.counts[2]).x,
-         rotation_minimal_quadrants(self.line.section.counts[3]).x)
+  , rmin(rotation_minimal_quadrants(pre.line.section.counts[0]).x,
+         rotation_minimal_quadrants(pre.line.section.counts[1]).x,
+         rotation_minimal_quadrants(pre.line.section.counts[2]).x,
+         rotation_minimal_quadrants(pre.line.section.counts[3]).x)
 
   // Numbers of steps to complete
-  , missing_input_responses(child_length)
-  , missing_input_blocks(child_length)
-  , missing_microlines(self.output_shape.remove_index(self.line.dimension).product())
-  , unsent_output_blocks(self.line.length)
+  , missing_input_responses(input_blocks)
+  , missing_input_blocks(input_blocks)
+  , missing_microlines(pre.output_shape.remove_index(pre.line.dimension).product())
+  , unsent_output_blocks(pre.line.length)
 
   // Allocate memory for both input and output in a single buffer
-  , input(large_buffer<Vector<super_t,2>>(self.input_shape.product()+self.output_shape.product(),false))
+  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product(),false))
 
   // When computation is complete, send a wakeup message here
-  , wakeup_comm(wakeup_comm)
-  , self(&self) {
+  , wakeup_comm(wakeup_comm) {
 
   // Split buffer into two pieces
-  const int split = self.input_shape.product();
+  const int split = pre.input_shape.product();
   const_cast_(output) = input.slice_own(split,input.size());
   const_cast_(input) = input.slice_own(0,split);
 
@@ -135,7 +98,7 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
     const_cast_(reflection_moves) = vec(child_rmin[0].y,child_rmin[1].y,child_rmin[2].y,child_rmin[3].y);
 
   // Compute symmetries needed to restore minimality after reflection
-  const Vector<int,4> standard_input_shape(self.input_shape.subset(permutation));
+  const Vector<int,4> standard_input_shape(pre.input_shape.subset(permutation));
   if (standard_input_shape != Vector<int,4>()) {
     const_cast_(all_reflection_symmetries) = Array<local_symmetry_t>(standard_input_shape.sum());
     const_cast_(reflection_symmetry_offsets[0]) = 0;
@@ -153,55 +116,45 @@ allocated_t::allocated_t(const line_data_t& self, const MPI_Comm wakeup_comm)
   }
 }
 
-void line_data_t::allocate(const MPI_Comm wakeup_comm) {
-  rest.reset(new allocated_t(*this,wakeup_comm));
-}
+line_details_t::~line_details_t() {}
 
-section_t line_data_t::standard_child_section() const {
-  return rest->standard_child_section;
-}
-
-int line_data_t::input_blocks() const {
-  return rest->child_length;
-}
-
-Vector<int,4> line_data_t::input_block(int k) const {
-  OTHER_ASSERT((unsigned)k<(unsigned)rest->child_length);
-  auto block = rest->first_child_block;
-  block[rest->child_dimension&3] = k;
+Vector<int,4> line_details_t::input_block(int k) const {
+  OTHER_ASSERT((unsigned)k<(unsigned)input_blocks);
+  auto block = first_child_block;
+  block[child_dimension&3] = k;
   return block;
 }
 
-RawArray<Vector<super_t,2>> line_data_t::input_block_data(int k) const {
-  OTHER_ASSERT((unsigned)k<(unsigned)rest->child_length);
-  const int start = line.node_step*k;
-  return rest->input.slice(start,min(start+line.node_step,rest->input.size()));
+RawArray<Vector<super_t,2>> line_details_t::input_block_data(int k) const {
+  OTHER_ASSERT((unsigned)k<(unsigned)input_blocks);
+  const int start = pre.line.node_step*k;
+  return input.slice(start,min(start+pre.line.node_step,input.size()));
 }
 
-RawArray<Vector<super_t,2>> line_data_t::input_block_data(Vector<int,4> block) const {
-  const int child_dim = rest->child_dimension;
-  OTHER_ASSERT(block.remove_index(child_dim)==rest->first_child_block.remove_index(child_dim));
+RawArray<Vector<super_t,2>> line_details_t::input_block_data(Vector<int,4> block) const {
+  const int child_dim = child_dimension;
+  OTHER_ASSERT(block.remove_index(child_dim)==first_child_block.remove_index(child_dim));
   return input_block_data(block[child_dim]);
 }
 
-RawArray<const Vector<super_t,2>> line_data_t::output_block_data(int k) const {
-  OTHER_ASSERT(0<=k && k<line.length);
-  const int start = line.node_step*k;
-  return rest->output.slice(start,min(start+line.node_step,rest->output.size()));
+RawArray<const Vector<super_t,2>> line_details_t::output_block_data(int k) const {
+  OTHER_ASSERT(0<=k && k<pre.line.length);
+  const int start = pre.line.node_step*k;
+  return output.slice(start,min(start+pre.line.node_step,output.size()));
 }
 
-int line_data_t::decrement_input_responses() {
-  return --rest->missing_input_responses;
+int line_details_t::decrement_input_responses() {
+  return --missing_input_responses;
 }
 
-void line_data_t::decrement_missing_input_blocks() {
+void line_details_t::decrement_missing_input_blocks() {
   // Are we ready to compute?
-  if (!--rest->missing_input_blocks)
+  if (!--missing_input_blocks)
     schedule_compute_line(*this);
 }
 
-int line_data_t::decrement_unsent_output_blocks() {
-  return --rest->unsent_output_blocks;
+int line_details_t::decrement_unsent_output_blocks() {
+  return --unsent_output_blocks;
 }
 
 /*********************** slow_verify ************************/
@@ -227,76 +180,76 @@ static OTHER_UNUSED void slow_verify(const char* prefix, const board_t board, co
 /*********************** compute_microline ************************/
 
 // Compute a single 1D line through a section (a 1D component of a block line)
-template<bool slice_35> static void compute_microline(line_data_t* const line, const Vector<int,3> base) {
+template<bool slice_35> static void compute_microline(line_details_t* const line, const Vector<int,3> base) {
   // Prepare
   thread_time_t time(compute_kind);
-  const int dim = line->line.dimension & 3; // Tell compiler that 0<=dim<4
-  const int length = line->line.length;
-  const int child_dim = line->rest->child_dimension & 3;
+  const auto& pre = line->pre;
+  const int dim = pre.line.dimension & 3; // Tell compiler that 0<=dim<4
+  const int length = pre.line.length;
+  const int child_dim = line->child_dimension & 3;
   const auto full_base = base.insert(0,dim);
-  auto& rest = *line->rest;
-  const int child_length = rest.child_length;
-  const auto first_block = line->line.block_base.insert(0,dim);
+  const int child_length = line->input_blocks;
+  const auto first_block = pre.line.block_base.insert(0,dim);
   const auto first_node = block_size*first_block+full_base;
-  Vector<quadrant_t,4> base_quadrants(rest.rmin[0][first_node[0]],
-                                      rest.rmin[1][first_node[1]],
-                                      rest.rmin[2][first_node[2]],
-                                      rest.rmin[3][first_node[3]]);
+  Vector<quadrant_t,4> base_quadrants(line->rmin[0][first_node[0]],
+                                      line->rmin[1][first_node[1]],
+                                      line->rmin[2][first_node[2]],
+                                      line->rmin[3][first_node[3]]);
   base_quadrants[dim] = 0;
   const auto base_board = quadrants(base_quadrants[0],base_quadrants[1],base_quadrants[2],base_quadrants[3]);
-  const bool turn = line->line.section.sum()&1;
+  const bool turn = pre.line.section.sum()&1;
   const auto base_side0 = unpack(base_board,turn),
              base_side1 = unpack(base_board,1-turn);
-  const auto rmin = rest.rmin[dim];
-  OTHER_ASSERT(rmin.size()==line->output_shape[dim]);
+  const auto rmin = line->rmin[dim];
+  OTHER_ASSERT(rmin.size()==pre.output_shape[dim]);
   const int dim_shift = 16*dim;
 
   // Prepare to index into output array
-  const int block_stride = line->line.node_step;
-  auto output_block_shape = line->output_shape;
+  const int block_stride = pre.line.node_step;
+  auto output_block_shape = pre.output_shape;
   output_block_shape[dim] = block_size;
   const auto output_block_strides = strides(output_block_shape);
   const int output_stride = output_block_strides[dim];
   const int output_base = dot(output_block_strides,full_base); // Base if we're before the last block
-  const RawArray<Vector<super_t,2>> output = rest.output;
+  const RawArray<Vector<super_t,2>> output = line->output;
 
   // Prepare to index into input array
-  Vector<int,4> input_block_shape(output_block_shape.subset(rest.permutation&3));
+  Vector<int,4> input_block_shape(output_block_shape.subset(line->permutation&3));
   const auto input_block_strides = strides(input_block_shape);
   const int input_stride = input_block_strides[child_dim];
-  const Vector<int,4> full_child_base(full_base.subset(rest.permutation&3));
-  const auto first_child_node = block_size*rest.first_child_block+full_child_base;
-  const auto reflected_child_base = full_child_base^Vector<int,4>(child_dim!=0 && first_child_node[0]<rest.reflection_moves[0],
-                                                                  child_dim!=1 && first_child_node[1]<rest.reflection_moves[1],
-                                                                  child_dim!=2 && first_child_node[2]<rest.reflection_moves[2],
-                                                                  child_dim!=3 && first_child_node[3]<rest.reflection_moves[3]);
+  const Vector<int,4> full_child_base(full_base.subset(line->permutation&3));
+  const auto first_child_node = block_size*line->first_child_block+full_child_base;
+  const auto reflected_child_base = full_child_base^Vector<int,4>(child_dim!=0 && first_child_node[0]<line->reflection_moves[0],
+                                                                  child_dim!=1 && first_child_node[1]<line->reflection_moves[1],
+                                                                  child_dim!=2 && first_child_node[2]<line->reflection_moves[2],
+                                                                  child_dim!=3 && first_child_node[3]<line->reflection_moves[3]);
   const int input_base = dot(input_block_strides,reflected_child_base); // Base if we're before the last block
-  const RawArray<const Vector<super_t,2>> input = rest.input;
-  const int line_moves = rest.reflection_moves[child_dim];
+  const RawArray<const Vector<super_t,2>> input = line->input;
+  const int line_moves = line->reflection_moves[child_dim];
 
   // If we hit the last block in either input or output, the base indices change
   output_block_shape[dim] = rmin.size()&(block_size-1)?:block_size;
   const int last_output_base = dot(strides(output_block_shape),full_base);
-  input_block_shape[child_dim] = line->input_shape[dim]&(block_size-1)?:block_size;
+  input_block_shape[child_dim] = pre.input_shape[dim]&(block_size-1)?:block_size;
   const int last_input_base = dot(strides(input_block_shape),reflected_child_base); // Base if we're in the last block
 
   // Account for symmetries
-  const auto rs_offsets = rest.reflection_symmetry_offsets;
-  const auto symmetries = rest.all_reflection_symmetries.slice(rs_offsets[child_dim],rs_offsets[child_dim+1]);
-  const local_symmetry_t local_symmetry(rest.all_reflection_symmetries.size()? (child_dim!=0)*rest.all_reflection_symmetries[rs_offsets[0]+full_child_base[0]].local
-                                                                              +(child_dim!=1)*rest.all_reflection_symmetries[rs_offsets[1]+full_child_base[1]].local
-                                                                              +(child_dim!=2)*rest.all_reflection_symmetries[rs_offsets[2]+full_child_base[2]].local
-                                                                              +(child_dim!=3)*rest.all_reflection_symmetries[rs_offsets[3]+full_child_base[3]].local
-                                                                             :0);
-  const symmetry_t base_transform = rest.inverse_transform*local_symmetry;
+  const auto rs_offsets = line->reflection_symmetry_offsets;
+  const auto symmetries = line->all_reflection_symmetries.slice(rs_offsets[child_dim],rs_offsets[child_dim+1]);
+  const local_symmetry_t local_symmetry(line->all_reflection_symmetries.size()? (child_dim!=0)*line->all_reflection_symmetries[rs_offsets[0]+full_child_base[0]].local
+                                                                               +(child_dim!=1)*line->all_reflection_symmetries[rs_offsets[1]+full_child_base[1]].local
+                                                                               +(child_dim!=2)*line->all_reflection_symmetries[rs_offsets[2]+full_child_base[2]].local
+                                                                               +(child_dim!=3)*line->all_reflection_symmetries[rs_offsets[3]+full_child_base[3]].local
+                                                                              :0);
+  const symmetry_t base_transform = line->inverse_transform*local_symmetry;
 
 #ifdef PENTAGO_MPI_DEBUG
   // Check that child data is consistent before and after transformation
-  const auto child_rmin = vec(rotation_minimal_quadrants(rest.standard_child_section.counts[0]),
-                              rotation_minimal_quadrants(rest.standard_child_section.counts[1]),
-                              rotation_minimal_quadrants(rest.standard_child_section.counts[2]),
-                              rotation_minimal_quadrants(rest.standard_child_section.counts[3]));
-  const auto reflected_first_child_node = block_size*rest.first_child_block+reflected_child_base;
+  const auto child_rmin = vec(rotation_minimal_quadrants(line->standard_child_section.counts[0]),
+                              rotation_minimal_quadrants(line->standard_child_section.counts[1]),
+                              rotation_minimal_quadrants(line->standard_child_section.counts[2]),
+                              rotation_minimal_quadrants(line->standard_child_section.counts[3]));
+  const auto reflected_first_child_node = block_size*line->first_child_block+reflected_child_base;
   const auto child_board_base = quadrants((child_dim!=0)*child_rmin[0].x[reflected_first_child_node[0]],
                                           (child_dim!=1)*child_rmin[1].x[reflected_first_child_node[1]],
                                           (child_dim!=2)*child_rmin[2].x[reflected_first_child_node[2]],
@@ -305,7 +258,7 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
     const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+block_stride*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
     auto child_index = reflected_child_base;
     child_index[child_dim] = j^(j<line_moves);
-    const auto child_node = block_size*rest.first_child_block+child_index;
+    const auto child_node = block_size*line->first_child_block+child_index;
     const auto board = quadrants(child_rmin[0].x[child_node[0]],
                                  child_rmin[1].x[child_node[1]],
                                  child_rmin[2].x[child_node[2]],
@@ -366,18 +319,18 @@ template<bool slice_35> static void compute_microline(line_data_t* const line, c
   }
 
   // Are we done with this line?
-  if (!--rest.missing_microlines) {
+  if (!--line->missing_microlines) {
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
     MPI_Request request;
-    CHECK(MPI_Isend((void*)&rest.self,1,MPI_LONG_LONG_INT,0,wakeup_tag,rest.wakeup_comm,&request));
+    CHECK(MPI_Isend((void*)&line,1,MPI_LONG_LONG_INT,0,wakeup_tag,line->wakeup_comm,&request));
     CHECK(MPI_Request_free(&request));
-    PENTAGO_MPI_TRACE("sent wakeup for %s",str(line->line));
+    PENTAGO_MPI_TRACE("sent wakeup for %s",str(pre.line));
   }
 }
 
-template void compute_microline<true>(line_data_t* const,const Vector<int,3>);
-template void compute_microline<false>(line_data_t* const,const Vector<int,3>);
+template void compute_microline<true>(line_details_t* const,const Vector<int,3>);
+template void compute_microline<false>(line_details_t* const,const Vector<int,3>);
 
 /*********************** schedule_compute_line ************************/
 
@@ -397,11 +350,11 @@ template void compute_microline<false>(line_data_t* const,const Vector<int,3>);
  * Most microlines are significantly larger than 20, so this seems like plenty of room.  One microline
  * per job it is.
  */
-void schedule_compute_line(line_data_t& line) {
+void schedule_compute_line(line_details_t& line) {
   PENTAGO_MPI_TRACE("schedule compute line %s",str(line.line));
   // Schedule each microline
-  const auto cross_section = line.output_shape.remove_index(line.line.dimension);
-  const auto compute = line.line.section.sum()==35?compute_microline<true>:compute_microline<false>;
+  const auto cross_section = line.pre.output_shape.remove_index(line.pre.line.dimension);
+  const auto compute = line.pre.line.section.sum()==35?compute_microline<true>:compute_microline<false>;
   for (int i=0;i<cross_section[0];i++)
     for (int j=0;j<cross_section[1];j++)
       for (int k=0;k<cross_section[2];k++)
