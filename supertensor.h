@@ -93,7 +93,7 @@ struct supertensor_header_t {
   supertensor_header_t();
   supertensor_header_t(section_t section, int block_size, int filter); // Initialize everything except for valid and index
 
-  Vector<int,4> block_shape(Vector<int,4> block) const;
+  Vector<int,4> block_shape(Vector<uint8_t,4> block) const;
   void pack(RawArray<uint8_t> buffer) const;
 };
 
@@ -125,16 +125,16 @@ public:
   ~supertensor_reader_t();
 
   // Read a block of data from disk
-  Array<Vector<super_t,2>,4> read_block(Vector<int,4> block) const;
+  Array<Vector<super_t,2>,4> read_block(Vector<uint8_t,4> block) const;
 
   // Read a block eventually, and call a (thread safe) function once the read completes
-  void schedule_read_block(Vector<int,4> block, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const;
+  void schedule_read_block(Vector<uint8_t,4> block, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;
 
   // Schedule several block reads together
-  void schedule_read_blocks(RawArray<const Vector<int,4>> blocks, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const;
+  void schedule_read_blocks(RawArray<const Vector<uint8_t,4>> blocks, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;
 
-  uint64_t compressed_size(Vector<int,4> block) const;
-  uint64_t uncompressed_size(Vector<int,4> block) const;
+  uint64_t compressed_size(Vector<uint8_t,4> block) const;
+  uint64_t uncompressed_size(Vector<uint8_t,4> block) const;
 
   // For debugging purposes
   uint64_t total_size() const;
@@ -158,17 +158,17 @@ public:
   ~supertensor_writer_t();
 
   // Write a block of data to disk now
-  void write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data);
+  void write_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data);
 
   // Write a block of data eventually, destroying it in the process.
   // The data is not necessarily actually written until finalize is called.
-  void schedule_write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data);
+  void schedule_write_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data);
 
   // Write the final index to disk and close the file
   void finalize();
 
-  uint64_t compressed_size(Vector<int,4> block) const;
-  uint64_t uncompressed_size(Vector<int,4> block) const;
+  uint64_t compressed_size(Vector<uint8_t,4> block) const;
+  uint64_t uncompressed_size(Vector<uint8_t,4> block) const;
 
 private:
   void compress_and_write(supertensor_blob_t* blob, RawArray<const uint8_t> data);

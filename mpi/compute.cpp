@@ -59,9 +59,9 @@ line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_com
   , standard_child_section(standardize_child_section(pre.line.section,pre.line.dimension).x)
   , section_transform(     standardize_child_section(pre.line.section,pre.line.dimension).y)
   , permutation(section_t::quadrant_permutation(symmetry_t::invert_global(section_transform)))
-  , child_dimension(permutation.find(pre.line.dimension&3))
+  , child_dimension(permutation.find(pre.line.dimension))
   , input_blocks(ceil_div(pre.input_shape[pre.line.dimension],block_size))
-  , first_child_block(pre.line.block_base.insert(0,pre.line.dimension&3).subset(permutation))
+  , first_child_block(pre.line.block(0).subset(permutation))
 
   // Prepare a transform that rotates quadrants globally while preserving their orientation, reflecting first if necessary.
   , inverse_transform(symmetry_t((4-(section_transform&3))&3,(1+4+16+64)*(section_transform&3))*symmetry_t(section_transform&4,0))
@@ -118,10 +118,10 @@ line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_com
 
 line_details_t::~line_details_t() {}
 
-Vector<int,4> line_details_t::input_block(int k) const {
+Vector<uint8_t,4> line_details_t::input_block(int k) const {
   OTHER_ASSERT((unsigned)k<(unsigned)input_blocks);
   auto block = first_child_block;
-  block[child_dimension&3] = k;
+  block[child_dimension] = k;
   return block;
 }
 
@@ -131,14 +131,14 @@ RawArray<Vector<super_t,2>> line_details_t::input_block_data(int k) const {
   return input.slice(start,min(start+pre.line.node_step,input.size()));
 }
 
-RawArray<Vector<super_t,2>> line_details_t::input_block_data(Vector<int,4> block) const {
+RawArray<Vector<super_t,2>> line_details_t::input_block_data(Vector<uint8_t,4> block) const {
   const int child_dim = child_dimension;
   OTHER_ASSERT(block.remove_index(child_dim)==first_child_block.remove_index(child_dim));
   return input_block_data(block[child_dim]);
 }
 
 RawArray<const Vector<super_t,2>> line_details_t::output_block_data(int k) const {
-  OTHER_ASSERT(0<=k && k<pre.line.length);
+  OTHER_ASSERT((unsigned)k<pre.line.length);
   const int start = pre.line.node_step*k;
   return output.slice(start,min(start+pre.line.node_step,output.size()));
 }
@@ -184,12 +184,12 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
   // Prepare
   thread_time_t time(compute_kind);
   const auto& pre = line->pre;
-  const int dim = pre.line.dimension & 3; // Tell compiler that 0<=dim<4
+  const int dim = pre.line.dimension;
   const int length = pre.line.length;
-  const int child_dim = line->child_dimension & 3;
+  const int child_dim = line->child_dimension;
   const auto full_base = base.insert(0,dim);
   const int child_length = line->input_blocks;
-  const auto first_block = pre.line.block_base.insert(0,dim);
+  const Vector<int,4> first_block(pre.line.block(0));
   const auto first_node = block_size*first_block+full_base;
   Vector<quadrant_t,4> base_quadrants(line->rmin[0][first_node[0]],
                                       line->rmin[1][first_node[1]],
@@ -218,7 +218,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
   const auto input_block_strides = strides(input_block_shape);
   const int input_stride = input_block_strides[child_dim];
   const Vector<int,4> full_child_base(full_base.subset(line->permutation&3));
-  const auto first_child_node = block_size*line->first_child_block+full_child_base;
+  const auto first_child_node = block_size*Vector<int,4>(line->first_child_block)+full_child_base;
   const auto reflected_child_base = full_child_base^Vector<int,4>(child_dim!=0 && first_child_node[0]<line->reflection_moves[0],
                                                                   child_dim!=1 && first_child_node[1]<line->reflection_moves[1],
                                                                   child_dim!=2 && first_child_node[2]<line->reflection_moves[2],

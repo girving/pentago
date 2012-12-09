@@ -43,8 +43,8 @@ static PyObject* to_python(const supertensor_header_t& h) {
   return to_python(new_<supertensor_header_py>(h));
 }
 
-Vector<int,4> supertensor_header_t::block_shape(Vector<int,4> block) const {
-  OTHER_ASSERT(block.min()>=0 && (Vector<int,4>(blocks)-block).min()>=0);
+Vector<int,4> supertensor_header_t::block_shape(Vector<uint8_t,4> block) const {
+  OTHER_ASSERT(block.min()>=0 && all_less_equal(Vector<uint16_t,4>(block),blocks));
   Vector<int,4> bs;
   for (int i=0;i<4;i++)
     bs[i] = block[i]+1<blocks[i]?block_size:shape[i]-block_size*(blocks[i]-1);
@@ -228,11 +228,11 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
 
 supertensor_reader_t::~supertensor_reader_t() {}
 
-static void save(Array<Vector<super_t,2>,4>* dst, Vector<int,4> block, Array<Vector<super_t,2>,4> src) {
+static void save(Array<Vector<super_t,2>,4>* dst, Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> src) {
   *dst = src;
 }
 
-Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<int,4> block) const {
+Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<uint8_t,4> block) const {
   Array<Vector<super_t,2>,4> data;
   schedule_read_block(block,curry(save,&data));
   threads_wait_all();
@@ -252,14 +252,15 @@ static Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape
   return data;
 }
 
-void supertensor_reader_t::schedule_read_block(Vector<int,4> block, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const {
-  schedule_read_blocks(RawArray<const Vector<int,4>>(1,&block),cont);
+void supertensor_reader_t::schedule_read_block(Vector<uint8_t,4> block, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const {
+  schedule_read_blocks(RawArray<const Vector<uint8_t,4>>(1,&block),cont);
 }
 
-void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<int,4>> blocks, const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)>& cont) const {
+void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<uint8_t,4>> blocks, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const {
   for (auto block : blocks) {
-    OTHER_ASSERT(index.valid(block));
-    threads_schedule(IO,curry(read_and_uncompress,fd->fd,index[block],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
+    const Vector<int,4> block_(block);
+    OTHER_ASSERT(index.valid(block_));
+    threads_schedule(IO,curry(read_and_uncompress,fd->fd,index[block_],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
   }
 }
 
@@ -334,15 +335,16 @@ static Array<uint8_t> filter(int filter, Array<Vector<super_t,2>,4> data) {
   return char_view_own(data.flat);
 }
 
-void supertensor_writer_t::write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data) {
+void supertensor_writer_t::write_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data) {
   schedule_write_block(block,data);
   threads_wait_all();
 }
 
-void supertensor_writer_t::schedule_write_block(Vector<int,4> block, Array<Vector<super_t,2>,4> data) {
+void supertensor_writer_t::schedule_write_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data) {
   OTHER_ASSERT(data.shape==header.block_shape(block));
-  OTHER_ASSERT(!index[block].offset); // Don't write the same block twice
-  threads_schedule(CPU,compose(curry(&Self::compress_and_write,this,&index[block]),curry(filter,header.filter,data)));
+  const Vector<int,4> block_(block);
+  OTHER_ASSERT(index.valid(block_) && !index[block_].offset); // Don't write the same block twice
+  threads_schedule(CPU,compose(curry(&Self::compress_and_write,this,&index[block_]),curry(filter,header.filter,data)));
 }
 
 void supertensor_writer_t::finalize() {
@@ -367,24 +369,24 @@ void supertensor_writer_t::finalize() {
   fd->close();
 }
 
-uint64_t supertensor_reader_t::compressed_size(Vector<int,4> block) const {
+uint64_t supertensor_reader_t::compressed_size(Vector<uint8_t,4> block) const {
   header.block_shape(block); // check validity
-  return index[block].compressed_size;
+  return index[Vector<int,4>(block)].compressed_size;
 }
 
-uint64_t supertensor_reader_t::uncompressed_size(Vector<int,4> block) const {
+uint64_t supertensor_reader_t::uncompressed_size(Vector<uint8_t,4> block) const {
   header.block_shape(block); // check validity
-  return index[block].uncompressed_size;
+  return index[Vector<int,4>(block)].uncompressed_size;
 }
 
-uint64_t supertensor_writer_t::compressed_size(Vector<int,4> block) const {
+uint64_t supertensor_writer_t::compressed_size(Vector<uint8_t,4> block) const {
   header.block_shape(block); // check validity
-  return index[block].compressed_size;
+  return index[Vector<int,4>(block)].compressed_size;
 }
 
-uint64_t supertensor_writer_t::uncompressed_size(Vector<int,4> block) const {
+uint64_t supertensor_writer_t::uncompressed_size(Vector<uint8_t,4> block) const {
   header.block_shape(block); // check validity
-  return index[block].uncompressed_size;
+  return index[Vector<int,4>(block)].uncompressed_size;
 }
 
 vector<Ref<supertensor_reader_t>> open_supertensors(const string& path) {

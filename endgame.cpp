@@ -29,8 +29,8 @@ using Log::cout;
 using std::endl;
 using std::vector;
 
-static Vector<int,4> in_order(Vector<int,4> order, Vector<int,4> I) {
-  Vector<int,4> block;
+template<class T> static Vector<T,4> in_order(Vector<int,4> order, Vector<T,4> I) {
+  Vector<T,4> block;
   for (int i=0;i<4;i++)
     block[order[i]] = I[i];
   return block;
@@ -90,7 +90,7 @@ static void endgame_verify(const supertensor_reader_t& reader, Random& random, c
         for (int i3 : range(blocks[3])) {
           // Read block
           const Vector<int,4> block(i0,i1,i2,i3);
-          Array<Vector<super_t,2>,4> data = reader.read_block(block);
+          Array<Vector<super_t,2>,4> data = reader.read_block(Vector<uint8_t,4>(block));
           // Verify our chosen set of random samples
           for (Vector<int,4> sample : samples[((block[0]*blocks[1]+block[1])*blocks[2]+block[2])*blocks[3]+block[3]]) {
             const Vector<super_t,2>& result = data[sample-block_size*block];
@@ -170,7 +170,7 @@ struct read_helper_t : public boost::noncopyable {
     // Gather shape and stride information
     , block_size(reader.header.block_size)
     , first_block(in_order(reorder,vec(i,j,0,0)))
-    , first_block_shape(reader.header.block_shape(first_block))
+    , first_block_shape(reader.header.block_shape(Vector<uint8_t,4>(first_block)))
     , blocks(reader.header.blocks)
     , slice_blocks(blocks[reorder[2]],blocks[reorder[3]])
     , strides(in_order(reorder,pentago::strides(data.shape)))
@@ -187,12 +187,12 @@ struct read_helper_t : public boost::noncopyable {
       OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[reorder[a]]:reader.header.shape[reorder[a]]));
   }
 
-  void process_block(Vector<int,4> block, RawArray<Vector<super_t,2>,4> block_data) {
+  void process_block(Vector<uint8_t,4> block, RawArray<Vector<super_t,2>,4> block_data) {
     thread_time_t time(copy_kind);
     OTHER_ASSERT(block[reorder[0]]==i && block[reorder[1]]==j);
     const int k = block[reorder[2]], l = block[reorder[3]];
     OTHER_ASSERT(block_data.shape==reader.header.block_shape(block));
-    const Vector<int,4> block_moves = clamp_min(moves-block_size*block,0);
+    const Vector<int,4> block_moves = clamp_min(moves-block_size*Vector<int,4>(block),0);
     // Compute symmetries needed to restore minimality after reflection (rs in the above derivation)
     uint8_t symmetries[block_size][4];
     if (standard.y>=4)
@@ -220,10 +220,10 @@ struct read_helper_t : public boost::noncopyable {
 
 static void endgame_read_block_slice(section_t desired_section, const supertensor_reader_t& reader, Vector<int,4> order, int i, int j, RawArray<Vector<super_t,2>,4> data) {
   read_helper_t helper(desired_section,reader,order,i,j,data);
-  Array<Vector<int,4>> slice;
+  Array<Vector<uint8_t,4>> slice;
   for (const int k : range(helper.slice_blocks[0]))
     for (const int l : range(helper.slice_blocks[1]))
-      slice.append(in_order(helper.reorder,vec(i,j,k,l)));
+      slice.append(in_order(helper.reorder,vec<uint8_t>(i,j,k,l)));
   reader.schedule_read_blocks(slice,curry(&read_helper_t::process_block,&helper));
   threads_wait_all();
 }
@@ -254,7 +254,7 @@ struct sparse_sample_t : public Object {
     , block_boards(NestedArray<board_t>::zeros_like(samples))
     , block_wins(NestedArray<Vector<super_t,2>>::zeros_like(samples)) {}
 
-  int block_index(const Vector<int,4>& block) const {
+  int block_index(const Vector<uint8_t,4>& block) const {
     OTHER_ASSERT(   (unsigned)block[0]<(unsigned)blocks[0]
                  && (unsigned)block[1]<(unsigned)blocks[1]
                  && (unsigned)block[2]<(unsigned)blocks[2]
@@ -277,7 +277,7 @@ struct sparse_sample_t : public Object {
     NestedArray<Vector<int,4>> samples(counts.flat,false);
     for (const Vector<int,4>& I : flat_samples) {
       const auto block = I/block_size;
-      const int b = block_index(block);
+      const int b = block_index(Vector<uint8_t,4>(block));
       samples(b,--counts.flat[b]) = I-block_size*block;
     }
     return samples;
@@ -316,7 +316,7 @@ struct write_helper_t : public boost::noncopyable {
     , sparse(sparse)
     , block_size(writer.header.block_size)
     , first_block(in_order(order,vec(i,j,0,0)))
-    , first_block_shape(writer.header.block_shape(first_block))
+    , first_block_shape(writer.header.block_shape(Vector<uint8_t,4>(first_block)))
     , blocks(writer.header.blocks)
     , slice_blocks(blocks[order[2]],blocks[order[3]])
     , strides(in_order(order,pentago::strides(data.shape)))
@@ -330,7 +330,7 @@ struct write_helper_t : public boost::noncopyable {
       OTHER_ASSERT(data.shape[a]==(a<2?first_block_shape[order[a]]:writer.header.shape[order[a]]));
   }
 
-  void process_block(Vector<int,4> block, Array<Vector<super_t,2>,4> first_pass_data) {
+  void process_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> first_pass_data) {
     thread_time_t time(copy_kind);
     OTHER_ASSERT(block[order[0]]==i && block[order[1]]==j);
     const int k = block[order[2]], l = block[order[3]];
@@ -395,14 +395,14 @@ static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<superten
   if (!first_pass)
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1])) {
-        const Vector<int,4> block = in_order(order,vec(i,j,k,l));
+        const Vector<uint8_t,4> block(in_order(order,vec(i,j,k,l)));
         threads_schedule(CPU,curry(&write_helper_t::process_block,&helper,block,Array<Vector<super_t,2>,4>()));
       }
   else {
-    Array<Vector<int,4>> slice;
+    Array<Vector<uint8_t,4>> slice;
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1]))
-        slice.append(in_order(order,vec(i,j,k,l)));
+        slice.append(in_order(order,vec<uint8_t>(i,j,k,l)));
     first_pass->schedule_read_blocks(slice,curry(&write_helper_t::process_block,&helper));
   }
   threads_wait_all();

@@ -38,14 +38,14 @@ namespace mpi {
 
 struct block_info_t {
   section_t section;
-  Vector<int,4> block;
+  Vector<uint8_t,4> block;
 #if !PENTAGO_MPI_COMPRESS
   int offset; // Local offset into all_data
 #endif
   mutable int missing_contributions; // How many incoming contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
-BOOST_STATIC_ASSERT(sizeof(block_info_t)<=40);
+BOOST_STATIC_ASSERT(sizeof(block_info_t)<=24);
 
 class block_store_t : public Object {
 public:
@@ -99,7 +99,7 @@ public:
   void print_compression_stats(MPI_Comm comm) const;
 
   // Verify that we own the given block
-  void assert_contains(section_t section, Vector<int,4> block) const;
+  void assert_contains(section_t section, Vector<uint8_t,4> block) const;
 
   // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
   void accumulate(int local_id, RawArray<Vector<super_t,2>> new_data);
@@ -109,12 +109,12 @@ public:
   // first, requiring O(n) time, and return new mutable buffers.  To make sure all callers know about these differences, we
   // give the different versions different names.
 #if PENTAGO_MPI_COMPRESS
-  Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<int,4> block) const;
+  Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block) const;
   Array<Vector<super_t,2>,4> uncompress_and_get(int local_id) const;
   Array<Vector<super_t,2>> uncompress_and_get_flat(int local_id, bool allow_incomplete=false) const; // allow_incomplete for internal use only
   RawArray<const char> get_compressed(int local_id, bool allow_incomplete=false) const;
 #else
-  RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<int,4> block) const;
+  RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>,4> get_raw(int local_id) const;
   RawArray<const Vector<super_t,2>> get_raw_flat(int local_id) const;
 #endif
@@ -124,7 +124,7 @@ private:
 };
 
 // The kernel of count_wins factored out for use elsewhere
-Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<int,4> block, RawArray<const Vector<super_t,2>> data);
+Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<uint8_t,4> block, RawArray<const Vector<super_t,2>> data);
 
 }
 }

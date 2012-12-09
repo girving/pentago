@@ -30,8 +30,9 @@ string error_string(int code);
 
 Vector<int,4> section_blocks(section_t section);
 
-template<int d> static inline Vector<int,d> block_shape(Vector<int,d> shape, Vector<int,d> block) {
-  return Vector<int,d>::componentwise_min(shape,block_size*(block+1))-block_size*block;
+template<int d> static inline Vector<int,d> block_shape(Vector<int,d> shape, Vector<uint8_t,d> block) {
+  const Vector<int,d> block_(block);
+  return Vector<int,d>::componentwise_min(shape,block_size*(block_+1))-block_size*block_;
 }
 
 // Convenience functions

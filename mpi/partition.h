@@ -51,13 +51,13 @@ public:
   uint64_t rank_count_lines(int rank, bool owned) const;
 
   // Find the rank which owns a given block
-  int block_to_rank(section_t section, Vector<int,4> block) const;
+  int block_to_rank(section_t section, Vector<uint8_t,4> block) const;
 
   // Find the line that owns a given block
-  Vector<int,2> block_to_line(section_t section, Vector<int,4> block) const;
+  Vector<int,2> block_to_line(section_t section, Vector<uint8_t,4> block) const;
 
   // (block_id, global node offset) for a given block
-  Vector<uint64_t,2> block_offsets(section_t section, Vector<int,4> block) const;
+  Vector<uint64_t,2> block_offsets(section_t section, Vector<uint8_t,4> block) const;
 
 private:
   // Can the remaining work fit within the given bound?

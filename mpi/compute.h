@@ -49,9 +49,9 @@ struct line_details_t : public boost::noncopyable {
   const section_t standard_child_section;
   const uint8_t section_transform; // Maps output space to input (child) space
   const Vector<int,4> permutation; // Child quadrant i maps to quadrant permutation[i]
-  const int child_dimension;
-  const int input_blocks;
-  const Vector<int,4> first_child_block; // First child block
+  const unsigned child_dimension : 2;
+  const uint8_t input_blocks;
+  const Vector<uint8_t,4> first_child_block; // First child block
   const symmetry_t inverse_transform;
 
   // Rotation minimal quadrants
@@ -81,11 +81,11 @@ struct line_details_t : public boost::noncopyable {
   ~line_details_t();
 
   // Get the kth input block
-  Vector<int,4> input_block(int k) const;
+  Vector<uint8_t,4> input_block(int k) const;
 
   // Extract the data for the kth block of either the input or output array
   RawArray<Vector<super_t,2>> input_block_data(int k) const;
-  RawArray<Vector<super_t,2>> input_block_data(Vector<int,4> block) const;
+  RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>> output_block_data(int k) const;
 
   // Call this whenever a new input response arrives, but possibly *before* the data has been moved into place.

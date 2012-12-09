@@ -177,13 +177,13 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
     // Organize block information by section
     int remaining_owned_blocks = 0;
-    typedef Tuple<Vector<int,4>,supertensor_blob_t> block_blob_t;
-    BOOST_STATIC_ASSERT(sizeof(block_blob_t)==10*sizeof(int));
+    typedef Tuple<Vector<uint8_t,4>,supertensor_blob_t> block_blob_t;
+    BOOST_STATIC_ASSERT(sizeof(block_blob_t)==8*sizeof(int));
     Hashtable<int,Array<block_blob_t>> local_block_blobs;
     for (int b : range(local_blocks)) {
       const auto info = blocks.block_info[b];
       const int sid = section_id.get(info.section);
-      if (info.block==Vector<int,4>()) {
+      if (info.block==Vector<uint8_t,4>()) {
         const auto section_blocks = pentago::mpi::section_blocks(sections[sid]);
         Array<supertensor_blob_t,4> block_index(section_blocks,false);
         memset(block_index.data(),0,sizeof(supertensor_blob_t)*block_index.flat.size());
@@ -199,7 +199,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     for (auto& it : local_block_blobs) {
       const int sid = it.key;
       RawArray<const block_blob_t> blobs = it.data;
-      const int rank = partition.block_to_rank(sections[sid],Vector<int,4>());
+      const int rank = partition.block_to_rank(sections[sid],Vector<uint8_t,4>());
       MPI_Request request; 
       // Use the section id as the tag for identification purposes 
       CHECK(MPI_Isend((void*)blobs.data(),sizeof(block_blob_t)/sizeof(int)*blobs.size(),MPI_INT,rank,sid,comm,&request));
@@ -221,9 +221,10 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
       remaining_owned_blocks -= blobs.size();
       Array<supertensor_blob_t,4>& block_index = block_indexes.get(sid);
       for (const auto& blob : blobs) {
-        OTHER_ASSERT(block_index.valid(blob.x));
-        OTHER_ASSERT(!block_index[blob.x].offset);
-        block_index[blob.x] = blob.y;
+        const Vector<int,4> I(blob.x);
+        OTHER_ASSERT(block_index.valid(I));
+        OTHER_ASSERT(!block_index[I].offset);
+        block_index[I] = blob.y;
       }
     }
 

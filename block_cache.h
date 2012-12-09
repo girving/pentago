@@ -29,7 +29,7 @@ public:
 private:
   virtual bool has_section(const section_t section) const = 0; 
   virtual super_t extract(const bool turn, const bool aggressive, const Vector<super_t,2>& data) const = 0;
-  virtual RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<int,4> block) const = 0;
+  virtual RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const = 0;
 };
 
 // Generate a block cache from one or more supertensor files

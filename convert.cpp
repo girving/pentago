@@ -33,6 +33,7 @@ template<> struct NumpyIsScalar<wall_time_t> : public mpl::true_ {};
 }
 
 VECTOR_CONVERSIONS(2,uint8_t)
+VECTOR_CONVERSIONS(4,uint8_t)
 VECTOR_CONVERSIONS(3,uint64_t)
 VECTOR_CONVERSIONS(4,uint16_t)
 VECTOR_CONVERSIONS(4,Vector<uint8_t,2>)

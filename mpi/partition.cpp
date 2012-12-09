@@ -63,9 +63,9 @@ struct chunk_t {
   Vector<int,4> shape;
 
   // Line information
-  int dimension; // Line dimension
-  int length; // Line length in blocks
-  Box<Vector<int,3>> blocks; // Ranges of blocks along the other three dimensions
+  unsigned dimension : 2; // Line dimension
+  uint8_t length; // Line length in blocks
+  Box<Vector<uint8_t,3>> blocks; // Ranges of blocks along the other three dimensions
   int count; // Number of lines in this range = blocks.volume()
   int node_step; // Number of nodes in all blocks except possibly those at the end of lines
   int line_size; // All lines in this line range have the same size
@@ -74,7 +74,7 @@ struct chunk_t {
   uint64_t block_id; // Unique id of first block (others are indexed consecutively)
   uint64_t node_offset; // Total number of nodes in all blocks in lines before this
 };
-BOOST_STATIC_ASSERT(sizeof(chunk_t)==88);
+BOOST_STATIC_ASSERT(sizeof(chunk_t)==64);
 
 partition_t::partition_t(const int ranks, const int slice, Array<const section_t> sections, bool save_work)
   : ranks(ranks), slice(slice), sections(sections)
@@ -110,17 +110,17 @@ partition_t::partition_t(const int ranks, const int slice, Array<const section_t
   Array<chunk_t> owner_lines, other_lines;
   uint64_t owner_line_count = 0, other_line_count = 0;
   for (auto section : sections) {
-    const auto shape = section.shape(),
-               blocks_lo = shape/block_size,
-               blocks_hi = ceil_div(shape,block_size);
+    const auto shape = section.shape();
+    const Vector<uint8_t,4> blocks_lo(shape/block_size),
+                            blocks_hi(ceil_div(shape,block_size));
     const auto sums = section.sums();
     OTHER_ASSERT(sums.sum()<36);
     const int owner_k = sums.argmin();
     const int old_owners = owner_lines.size();
     for (int k=0;k<4;k++) {
       if (section.counts[k].sum()<9) {
-        const auto shape_k = shape.remove_index(k),
-                   blocks_lo_k = blocks_lo.remove_index(k),
+        const auto shape_k = shape.remove_index(k);
+        const auto blocks_lo_k = blocks_lo.remove_index(k),
                    blocks_hi_k = blocks_hi.remove_index(k);
         Array<chunk_t>& lines = owner_k==k?owner_lines:other_lines;
         uint64_t& line_count = owner_k==k?owner_line_count:other_line_count;
@@ -138,7 +138,7 @@ partition_t::partition_t(const int ranks, const int slice, Array<const section_t
                   chunk.blocks.max[a] = blocks_lo_k[a];
                 }
               }
-              chunk.count = chunk.blocks.volume();
+              chunk.count = Box<Vector<int,3>>(chunk.blocks).volume();
               if (chunk.count) {
                 chunk.section = section;
                 chunk.shape = shape;
@@ -223,7 +223,7 @@ partition_t::~partition_t() {}
 // different ranks.  Thus, we artificially inflate small blocks and very short lines in order to even things out.
 static inline uint64_t line_penalty(const chunk_t& chunk) {
   const int block_penalty = sqr(sqr(block_size))*2/3;
-  return max(chunk.line_size,block_penalty*max(chunk.length,4));
+  return max(chunk.line_size,block_penalty*max((int)chunk.length,4));
 }
 
 // Can the remaining work fit within the given bound?
@@ -328,14 +328,14 @@ Array<line_t> partition_t::rank_lines(int rank, bool owned) const {
   Array<line_t> result;
   for (int r : range(start.x,min(end.x+1,all_lines.size()))) {
     const auto& chunk = all_lines[r];
-    const auto sizes = chunk.blocks.sizes();
+    const Vector<int,3> sizes(chunk.blocks.sizes());
     for (int k : range(r==start.x?start.y:0,r==end.x?end.y:chunk.count)) {
       line_t line;
       line.section = chunk.section;
       line.dimension = chunk.dimension;
       line.length = chunk.length;
       line.node_step = chunk.node_step;
-      line.block_base = chunk.blocks.min+decompose(sizes,k);
+      line.block_base = chunk.blocks.min+Vector<uint8_t,3>(decompose(sizes,k));
       line.block_id = chunk.block_id+chunk.length*k;
       line.node_offset = chunk.node_offset+(uint64_t)chunk.line_size*k;
       result.append(line);
@@ -356,7 +356,7 @@ uint64_t partition_t::rank_count_lines(int rank, bool owned) const {
 }
 
 // Find the rank which owns a given block
-int partition_t::block_to_rank(section_t section, Vector<int,4> block) const {
+int partition_t::block_to_rank(section_t section, Vector<uint8_t,4> block) const {
   // Find the line range and specific line that contains this block
   const auto line = block_to_line(section,block);
   // Perform a binary search to find the right rank.
@@ -371,7 +371,7 @@ int partition_t::block_to_rank(section_t section, Vector<int,4> block) const {
 }
 
 // Find the line that owns a given block
-Vector<int,2> partition_t::block_to_line(section_t section, Vector<int,4> block) const {
+Vector<int,2> partition_t::block_to_line(section_t section, Vector<uint8_t,4> block) const {
   int index = first_owner_line.get(section);
   const int owner_k = owner_lines[index].dimension;
   const auto block_k = block.remove_index(owner_k);
@@ -382,20 +382,19 @@ Vector<int,2> partition_t::block_to_line(section_t section, Vector<int,4> block)
         goto skip;
     // We've locate the range of lines that contains (and owns) the block.  Now isolate the exact line. 
     {
-      const auto I = block_k - blocks.min,
-                 sizes = blocks.sizes();
-      const int line = (I.x*sizes.y+I.y)*sizes.z+I.z;
-      return vec(index,line);
+      const Vector<int,3> I(block_k - blocks.min),
+                          sizes(blocks.sizes());
+      return vec(index,pentago::index(sizes,I));
     }
     // The block isn't contained in this line range
     skip:;
     index++;
   } while (owner_lines.valid(index) && owner_lines[index].section==section);
-  die(format("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section)),str(block)));
+  die(format("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section)),str(Vector<int,4>(block))));
 }
 
 // (block_id, global node offset) for a given block
-Vector<uint64_t,2> partition_t::block_offsets(section_t section, Vector<int,4> block) const {
+Vector<uint64_t,2> partition_t::block_offsets(section_t section, Vector<uint8_t,4> block) const {
   const auto I = block_to_line(section,block);
   const auto& chunk = owner_lines[I.x];
   const int j = block[chunk.dimension];
@@ -439,7 +438,7 @@ static void partition_test() {
       const auto blocks = ceil_div(section.shape(),block_size);
       for (int i=0;i<10;i++) {
         const auto block = random->uniform(Vector<int,4>(),blocks);
-        int rank = partition->block_to_rank(section,block);
+        int rank = partition->block_to_rank(section,Vector<uint8_t,4>(block));
         OTHER_ASSERT(0<=rank && rank<ranks);
       }
     }
@@ -465,7 +464,7 @@ static void partition_test() {
       for (int i=0;i<100;i++) {
         const int rank = random->uniform<int>(0,ranks);
         // We should own all blocks in lines we own
-        Hashtable<Tuple<section_t,Vector<int,4>>> blocks;
+        Hashtable<Tuple<section_t,Vector<uint8_t,4>>> blocks;
         const auto owned = partition->rank_lines(rank,true);
         OTHER_ASSERT((uint64_t)owned.size()==partition->rank_count_lines(rank,true));
         const auto first_offsets = partition->rank_offsets(rank),

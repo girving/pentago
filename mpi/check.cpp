@@ -28,7 +28,7 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
 
   // Prepare
   const block_info_t* info = &self->block_info[local_id];
-  const auto base = block_size*info->block;
+  const auto base = block_size*Vector<int,4>(info->block);
   const auto shape = block_shape(info->section.shape(),info->block);
   const auto rmin0 = safe_rmin_slice(info->section.counts[0],base[0]+range(shape[0])),
              rmin1 = safe_rmin_slice(info->section.counts[1],base[1]+range(shape[1])),
@@ -126,7 +126,7 @@ static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawA
     const auto section = count(board);
     const auto index = standard_board_index(board);
     const auto block = index/block_size;
-    const int local_block_id = partition.block_offsets(section,block).x;
+    const int local_block_id = partition.block_offsets(section,Vector<uint8_t,4>(block)).x;
     block_samples[local_block_id].append(tuple(i,index-block_size*block));
   }
 
@@ -160,7 +160,7 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
       for (int i1 : range(shape[1]))
         for (int i2 : range(shape[2]))
           for (int i3 : range(shape[3]))
-            blocks.assert_contains(section,vec(i0,i1,i2,i3));
+            blocks.assert_contains(section,vec<uint8_t>(i0,i1,i2,i3));
   }
   OTHER_ASSERT(blocks.blocks()==count);
 
@@ -196,7 +196,7 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
 
 namespace {
 struct subcompare_t {
-  Vector<int,4> block;
+  Vector<uint8_t,4> block;
   spinlock_t lock;
   Array<const Vector<super_t,2>,4> old_data;
 };
@@ -218,7 +218,7 @@ struct compare_t : public boost::noncopyable {
 };
 }
 
-static void process_data(compare_t* self, subcompare_t* sub, RawArray<const Tuple<Vector<int,4>,Vector<super_t,2>>> samples, Vector<int,4> block, Array<const Vector<super_t,2>,4> data) {
+static void process_data(compare_t* self, subcompare_t* sub, RawArray<const Tuple<Vector<int,4>,Vector<super_t,2>>> samples, Vector<uint8_t,4> block, Array<const Vector<super_t,2>,4> data) {
   OTHER_ASSERT(block==sub->block);
   sub->lock.lock();
   if (!sub->old_data.flat.size() && self->old_reader) {
@@ -280,8 +280,8 @@ static Tuple<Vector<uint64_t,3>,int> compare_readers_and_samples(const supertens
       for (int i2 : range(blocks[2]))
         for (int i3 : range(blocks[3])) {
           auto sub = new subcompare_t;
-          auto block = sub->block = vec(i0,i1,i2,i3);
-          const function<void(Vector<int,4>,Array<Vector<super_t,2>,4>)> process = curry(process_data,&self,sub,block_samples.at(index(blocks,block)).raw());
+          const auto block = sub->block = vec<uint8_t>(i0,i1,i2,i3);
+          const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)> process = curry(process_data,&self,sub,block_samples.at(index(blocks,Vector<int,4>(block))).raw());
           reader.schedule_read_block(block,process);
           if (old_reader)
             old_reader->schedule_read_block(block,process);

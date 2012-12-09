@@ -30,10 +30,10 @@ using std::tr1::unordered_map;
 namespace {
 struct block_request_t : public boost::noncopyable {
   // The section is determined by the dependent line, so we don't need to store it
-  const Vector<int,4> block;
+  const Vector<uint8_t,4> block;
   vector<line_details_t*> dependent_lines;
 
-  block_request_t(Vector<int,4> block)
+  block_request_t(Vector<uint8_t,4> block)
     : block(block) {}
 };
 }
@@ -195,7 +195,7 @@ void flow_t::schedule_lines() {
     else {
       OTHER_ASSERT(input_blocks);
       free_line_gathers--;
-      for (int b : range(line->input_blocks)) {
+      for (int b : range((int)line->input_blocks)) {
         const auto block = line->input_block(b);
         const auto block_id = input_blocks->partition->block_offsets(line->standard_child_section,block).x;
         auto it = block_requests.find(block_id);

@@ -53,10 +53,11 @@ bool block_cache_t::lookup(const bool aggressive, const board_t board, super_t& 
   const auto symmetry = symmetry1.inverse()*local_symmetry_t(local_rotations);
 
   // Load block if necessary
-  const auto block = index/block_size;
+  const auto block = Vector<uint8_t,4>(index/block_size);
   const auto block_data = load_block(section.x,block);
-  OTHER_ASSERT(block_data.valid(index-block_size*block));
-  const auto& data = block_data[index-block_size*block];
+  const auto I = index-block_size*Vector<int,4>(block);
+  OTHER_ASSERT(block_data.valid(I));
+  const auto& data = block_data[I];
 
   // Extract the part we want
   wins = transform_super(symmetry,extract(turn,aggressive,data));
@@ -70,7 +71,7 @@ struct reader_block_cache_t : public block_cache_t {
 
   const uint64_t memory_limit;
   unordered_map<section_t,Ref<const supertensor_reader_t>,Hasher> readers;
-  mutable unordered_map<Tuple<section_t,Vector<int,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
+  mutable unordered_map<Tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
   mutable uint64_t free_memory;
 
 protected:
@@ -93,7 +94,7 @@ public:
                :aggressive?data.y:~data.x; // White to move
   }
 
-  RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<int,4> block) const {
+  RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const {
     const auto& reader = *readers.find(section)->second;
     const auto key = tuple(reader.header.section,block);
     const auto it = block_cache.find(key);
@@ -117,7 +118,7 @@ struct store_block_cache_t : public block_cache_t {
   const Ref<const mpi::block_store_t> blocks;
 #if PENTAGO_MPI_COMPRESS
   const uint64_t memory_limit;
-  mutable unordered_map<Tuple<section_t,Vector<int,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
+  mutable unordered_map<Tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
   mutable uint64_t free_memory;
 #endif
 
@@ -141,7 +142,7 @@ public:
     return aggressive?data.x:data.y;
   }
 
-  RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<int,4> block) const {
+  RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const {
 #if PENTAGO_MPI_COMPRESS
     const auto key = tuple(section,block);
     const auto it = block_cache.find(key);

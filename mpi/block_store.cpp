@@ -45,7 +45,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
   block_info[0].offset = 0;
 #endif
   for (auto line : lines)
-    for (int i : range(line.length)) {
+    for (int i : range((int)line.length)) {
       auto offsets = line.block_offsets(i);
       OTHER_ASSERT(block_info.valid(block_id+1) && offsets.x==first.x+block_id);
 #if !PENTAGO_MPI_COMPRESS
@@ -84,7 +84,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
   const_cast_(required_contributions) = total_count;
 
   // Organize blocks by section
-  unordered_map<section_t,unordered_map<Vector<int,4>,int,Hasher>,Hasher> section_blocks;
+  unordered_map<section_t,unordered_map<Vector<uint8_t,4>,int,Hasher>,Hasher> section_blocks;
   if (samples_per_section)
     for (int b : range(blocks()))
       section_blocks[block_info[b].section].insert(make_pair(block_info[b].block,b));
@@ -100,8 +100,8 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
                           rotation_minimal_quadrants(section.counts[3]).x);
     const auto random = new_<Random>(hash(section));
     for (int i=0;i<samples_per_section;i++) {
-      const auto index = random->uniform(Vector<int,4>(),shape),
-                 block = index/block_size;
+      const auto index = random->uniform(Vector<int,4>(),shape);
+      const auto block = Vector<uint8_t,4>(index/block_size);
       const auto it = s.second.find(block);
       if (it != s.second.end())
         sample_counts[it->second]++;
@@ -119,8 +119,8 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
                           rotation_minimal_quadrants(section.counts[3]).x);
     const auto random = new_<Random>(hash(section));
     for (int i=0;i<samples_per_section;i++) {
-      const auto index = random->uniform(Vector<int,4>(),shape),
-                 block = index/block_size;
+      const auto index = random->uniform(Vector<int,4>(),shape);
+      const auto block = Vector<uint8_t,4>(index/block_size);
       const auto it = s.second.find(block);
       if (it != s.second.end()) {
         auto& sample = samples[it->second][--sample_counts[it->second]];
@@ -128,7 +128,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
                                  rmin[1][index[1]],
                                  rmin[2][index[2]],
                                  rmin[3][index[3]]);
-        sample.index = pentago::index(block_shape(shape,block),index-block_size*block);
+        sample.index = pentago::index(block_shape(shape,block),index-block_size*Vector<int,4>(block));
       }
     }
   }
@@ -244,7 +244,7 @@ void block_store_t::accumulate(int local_id, RawArray<Vector<super_t,2>> new_dat
 #endif
 }
 
-void block_store_t::assert_contains(section_t section, Vector<int,4> block) const {
+void block_store_t::assert_contains(section_t section, Vector<uint8_t,4> block) const {
   const auto offsets = partition->block_offsets(section,block);
   const int local_id = offsets.x-first.x;
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
@@ -252,7 +252,7 @@ void block_store_t::assert_contains(section_t section, Vector<int,4> block) cons
 
 #if PENTAGO_MPI_COMPRESS
 
-Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<int,4> block) const {
+Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block) const {
   const auto offsets = partition->block_offsets(section,block);
   const int local_id = offsets.x-first.x;
   return uncompress_and_get(local_id);
@@ -285,7 +285,7 @@ RawArray<const char> block_store_t::get_compressed(int local_id, bool allow_inco
 
 #else
 
-RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Vector<int,4> block) const {
+RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Vector<uint8_t,4> block) const {
   const auto offsets = partition->block_offsets(section,block);
   const int local_id = offsets.x-first.x;
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
@@ -310,9 +310,9 @@ RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(int local_id) const {
 
 #endif
 
-Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<int,4> block, RawArray<const Vector<super_t,2>> flat_data) {
+Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<uint8_t,4> block, RawArray<const Vector<super_t,2>> flat_data) {
   // Prepare
-  const auto base = block_size*block;
+  const auto base = block_size*Vector<int,4>(block);
   const auto shape = block_shape(section.shape(),block);
   const auto rmin0 = safe_rmin_slice(section.counts[0],base[0]+range(shape[0])),
              rmin1 = safe_rmin_slice(section.counts[1],base[1]+range(shape[1])),
