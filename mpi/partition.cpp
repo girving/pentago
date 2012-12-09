@@ -482,7 +482,7 @@ static void partition_test() {
               first = false;
             }
             OTHER_ASSERT(offsets==line.block_offsets(j));
-            OTHER_ASSERT(offsets.all_less(last_offsets));
+            OTHER_ASSERT(all_less(offsets,last_offsets));
             blocks.set(tuple(line.section,block));
             OTHER_ASSERT(next_offset==offsets);
             next_offset.x++;
