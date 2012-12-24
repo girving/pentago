@@ -62,7 +62,7 @@ void ibarrier_t::process(MPI_Status status) {
   else if (!rank && !source) // Special message from root to itself so that it suffices to check done() only after recv()
     /* pass */;
   else
-    die(format("ibarrier_t: rank %d received unexpected message from rank %d (total ranks = %d)",rank,source,ranks));
+    die("ibarrier_t: rank %d received unexpected message from rank %d (total ranks = %d)",rank,source,ranks);
 }
     
 void ibarrier_t::decrement() {

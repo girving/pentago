@@ -12,7 +12,7 @@
 
 #include <other/core/utility/debug.h>
 #include <other/core/utility/SanitizeFunction.h>
-#include <other/core/utility/unique.h>
+#include <other/core/utility/Unique.h>
 #include <boost/noncopyable.hpp>
 namespace pentago {
 

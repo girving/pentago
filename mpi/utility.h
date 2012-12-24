@@ -15,13 +15,13 @@ using std::string;
 bool verbose();
 void set_verbose(bool verbose);
 
-// Print a message and abort
-void OTHER_NORETURN(die(const string& msg));
+// Print a message and abort without formatting
+void OTHER_NORETURN(die_helper(const string& msg));
 
-// Convenience version of die
+// Print a message and abort
 template<class... Args> static inline void OTHER_NORETURN(die(const char* msg, const Args&... args));
-template<class... Args> static inline void die(const char* msg, const Args&... args) {
-  die(format(msg,args...));
+template<class... Args> static inline void                die(const char* msg, const Args&... args) {
+  die_helper(format(msg,args...));
 }
 
 void OTHER_NORETURN(check_failed(const char* file, const char* function, int line, const char* call, int result));

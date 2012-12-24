@@ -21,7 +21,7 @@ void set_verbose(bool verbose) {
   verbose_ = verbose;
 }
 
-void die(const string& msg) {
+void die_helper(const string& msg) {
   cerr << "\nrank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
   process::backtrace();
   if (getenv("OTHER_BREAK_ON_ASSERT"))
@@ -86,8 +86,8 @@ mpi_world_t::mpi_world_t(int& argc, char**& argv) {
     die("Insufficent MPI thread support: required = multiple, provided = %d",provided);
 
   // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
-  debug::set_error_callback(die);
-  throw_callback = die;
+  debug::set_error_callback(static_cast<debug::ErrorCallback>(die_helper));
+  throw_callback = die_helper;
 
   // Make MPI errors return so that we can check the error codes ourselves
   MPI_Comm_set_errhandler(MPI_COMM_WORLD,MPI_ERRORS_RETURN);
