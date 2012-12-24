@@ -1,5 +1,6 @@
 // Symmetry-aware board counting via Polya's enumeration theorem
 
+#include <pentago/section.h>
 #include <other/core/math/uint128.h>
 namespace pentago {
 

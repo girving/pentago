@@ -33,6 +33,13 @@ struct wall_time_t {
   wall_time_t operator-(wall_time_t t) const {
     return wall_time_t(us-t.us);
   }
+
+  bool operator==(wall_time_t t) const { return us == t.us; }
+  bool operator!=(wall_time_t t) const { return us != t.us; }
+  bool operator< (wall_time_t t) const { return us <  t.us; }
+  bool operator<=(wall_time_t t) const { return us <= t.us; }
+  bool operator> (wall_time_t t) const { return us >  t.us; }
+  bool operator>=(wall_time_t t) const { return us >= t.us; }
 };
 
 static inline wall_time_t wall_time() {

@@ -31,7 +31,7 @@ void die(const string& msg) {
 }
 
 void check_failed(const char* file, const char* function, int line, const char* call, int result) {
-  die(format("%s:%s:%d: %s failed: %s",file,function,line,call,error_string(result)));
+  die("%s:%s:%d: %s failed: %s",file,function,line,call,error_string(result));
 }
 
 string error_string(int code) {
@@ -68,7 +68,7 @@ int get_count(MPI_Status* status, MPI_Datatype datatype) {
   CHECK(MPI_Get_count(status,datatype,&count));
   if (count == MPI_UNDEFINED) {
     CHECK(MPI_Get_count(status,MPI_BYTE,&count));
-    die(format("get_count: MPI_Get_count result is undefined, bytes = %d",count));
+    die("get_count: MPI_Get_count result is undefined, bytes = %d",count);
   }
   return count;
 }
@@ -83,7 +83,7 @@ mpi_world_t::mpi_world_t(int& argc, char**& argv) {
   int provided;
   CHECK(MPI_Init_thread(&argc,&argv,MPI_THREAD_MULTIPLE,&provided));
   if (provided<MPI_THREAD_MULTIPLE)
-    die(format("Insufficent MPI thread support: required = multiple, provided = %d",provided));
+    die("Insufficent MPI thread support: required = multiple, provided = %d",provided);
 
   // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
   debug::set_error_callback(die);

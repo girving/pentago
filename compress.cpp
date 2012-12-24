@@ -38,8 +38,8 @@ static bool is_lzma(RawArray<const uint8_t> data) {
   return data.size()>=6 && !memcmp(data.data(),magic,6);
 }
 
-Array<uint8_t> compress(RawArray<const uint8_t> data, int level) {
-  thread_time_t time(compress_kind);
+Array<uint8_t> compress(RawArray<const uint8_t> data, int level, event_t event) {
+  thread_time_t time(compress_kind,event);
   if (level<20) { // zlib
     size_t dest_size = compressBound(data.size());
     OTHER_ASSERT(dest_size<(uint64_t)1<<31);
@@ -68,9 +68,9 @@ size_t compress_memusage(int level) {
     return lzma_easy_encoder_memusage(level-20);
 }
 
-Array<uint8_t> decompress(Array<const uint8_t> compressed, const size_t uncompressed_size) {
+Array<uint8_t> decompress(Array<const uint8_t> compressed, const size_t uncompressed_size, event_t event) {
   OTHER_ASSERT(uncompressed_size<(uint64_t)1<<31);
-  thread_time_t time(decompress_kind);
+  thread_time_t time(decompress_kind,event);
   size_t dest_size = uncompressed_size;
   Array<uint8_t> uncompressed = aligned_buffer<uint8_t>(dest_size);
   if (!is_lzma(compressed)) { // zlib

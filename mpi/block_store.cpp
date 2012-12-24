@@ -74,11 +74,12 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
   // Count the number of required contributions before all blocks are complete
   uint64_t total_count = 0;
   for (int b : range(blocks())) {
-    int count = 0;
+    uint8_t dimensions = 0;
     for (int i=0;i<4;i++)
-      count += block_info[b].section.counts[i].sum()<9;
-    block_info[b].missing_contributions = count;
-    total_count += count;
+      if (block_info[b].section.counts[i].sum()<9)
+        dimensions |= 1<<i;
+    block_info[b].missing_dimensions = dimensions;
+    total_count += popcount((uint16_t)dimensions);
   }
   OTHER_ASSERT(total_count<(1u<<31));
   const_cast_(required_contributions) = total_count;
@@ -195,52 +196,57 @@ void block_store_t::print_compression_stats(MPI_Comm comm) const {
 #endif
 }
 
-void block_store_t::accumulate(int local_id, RawArray<Vector<super_t,2>> new_data) {
-  OTHER_ASSERT(0<=local_id && local_id<blocks());
-  const auto* info = &block_info[local_id];
+void block_store_t::accumulate(int local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data) {
+  OTHER_ASSERT(0<=local_id && local_id<blocks() && dimension<4);
+  const auto& info = block_info[local_id];
+  const event_t event = block_line_event(info.section,dimension,info.block);
 #if !PENTAGO_MPI_COMPRESS
-  const auto local_data = all_data.slice(info[0].offset,info[1].offset);
+  const auto local_data = all_data.slice(info.offset,(&info+1)->offset);
   OTHER_ASSERT(local_data.size()==new_data.size());
   {
-    spin_t spin(info->lock);
+    spin_t spin(info.lock);
     {
-      thread_time_t time("accumulate");
+      thread_time_t time(accumulate_kind,event);
       for (int i=0;i<local_data.size();i++)
         local_data[i] |= new_data[i];
     }
     // If all contributions are in place, count and sample
-    if (!--info->missing_contributions) {
+    OTHER_ASSERT(info.missing_dimensions&1<<dimension);
+    info.missing_dimensions &= ~(1<<dimension);
+    if (!info.missing_dimensions) {
       thread_time_t time("count");
       for (auto& sample : samples[local_id])
         sample.wins = local_data[sample.index];
-      const auto counts = count_block_wins(info->section,info->block,local_data);
-      const int section_id = partition->section_id.get(info->section);
+      const auto counts = count_block_wins(info.section,info.block,local_data);
+      const int section_id = partition->section_id.get(info.section);
       spin_t spin(section_counts_lock);
       section_counts[section_id] += counts;
     }
   }
 #else // PENTAGO_MPI_COMPRESS
-  spin_t spin(info->lock);
+  spin_t spin(info.lock);
   // If previous contributions exist, uncompress the old data and combine it with the new
   if (store.size(local_id)) {
-    const auto old_data = uncompress_and_get_flat(local_id,true);
-    thread_time_t time(accumulate_kind);
+    const auto old_data = uncompress_and_get_flat(local_id,event,true);
+    thread_time_t time(accumulate_kind,event);
     OTHER_ASSERT(new_data.size()==old_data.size());
     for (int i=0;i<new_data.size();i++)
       new_data[i] |= old_data[i];
   }
   // If all contributions are in place, count and sample
-  if (!--info->missing_contributions) {
-    thread_time_t time(count_kind);
+  OTHER_ASSERT(info.missing_dimensions&1<<dimension);
+  info.missing_dimensions &= ~(1<<dimension);
+  if (!info.missing_dimensions) {
+    thread_time_t time(count_kind,event);
     for (auto& sample : samples[local_id])
       sample.wins = new_data[sample.index];
-    const auto counts = count_block_wins(info->section,info->block,new_data);
-    const int section_id = partition->section_id.get(info->section);
+    const auto counts = count_block_wins(info.section,info.block,new_data);
+    const int section_id = partition->section_id.get(info.section);
     spin_t spin(section_counts_lock);
     section_counts[section_id] += counts;
   }
   // Compress data into place
-  store.compress_and_set(local_id,new_data);
+  store.compress_and_set(local_id,new_data,event);
 #endif
 }
 
@@ -250,36 +256,55 @@ void block_store_t::assert_contains(section_t section, Vector<uint8_t,4> block) 
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
 }
 
-#if PENTAGO_MPI_COMPRESS
-
-Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block) const {
-  const auto offsets = partition->block_offsets(section,block);
-  const int local_id = offsets.x-first.x;
-  return uncompress_and_get(local_id);
+event_t block_store_t::local_block_event(int local_id) const {
+  OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
+  const auto& info = block_info[local_id];
+  return block_event(info.section,info.block);
 }
 
-Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(int local_id) const {
-  const auto flat = uncompress_and_get_flat(local_id);
+event_t block_store_t::local_block_line_event(int local_id, uint8_t dimension) const {
+  if ((unsigned)local_id>=(unsigned)blocks() || dimension>=4)
+    die("block_store_t::local_block_line_event: local_id %d, blocks %d, dimension %d",local_id,blocks(),dimension);
+  const auto& info = block_info[local_id];
+  return block_line_event(info.section,dimension,info.block);
+}
+
+event_t block_store_t::local_block_lines_event(int local_id, uint8_t dimensions) const {
+  OTHER_ASSERT((unsigned)local_id<(unsigned)blocks() && dimensions<16);
+  const auto& info = block_info[local_id];
+  return block_lines_event(info.section,dimensions,info.block);
+}
+
+#if PENTAGO_MPI_COMPRESS
+
+Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const {
+  const auto offsets = partition->block_offsets(section,block);
+  const int local_id = offsets.x-first.x;
+  return uncompress_and_get(local_id,event);
+}
+
+Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(int local_id, event_t event) const {
+  const auto flat = uncompress_and_get_flat(local_id,event);
   const block_info_t& info = block_info[local_id];
   const auto shape = block_shape(info.section.shape(),info.block);
   return Array<Vector<super_t,2>,4>(shape,flat.data(),flat.borrow_owner());
 }
 
-Array<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(int local_id, bool allow_incomplete) const {
+Array<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(int local_id, event_t event, bool allow_incomplete) const {
   const auto compressed = get_compressed(local_id,allow_incomplete);
   const block_info_t& info = block_info[local_id];
   const int flat_size = block_shape(info.section.shape(),info.block).product();
   // Uncompress into a temporary array.  For sake of simplicity, we'll hope that malloc manages to avoid fragmentation.
   // In the future, we may want to keep a list of temporary blocks around to eliminate fragmentation entirely.
   const auto flat = large_buffer<Vector<super_t,2>>(flat_size,false);
-  fast_uncompress(compressed,flat);
+  fast_uncompress(compressed,flat,event);
   return flat;
 }
 
 RawArray<const char> block_store_t::get_compressed(int local_id, bool allow_incomplete) const {
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
   if (!allow_incomplete)
-    OTHER_ASSERT(!block_info[local_id].missing_contributions);
+    OTHER_ASSERT(!block_info[local_id].missing_dimensions);
   return store.current_buffer(local_id);
 }
 

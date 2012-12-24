@@ -111,7 +111,7 @@ public:
 };
 
 struct supertensor_reader_t : public Object {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
   const Ref<const fildes_t> fd;
   const supertensor_header_t header;
@@ -141,7 +141,7 @@ public:
 };
 
 struct supertensor_writer_t : public Object {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
   typedef supertensor_writer_t Self;
 
   const string path;

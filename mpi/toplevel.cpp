@@ -1,5 +1,6 @@
 // Massively parallel in-core endgame database computation
 
+#include <pentago/mpi/toplevel.h>
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/config.h>
 #include <pentago/mpi/partition.h>
@@ -23,8 +24,8 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <getopt.h>
-using namespace pentago;
-using namespace pentago::mpi;
+namespace pentago {
+namespace mpi {
 
 using Log::cout;
 using Log::cerr;
@@ -89,7 +90,7 @@ static void report_mpi_times(MPI_Comm comm, RawArray<wall_time_t> times, wall_ti
   }
 }
 
-int main(int argc, char** argv) {
+int toplevel(int argc, char** argv) {
   // Initialize MPI
   mpi_world_t world(argc,argv);
   MPI_Comm comm = MPI_COMM_WORLD;
@@ -97,6 +98,19 @@ int main(int argc, char** argv) {
             rank = comm_rank(comm);
   set_verbose(!rank);
   report(comm,"mpi");
+
+  // Check tag space
+  int tag_ub = 0;
+  {
+    int success = false;
+    void* value = 0;
+    CHECK(MPI_Comm_get_attr(comm,MPI_TAG_UB,(void*)&value,&success));
+    if (!success)
+      error("tag upper bound lookup failed");
+    tag_ub = *(int*)value;
+    if (tag_ub<(1<<19))
+      error("tag upper bound is only %d, need at least %d: 15 bits for block, 4 for dimensions",(int)tag_ub,1<<19);
+  }
 
   // Parse command line options
   int save = -100;
@@ -256,7 +270,7 @@ int main(int argc, char** argv) {
     Array<uint8_t> data(37,false);
     for (int i=0;i<data.size();i++)
       data[i] = i;
-    OTHER_ASSERT(decompress(compress(data,level),data.size())==data);
+    OTHER_ASSERT(decompress(compress(data,level,unevent),data.size(),unevent)==data);
   }
 
   // Run unit test if requested.  See test_mpi.py for the Python side of these tests.
@@ -292,6 +306,7 @@ int main(int argc, char** argv) {
          << "\ngather limit = "<<gather_limit
          << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
+         << "\ntag ub = "<<tag_ub
          << endl;
 #ifdef PENTAGO_MPI_DEBUG
     cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 
@@ -350,7 +365,7 @@ int main(int argc, char** argv) {
                     line_memory = memory_usage(lines)+base_compute_memory_usage(lines.size()),
                     base_memory = partition_memory+block_memory+line_memory;
       if (memory_limit <= base_memory)
-        die(format("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit)));
+        die("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit));
       const int64_t free_memory = memory_limit-base_memory;
       {
         int64_t numbers[5] = {partition_memory,block_memory,line_memory,base_memory,-free_memory};
@@ -400,4 +415,7 @@ int main(int argc, char** argv) {
   report(comm,"final");
   write_thread_history(format("%s/history-r%d",dir,rank));
   return 0;
+}
+
+}
 }

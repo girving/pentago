@@ -96,6 +96,13 @@ enum time_kind_t {
   write_sections_kind,
   write_counts_kind,
   write_sparse_kind,
+  allocate_line_kind,
+  request_send_kind,
+  response_send_kind,
+  response_recv_kind,
+  wakeup_kind,
+  output_send_kind,
+  output_recv_kind,
   master_idle_kind,
   cpu_idle_kind,
   io_idle_kind,
@@ -107,11 +114,24 @@ enum time_kind_t {
   _time_kinds
 };
 
+// Convert time_kind_t to string
+vector<const char*> time_kind_names();
+
+// The top 3 bits are for the event kind
+typedef uint64_t event_t;
+const event_t unevent = 0;
+const event_t block_ekind       = event_t(1)<<61;
+const event_t line_ekind        = event_t(2)<<61;
+const event_t block_line_ekind  = event_t(3)<<61;
+const event_t block_lines_ekind = event_t(4)<<61;
+const event_t ekind_mask        = event_t(7)<<61;
+
 class thread_time_t : public boost::noncopyable {
-  time_entry_t& entry;
+  time_entry_t* entry;
 public:
-  thread_time_t(time_kind_t kind);
+  thread_time_t(time_kind_t kind, event_t event);
   ~thread_time_t();
+  void stop(); // Stop early
 };
 
 // Extract local times and reset them to zero
@@ -138,8 +158,20 @@ void threads_wait_all();
 // Join the CPU thread pool until all jobs complete
 void threads_wait_all_help();
 
+// A historical event
+struct history_t {
+  event_t event;
+  wall_time_t start, end;
+
+  history_t()
+    : event(0), start(0), end(0) {}
+
+  history_t(event_t event, wall_time_t start, wall_time_t end)
+    : event(event), start(start), end(end) {}
+};
+
 // Operations on tracked history.  If history is untracked, these are trivial.
-vector<vector<Array<const Vector<wall_time_t,2>>>> thread_history();
+vector<vector<Array<const history_t>>> thread_history();
 void write_thread_history(const string& filename);
 
 }

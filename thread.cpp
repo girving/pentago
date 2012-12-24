@@ -46,12 +46,13 @@ static bool is_master() {
 
 struct time_entry_t {
   wall_time_t total, local, start;
+  event_t event;
 #ifdef HISTORY
-  Array<Vector<wall_time_t,2>> history;
+  Array<history_t> history;
 #endif
 
   time_entry_t()
-    : total(0), local(0), start(0) {}
+    : total(0), local(0), start(0), event(0) {}
 };
 
 struct time_table_t {
@@ -94,18 +95,26 @@ static inline time_entry_t& time_entry(time_kind_t kind) {
   return table->times[kind];
 }
 
-thread_time_t::thread_time_t(time_kind_t kind)
-  : entry(time_entry(kind)) {
-  entry.start = wall_time();
+thread_time_t::thread_time_t(time_kind_t kind, event_t event)
+  : entry(&time_entry(kind)) {
+  entry->start = wall_time();
+  entry->event = event;
 }
 
 thread_time_t::~thread_time_t() {
-  wall_time_t now = wall_time();
+  stop();
+}
+
+void thread_time_t::stop() {
+  if (entry) {
+    wall_time_t now = wall_time();
 #if HISTORY
-  entry.history.append(vec(entry.start,now));
+    entry->history.append(history_t(entry->event,entry->start,now));
 #endif
-  entry.local += now-entry.start;
-  entry.start = wall_time_t(0);
+    entry->local += now-entry->start;
+    entry->start = wall_time_t(0);
+    entry = 0;
+  }
 }
 
 /****************** thread_pool_t *****************/
@@ -114,7 +123,7 @@ namespace {
 
 class thread_pool_t : public Object {
 public:
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
   const thread_type_t type;
   const int count;
@@ -207,7 +216,7 @@ void* thread_pool_t::worker(void* pool_) {
     // Grab a job
     job_t f;
     {
-      thread_time_t time(idle);
+      thread_time_t time(idle,unevent);
       lock_t lock(pool.mutex);
       while (!f) {
         if (pool.die)
@@ -256,7 +265,7 @@ void thread_pool_t::schedule(job_t&& f, bool soon) {
 
 void thread_pool_t::wait() {
   OTHER_ASSERT(is_master());
-  thread_time_t time(master_idle_kind);
+  thread_time_t time(master_idle_kind,unevent);
   lock_t lock(mutex);
   while (!die && (jobs.size() || waiting<count))
     master_cond.wait();
@@ -363,7 +372,7 @@ Array<wall_time_t> clear_thread_times() {
       auto& entry = table->times[k];
       if (entry.start) {
 #if HISTORY
-        entry.history.append(vec(entry.start,now));
+        entry.history.append(history_t(entry.event,entry.start,now));
 #endif
         entry.local += now-entry.start;
         entry.start = now;
@@ -398,7 +407,7 @@ Array<wall_time_t> total_thread_times() {
   return result;
 }
 
-static vector<const char*> time_kind_names() {
+vector<const char*> time_kind_names() {
   vector<const char*> names(master_missing_kind);
   #define FIELD(kind) names[kind##_kind] = #kind;
   FIELD(compress)
@@ -420,6 +429,13 @@ static vector<const char*> time_kind_names() {
   FIELD(write_sections)
   FIELD(write_counts)
   FIELD(write_sparse)
+  FIELD(allocate_line)
+  FIELD(request_send)
+  FIELD(response_send)
+  FIELD(response_recv)
+  FIELD(wakeup)
+  FIELD(output_send)
+  FIELD(output_recv)
   FIELD(master_idle)
   FIELD(cpu_idle)
   FIELD(io_idle)
@@ -445,10 +461,10 @@ void report_thread_times(RawArray<const wall_time_t> times, const string& name) 
   cout << flush;
 }
 
-vector<vector<Array<const Vector<wall_time_t,2>>>> thread_history() {
+vector<vector<Array<const history_t>>> thread_history() {
   clear_thread_times();
   lock_t lock(time_mutex);
-  vector<vector<Array<const Vector<wall_time_t,2>>>> data(time_tables.size());
+  vector<vector<Array<const history_t>>> data(time_tables.size());
 #if HISTORY
   for (int t : range((int)data.size())) {
     auto& table = *time_tables[t];
@@ -461,7 +477,8 @@ vector<vector<Array<const Vector<wall_time_t,2>>>> thread_history() {
 
 void write_thread_history(const string& filename) {
 #if HISTORY
-  typedef Vector<int64_t,2> Elem;
+  typedef Vector<int64_t,3> Elem;
+  BOOST_STATIC_ASSERT(sizeof(Elem)==sizeof(history_t));
   const auto history = thread_history();
   if (!history.size())
     return;
@@ -469,10 +486,10 @@ void write_thread_history(const string& filename) {
   OTHER_ASSERT(file);
   int offset = 1+history.size()*history[0].size();
   Array<Elem> header;
-  header.append(Elem(history.size(),history[0].size()));
+  header.append(Elem(history.size(),history[0].size(),0));
   for (const auto& thread : history)
     for (const auto& trace : thread) {
-      header.append(Elem(offset,offset+trace.size()));
+      header.append(Elem(offset,offset+trace.size(),0));
       offset += trace.size();
     }
   fwrite(header.data(),sizeof(Elem),header.size(),file);

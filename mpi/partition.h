@@ -18,7 +18,7 @@ vector<Array<const section_t>> descendent_sections(const section_t root, const i
 
 // Given a set of sections, distribute all lines amongst a number of processors
 struct partition_t : public Object {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
   const int ranks;
   const int slice; // Common number of stones in each section

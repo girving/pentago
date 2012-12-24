@@ -3,6 +3,7 @@
 
 #include <pentago/mpi/config.h>
 #include <pentago/mpi/partition.h>
+#include <pentago/mpi/utility.h>
 #include <pentago/superscore.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
@@ -42,14 +43,14 @@ struct block_info_t {
 #if !PENTAGO_MPI_COMPRESS
   int offset; // Local offset into all_data
 #endif
-  mutable int missing_contributions; // How many incoming contributions are needed to complete this block
+  mutable uint8_t missing_dimensions; // Which incoming dimension contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
 BOOST_STATIC_ASSERT(sizeof(block_info_t)<=24);
 
 class block_store_t : public Object {
 public:
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
   const Ref<const partition_t> partition;
   const int rank;
@@ -101,17 +102,22 @@ public:
   // Verify that we own the given block
   void assert_contains(section_t section, Vector<uint8_t,4> block) const;
 
+  // Generate events for the given local block
+  event_t local_block_event(int local_id) const;
+  event_t local_block_line_event(int local_id, uint8_t dimension) const;
+  event_t local_block_lines_event(int local_id, uint8_t dimensions) const;
+
   // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
-  void accumulate(int local_id, RawArray<Vector<super_t,2>> new_data);
+  void accumulate(int local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
 
   // Access the data for a completed block, either by (section,block) or local block id.
   // In uncompressed mode, these are O(1) and return views into all_data.  In compressed mode they must uncompress
   // first, requiring O(n) time, and return new mutable buffers.  To make sure all callers know about these differences, we
   // give the different versions different names.
 #if PENTAGO_MPI_COMPRESS
-  Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block) const;
-  Array<Vector<super_t,2>,4> uncompress_and_get(int local_id) const;
-  Array<Vector<super_t,2>> uncompress_and_get_flat(int local_id, bool allow_incomplete=false) const; // allow_incomplete for internal use only
+  Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
+  Array<Vector<super_t,2>,4> uncompress_and_get(int local_id, event_t event) const;
+  Array<Vector<super_t,2>> uncompress_and_get_flat(int local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
   RawArray<const char> get_compressed(int local_id, bool allow_incomplete=false) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;

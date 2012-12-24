@@ -27,14 +27,32 @@ using std::endl;
 using std::make_pair;
 using std::tr1::unordered_map;
 
+static inline int request_id(int owner_block_id, uint8_t child_dimension, uint8_t parent_dimension) {
+  return 16*owner_block_id + 4*child_dimension + parent_dimension;
+}
+
+static inline int request_block_id(int request_id) {
+  return request_id>>4;
+}
+
+static inline uint8_t request_dimensions(int request_id) {
+  return request_id&15;
+}
+
 namespace {
 struct block_request_t : public boost::noncopyable {
   // The section is determined by the dependent line, so we don't need to store it
   const Vector<uint8_t,4> block;
+  const uint8_t dimensions;
   vector<line_details_t*> dependent_lines;
 
-  block_request_t(Vector<uint8_t,4> block)
-    : block(block) {}
+  block_request_t(Vector<uint8_t,4> block, uint8_t dimensions)
+    : block(block), dimensions(dimensions) {}
+
+  event_t block_lines_event() const {
+    OTHER_ASSERT(dependent_lines.size());
+    return pentago::mpi::block_lines_event(dependent_lines[0]->standard_child_section,dimensions,block);
+  }
 };
 }
 
@@ -83,7 +101,7 @@ struct flow_t {
   // Pending block requests, with internal references to the lines that depend on them.
   unordered_map<uint64_t,block_request_t*> block_requests;
 
-  // Keep track out how much more stuff has to happen.  This includes both blocks we need to send and those we need to receive.
+  // Keep track of how much more stuff has to happen.  This includes both blocks we need to send and those we need to receive.
   ibarrier_countdown_t countdown;
   ProgressIndicator progress;
 
@@ -176,19 +194,20 @@ flow_t::~flow_t() {}
 void flow_t::schedule_lines() {
   // If there are unscheduled lines, try to schedule them
   while (free_lines && free_line_gathers && unscheduled_lines.size()) {
-    const line_data_t* preline = unscheduled_lines.back();
-    const auto line_memory = preline->memory_usage();
-    if (free_memory < line_memory)
-      break;
-    // Schedule the line
-    thread_time_t time(schedule_kind);
-    unscheduled_lines.pop();
-    free_memory -= line_memory;
-    free_lines--;
-    line_details_t* line = new line_details_t(*preline,comms.wakeup_comm);
-    delete preline;
-    #define preline freed
-    PENTAGO_MPI_TRACE("allocate line %s",str(line->line));
+    line_details_t* line;
+    {
+      const line_data_t* preline = unscheduled_lines.back();
+      const auto line_memory = preline->memory_usage();
+      if (free_memory < line_memory)
+        return;
+      // Schedule the line
+      thread_time_t time(allocate_line_kind,preline->line.line_event());
+      unscheduled_lines.pop();
+      free_memory -= line_memory;
+      free_lines--;
+      line = new line_details_t(*preline,comms.wakeup_comm);
+      PENTAGO_MPI_TRACE("allocate line %s",str(line->line));
+    }
     // Request all input blocks
     if (!line->input_blocks)
       schedule_compute_line(*line);
@@ -198,23 +217,44 @@ void flow_t::schedule_lines() {
       for (int b : range((int)line->input_blocks)) {
         const auto block = line->input_block(b);
         const auto block_id = input_blocks->partition->block_offsets(line->standard_child_section,block).x;
-        auto it = block_requests.find(block_id);
+        const auto request_id = pentago::mpi::request_id(block_id,line->child_dimension,line->pre.line.dimension);
+        // Verify that this particular block/dimension pair hasn't been requested yet
+        auto it = block_requests.find(request_id);
+        if (it != block_requests.end()) {
+          const auto other = it->second->dependent_lines[0];
+          die("block request %s,%s,%d from line %s,%s,%d not unique: existing request from line %s,%s,%d",
+              str(line->standard_child_section),str(block),line->child_dimension,
+              str(line->pre.line.section),str(line->pre.line.block_base),line->pre.line.dimension,
+              str(other->pre.line.section),str(other->pre.line.block_base),other->pre.line.dimension);
+        }
+        // Check for an existing block request if desired
+        if (merge_block_requests)
+          for (int d=0;d<16;d++) {
+            const int id = pentago::mpi::request_id(block_id,0,d);
+            if (id != request_id) {
+              it = block_requests.find(id);
+              if (it != block_requests.end())
+                break;
+            }
+          }
         if (it == block_requests.end()) {
           // Send a block request message
-          const auto block_request = new block_request_t(block);
+          const uint8_t dimensions = 4*line->child_dimension+line->pre.line.dimension;
+          thread_time_t time(request_send_kind,block_lines_event(line->standard_child_section,dimensions,block));
+          const auto block_request = new block_request_t(block,dimensions);
           const int owner = input_blocks->partition->block_to_rank(line->standard_child_section,block);
           const auto owner_offsets = input_blocks->partition->rank_offsets(owner);
-          const int owner_block_id = block_id-owner_offsets.x;
-          send_empty(owner,owner_block_id,comms.request_comm);
-          PENTAGO_MPI_TRACE("block request: owner %d, owner block id %d",owner,owner_block_id);
-          it = block_requests.insert(make_pair(block_id,block_request)).first;
+          const int tag = request_id-16*owner_offsets.x;
+          send_empty(owner,tag,comms.request_comm);
+          PENTAGO_MPI_TRACE("block request: owner %d, request_id %d,tag %d",owner,request_id,tag);
+          it = block_requests.insert(make_pair(request_id,block_request)).first;
 #if !PENTAGO_MPI_COMPRESS
           // In uncompressed mode, we can post receives for all responses simultaneously, feeding directly
           // into the input memory for the first line.  In compressed mode, responses are handled by a
           // single wildcard recv.
           const auto block_data = line->input_block_data(b);
           MPI_Request request;
-          CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,owner_block_id,comms.response_comm,&request));
+          CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.response_comm,&request));
           requests.add(request,response_callback);
 #endif
         }
@@ -244,18 +284,20 @@ void flow_t::post_request_recv() {
 
 void flow_t::process_request(MPI_Status* status) {
   OTHER_ASSERT(input_blocks);
-  const int local_block_id = status->MPI_TAG;
-  PENTAGO_MPI_TRACE("process request: local block %d",local_block_id);
+  const int local_block_id = request_block_id(status->MPI_TAG);
+  const uint8_t dimensions = request_dimensions(status->MPI_TAG);
+  thread_time_t time(response_send_kind,input_blocks->local_block_lines_event(local_block_id,dimensions));
+  PENTAGO_MPI_TRACE("process request: local block %d, dimensions %d",local_block_id,dimensions);
   // Send block data
   MPI_Request request;
 #if PENTAGO_MPI_COMPRESS
   const auto compressed_data = input_blocks->get_compressed(local_block_id);
-  CHECK(MPI_Isend((void*)compressed_data.data(),compressed_data.size(),MPI_BYTE,status->MPI_SOURCE,local_block_id,comms.response_comm,&request));
+  CHECK(MPI_Isend((void*)compressed_data.data(),compressed_data.size(),MPI_BYTE,status->MPI_SOURCE,status->MPI_TAG,comms.response_comm,&request));
 #else
   const auto block_data = input_blocks->get_raw_flat(local_block_id);
-  CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,local_block_id,comms.response_comm,&request));
+  CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,status->MPI_TAG,comms.response_comm,&request));
 #endif
-  PENTAGO_MPI_TRACE("block response: source %d, local block id %d",status->MPI_SOURCE,local_block_id);
+  PENTAGO_MPI_TRACE("block response: source %d, local block id %d, dimensions %d",status->MPI_SOURCE,local_block_id,dimensions);
   // The barrier tells us when all messages are finished, so we don't need this request
   CHECK(MPI_Request_free(&request));
   // Repost wildcard receive
@@ -268,7 +310,7 @@ void flow_t::post_output_recv() {
   if (!output_buffer.size())
     output_buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size)),false);
   {
-    thread_time_t time(mpi_kind);
+    thread_time_t time(mpi_kind,unevent);
     CHECK(MPI_Irecv(output_buffer.data(),8*output_buffer.size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
   }
   requests.add(request,output_callback,true);
@@ -276,14 +318,19 @@ void flow_t::post_output_recv() {
 
 // Incoming output data for a block
 void flow_t::process_output(MPI_Status* status) {
-  // How many elements did we receive?
-  int count = get_count(status,MPI_LONG_LONG_INT);
-  PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, count %g",status->MPI_SOURCE,status->MPI_TAG,count/8.);
-  OTHER_ASSERT(!(count&7));
-  const auto block_data = output_buffer.slice_own(0,count/8);
-  output_buffer.clean_memory();
-  // Schedule an accumulate as soon as possible to conserve memory
-  threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,status->MPI_TAG,block_data),true);
+  {
+    // How many elements did we receive?
+    const int local_block_id = request_block_id(status->MPI_TAG);
+    const uint8_t dimension = request_dimensions(status->MPI_TAG);
+    thread_time_t time(output_recv_kind,output_blocks.local_block_line_event(local_block_id,dimension));
+    const int count = get_count(status,MPI_LONG_LONG_INT);
+    PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, dimension %d, count %g",status->MPI_SOURCE,local_block_id,dimension,count/8.);
+    OTHER_ASSERT(!(count&7));
+    const auto block_data = output_buffer.slice_own(0,count/8);
+    output_buffer.clean_memory();
+    // Schedule an accumulate as soon as possible to conserve memory
+    threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,local_block_id,dimension,block_data),true);
+  }
   // One step closer...
   progress.progress();
   countdown.decrement();
@@ -306,14 +353,16 @@ void flow_t::process_wakeup(MPI_Status* status) {
   const function<void(MPI_Status*)> callback(curry(&flow_t::finish_output_send,this,line));
   for (int b=0;b<line->pre.line.length;b++) {
     const auto block = line->pre.line.block(b);
+    thread_time_t time(output_send_kind,line->pre.line.block_line_event(b));
     const auto block_id = output_blocks.partition->block_offsets(line->pre.line.section,block).x;
     const auto block_data = line->output_block_data(b);
     const int owner = output_blocks.partition->block_to_rank(line->pre.line.section,block);
     const auto owner_offsets = output_blocks.partition->rank_offsets(owner);
     const int owner_block_id = block_id-owner_offsets.x;
+    const int tag = request_id(owner_block_id,0,line->pre.line.dimension);
     MPI_Request request;
-    CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,owner_block_id,comms.output_comm,&request));
-    PENTAGO_MPI_TRACE("send output: owner %d, owner block id %d, count %d",owner,owner_block_id,block_data.size());
+    CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.output_comm,&request));
+    PENTAGO_MPI_TRACE("send output: owner %d, owner block id %d, dimension %d, count %d",owner,owner_block_id,dimension,block_data.size());
     requests.add(request,callback);
   }
   post_wakeup_recv();
@@ -356,15 +405,16 @@ static void absorb_response(block_request_t* request)
   OTHER_ASSERT(lines);
   const auto first_line = request->dependent_lines[0];
   const auto first_block_data = first_line->input_block_data(request->block);
+  const auto event = request->block_lines_event();
 
 #if PENTAGO_MPI_COMPRESS
   // Uncompress data into the first dependent line
-  fast_uncompress(compressed,first_block_data);
+  fast_uncompress(compressed,first_block_data,event);
 #endif
 
   // Copy data to dependent lines other than the first
   if (lines>1) {
-    thread_time_t time(copy_kind);
+    thread_time_t time(copy_kind,event);
     for (int i=1;i<lines;i++) {
       const auto& line = request->dependent_lines[i];
       const auto block_data = line->input_block_data(request->block);
@@ -382,31 +432,36 @@ static void absorb_response(block_request_t* request)
 }
 
 void flow_t::process_response(MPI_Status* status) {
-  // Look up block request
-  OTHER_ASSERT(input_blocks);
-  const auto block_id = input_blocks->partition->rank_offsets(status->MPI_SOURCE).x+status->MPI_TAG;
-  const auto it = block_requests.find(block_id);
-  if (it == block_requests.end())
-    die(format("other rank %d sent an unrequested block %lld",status->MPI_SOURCE,block_id));
-  const auto request = it->second;
-  block_requests.erase(it);
-  PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d",status->MPI_SOURCE,status->MPI_TAG);
+  {
+    // Look up block request
+    OTHER_ASSERT(input_blocks);
+    const int tag = status->MPI_TAG;
+    const uint8_t dimensions = request_dimensions(tag);
+    const auto request_id = tag+16*input_blocks->partition->rank_offsets(status->MPI_SOURCE).x;
+    const auto it = block_requests.find(request_id);
+    if (it == block_requests.end())
+      die("other rank %d sent an unrequested block %lld, dimensions %d",status->MPI_SOURCE,request_block_id(request_id),dimensions);
+    const auto request = it->second;
+    block_requests.erase(it);
+    thread_time_t time(response_recv_kind,request->block_lines_event());
+    PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d, dimension %d",status->MPI_SOURCE,request_block_id(tag),dimensions);
 
-  // Decrement input response counters
-  for (auto line : request->dependent_lines)
-    if (!line->decrement_input_responses())
-      free_line_gathers++;
+    // Decrement input response counters
+    for (auto line : request->dependent_lines)
+      if (!line->decrement_input_responses())
+        free_line_gathers++;
 
 #if PENTAGO_MPI_COMPRESS
-  // Schedule decompression task at the head of the job queue (to free memory as soon as possible)
-  const auto compressed = response_buffer.slice_own(0,get_count(status,MPI_BYTE));
-  response_buffer.clean_memory();
-  threads_schedule(CPU,curry(absorb_response,request,compressed),true);
-  post_response_recv();
+    // Schedule decompression task at the head of the job queue (to free memory as soon as possible)
+    const auto compressed = response_buffer.slice_own(0,get_count(status,MPI_BYTE));
+    response_buffer.clean_memory();
+    threads_schedule(CPU,curry(absorb_response,request,compressed),true);
+    post_response_recv();
 #else
-  // Data has already been received into the first dependent line.  Schedule a pure copying job
-  threads_schedule(CPU,curry(absorb_response,request));
+    // Data has already been received into the first dependent line.  Schedule a pure copying job
+    threads_schedule(CPU,curry(absorb_response,request));
 #endif
+  }
 
   // We may be able to schedule more lines if any line gathers completed
   schedule_lines();

@@ -28,7 +28,7 @@ void requests_t::checksome(bool wait) {
     int finished;
     const auto check = wait?MPI_Waitsome:MPI_Testsome;
     {
-      thread_time_t time(wait_kind);
+      thread_time_t time(wait_kind,unevent);
       CHECK(check(n,requests.data(),&finished,indices,statuses));
     }
     // Add requested callback to pending list

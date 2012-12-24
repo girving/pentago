@@ -42,7 +42,7 @@ using std::tr1::unordered_map;
  */
 
 static void compress_and_store(Array<uint8_t>* dst, RawArray<const uint8_t> data, int level) {
-  *dst = compress(data,level);
+  *dst = compress(data,level,unevent);
 }
 
 #if PENTAGO_MPI_COMPRESS
@@ -53,7 +53,10 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
 
 #if PENTAGO_MPI_COMPRESS
   // Uncompress if necessary
-  Array<Vector<super_t,2>> data = blocks->uncompress_and_get_flat(local_id);
+  const event_t event = blocks->local_block_event(local_id);
+  Array<Vector<super_t,2>> data = blocks->uncompress_and_get_flat(local_id,event);
+#else
+  const event_t event = unevent;
 #endif
 
   // Adjust for the different format of block_store_t and apply interleave filtering
@@ -63,7 +66,7 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
   Array<Vector<super_t,2>> filtered;
 #endif
   {
-    thread_time_t time(filter_kind);
+    thread_time_t time(filter_kind,event);
 #if !PENTAGO_MPI_COMPRESS
     filtered = large_buffer<Vector<super_t,2>>(data.size(),false);
 #endif
@@ -75,7 +78,7 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
         filtered[i] = interleave_super(vec(~data[i].y,data[i].x));
   }
   // Compress
-  *dst = compress(char_view(filtered),level);
+  *dst = compress(char_view(filtered),level,event);
   // Tick
   spin_t spin(progress->x); 
   progress->y.progress();
@@ -85,7 +88,7 @@ static void file_open(const MPI_Comm comm, const string& filename, MPI_File* fil
   const int amode = MPI_MODE_WRONLY | MPI_MODE_CREATE;
   int r = MPI_File_open(comm,(char*)filename.c_str(),amode,MPI_INFO_NULL,file);
   if (r != MPI_SUCCESS)
-    die(format("failed to open '%s' for writing: %s",filename,error_string(r)));
+    die("failed to open '%s' for writing: %s",filename,error_string(r));
 }
 
 void write_sections(const MPI_Comm comm, const string& filename, const block_store_t& blocks, const int level) {
@@ -94,11 +97,12 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   const auto& partition = *blocks.partition;
   const int filter = 1; // interleave filtering
   const bool turn = partition.slice&1;
+  const event_t event = unevent;
 
   // Open the file
   MPI_File file;
   {
-    thread_time_t time(write_sections_kind);
+    thread_time_t time(write_sections_kind,event);
     file_open(comm,filename,&file);
   }
 
@@ -121,7 +125,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   uint64_t local_size = 0;
   uint64_t previous = 0;
   {
-    thread_time_t time(write_sections_kind);
+    thread_time_t time(write_sections_kind,event);
     for (const auto& c : compressed)
       local_size += c.size();
     OTHER_ASSERT(local_size<(1u<<31));
@@ -131,7 +135,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   // Broadcast offset of first block index to everyone
   uint64_t block_index_start = rank==ranks-1?header_size+previous+local_size:0;
   {
-    thread_time_t time(write_sections_kind);
+    thread_time_t time(write_sections_kind,event);
     CHECK(MPI_Bcast(&block_index_start,1,MPI_LONG_LONG_INT,ranks-1,comm));
   }
 
@@ -139,7 +143,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   Array<supertensor_blob_t> block_blobs(local_blocks+1,false);
   block_blobs[0].offset = header_size+previous;
   {
-    thread_time_t time(write_sections_kind);
+    thread_time_t time(write_sections_kind,event);
     for (int b : range(local_blocks)) {
       const auto info = blocks.block_info[b];
       block_blobs[b].compressed_size = compressed[b].size();
@@ -151,7 +155,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
   // Concatenate local data into a single buffer
   {
-    thread_time_t time(write_sections_kind);
+    thread_time_t time(write_sections_kind,event);
     Array<uint8_t> buffer(local_size,false);
     int next = 0;
     for (const auto& c : compressed) {
@@ -173,7 +177,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
   Hashtable<int,Array<supertensor_blob_t,4>> block_indexes;
   {
-    thread_time_t time(write_sections_kind);
+    thread_time_t time(write_sections_kind,event);
 
     // Organize block information by section
     int remaining_owned_blocks = 0;
@@ -233,7 +237,6 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   }
 
   // Compress all block indexes
-  thread_time_t time(write_sections_kind);
   vector<Tuple<int,Array<uint8_t>>> compressed_block_indexes;
   compressed_block_indexes.reserve(block_indexes.size());
   for (auto& it : block_indexes) {
@@ -245,6 +248,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   #define block_indexes hide_block_indexes
 
   // Compute block index offsets
+  thread_time_t time(write_sections_kind,event);
   uint64_t local_block_indexes_size = 0;
   for (const auto& bi : compressed_block_indexes)
     local_block_indexes_size += bi.y.size();
@@ -323,7 +327,7 @@ void check_directory(const MPI_Comm comm, const string& dir) {
 }
 
 void write_counts(const MPI_Comm comm, const string& filename, const block_store_t& blocks) {
-  thread_time_t time(write_counts_kind);
+  thread_time_t time(write_counts_kind,unevent);
 
   // Reduce win counts down to root, destroying them in the process
   const int rank = comm_rank(comm);
@@ -362,7 +366,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
 }
 
 void write_sparse_samples(const MPI_Comm comm, const string& filename, block_store_t& blocks) {
-  thread_time_t time(write_sparse_kind);
+  thread_time_t time(write_sparse_kind,unevent);
   const int rank = comm_rank(comm);
   const bool turn = blocks.partition->slice&1;
 

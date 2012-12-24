@@ -1,7 +1,9 @@
-// Instantiation necessary python conversions
+// Instantiate necessary python conversions
 
+#include <pentago/convert.h>
 #include <pentago/section.h>
 #include <pentago/superscore.h>
+#include <pentago/thread.h>
 #include <pentago/utility/wall_time.h>
 #include <other/core/array/convert.h>
 #include <other/core/vector/convert.h>
@@ -30,13 +32,20 @@ template<> struct NumpyInfo<section_t> : public NumpyInfo<CV> {};
 template<> struct NumpyDescr<wall_time_t> : public NumpyDescr<int64_t> {};
 template<> struct NumpyIsScalar<wall_time_t> : public mpl::true_ {};
 
+// history_t looks like Vector<int64_t,3>
+typedef Vector<int64_t,3> IV;
+template<> struct NumpyDescr<history_t> : public NumpyDescr<IV> {};
+template<> struct NumpyIsStatic<history_t> : public NumpyIsStatic<IV> {};
+template<> struct NumpyRank<history_t> : public NumpyRank<IV> {};
+template<> struct NumpyInfo<history_t> : public NumpyInfo<IV> {};
+
 }
 
-VECTOR_CONVERSIONS(2,uint8_t)
-VECTOR_CONVERSIONS(4,uint8_t)
-VECTOR_CONVERSIONS(3,uint64_t)
-VECTOR_CONVERSIONS(4,uint16_t)
-VECTOR_CONVERSIONS(4,Vector<uint8_t,2>)
+OTHER_DEFINE_VECTOR_CONVERSIONS(OTHER_NO_EXPORT,2,uint8_t)
+OTHER_DEFINE_VECTOR_CONVERSIONS(OTHER_NO_EXPORT,4,uint8_t)
+OTHER_DEFINE_VECTOR_CONVERSIONS(OTHER_NO_EXPORT,3,uint64_t)
+OTHER_DEFINE_VECTOR_CONVERSIONS(OTHER_NO_EXPORT,4,uint16_t)
+OTHER_DEFINE_VECTOR_CONVERSIONS(OTHER_NO_EXPORT,4,Vector<uint8_t,2>)
 ARRAY_CONVERSIONS(1,uint8_t)
 ARRAY_CONVERSIONS(1,super_t)
 ARRAY_CONVERSIONS(4,super_t)
@@ -49,5 +58,17 @@ NDARRAY_CONVERSIONS(Vector<super_t,2>)
 ARRAY_CONVERSIONS(1,section_t)
 ARRAY_CONVERSIONS(1,wall_time_t)
 ARRAY_CONVERSIONS(1,Vector<wall_time_t,2>)
+ARRAY_CONVERSIONS(1,history_t)
+
+history_t FromPython<history_t>::convert(PyObject* object) {
+  return from_numpy<history_t>(object);
+}
+
+}
+namespace pentago {
+
+PyObject* to_python(history_t event) {
+  return to_numpy(event);
+}
 
 }

@@ -15,7 +15,7 @@ using std::vector;
 namespace {
 
 struct mmap_buffer_t : public boost::noncopyable {
-  OTHER_DECLARE_TYPE // Declare pytype
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT) // Declare pytype
   PyObject_HEAD // Reference counter and pointer to type object
   size_t size; // Size of memory block
   void* start; // Owning pointer to start of block

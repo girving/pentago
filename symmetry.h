@@ -125,8 +125,8 @@ Tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) OTHER_CON
 bool meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 super_t super_meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 
-ostream& operator<<(ostream& output, symmetry_t s) OTHER_EXPORT;
-ostream& operator<<(ostream& output, local_symmetry_t s) OTHER_EXPORT;
+ostream& operator<<(ostream& output, symmetry_t s);
+ostream& operator<<(ostream& output, local_symmetry_t s);
 symmetry_t random_symmetry(Random& random);
 
 // Convenient enumeration of all symmetries

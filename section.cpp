@@ -1,6 +1,7 @@
 // Board enumeration
 
 #include <pentago/section.h>
+#include <pentago/convert.h>
 #include <pentago/symmetry.h>
 #include <pentago/utility/debug.h>
 #include <other/core/array/NdArray.h>
@@ -58,6 +59,16 @@ section_t section_t::child(int quadrant) const {
   section_t child = *this;
   child.counts[quadrant][sum()&1]++;
   return child;
+}
+
+section_t section_t::parent(int quadrant) const {
+  OTHER_ASSERT((unsigned)quadrant<4);
+  section_t parent = *this;
+  auto& count = parent.counts[quadrant][!(sum()&1)];
+  OTHER_ASSERT(count);
+  count--;
+  OTHER_ASSERT(parent.child(quadrant)==*this);
+  return parent;
 }
 
 section_t section_t::transform(uint8_t global) const {

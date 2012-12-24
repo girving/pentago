@@ -254,7 +254,7 @@ uint64_t all_boards_stats(int n, int symmetries) {
     }
   }
   const uint64_t exact = count_boards(n,2048);
-  cout << format("n = %2d, simple count = %17s, ratio = %5.3f, unreduced ratio = %5.3f, reduced sections = %*d, unreduced sections = %5d, blocks = %9lld %9lld, slices = %8lld %9lld / %7lld %7lld, max section = %14s, average section = %g",
+  cout << format("n = %2d, simple count = %17s, ratio = %5.3f (unreduced %5.3f), sections = %*d (unreduced %5d), blocks = %9lld %9lld, slices = %8lld %9lld / %7lld %7lld, max section = %14s, mean = %.4g",
     n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,slices1.min,slices1.max,slices2.min,slices2.max,large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;

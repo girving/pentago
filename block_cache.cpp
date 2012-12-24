@@ -66,7 +66,7 @@ bool block_cache_t::lookup(const bool aggressive, const board_t board, super_t& 
 
 namespace {
 struct reader_block_cache_t : public block_cache_t {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
   typedef block_cache_t Base;
 
   const uint64_t memory_limit;
@@ -112,7 +112,7 @@ public:
 OTHER_DEFINE_TYPE(reader_block_cache_t)
 
 struct store_block_cache_t : public block_cache_t {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
   typedef block_cache_t Base;
 
   const Ref<const mpi::block_store_t> blocks;
@@ -148,7 +148,7 @@ public:
     const auto it = block_cache.find(key);
     if (it != block_cache.end())
       return it->second;
-    const auto data = blocks->uncompress_and_get(section,block);
+    const auto data = blocks->uncompress_and_get(section,block,unevent);
     const auto memory = memory_usage(data);
     if (free_memory < memory)
       THROW(RuntimeError,"store_block_cache_t: memory limit of %s exceeded (%zu blocks loaded)",large(memory_limit),block_cache.size());

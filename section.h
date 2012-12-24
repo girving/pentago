@@ -36,6 +36,13 @@ struct section_t {
     return s;
   }
 
+  uint32_t microsig() const {
+    return       counts[0].x     +((int)counts[0].y<<4)
+          +((int)counts[1].x<<8) +((int)counts[1].y<<12)
+          +((int)counts[2].x<<16)+((int)counts[2].y<<20)
+          +((int)counts[3].x<<24)+((int)counts[3].y<<28);
+  }
+
   bool operator==(const section_t& s) const {
     return counts==s.counts;
   }
@@ -65,6 +72,7 @@ struct section_t {
   bool valid() const;
   section_t transform(uint8_t global) const;
   section_t child(int quadrant) const;
+  section_t parent(int quadrant) const;
 
   // Given s, find global symmetry g minimizing g(s) and return g(s),g
   template<int symmetries> Tuple<section_t,uint8_t> standardize() const;

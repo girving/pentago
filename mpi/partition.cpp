@@ -82,7 +82,7 @@ partition_t::partition_t(const int ranks, const int slice, Array<const section_t
   , total_blocks(0), total_nodes(0), max_rank_blocks(0), max_rank_nodes(0) {
   OTHER_ASSERT(ranks>0);
   Log::Scope scope("partition");
-  thread_time_t time(partition_kind);
+  thread_time_t time(partition_kind,unevent);
 
   // Verify that caller didn't lie about slice
   for (const auto& section : sections)
@@ -390,7 +390,7 @@ Vector<int,2> partition_t::block_to_line(section_t section, Vector<uint8_t,4> bl
     skip:;
     index++;
   } while (owner_lines.valid(index) && owner_lines[index].section==section);
-  die(format("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section)),str(Vector<int,4>(block))));
+  die("block_to_line failed: section %s, blocks %s, block %s",str(section),str(section_blocks(section)),str(Vector<int,4>(block)));
 }
 
 // (block_id, global node offset) for a given block

@@ -5,8 +5,8 @@ import os
 import re
 import sys
 from numpy import *
-import libpentago as engine
-from libpentago import *
+import pentago_core as engine
+from pentago_core import *
 
 def is_super(board):
   try:

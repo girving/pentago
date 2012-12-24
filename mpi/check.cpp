@@ -2,6 +2,7 @@
 
 #include <pentago/mpi/block_store.h>
 #include <pentago/mpi/utility.h>
+#include <pentago/convert.h>
 #include <pentago/count.h>
 #include <pentago/supertensor.h>
 #include <pentago/symmetry.h>
@@ -24,7 +25,8 @@ using std::flush;
 using std::tr1::unordered_map;
 
 static void meaningless_helper(block_store_t* const self, const int local_id) {
-  thread_time_t time(meaningless_kind);
+  const event_t event = self->local_block_event(local_id);
+  thread_time_t time(meaningless_kind,event);
 
   // Prepare
   const block_info_t* info = &self->block_info[local_id];
@@ -58,15 +60,16 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
           // Count wins
           counts += Vector<uint64_t,3>(popcounts_over_stabilizers(board,node)); 
         }
-  info->missing_contributions = 0;
+  info->missing_dimensions = 0;
 
   // Sample
   for (auto& sample : self->samples[local_id])
     sample.wins = block_data.flat[sample.index];
 
 #if PENTAGO_MPI_COMPRESS
+  time.stop();
   // Compress data into place
-  self->store.compress_and_set(local_id,flat_data);
+  self->store.compress_and_set(local_id,flat_data,event);
 #endif
 
   // Add to section counts
@@ -134,7 +137,7 @@ static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawA
   for (int b : range((int)block_samples.size())) {
     const bool turn = blocks.block_info[b].section.sum()&1;
 #if PENTAGO_MPI_COMPRESS
-    const auto block_data = blocks.uncompress_and_get(b);
+    const auto block_data = blocks.uncompress_and_get(b,unevent);
 #else
     const auto block_data = blocks.get_raw(b);
 #endif
@@ -178,7 +181,7 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
     // Verify that all data matches
     const auto read_data = reader.read_block(info.block).flat;
 #if PENTAGO_MPI_COMPRESS
-    const auto good_data = blocks.uncompress_and_get_flat(b);
+    const auto good_data = blocks.uncompress_and_get_flat(b,unevent);
 #else
     const auto good_data = blocks.get_raw_flat(b);
 #endif

@@ -12,8 +12,8 @@ namespace mpi {
 
 const int max_fast_compressed_size = snappy::MaxCompressedLength(sizeof(Vector<super_t,2>)*sqr(sqr(block_size)));
 
-int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<char> compressed) {
-  thread_time_t time(snappy_kind);
+int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<char> compressed, event_t event) {
+  thread_time_t time(snappy_kind,event);
   // Filter
 #if PENTAGO_MPI_SNAPPY_FILTER
   interleave(uncompressed);
@@ -25,8 +25,8 @@ int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<char> compr
   return size;
 }
 
-void fast_uncompress(RawArray<const char> compressed, RawArray<Vector<super_t,2>> uncompressed) {
-  thread_time_t time(unsnappy_kind);
+void fast_uncompress(RawArray<const char> compressed, RawArray<Vector<super_t,2>> uncompressed, event_t event) {
+  thread_time_t time(unsnappy_kind,event);
   // Uncompress
   size_t uncompressed_size;
   OTHER_ASSERT(   snappy::GetUncompressedLength(compressed.data(),compressed.size(),&uncompressed_size)

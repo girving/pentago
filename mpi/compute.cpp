@@ -54,6 +54,7 @@ OTHER_CONST static inline Tuple<section_t,uint8_t> standardize_child_section(sec
 
 line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_comm)
   : pre(pre)
+  , line_event(pre.line.line_event())
 
   // Standardize
   , standard_child_section(standardize_child_section(pre.line.section,pre.line.dimension).x)
@@ -182,7 +183,7 @@ static OTHER_UNUSED void slow_verify(const char* prefix, const board_t board, co
 // Compute a single 1D line through a section (a 1D component of a block line)
 template<bool slice_35> static void compute_microline(line_details_t* const line, const Vector<int,3> base) {
   // Prepare
-  thread_time_t time(compute_kind);
+  thread_time_t time(compute_kind,line->line_event);
   const auto& pre = line->pre;
   const int dim = pre.line.dimension;
   const int length = pre.line.length;
@@ -320,6 +321,8 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
 
   // Are we done with this line?
   if (!--line->missing_microlines) {
+    time.stop();
+    thread_time_t wakeup(wakeup_kind,line->line_event);
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
     MPI_Request request;
@@ -351,6 +354,7 @@ template void compute_microline<false>(line_details_t* const,const Vector<int,3>
  * per job it is.
  */
 void schedule_compute_line(line_details_t& line) {
+  thread_time_t time(schedule_kind,line.line_event);
   PENTAGO_MPI_TRACE("schedule compute line %s",str(line.line));
   // Schedule each microline
   const auto cross_section = line.pre.output_shape.remove_index(line.pre.line.dimension);

@@ -58,8 +58,8 @@ RawArray<char> sparse_store_t::current_buffer(int array) const {
   return RawArray<char>(sizes[array].size,sparse_base+(size_t)max_array_size*array);
 }
 
-void sparse_store_t::compress_and_set(int array, RawArray<Vector<super_t,2>> uncompressed) {
-  set_size(array,fast_compress(uncompressed,whole_buffer(array)));
+void sparse_store_t::compress_and_set(int array, RawArray<Vector<super_t,2>> uncompressed, event_t event) {
+  set_size(array,fast_compress(uncompressed,whole_buffer(array),event));
 }
 
 }

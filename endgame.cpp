@@ -1,12 +1,13 @@
 // Endgame database computation
 
 #include <pentago/endgame.h>
-#include <pentago/symmetry.h>
-#include <pentago/superscore.h>
+#include <pentago/convert.h>
+#include <pentago/count.h>
 #include <pentago/section.h>
+#include <pentago/superscore.h>
 #include <pentago/supertensor.h>
 #include <pentago/superengine.h>
-#include <pentago/count.h>
+#include <pentago/symmetry.h>
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/debug.h>
 #include <other/core/array/Array2d.h>
@@ -188,7 +189,7 @@ struct read_helper_t : public boost::noncopyable {
   }
 
   void process_block(Vector<uint8_t,4> block, RawArray<Vector<super_t,2>,4> block_data) {
-    thread_time_t time(copy_kind);
+    thread_time_t time(copy_kind,unevent);
     OTHER_ASSERT(block[reorder[0]]==i && block[reorder[1]]==j);
     const int k = block[reorder[2]], l = block[reorder[3]];
     OTHER_ASSERT(block_data.shape==reader.header.block_shape(block));
@@ -239,7 +240,7 @@ OTHER_UNUSED static board_t section_board(const section_t& section, const Vector
 namespace {
 
 struct sparse_sample_t : public Object {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
   const supertensor_header_t header;
   const Vector<int,4> blocks;
@@ -331,7 +332,7 @@ struct write_helper_t : public boost::noncopyable {
   }
 
   void process_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> first_pass_data) {
-    thread_time_t time(copy_kind);
+    thread_time_t time(copy_kind,unevent);
     OTHER_ASSERT(block[order[0]]==i && block[order[1]]==j);
     const int k = block[order[2]], l = block[order[3]];
     const Vector<int,4> block_shape = writer.header.block_shape(block);
@@ -443,7 +444,7 @@ template<bool turn,bool final> struct compute_helper_t {
 
   void compute_slice(int ii, int jj) {
     // Run inner two dimensions sequentially.  Hopefully this produces nice cache behavior.
-    thread_time_t time(compute_kind);
+    thread_time_t time(compute_kind,unevent);
     Vector<uint64_t,3> win_counts;
     for (int kk=0;kk<dest.shape[2];kk++)
       for (int ll=0;ll<dest.shape[3];ll++) {

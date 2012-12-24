@@ -15,7 +15,7 @@ class block_store_t;
 }
 
 struct block_cache_t : public Object {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
 protected:
   block_cache_t();

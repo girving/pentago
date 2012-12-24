@@ -2,7 +2,7 @@
 
 #include <other/core/python/module.h>
 
-OTHER_PYTHON_MODULE(pentago) {
+OTHER_PYTHON_MODULE(pentago_core) {
   OTHER_WRAP(board)
   OTHER_WRAP(score)
   OTHER_WRAP(moves)
@@ -30,4 +30,5 @@ OTHER_PYTHON_MODULE(pentago) {
   OTHER_WRAP(block_store)
   OTHER_WRAP(predict)
   OTHER_WRAP(check)
+  OTHER_WRAP(history)
 }

@@ -1,7 +1,9 @@
 // Information about a single 1D block line
 #pragma once
 
+#include <pentago/mpi/utility.h>
 #include <pentago/section.h>
+#include <pentago/thread.h>
 namespace pentago {
 namespace mpi {
 
@@ -23,7 +25,16 @@ struct line_t {
     OTHER_ASSERT((unsigned)i<=(unsigned)length);
     return vec(block_id+i,node_offset+node_step*i);
   }
+
+  event_t line_event() const {
+    return pentago::mpi::line_event(section,dimension,block_base);
+  }
+
+  event_t block_line_event(int i) const {
+    return pentago::mpi::block_line_event(section,dimension,this->block(i));
+  }
 };
+
 BOOST_STATIC_ASSERT(sizeof(line_t)==40);
 
 ostream& operator<<(ostream& output, const line_t& line);

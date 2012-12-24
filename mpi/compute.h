@@ -44,6 +44,7 @@ struct line_data_t {
 struct line_details_t : public boost::noncopyable {
   // Initial information
   const line_data_t pre;
+  const event_t line_event;
 
   // Standardization
   const section_t standard_child_section;

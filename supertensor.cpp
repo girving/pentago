@@ -1,8 +1,9 @@
 // In memory and out-of-core operations on large four dimensional arrays of superscores
 
 #include <pentago/supertensor.h>
-#include <pentago/filter.h>
 #include <pentago/compress.h>
+#include <pentago/convert.h>
+#include <pentago/filter.h>
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/debug.h>
@@ -29,7 +30,7 @@ const char single_supertensor_magic[21]   = "pentago supertensor\n";
 const char multiple_supertensor_magic[21] = "pentago sections   \n";
 
 struct supertensor_header_py : public Object, public supertensor_header_t {
-  OTHER_DECLARE_TYPE
+  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 protected:
   supertensor_header_py(supertensor_header_t h)
     : supertensor_header_t(h) {}
@@ -60,7 +61,7 @@ void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Ar
   // Read using pread for thread safety
   Array<uint8_t> compressed;
   {
-    thread_time_t time(read_kind);
+    thread_time_t time(read_kind,unevent);
     compressed.resize(blob.compressed_size,false,false);
     ssize_t r = pread(fd,compressed.data(),blob.compressed_size,blob.offset);
     if (r<0 || r!=(ssize_t)blob.compressed_size)
@@ -68,7 +69,7 @@ void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Ar
   }
 
   // Schedule decompression
-  threads_schedule(CPU,compose(cont,curry(decompress,compressed,blob.uncompressed_size)));
+  threads_schedule(CPU,compose(cont,curry(decompress,compressed,blob.uncompressed_size,unevent)));
 }
 
 void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t> data) {
@@ -82,7 +83,7 @@ void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t>
   }
 
   // Write using pwrite for thread safety
-  thread_time_t time(write_kind);
+  thread_time_t time(write_kind,unevent);
   ssize_t w = ::pwrite(fd->fd,data.data(),data.size(),blob->offset);
   if (w < 0 || w < (ssize_t)data.size())
     THROW(IOError,"failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write");
@@ -92,9 +93,9 @@ void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray
   OTHER_ASSERT(thread_type()==CPU);
 
   // Compress
-  thread_time_t time(compress_kind);
+  thread_time_t time(compress_kind,unevent);
   blob->uncompressed_size = data.size();
-  Array<uint8_t> compressed = compress(data,level);
+  Array<uint8_t> compressed = compress(data,level,unevent);
   blob->compressed_size = compressed.size();
 
   // Schedule write
