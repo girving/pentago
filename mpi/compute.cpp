@@ -328,7 +328,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
     MPI_Request request;
     CHECK(MPI_Isend((void*)&line,1,MPI_LONG_LONG_INT,0,wakeup_tag,line->wakeup_comm,&request));
     CHECK(MPI_Request_free(&request));
-    PENTAGO_MPI_TRACE("sent wakeup for %s",str(pre.line));
+    PENTAGO_MPI_TRACE("sent wakeup for %p: %s",line,str(pre.line));
   }
 }
 
@@ -355,7 +355,7 @@ template void compute_microline<false>(line_details_t* const,const Vector<int,3>
  */
 void schedule_compute_line(line_details_t& line) {
   thread_time_t time(schedule_kind,line.line_event);
-  PENTAGO_MPI_TRACE("schedule compute line %s",str(line.line));
+  PENTAGO_MPI_TRACE("schedule compute line %p: %s",&line,str(line.pre.line));
   // Schedule each microline
   const auto cross_section = line.pre.output_shape.remove_index(line.pre.line.dimension);
   const auto compute = line.pre.line.section.sum()==35?compute_microline<true>:compute_microline<false>;

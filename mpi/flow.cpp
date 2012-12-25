@@ -206,7 +206,7 @@ void flow_t::schedule_lines() {
       free_memory -= line_memory;
       free_lines--;
       line = new line_details_t(*preline,comms.wakeup_comm);
-      PENTAGO_MPI_TRACE("allocate line %s",str(line->line));
+      PENTAGO_MPI_TRACE("allocate line %p: %s",line,str(line->pre.line));
     }
     // Request all input blocks
     if (!line->input_blocks)
@@ -349,7 +349,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
   BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
   OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
   line_details_t* const line = (line_details_t*)wakeup_buffer; 
-  PENTAGO_MPI_TRACE("process wakeup %s",str(line->line));
+  PENTAGO_MPI_TRACE("process wakeup %p: %s",line,str(line->pre.line));
   const function<void(MPI_Status*)> callback(curry(&flow_t::finish_output_send,this,line));
   for (int b=0;b<line->pre.line.length;b++) {
     const auto block = line->pre.line.block(b);
@@ -362,7 +362,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
     const int tag = request_id(owner_block_id,0,line->pre.line.dimension);
     MPI_Request request;
     CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.output_comm,&request));
-    PENTAGO_MPI_TRACE("send output: owner %d, owner block id %d, dimension %d, count %d",owner,owner_block_id,dimension,block_data.size());
+    PENTAGO_MPI_TRACE("send output %p: owner %d, owner block id %d, dimension %d, count %d",line,owner,owner_block_id,line->pre.line.dimension,block_data.size());
     requests.add(request,callback);
   }
   post_wakeup_recv();
@@ -370,9 +370,9 @@ void flow_t::process_wakeup(MPI_Status* status) {
 
 void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) {
   const int remaining = line->decrement_unsent_output_blocks();
-  PENTAGO_MPI_TRACE("finish output send %s: remaining %d",str(line->line),remaining);
+  PENTAGO_MPI_TRACE("finish output send %p: %s: remaining %d",line,str(line->pre.line),remaining);
   if (!remaining) {
-    PENTAGO_MPI_TRACE("deallocate line %s",str(line->line));
+    PENTAGO_MPI_TRACE("deallocate line %p: %s",line,str(line->pre.line));
     const auto line_memory = line->pre.memory_usage();
     delete line;
     free_lines++;
