@@ -5,6 +5,8 @@ from pentago import *
 from other.core import *
 from other.core.utility import Log
 import subprocess
+import tempfile
+import shutil
 
 def test_partition():
   init_threads(-1,-1)
@@ -38,11 +40,21 @@ def mpirun():
       return cmd
   raise OSError('no mpirun found, tried %s'%', '.join(cmds))
 
-def test_write(tmpdir):
+class TmpDir(object):
+  def __init__(self,suffix):
+    self.name = tempfile.mkdtemp(suffix)
+
+  def __del__(self):
+    shutil.rmtree(self.name,ignore_errors=True)
+
+def test_write(dir=None):
+  if dir is None:
+    tmpdir = TmpDir('test_write')
+    dir = tmpdir.name
   init_threads(-1,-1)
   for slice in 3,4:
     # Write out meaningless data from MPI
-    dir = '%s/write-%d'%(tmpdir,slice)
+    dir = '%s/write-%d'%(dir,slice)
     run('%s -n 2 endgame-mpi --threads 3 --dir %s --test write-%d'%(mpirun(),dir,slice))
 
     # Check
@@ -79,10 +91,13 @@ def test_write(tmpdir):
       assert total==os.stat(slice_file).st_size
       compare_blocks_with_supertensors(blocks,readers)
 
-def test_meaningless(tmpdir):
+def test_meaningless(dir=None):
+  if dir is None:
+    tmpdir = TmpDir('test_meaningless')
+    dir = tmpdir.name
   for slice in 4,5:
     # Compute small count slices based on meaningless data
-    dir = '%s/meaningless-%d'%(tmpdir,slice)
+    dir = '%s/meaningless-%d'%(dir,slice)
     run('%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d 00000000 --dir %s'%(mpirun(),slice,dir))
     # Check validity
     run('%s/check --meaningless %d %s'%(os.path.dirname(__file__),slice,dir))
