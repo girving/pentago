@@ -32,8 +32,9 @@ def run(cmd):
 @cache
 def mpirun():
   cmds = 'mpirun','aprun'
+  devnull = open(os.devnull,'w')
   for cmd in 'mpirun','aprun':
-    if not subprocess.call(['which','-s',cmd]):
+    if not subprocess.call(['which',cmd],stdout=devnull,stderr=devnull):
       return cmd
   raise OSError('no mpirun found, tried %s'%', '.join(cmds))
 
