@@ -77,6 +77,7 @@ struct line_details_t : public boost::noncopyable {
 
   // When computation is complete, send a wakeup message here
   const MPI_Comm wakeup_comm;
+  const line_details_t* const self; // Buffer for wakeup message
 
   line_details_t(const line_data_t& pre, const MPI_Comm wakeup_comm);
   ~line_details_t();

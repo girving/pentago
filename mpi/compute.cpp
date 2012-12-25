@@ -83,7 +83,8 @@ line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_com
   , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product(),false))
 
   // When computation is complete, send a wakeup message here
-  , wakeup_comm(wakeup_comm) {
+  , wakeup_comm(wakeup_comm)
+  , self(this) {
 
   // Split buffer into two pieces
   const int split = pre.input_shape.product();
@@ -323,10 +324,10 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
   if (!--line->missing_microlines) {
     time.stop();
     thread_time_t wakeup(wakeup_kind,line->line_event);
-    BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
+    BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
     MPI_Request request;
-    CHECK(MPI_Isend((void*)&line,1,MPI_LONG_LONG_INT,0,wakeup_tag,line->wakeup_comm,&request));
+    CHECK(MPI_Isend((void*)&line->self,1,MPI_LONG_LONG_INT,0,wakeup_tag,line->wakeup_comm,&request));
     CHECK(MPI_Request_free(&request));
     PENTAGO_MPI_TRACE("sent wakeup for %p: %s",line,str(pre.line));
   }
