@@ -34,7 +34,7 @@ if meaningless:
 unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if f not in 'log empty.pentago' and not f.startswith('history'))
 random = Random(8183131)
 init_supertable(16)
-for slice in arange(36):
+for slice in arange(36)[::-1]:
   counts_file = '%s/counts-%d.npy'%(dir,slice)
   sparse_file = '%s/sparse-%d.npy'%(dir,slice)
   slice_file = '%s/slice-%d.pentago'%(dir,slice)
