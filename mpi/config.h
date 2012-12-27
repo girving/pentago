@@ -27,7 +27,7 @@ const int block_size = 8;
 const int block_shift = 3;
 
 // Hopefully conservative estimate of snappy's compression ratio on our data
-const double snappy_compression_estimate = .5;
+const double snappy_compression_estimate = .45;
 
 // Whether or not to merge matching block requests
 const bool merge_block_requests = true;

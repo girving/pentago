@@ -65,6 +65,9 @@ def line_parallelism(base_memory):
   return (memory-base_memory)/line_cost
 speed_estimate = 455092
 
+# Limit the number of per rank blocks for tag purposes
+block_limit = 2**17-1
+
 # Simulate execution
 slices = descendent_sections(section,35)
 prev_partition = None
@@ -84,8 +87,8 @@ for slice in reversed(xrange(len(slices))):
     Log.write('blocks = %d'%partition.max_rank_blocks)
     Log.write('nodes = %d'%partition.max_rank_nodes)
     max_blocks = max(max_blocks,partition.max_rank_blocks)
-    if partition.max_rank_blocks>=32767:
-      raise RuntimeError('max rank blocks = %d > 32767'%partition.max_rank_blocks)
+    if partition.max_rank_blocks>=block_limit:
+      raise RuntimeError('max rank blocks = %d > %d'%(partition.max_rank_blocks,block_limit))
     base_memory = max_rank_memory_usage(prev_partition,partition)
     max_base_memory = max(max_base_memory,base_memory)
     Log.write('base memory = %s'%large(base_memory))

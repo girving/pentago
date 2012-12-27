@@ -25,7 +25,7 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, co
                       + 2*sizeof(block_store_t) // block_store_t
                       + sizeof(block_info_t)*counts.x // block_store_t.block_info
 #if PENTAGO_MPI_COMPRESS
-                      + sparse_store_t::estimate_peak_memory_usage(counts.x,sizeof(Vector<super_t,2>)*counts.y) // block_store_t.store
+                      + sparse_store_t::estimate_peak_memory_usage(counts.x,snappy_compression_estimate*sizeof(Vector<super_t,2>)*counts.y) // block_store_t.store
 #else
                       + sizeof(Vector<super_t,2>)*counts.y // block_store_t.all_data
 #endif
