@@ -171,6 +171,7 @@ struct history_t {
 };
 
 // Operations on tracked history.  If history is untracked, these are trivial.
+bool thread_history_enabled();
 vector<vector<Array<const history_t>>> thread_history();
 void write_thread_history(const string& filename);
 

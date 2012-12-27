@@ -461,6 +461,10 @@ void report_thread_times(RawArray<const wall_time_t> times, const string& name) 
   cout << flush;
 }
 
+bool thread_history_enabled() {
+  return HISTORY;
+}
+
 vector<vector<Array<const history_t>>> thread_history() {
   clear_thread_times();
   lock_t lock(time_mutex);

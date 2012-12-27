@@ -15,10 +15,12 @@
 #include <pentago/superengine.h>
 #include <pentago/supertable.h>
 #include <pentago/utility/aligned.h>
+#include <pentago/utility/index.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
 #include <pentago/utility/wall_time.h>
 #include <other/core/array/Array2d.h>
+#include <other/core/random/Random.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <sys/resource.h>
@@ -125,6 +127,7 @@ int toplevel(int argc, char** argv) {
   string test;
   int meaningless = 0;
   int stop_after = 0;
+  int randomize = 0;
   static const option options[] = {
     {"help",no_argument,0,'h'},
     {"threads",required_argument,0,'t'},
@@ -141,6 +144,7 @@ int toplevel(int argc, char** argv) {
     {"meaningless",required_argument,0,'n'},
     {"per-rank-times",no_argument,0,'z'},
     {"stop-after",required_argument,0,'S'},
+    {"randomize",required_argument,0,'R'},
     {0,0,0,0}};
   for (;;) {
     int option = 0;
@@ -168,6 +172,7 @@ int toplevel(int argc, char** argv) {
                   "      --meaningless <n>      Use meaningless values the given slice\n"
                   "      --per-rank-times       Print a timing report for each rank\n"
                   "      --stop-after <n>       Stop after computing the given slice\n"
+                  "      --randomize <seed>     If nonzero, compute lines in random order using given seed\n"
                << flush;
         }
         return 0;
@@ -188,6 +193,7 @@ int toplevel(int argc, char** argv) {
       INT_ARG('g',gather-limit,gather_limit)
       INT_ARG('L',line-limit,line_limit)
       INT_ARG('S',stop-after,stop_after)
+      INT_ARG('R',randomize,randomize)
       case 'm': {
         double memory = strtod(optarg,&end);
         if (!strcmp(end,"MB") || !strcmp(end,"M"))
@@ -306,6 +312,9 @@ int toplevel(int argc, char** argv) {
          << "\ngather limit = "<<gather_limit
          << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
+         << "\nhistory = "<<thread_history_enabled()
+         << "\nmerge = "<<merge_block_requests
+         << "\nrandomize = "<<randomize
          << "\ntag ub = "<<tag_ub
          << endl;
 #ifdef PENTAGO_MPI_DEBUG
@@ -380,6 +389,10 @@ int toplevel(int argc, char** argv) {
       // Compute (and communicate)
       {
         Log::Scope scope("compute");
+        if (randomize) {
+          const int seed = index(vec(0,ranks,37),vec(randomize,rank,slice));
+          new_<Random>(seed)->shuffle(lines);
+        }
         compute_lines(comms,prev_blocks,blocks,lines,free_memory,gather_limit,line_limit);
       }
       blocks->print_compression_stats(comm);
