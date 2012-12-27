@@ -214,7 +214,7 @@ void block_store_t::accumulate(int local_id, uint8_t dimension, RawArray<Vector<
     OTHER_ASSERT(info.missing_dimensions&1<<dimension);
     info.missing_dimensions &= ~(1<<dimension);
     if (!info.missing_dimensions) {
-      thread_time_t time("count");
+      thread_time_t time(count_kind,event);
       for (auto& sample : samples[local_id])
         sample.wins = local_data[sample.index];
       const auto counts = count_block_wins(info.section,info.block,local_data);
@@ -314,7 +314,7 @@ RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Ve
   const auto offsets = partition->block_offsets(section,block);
   const int local_id = offsets.x-first.x;
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
-  OTHER_ASSERT(!block_info[local_id].missing_contributions);
+  OTHER_ASSERT(!block_info[local_id].missing_dimensions);
   const auto shape = block_shape(section.shape(),block);
   OTHER_ASSERT(first.y<=offsets.y && offsets.y+shape.product()<=last.y);
   return RawArray<const Vector<super_t,2>,4>(shape,all_data.data()+offsets.y-first.y);
@@ -322,7 +322,7 @@ RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Ve
 
 RawArray<const Vector<super_t,2>> block_store_t::get_raw_flat(int local_id) const {
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
-  OTHER_ASSERT(!block_info[local_id].missing_contributions);
+  OTHER_ASSERT(!block_info[local_id].missing_dimensions);
   return all_data.slice(block_info[local_id].offset,block_info[local_id+1].offset);
 }
 
