@@ -8,6 +8,7 @@
 #include <pentago/mpi/trace.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/thread.h>
+#include <pentago/utility/char_view.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/Array4d.h>
@@ -112,16 +113,10 @@ struct flow_t {
 
   // Space for persistent message requests
   Vector<Array<Vector<super_t,2>>,wildcard_recv_count> output_buffers;
-#if PENTAGO_MPI_COMPRESS
-  Vector<Array<char>,wildcard_recv_count> response_buffers;
-#endif
   uint64_t wakeup_buffer;
 
   // Wildcard callbacks
-  function<void(MPI_Status*)> barrier_callback, request_callback, wakeup_callback;
-#if !PENTAGO_MPI_COMPRESS
-  function<void(MPI_Status*)> response_callback;
-#endif
+  function<void(MPI_Status*)> barrier_callback, request_callback, wakeup_callback, response_callback;
 
   flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
   ~flow_t();
@@ -129,20 +124,13 @@ struct flow_t {
   void schedule_lines();
   void post_barrier_recv();
   void post_request_recv();
-#if PENTAGO_MPI_COMPRESS
-  void post_response_recv(Array<char>* buffer);
-#endif
   void post_output_recv(Array<Vector<super_t,2>>* buffer);
   void post_wakeup_recv();
   void process_barrier(MPI_Status* status);
   void process_request(MPI_Status* status);
   void process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status);
   void process_wakeup(MPI_Status* status);
-#if PENTAGO_MPI_COMPRESS
-  void process_response(Array<char>* buffer, MPI_Status* status);
-#else
   void process_response(MPI_Status* status);
-#endif
   void finish_output_send(line_details_t* const line, MPI_Status* status);
 };
 
@@ -158,9 +146,7 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , barrier_callback(curry(&flow_t::process_barrier,this))
   , request_callback(curry(&flow_t::process_request,this))
   , wakeup_callback(curry(&flow_t::process_wakeup,this))
-#if !PENTAGO_MPI_COMPRESS
   , response_callback(curry(&flow_t::process_response,this))
-#endif
 {
 
   OTHER_ASSERT(free_line_gathers>=1);
@@ -169,7 +155,7 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   unscheduled_lines.preallocate(lines.size());
   for (int i=lines.size()-1;i>=0;i--) {
     const auto line = new line_data_t(lines[i]);
-    OTHER_ASSERT(line->memory_usage()<=memory_limit/2);
+    OTHER_ASSERT(line->memory_usage<=memory_limit/2);
     unscheduled_lines.append_assuming_enough_space(line);
   }
 
@@ -177,10 +163,6 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   post_barrier_recv();
   for (int i=0;i<wildcard_recv_count;i++)
     post_request_recv();
-#if PENTAGO_MPI_COMPRESS
-  for (auto& buffer : response_buffers)
-    post_response_recv(&buffer);
-#endif
   for (auto& buffer : output_buffers)
     post_output_recv(&buffer);
   post_wakeup_recv();
@@ -209,7 +191,7 @@ void flow_t::schedule_lines() {
     line_details_t* line;
     {
       const line_data_t* preline = unscheduled_lines.back();
-      const auto line_memory = preline->memory_usage();
+      const auto line_memory = preline->memory_usage;
       if (free_memory < line_memory)
         return;
       // Schedule the line
@@ -258,18 +240,18 @@ void flow_t::schedule_lines() {
           const int owner = input_blocks->partition->block_to_rank(line->standard_child_section,block);
           const auto owner_offsets = input_blocks->partition->rank_offsets(owner);
           const int tag = request_id-pentago::mpi::request_id(owner_offsets.x,dimensions_t::raw(0));
+          it = block_requests.insert(make_pair(request_id,block_request)).first;
+          // Post receives for all responses, feeding directly into the input memory for the first line.
+          // We can still do this in compressed mode since the input buffer has an extra entry to account for expansion.
+          const RawArray<Vector<super_t,2>> block_data = line->input_block_data(b);
+          MPI_Request request;
+          if (PENTAGO_MPI_COMPRESS)
+            CHECK(MPI_Irecv(block_data.data(),memory_usage(block_data),MPI_BYTE,owner,tag,comms.response_comm,&request));
+          else
+            CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.response_comm,&request));
           send_empty(owner,tag,comms.request_comm);
           PENTAGO_MPI_TRACE("block request: owner %d, request_id %d,tag %d",owner,request_id,tag);
-          it = block_requests.insert(make_pair(request_id,block_request)).first;
-#if !PENTAGO_MPI_COMPRESS
-          // In uncompressed mode, we can post receives for all responses simultaneously, feeding directly
-          // into the input memory for the first line.  In compressed mode, responses are handled by a
-          // single wildcard recv.
-          const auto block_data = line->input_block_data(b);
-          MPI_Request request;
-          CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.response_comm,&request));
           requests.add(request,response_callback);
-#endif
         }
         it->second->dependent_lines.push_back(line);
       }
@@ -387,7 +369,7 @@ void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) 
   PENTAGO_MPI_TRACE("finish output send %p: %s: remaining %d",line,str(line->pre.line),remaining);
   if (!remaining) {
     PENTAGO_MPI_TRACE("deallocate line %p: %s",line,str(line->pre.line));
-    const auto line_memory = line->pre.memory_usage();
+    const auto line_memory = line->pre.memory_usage;
     delete line;
     free_lines++;
     free_memory += line_memory;
@@ -399,32 +381,27 @@ void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) 
 }
 
 #if PENTAGO_MPI_COMPRESS
-void flow_t::post_response_recv(Array<char>* buffer) {
-  PENTAGO_MPI_TRACE("post response recv");
-  MPI_Request request;
-  if (!buffer->size())
-    *buffer = large_buffer<char>(max_fast_compressed_size,false);
-  OTHER_ASSERT(buffer->size()==max_fast_compressed_size);
-  CHECK(MPI_Irecv(buffer->data(),buffer->size(),MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.response_comm,&request));
-  requests.add(request,curry(&flow_t::process_response,this,buffer),true);
-}
+// Thread local temporary buffer for "in place" decompression.
+static __thread Vector<super_t,2>* decompression_buffer;
 #endif
 
-#if PENTAGO_MPI_COMPRESS
-static void absorb_response(block_request_t* request, RawArray<char> compressed)
-#else
-static void absorb_response(block_request_t* request)
-#endif
-{
+static void absorb_response(block_request_t* request, const int recv_size) {
   const int lines = request->dependent_lines.size();
   OTHER_ASSERT(lines);
   const auto first_line = request->dependent_lines[0];
   const auto first_block_data = first_line->input_block_data(request->block);
+  const int nodes = first_block_data.size()-PENTAGO_MPI_COMPRESS;
   const auto event = request->block_lines_event();
 
 #if PENTAGO_MPI_COMPRESS
-  // Uncompress data into the first dependent line
-  fast_uncompress(compressed,first_block_data,event);
+  // Uncompress data into a temporary buffer
+  Vector<super_t,2>* buffer_ptr = decompression_buffer;
+  if (!buffer_ptr)
+    buffer_ptr = decompression_buffer = (Vector<super_t,2>*)malloc(sizeof(Vector<super_t,2>)*sqr(sqr(block_size)));
+  RawArray<Vector<super_t,2>> buffer(nodes,buffer_ptr);
+  fast_uncompress(char_view(first_block_data).slice(0,recv_size),buffer,event);
+  // Copy back to first dependent line
+  memcpy(first_block_data.data(),buffer.data(),memory_usage(buffer));
 #endif
 
   // Copy data to dependent lines other than the first
@@ -433,8 +410,8 @@ static void absorb_response(block_request_t* request)
     for (int i=1;i<lines;i++) {
       const auto& line = request->dependent_lines[i];
       const auto block_data = line->input_block_data(request->block);
-      OTHER_ASSERT(block_data.size()==first_block_data.size());
-      memcpy(block_data.data(),first_block_data.data(),sizeof(Vector<super_t,2>)*first_block_data.size());
+      OTHER_ASSERT(block_data.size()==nodes+PENTAGO_MPI_COMPRESS);
+      memcpy(block_data.data(),first_block_data.data(),sizeof(Vector<super_t,2>)*nodes);
       line->decrement_missing_input_blocks();
     }
   }
@@ -446,12 +423,7 @@ static void absorb_response(block_request_t* request)
   delete request;
 }
 
-#if PENTAGO_MPI_COMPRESS
-void flow_t::process_response(Array<char>* buffer, MPI_Status* status)
-#else
-void flow_t::process_response(MPI_Status* status)
-#endif
-{
+void flow_t::process_response(MPI_Status* status) {
   {
     // Look up block request
     OTHER_ASSERT(input_blocks);
@@ -471,16 +443,11 @@ void flow_t::process_response(MPI_Status* status)
       if (!line->decrement_input_responses())
         free_line_gathers++;
 
-#if PENTAGO_MPI_COMPRESS
-    // Schedule decompression task at the head of the job queue (to free memory as soon as possible)
-    const auto compressed = buffer->slice_own(0,get_count(status,MPI_BYTE));
-    buffer->clean_memory();
-    threads_schedule(CPU,curry(absorb_response,request,compressed),true);
-    post_response_recv(buffer); // Repost Irecv
-#else
-    // Data has already been received into the first dependent line.  Schedule a pure copying job
-    threads_schedule(CPU,curry(absorb_response,request));
-#endif
+    // Data has already been received into the first dependent line, but may be compressed.
+    // Schedule a decompression and/or copying job.  No need to put this at the front of the queue,
+    // since there's no memory to be deallocated.
+    const int recv_size = get_count(status,MPI_BYTE);
+    threads_schedule(CPU,curry(absorb_response,request,recv_size));
   }
 
   // We may be able to schedule more lines if any line gathers completed

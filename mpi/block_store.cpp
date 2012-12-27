@@ -31,7 +31,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, const
   , section_counts(partition.sections.size())
   , required_contributions(0) // set below
 #if PENTAGO_MPI_COMPRESS
-  , store(last.x-first.x,max_fast_compressed_size)
+  , store(last.x-first.x,raw_max_fast_compressed_size)
 #endif
 {
   // Make sure 32-bit array indices suffice
@@ -301,7 +301,7 @@ Array<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(int local_id, ev
   return flat;
 }
 
-RawArray<const char> block_store_t::get_compressed(int local_id, bool allow_incomplete) const {
+RawArray<const uint8_t> block_store_t::get_compressed(int local_id, bool allow_incomplete) const {
   OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
   if (!allow_incomplete)
     OTHER_ASSERT(!block_info[local_id].missing_dimensions);

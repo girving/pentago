@@ -23,7 +23,7 @@ using std::endl;
 /*********************** line_data_t ************************/
 
 line_data_t::line_data_t(const line_t& line)
-  : line(line) {
+  : line(line), memory_usage(0) {
 
   // Compute input and output shapes
   const int dim = line.dimension;
@@ -39,13 +39,13 @@ line_data_t::line_data_t(const line_t& line)
     input_shape = Vector<int,4>();
   const_cast_(this->input_shape) = input_shape;
   const_cast_(this->output_shape) = output_shape;
+
+  // Estimate memory usage: expected size plus 1 entry per input block so that we can receive compressed data in place.
+  const uint8_t input_blocks = ceil_div(input_shape[dim],block_size);
+  const_cast_(memory_usage) = sizeof(Vector<super_t,2>)*(input_shape.product()+output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks);
 }
 
 line_data_t::~line_data_t() {}
-
-uint64_t line_data_t::memory_usage() const {
-  return sizeof(Vector<super_t,2>)*(input_shape.product()+output_shape.product());
-}
 
 // Mark this const so that the two identical calls in line_details_t's constructor can be CSE'ed
 OTHER_CONST static inline Tuple<section_t,uint8_t> standardize_child_section(section_t section, int dimension) {
@@ -80,14 +80,14 @@ line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_com
   , unsent_output_blocks(pre.line.length)
 
   // Allocate memory for both input and output in a single buffer
-  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product(),false))
+  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks,false))
 
   // When computation is complete, send a wakeup message here
   , wakeup_comm(wakeup_comm)
   , self(this) {
 
   // Split buffer into two pieces
-  const int split = pre.input_shape.product();
+  const int split = pre.input_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks;
   const_cast_(output) = input.slice_own(split,input.size());
   const_cast_(input) = input.slice_own(0,split);
 
@@ -129,8 +129,9 @@ Vector<uint8_t,4> line_details_t::input_block(int k) const {
 
 RawArray<Vector<super_t,2>> line_details_t::input_block_data(int k) const {
   OTHER_ASSERT((unsigned)k<(unsigned)input_blocks);
-  const int start = pre.line.node_step*k;
-  return input.slice(start,min(start+pre.line.node_step,input.size()));
+  const int step = pre.line.node_step+PENTAGO_MPI_COMPRESS;
+  const int start = step*k;
+  return input.slice(start,min(start+step,input.size()));
 }
 
 RawArray<Vector<super_t,2>> line_details_t::input_block_data(Vector<uint8_t,4> block) const {
@@ -257,7 +258,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
                                           (child_dim!=2)*child_rmin[2].x[reflected_first_child_node[2]],
                                           (child_dim!=3)*child_rmin[3].x[reflected_first_child_node[3]]);
   for (int j : range(line->input_shape[dim])) {
-    const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+block_stride*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
+    const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+(block_stride+PENTAGO_MPI_COMPRESS)*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
     auto child_index = reflected_child_base;
     child_index[child_dim] = j^(j<line_moves);
     const auto child_node = block_size*line->first_child_block+child_index;
@@ -301,7 +302,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
         const uint16_t ir = rotation_minimal_quadrants_inverse[new_q];
         const int j = ir/4;
         const symmetry_t symmetry = local_symmetry_t((ir&3)<<2*dim)*base_transform*local_symmetry_t(symmetries[j]);
-        const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+block_stride*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
+        const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+(block_stride+PENTAGO_MPI_COMPRESS)*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
 #ifdef PENTAGO_MPI_DEBUG
         const auto child_board = child_board_base|(board_t)child_rmin[child_dim].x[j^(j<line_moves)]<<16*child_dim;
         slow_verify("child inline",child_board,child,true);

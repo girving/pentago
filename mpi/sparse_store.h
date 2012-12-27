@@ -36,7 +36,7 @@ class sparse_store_t : public boost::noncopyable {
 
   const int max_array_size; // Rounded up to the nearest page
   const size_t sparse_size; // count*max_array_size
-  char* const sparse_base; // mmap'ed memory region, only part of which will ever be resident in memory
+  uint8_t* const sparse_base; // mmap'ed memory region, only part of which will ever be resident in memory
 public:
 
   // Allocates count empty arrays.  No array can grow beyond the given limit.
@@ -62,10 +62,10 @@ public:
   // Get access to the entire buffer available to this array.  This must be used with care:
   // most of it is likely to be non-resident, so loop through the entire thing could cause
   // massive swapping.  Write or read only the part you need, then call set_size if necessary.
-  RawArray<char> whole_buffer(int array) const;
+  RawArray<uint8_t> whole_buffer(int array) const;
 
   // Get access to the correctly sized, currently allocated buffer.
-  RawArray<char> current_buffer(int array) const;
+  RawArray<uint8_t> current_buffer(int array) const;
 
   // Replace the given array with the compressed version of the given buffer.  The input array is destroyed.
   void compress_and_set(int array, RawArray<Vector<super_t,2>> uncompressed, event_t event);

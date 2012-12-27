@@ -31,4 +31,5 @@ OTHER_PYTHON_MODULE(pentago_core) {
   OTHER_WRAP(predict)
   OTHER_WRAP(check)
   OTHER_WRAP(history)
+  OTHER_WRAP(fast_compress)
 }

@@ -16,7 +16,7 @@ sparse_store_t::sparse_store_t(const int count, const int max_size)
   : sizes(count)
   , max_array_size((max_size+page_size-1)&~(page_size-1))
   , sparse_size((size_t)count*max_array_size)
-  , sparse_base(sparse_size?(char*)mmap(0,sparse_size,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0):0) {
+  , sparse_base(sparse_size?(uint8_t*)mmap(0,sparse_size,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0):0) {
   if (sparse_base==MAP_FAILED)
     THROW(RuntimeError,"anonymous mmap of size %zu failed, %s",sparse_size,strerror(errno));
   memset(sizes.data(),0,memory_usage(sizes));
@@ -50,12 +50,12 @@ void sparse_store_t::set_size(int array, int size) const {
   info.peak_size = max(info.peak_size,size);
 }
 
-RawArray<char> sparse_store_t::whole_buffer(int array) const {
-  return RawArray<char>(max_array_size,sparse_base+(size_t)max_array_size*array);
+RawArray<uint8_t> sparse_store_t::whole_buffer(int array) const {
+  return RawArray<uint8_t>(max_array_size,sparse_base+(size_t)max_array_size*array);
 }
 
-RawArray<char> sparse_store_t::current_buffer(int array) const {
-  return RawArray<char>(sizes[array].size,sparse_base+(size_t)max_array_size*array);
+RawArray<uint8_t> sparse_store_t::current_buffer(int array) const {
+  return RawArray<uint8_t>(sizes[array].size,sparse_base+(size_t)max_array_size*array);
 }
 
 void sparse_store_t::compress_and_set(int array, RawArray<Vector<super_t,2>> uncompressed, event_t event) {

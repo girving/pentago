@@ -33,12 +33,10 @@ struct line_data_t {
   const line_t& line;
   const Vector<int,4> input_shape; // Unstandardized
   const Vector<int,4> output_shape;
+  const uint64_t memory_usage;
 
   line_data_t(const line_t& line);
   ~line_data_t();
-
-  // Estimate memory usage of corresponding line details
-  uint64_t memory_usage() const;
 };
 
 struct line_details_t : public boost::noncopyable {
@@ -85,7 +83,8 @@ struct line_details_t : public boost::noncopyable {
   // Get the kth input block
   Vector<uint8_t,4> input_block(int k) const;
 
-  // Extract the data for the kth block of either the input or output array
+  // Extract the data for the kth block of either the input or output array.
+  // In compressed mode, input block data has an extra entry to account for possible expansion.
   RawArray<Vector<super_t,2>> input_block_data(int k) const;
   RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>> output_block_data(int k) const;

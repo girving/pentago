@@ -102,6 +102,29 @@ def test_meaningless(dir=None):
     # Check validity
     run('%s/check --meaningless %d %s'%(os.path.dirname(__file__),slice,dir))
 
+def test_fast_compress():
+  init_threads(-1,-1)
+  def compress_check(input):
+    buffer = empty(64+7*input.nbytes//6,dtype=uint8)
+    compressed = buffer[:fast_compress(input.copy(),buffer,0)]
+    output = empty_like(input)
+    fast_uncompress(compressed,output,0)
+    assert all(input==output)
+    return compressed
+  # Test a highly compressible sequence
+  regular = arange(64//4*18731).view(uint64).reshape(-1,2,4)
+  compressed = compress_check(regular)
+  assert compressed[0]==1
+  ratio = len(compressed)/regular.nbytes
+  assert ratio < .31
+  # Test various random (incompressible) sequences
+  random.seed(18731)
+  for n in 0,64,64*18731:
+    bad = fromstring(random.bytes(n),dtype=uint64).reshape(-1,2,4)
+    compressed = compress_check(bad)
+    assert compressed[0]==0
+    assert len(compressed)==bad.nbytes+1
+  
 if __name__=='__main__':
   Log.configure('test',False,False,100)
   if not os.path.exists('tmp'):
@@ -110,3 +133,4 @@ if __name__=='__main__':
   test_counts()
   test_meaningless('tmp')
   partition_test()
+  test_fast_compress()

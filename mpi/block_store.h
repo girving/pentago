@@ -118,7 +118,7 @@ public:
   Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
   Array<Vector<super_t,2>,4> uncompress_and_get(int local_id, event_t event) const;
   Array<Vector<super_t,2>> uncompress_and_get_flat(int local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
-  RawArray<const char> get_compressed(int local_id, bool allow_incomplete=false) const;
+  RawArray<const uint8_t> get_compressed(int local_id, bool allow_incomplete=false) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>,4> get_raw(int local_id) const;
