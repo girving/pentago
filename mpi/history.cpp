@@ -125,7 +125,7 @@ string str_event(const event_t event) {
   }
 }
 
-static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, event_t event) {
+static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, event_t event, event_t root) {
   // Parse event
   const section_t section = parse_section(event);
   const auto block = parse_block(event);
@@ -142,10 +142,14 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
       break; }
     case request_send_kind: {
       OTHER_ASSERT(ekind==block_lines_ekind);
-      const auto parent_section = section.parent(child_dimension).standardize<8>();
-      const auto permutation = section_t::quadrant_permutation(symmetry_t::invert_global(parent_section.y));
-      const auto block_base = Vector<uint8_t,4>(block.subset(permutation)).remove_index(parent_dimension);
-      deps.append(tuple(allocate_line_kind,line_event(parent_section.x,parent_dimension,block_base)));
+      if (0) {
+        const auto parent_section = section.parent(child_dimension).standardize<8>();
+        const auto permutation = section_t::quadrant_permutation(symmetry_t::invert_global(parent_section.y));
+        const auto block_base = Vector<uint8_t,4>(block.subset(permutation)).remove_index(parent_dimension);
+        deps.append(tuple(allocate_line_kind,line_event(parent_section.x,parent_dimension,block_base)));
+      }
+      OTHER_ASSERT((root&ekind_mask)==line_ekind);
+      deps.append(tuple(allocate_line_kind,root));
       break; }
     case response_send_kind: {
       OTHER_ASSERT(ekind==block_lines_ekind);
@@ -191,9 +195,9 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
 }
 
 // Compute the dependencies of a given event.  Returns a list of (thread,kind,event) triples.
-vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int thread, const int kind, const history_t source) {
+vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int thread, const int kind, const history_t source, const history_t root) {
   vector<Tuple<int,int,history_t>> deps;
-  for (const auto kind_event : dependencies(time_kind_t(kind),source.event)) {
+  for (const auto kind_event : dependencies(time_kind_t(kind),source.event,root.event)) {
     const int dep_kind = kind_event.x;
     const event_t dep_event = kind_event.y;
     // Search for event in each thread
@@ -231,10 +235,13 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
 
 // Find dependencies for all dvents as a consistency check
 void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history) {
+  OTHER_NOT_IMPLEMENTED();
+/*
   for (int thread : range((int)event_sorted_history.size()))
     for (int kind : range((int)event_sorted_history[thread].size()))
       for (const auto& event : event_sorted_history[thread][kind])
         event_dependencies(event_sorted_history,thread,kind,event);
+*/
 }
 
 }

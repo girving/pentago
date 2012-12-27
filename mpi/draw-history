@@ -14,6 +14,8 @@ import glob
 props = PropManager()
 history_dir = props.add('history','').set_required(True).set_help('record thread execution history to given file').set_category('history')
 dependency_depth = props.add('dependency_depth',10).set_help('search back this far when drawing selected events').set_category('history')
+label_dependencies = props.add('label_dependencies',False).set_help('draw text for each event in the picked dependeny graph').set_category('history')
+run_checks = props.add('check',False).set_help('run expensive self checks').set_category('history')
 #short = props.add('short',1).set_help('events separated by less than this number of milliseconds will be merged').set_category('history')
 #drop = props.add('drop',.1).set_help('kinds which take less than this amount of time won\'t be shown').set_category('history')
 #mode = props.add('mode','rasterize').set_allowed('rasterize bar'.split()).set_help('rendering mode').set_category('history')
@@ -73,7 +75,8 @@ class HistoryScene(Scene):
       def sort_by_events(events):
         return events[argsort(events[:,0])] if len(events) else events
       self.event_sorted_history = map(curry(map,sort_by_events),history)
-      check_dependencies(self.event_sorted_history)
+      if run_checks():
+        check_dependencies(self.event_sorted_history)
 
     # Pick colors and generate legend information.
     # Use distinguishable colors for important entries, black for the rest
@@ -124,34 +127,44 @@ class HistoryScene(Scene):
       px,pn = picked()
       pn = int(pn)
       if pn>=0:
-        thread = self.history[pn]
-        kind,event = search_thread(thread,px)
-        if kind<0:
-          Log.write('thread %d, time %d: found nothing'%(pn,px))
-        else:
-          event = thread[kind][event]
-          Log.write('thread %d, time %d: found %s from %d to %d'%(pn,px,str_event(event[0]),event[1],event[2]))
-          text = '%s: %s'%(self.kind_names[kind],str_event(event[0]))
-          GL.glColor(zeros(3))
-          draw_text(((event[1]+event[2])/2,pn+.5,0),text,0)
-          # Draw dependency edges
-          work = [((pn,kind,event),0)]
-          seen = set()
-          max_depth = dependency_depth()
-          def event_box((thread,kind,event)):
-            return Box((event[1],thread+.1),(event[2],thread+.9))
-          circles = []
-          while work:
-            source,depth = work.pop()
-            key = source[0],source[1],tuple(source[2])
-            if key not in seen and depth<max_depth:
-              seen.add(key)
-              source_box = event_box(source)
-              circles.append(source_box.center())
-              for dep in event_dependencies(self.event_sorted_history,*source):
-                work.append((dep,depth+1))
-                line_between_boxes(zeros(3),source_box,event_box(dep))
-          self.circles.set(circles)
+        with Log.scope('graph'):
+          thread = self.history[pn]
+          kind,event = search_thread(thread,px)
+          if kind<0:
+            Log.write('thread %d, time %d: found nothing'%(pn,px))
+          else:
+            event = thread[kind][event]
+            def name(event):
+              return str_event(event.view(uint64)[0])
+            Log.write('thread %d, time %d: found %s from %d to %d'%(pn,px,name(event),event[1],event[2]))
+            text = '%s: %s'%(self.kind_names[kind],name(event))
+            GL.glColor(zeros(3))
+            draw_text(((event[1]+event[2])/2,pn+.5,0),text,0)
+            # Draw dependency edges
+            root = event
+            work = [((pn,kind,event),0)]
+            seen = set()
+            max_depth = dependency_depth()
+            def event_box((thread,kind,event)):
+              return Box((event[1],thread+.1),(event[2],thread+.9))
+            circles = []
+            label = label_dependencies()
+            while work:
+              source,depth = work.pop()
+              key = source[0],source[1],tuple(source[2])
+              if key not in seen and depth<max_depth:
+                seen.add(key)
+                source_box = event_box(source)
+                source_text = '%s: %s'%(self.kind_names[source[1]],name(source[2]))
+                Log.write(source_text)
+                if depth and label:
+                  draw_text(hstack([source_box.center(),0]),source_text,0)
+                circles.append(source_box.center())
+                for dep in event_dependencies(self.event_sorted_history,source[0],source[1],source[2],root):
+                  work.append((dep,depth+1))
+                  Log.write('  %s: %s'%(self.kind_names[dep[1]],name(dep[2])))
+                  line_between_boxes(zeros(3),source_box,event_box(dep))
+            self.circles.set(circles)
     self.circles = Prop('circles',None).set([])
     self.picked_list = cache_render(draw_picked)
  
@@ -172,9 +185,37 @@ class HistoryScene(Scene):
       GL.glBegin(GL.GL_LINE_LOOP)
       gl_vertices((1e-6*sx,sy)*x+circle)
       GL.glEnd()
+    # Draw tick marks
+    w,h = view.cam.viewport[2:]
+    with gl_scope():
+      A = view.cam.window_to_world()
+      lo = homogeneous_times(A,zeros(3))[0]/(1e-6*sx)
+      hi = homogeneous_times(A,(w,0,0))[0]/(1e-6*sx)
+      size = hi-lo
+      # Goal: size/10**n in [10,100]
+      #       log_10 size - n in [1,2]
+      #       log(size)/log(10) - [1,2] = n
+      n = int(floor(log(size)/log(10)-1))
+      tick = 10**n
+      assert 10-1e-3 < size/tick < 100+1e-3
+      center = homogeneous_times(A,(w/2,0,0))[0]
+      GL.glColor(zeros(3))
+      GL.glScale(1e-6*sx,sy,1)
+      ticks = arange(int(floor(lo/tick))-1,hi/tick+1)*tick
+      center = rint((lo+hi)/2/tick)*tick
+      draw_text((center,len(self.history)+1.12,0),'1e%d s'%(n-6),0)
+      vertices = zeros((len(ticks),2,2))
+      vertices[:,:,0] = ticks.reshape(-1,1)
+      vertices[:,1,1] = 1
+      for translate,scale in (-.1,-1),(len(self.history)+.1,1):
+        with gl_scope():
+          GL.glTranslate(0,translate,0)
+          GL.glScale(1,scale,1)
+          GL.glBegin(GL.GL_LINES)
+          gl_vertices(vertices)
+          GL.glEnd()
     # Draw legend
     with gl_scope():
-      w,h = view.cam.viewport[2:]
       set_matrices_window(w,h)
       GL.glDisable(GL.GL_LIGHTING)
       GL.glDisable(GL.GL_DEPTH_TEST)
