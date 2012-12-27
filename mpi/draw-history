@@ -141,7 +141,6 @@ class HistoryScene(Scene):
             GL.glColor(zeros(3))
             draw_text(((event[1]+event[2])/2,pn+.5,0),text,0)
             # Draw dependency edges
-            root = event
             work = [((pn,kind,event),0)]
             seen = set()
             max_depth = dependency_depth()
@@ -160,7 +159,7 @@ class HistoryScene(Scene):
                 if depth and label:
                   draw_text(hstack([source_box.center(),0]),source_text,0)
                 circles.append(source_box.center())
-                for dep in event_dependencies(self.event_sorted_history,source[0],source[1],source[2],root):
+                for dep in event_dependencies(self.event_sorted_history,source[0],source[1],source[2]):
                   work.append((dep,depth+1))
                   Log.write('  %s: %s'%(self.kind_names[dep[1]],name(dep[2])))
                   line_between_boxes(zeros(3),source_box,event_box(dep))

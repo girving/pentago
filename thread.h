@@ -123,7 +123,7 @@ const event_t unevent = 0;
 const event_t block_ekind       = event_t(1)<<61;
 const event_t line_ekind        = event_t(2)<<61;
 const event_t block_line_ekind  = event_t(3)<<61;
-const event_t block_lines_ekind = event_t(4)<<61;
+const event_t block_lines_ekind = event_t(5)<<61; // Used to be 4, but the format changed
 const event_t ekind_mask        = event_t(7)<<61;
 
 class thread_time_t : public boost::noncopyable {

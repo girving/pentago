@@ -269,8 +269,8 @@ event_t block_store_t::local_block_line_event(int local_id, uint8_t dimension) c
   return block_line_event(info.section,dimension,info.block);
 }
 
-event_t block_store_t::local_block_lines_event(int local_id, uint8_t dimensions) const {
-  OTHER_ASSERT((unsigned)local_id<(unsigned)blocks() && dimensions<16);
+event_t block_store_t::local_block_lines_event(int local_id, dimensions_t dimensions) const {
+  OTHER_ASSERT((unsigned)local_id<(unsigned)blocks());
   const auto& info = block_info[local_id];
   return block_lines_event(info.section,dimensions,info.block);
 }

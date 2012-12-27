@@ -105,7 +105,7 @@ public:
   // Generate events for the given local block
   event_t local_block_event(int local_id) const;
   event_t local_block_line_event(int local_id, uint8_t dimension) const;
-  event_t local_block_lines_event(int local_id, uint8_t dimensions) const;
+  event_t local_block_lines_event(int local_id, dimensions_t dimensions) const;
 
   // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
   void accumulate(int local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);

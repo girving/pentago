@@ -79,7 +79,7 @@ Vector<int,2> search_thread(const vector<Array<const history_t>>& thread, double
 }
 
 static section_t parse_section(const event_t event) {
-  const uint32_t microsig(event>>28);
+  const uint32_t microsig(event>>29);
   uint8_t counts[8];
   for (int i=0;i<8;i++)
     counts[i] = microsig>>4*i&0xf;
@@ -96,7 +96,7 @@ static Vector<uint8_t,4> parse_block(const event_t event) {
 }
 
 static inline uint8_t parse_dimensions(const event_t event) {
-  return event>>24&15;
+  return event>>24&31;
 }
 
 string str_event(const event_t event) {
@@ -119,19 +119,19 @@ string str_event(const event_t event) {
     case block_line_ekind:
       return format("s%s d%d b%d,%d,%d,%d",str(section),dimensions,block[0],block[1],block[2],block[3]);
     case block_lines_ekind:
-      return format("s%s d%d-%d b%d,%d,%d,%d",str(section),dimensions>>2,dimensions&3,block[0],block[1],block[2],block[3]);
+      return format("s%s ss%d cd%d b%d,%d,%d,%d",str(section),dimensions>>2,dimensions&3,block[0],block[1],block[2],block[3]);
     default:
       return "<error>";
   }
 }
 
-static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, event_t event, event_t root) {
+static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, event_t event) {
   // Parse event
   const section_t section = parse_section(event);
   const auto block = parse_block(event);
   const uint8_t dimensions = parse_dimensions(event),
-                child_dimension = dimensions>>2,
-                parent_dimension = dimensions&3;
+                parent_to_child_symmetry = dimensions>>2,
+                dimension = dimensions&3;
   const auto ekind = event&ekind_mask;
 
   // See mpi/graph for summarized explanation
@@ -142,14 +142,11 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
       break; }
     case request_send_kind: {
       OTHER_ASSERT(ekind==block_lines_ekind);
-      if (0) {
-        const auto parent_section = section.parent(child_dimension).standardize<8>();
-        const auto permutation = section_t::quadrant_permutation(symmetry_t::invert_global(parent_section.y));
-        const auto block_base = Vector<uint8_t,4>(block.subset(permutation)).remove_index(parent_dimension);
-        deps.append(tuple(allocate_line_kind,line_event(parent_section.x,parent_dimension,block_base)));
-      }
-      OTHER_ASSERT((root&ekind_mask)==line_ekind);
-      deps.append(tuple(allocate_line_kind,root));
+      const auto parent_section = section.parent(dimension).transform(symmetry_t::invert_global(parent_to_child_symmetry));
+      const auto permutation = section_t::quadrant_permutation(parent_to_child_symmetry);
+      const uint8_t parent_dimension = permutation.find(dimension);
+      const auto block_base = Vector<uint8_t,4>(block.subset(permutation)).remove_index(parent_dimension);
+      deps.append(tuple(allocate_line_kind,line_event(parent_section,parent_dimension,block_base)));
       break; }
     case response_send_kind: {
       OTHER_ASSERT(ekind==block_lines_ekind);
@@ -162,13 +159,14 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
     case schedule_kind: {
       OTHER_ASSERT(ekind==line_ekind);
       if (section.sum()!=35) {
-        const auto child_section = section.child(parent_dimension).standardize<8>();
+        const auto child_section = section.child(dimension).standardize<8>();
         const auto permutation = section_t::quadrant_permutation(symmetry_t::invert_global(child_section.y));
-        const uint8_t child_dimension = section_t::quadrant_permutation(child_section.y)[parent_dimension];
-        auto child_block = Vector<uint8_t,4>(block.slice<0,3>().insert(0,parent_dimension).subset(permutation));
+        const uint8_t child_dimension = permutation.find(dimension);
+        const dimensions_t dimensions(child_section.y,child_dimension);
+        auto child_block = Vector<uint8_t,4>(block.slice<0,3>().insert(0,dimension).subset(permutation));
         for (uint8_t b : range(section_blocks(child_section.x)[child_dimension])) {
           child_block[child_dimension] = b;
-          deps.append(tuple(response_recv_kind,block_lines_event(child_section.x,4*child_dimension+parent_dimension,child_block)));
+          deps.append(tuple(response_recv_kind,block_lines_event(child_section.x,dimensions,child_block)));
         }
       }
       break; }
@@ -182,7 +180,7 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
       break; }
     case output_send_kind: {
       OTHER_ASSERT(ekind==block_line_ekind);
-      deps.append(tuple(wakeup_kind,line_event(section,parent_dimension,block.remove_index(parent_dimension))));
+      deps.append(tuple(wakeup_kind,line_event(section,dimension,block.remove_index(dimension))));
       break; }
     case output_recv_kind: {
       OTHER_ASSERT(ekind==block_line_ekind);
@@ -195,9 +193,9 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
 }
 
 // Compute the dependencies of a given event.  Returns a list of (thread,kind,event) triples.
-vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int thread, const int kind, const history_t source, const history_t root) {
+vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int thread, const int kind, const history_t source) {
   vector<Tuple<int,int,history_t>> deps;
-  for (const auto kind_event : dependencies(time_kind_t(kind),source.event,root.event)) {
+  for (const auto kind_event : dependencies(time_kind_t(kind),source.event)) {
     const int dep_kind = kind_event.x;
     const event_t dep_event = kind_event.y;
     // Search for event in each thread
@@ -235,13 +233,10 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
 
 // Find dependencies for all dvents as a consistency check
 void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history) {
-  OTHER_NOT_IMPLEMENTED();
-/*
   for (int thread : range((int)event_sorted_history.size()))
     for (int kind : range((int)event_sorted_history[thread].size()))
       for (const auto& event : event_sorted_history[thread][kind])
         event_dependencies(event_sorted_history,thread,kind,event);
-*/
 }
 
 }

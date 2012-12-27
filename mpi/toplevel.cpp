@@ -110,9 +110,9 @@ int toplevel(int argc, char** argv) {
     if (!success)
       error("tag upper bound lookup failed");
     tag_ub = *(int*)value;
-    const int required = 1<<21;
+    const int required = 1<<22;
     if (tag_ub<required)
-      error("tag upper bound is only %d, need at least %d: 17 bits for block, 4 for dimensions",(int)tag_ub,required);
+      error("tag upper bound is only %d, need at least %d: 17 bits for block, 5 for dimensions",(int)tag_ub,required);
   }
 
   // Parse command line options
@@ -314,7 +314,6 @@ int toplevel(int argc, char** argv) {
          << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
          << "\nhistory = "<<thread_history_enabled()
-         << "\nmerge = "<<merge_block_requests
          << "\nwildcard recvs = "<<wildcard_recv_count
          << "\nrandomize = "<<randomize
          << "\ntag ub = "<<tag_ub
