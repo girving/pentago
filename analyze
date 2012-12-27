@@ -106,21 +106,20 @@ def probability():
 @command
 def approx():
   total = 0
-  partial_total = 0
-  partial = 17
+  partials = zeros(36,dtype=uint64)
   raw_total = 0
   symmetries = 8
   print 'symmetries = %d'%symmetries
   for n in xrange(37):
     count = all_boards_stats(n,symmetries)
     total += count
-    if n<=partial:
-      partial_total += count
+    partials[n:] += count
     raw_total += count_boards(n,2048)
   sections = sum(len(all_boards_sections(n,symmetries)) for n in xrange(37))
   print 'grand total = %s, grand ratio = %g, total sections = %d'%(large(total),total/raw_total,sections)
   print 'super ratio = %g'%(256*total/sum(count_boards(n,8) for n in xrange(37)))
-  print 'total up to %d stones = %s supers, %s bytes'%(partial,large(partial_total),large(64*partial_total))
+  for p in 17,18:
+    print 'total up to %d stones = %s supers, %s bytes'%(p,large(partials[p]),large(64*long(partials[p])))
 
 @command
 def sections():
