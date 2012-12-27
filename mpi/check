@@ -31,7 +31,7 @@ if meaningless:
   set_block_cache(cache)
 
 # Process each slice that exists, keeping track of which files we've checked
-unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if f not in 'log empty.pentago' and not f.startswith('history'))
+unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if f not in 'log empty.pentago' and not f.startswith('history') and not f.startswith('output-'))
 random = Random(8183131)
 init_supertable(16)
 for slice in arange(36)[::-1]:
