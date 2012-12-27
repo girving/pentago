@@ -32,4 +32,8 @@ const double snappy_compression_estimate = .45;
 // Whether or not to merge matching block requests
 const bool merge_block_requests = true;
 
+// How many copies to post of each wildcard Irecv (for requests, responses, and outputs).
+// This significantly improves latency.
+const int wildcard_recv_count = 8;
+
 }

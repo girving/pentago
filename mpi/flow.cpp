@@ -111,14 +111,17 @@ struct flow_t {
   int free_lines;
 
   // Space for persistent message requests
-  Array<Vector<super_t,2>> output_buffer;
+  Vector<Array<Vector<super_t,2>>,wildcard_recv_count> output_buffers;
 #if PENTAGO_MPI_COMPRESS
-  Array<char> response_buffer;
+  Vector<Array<char>,wildcard_recv_count> response_buffers;
 #endif
   uint64_t wakeup_buffer;
 
   // Wildcard callbacks
-  function<void(MPI_Status*)> barrier_callback, request_callback, output_callback, wakeup_callback, response_callback;
+  function<void(MPI_Status*)> barrier_callback, request_callback, wakeup_callback;
+#if !PENTAGO_MPI_COMPRESS
+  function<void(MPI_Status*)> response_callback;
+#endif
 
   flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
   ~flow_t();
@@ -127,15 +130,19 @@ struct flow_t {
   void post_barrier_recv();
   void post_request_recv();
 #if PENTAGO_MPI_COMPRESS
-  void post_response_recv();
+  void post_response_recv(Array<char>* buffer);
 #endif
-  void post_output_recv();
+  void post_output_recv(Array<Vector<super_t,2>>* buffer);
   void post_wakeup_recv();
   void process_barrier(MPI_Status* status);
   void process_request(MPI_Status* status);
-  void process_output(MPI_Status* status);
+  void process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status);
   void process_wakeup(MPI_Status* status);
+#if PENTAGO_MPI_COMPRESS
+  void process_response(Array<char>* buffer, MPI_Status* status);
+#else
   void process_response(MPI_Status* status);
+#endif
   void finish_output_send(line_details_t* const line, MPI_Status* status);
 };
 
@@ -150,9 +157,11 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , free_lines(line_limit)
   , barrier_callback(curry(&flow_t::process_barrier,this))
   , request_callback(curry(&flow_t::process_request,this))
-  , output_callback(curry(&flow_t::process_output,this))
   , wakeup_callback(curry(&flow_t::process_wakeup,this))
-  , response_callback(curry(&flow_t::process_response,this)) {
+#if !PENTAGO_MPI_COMPRESS
+  , response_callback(curry(&flow_t::process_response,this))
+#endif
+{
 
   OTHER_ASSERT(free_line_gathers>=1);
 
@@ -166,11 +175,14 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
 
   // Start wildcard receives
   post_barrier_recv();
-  post_request_recv();
+  for (int i=0;i<wildcard_recv_count;i++)
+    post_request_recv();
 #if PENTAGO_MPI_COMPRESS
-  post_response_recv();
+  for (auto& buffer : response_buffers)
+    post_response_recv(&buffer);
 #endif
-  post_output_recv();
+  for (auto& buffer : output_buffers)
+    post_output_recv(&buffer);
   post_wakeup_recv();
 
   // Schedule some lines
@@ -304,20 +316,21 @@ void flow_t::process_request(MPI_Status* status) {
   post_request_recv();
 }
 
-void flow_t::post_output_recv() {
+void flow_t::post_output_recv(Array<Vector<super_t,2>>* buffer) {
   PENTAGO_MPI_TRACE("post output recv");
   MPI_Request request;
-  if (!output_buffer.size())
-    output_buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size)),false);
+  if (!buffer->size())
+    *buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size)),false);
+  OTHER_ASSERT(buffer->size()==sqr(sqr(block_size)));
   {
     thread_time_t time(mpi_kind,unevent);
-    CHECK(MPI_Irecv(output_buffer.data(),8*output_buffer.size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
+    CHECK(MPI_Irecv(buffer->data(),8*buffer->size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
   }
-  requests.add(request,output_callback,true);
+  requests.add(request,curry(&flow_t::process_output,this,buffer),true);
 }
 
 // Incoming output data for a block
-void flow_t::process_output(MPI_Status* status) {
+void flow_t::process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status) {
   {
     // How many elements did we receive?
     const int local_block_id = request_block_id(status->MPI_TAG);
@@ -326,15 +339,15 @@ void flow_t::process_output(MPI_Status* status) {
     const int count = get_count(status,MPI_LONG_LONG_INT);
     PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, dimension %d, count %g",status->MPI_SOURCE,local_block_id,dimension,count/8.);
     OTHER_ASSERT(!(count&7));
-    const auto block_data = output_buffer.slice_own(0,count/8);
-    output_buffer.clean_memory();
+    const auto block_data = buffer->slice_own(0,count/8);
+    buffer->clean_memory();
     // Schedule an accumulate as soon as possible to conserve memory
     threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,local_block_id,dimension,block_data),true);
   }
   // One step closer...
   progress.progress();
   countdown.decrement();
-  post_output_recv();
+  post_output_recv(buffer);
 }
 
 void flow_t::post_wakeup_recv() {
@@ -385,13 +398,14 @@ void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) 
 }
 
 #if PENTAGO_MPI_COMPRESS
-void flow_t::post_response_recv() {
+void flow_t::post_response_recv(Array<char>* buffer) {
   PENTAGO_MPI_TRACE("post response recv");
   MPI_Request request;
-  if (!response_buffer.size())
-    response_buffer = large_buffer<char>(max_fast_compressed_size,false);
-  CHECK(MPI_Irecv(response_buffer.data(),response_buffer.size(),MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.response_comm,&request));
-  requests.add(request,response_callback,true);
+  if (!buffer->size())
+    *buffer = large_buffer<char>(max_fast_compressed_size,false);
+  OTHER_ASSERT(buffer->size()==max_fast_compressed_size);
+  CHECK(MPI_Irecv(buffer->data(),buffer->size(),MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.response_comm,&request));
+  requests.add(request,curry(&flow_t::process_response,this,buffer),true);
 }
 #endif
 
@@ -431,7 +445,12 @@ static void absorb_response(block_request_t* request)
   delete request;
 }
 
-void flow_t::process_response(MPI_Status* status) {
+#if PENTAGO_MPI_COMPRESS
+void flow_t::process_response(Array<char>* buffer, MPI_Status* status)
+#else
+void flow_t::process_response(MPI_Status* status)
+#endif
+{
   {
     // Look up block request
     OTHER_ASSERT(input_blocks);
@@ -453,10 +472,10 @@ void flow_t::process_response(MPI_Status* status) {
 
 #if PENTAGO_MPI_COMPRESS
     // Schedule decompression task at the head of the job queue (to free memory as soon as possible)
-    const auto compressed = response_buffer.slice_own(0,get_count(status,MPI_BYTE));
-    response_buffer.clean_memory();
+    const auto compressed = buffer->slice_own(0,get_count(status,MPI_BYTE));
+    buffer->clean_memory();
     threads_schedule(CPU,curry(absorb_response,request,compressed),true);
-    post_response_recv();
+    post_response_recv(buffer); // Repost Irecv
 #else
     // Data has already been received into the first dependent line.  Schedule a pure copying job
     threads_schedule(CPU,curry(absorb_response,request));

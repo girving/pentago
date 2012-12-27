@@ -315,6 +315,7 @@ int toplevel(int argc, char** argv) {
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
          << "\nhistory = "<<thread_history_enabled()
          << "\nmerge = "<<merge_block_requests
+         << "\nwildcard recvs = "<<wildcard_recv_count
          << "\nrandomize = "<<randomize
          << "\ntag ub = "<<tag_ub
          << endl;
