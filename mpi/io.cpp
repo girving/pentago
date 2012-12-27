@@ -382,50 +382,47 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, block_sto
       swap(sample.wins.x,sample.wins.y);
     }
 
-  // Generate a datatype for the pieces of block_store_t::sample_t that we need
-  MPI_Datatype sample_type;
-  int lengths[2] = {1,8};
-  MPI_Aint displacements[2] = {offsetof(sample_t,board),offsetof(sample_t,wins)};
-  MPI_Datatype types[2] = {MPI_LONG_LONG_INT,MPI_LONG_LONG_INT};
-  CHECK(MPI_Type_create_struct(2,lengths,displacements,types,&sample_type));
-
   // Count total samples and send to root
   const int local_samples = samples.size();
   int total_samples;
   CHECK(MPI_Reduce((void*)&local_samples,&total_samples,1,MPI_INT,MPI_SUM,0,comm));
 
-  // Open the file
-  MPI_File file;
-  file_open(comm,filename,&file);
-
-  // Write our data
-  if (rank) {
-    // On non-root processes, we only need to write out samples
-    CHECK(MPI_Type_commit(&sample_type));
-    CHECK(MPI_File_write_ordered(file,samples.data(),samples.size(),sample_type,MPI_STATUS_IGNORE));
-  } else {
-    // On the root, we have to write out both header and our samples.  First, build the header.
-    Array<uint8_t> header;
-    {
-      RawArray<Vector<uint64_t,9>> all_samples(total_samples,0); // False array of all samples
-      fill_numpy_header(header,all_samples);
-    }
-    // Construct datatype combining header with local samples
-    int lengths[2] = {header.size(),samples.size()};
-    MPI_Aint displacements[2] = {(MPI_Aint)header.data(),(MPI_Aint)samples.data()};
-    MPI_Datatype types[2] = {MPI_BYTE,sample_type};
-    MPI_Datatype datatype;
-    CHECK(MPI_Type_struct(2,lengths,displacements,types,&datatype));
-    CHECK(MPI_Type_commit(&datatype));
-    // Write 
-    CHECK(MPI_File_write_ordered(file,0,1,datatype,MPI_STATUS_IGNORE));
-    // Free datatype
-    CHECK(MPI_Type_free(&datatype));
+  // A previous version of this routine used MPI datatypes to avoid manual packing of the samples.
+  // However, a 960 core run produced a double free error with the stack
+  //     /lib64/libc.so.6(+0x75018)[0x2aaaaff00018]
+  //     /lib64/libc.so.6(cfree+0x6c)[0x2aaaaff04fec]
+  //     /opt/cray/lib64/libmpl.so.0(MPL_trfree+0x29a)[0x2aaaae65391a]
+  //     /opt/cray/lib64/libmpich_gnu_47.so.1(ADIOI_Flatten+0x14d)[0x2aaaae3b238d]
+  //     /opt/cray/lib64/libmpich_gnu_47.so.1(ADIOI_Flatten_datatype+0xc5)[0x2aaaae3b4135]
+  //     /opt/cray/lib64/libmpich_gnu_47.so.1(ADIOI_CRAY_Exch_and_write+0xfd8)[0x2aaaae38a508]
+  //     /opt/cray/lib64/libmpich_gnu_47.so.1(ADIOI_CRAY_WriteStridedColl+0x4a0)[0x2aaaae38aa50]
+  //     /opt/cray/lib64/libmpich_gnu_47.so.1(MPI_File_write_ordered+0x1f1)[0x2aaaae37e001]
+  //     /global/u2/g/girving/otherlab/other/install/release/lib/libpentago_core.so(_ZN7pentago3mpi20write_sparse_samplesEiRKSsRNS0_13block_store_tE+0x5a0)[0x2aaaaad7cae0]
+  //     /global/u2/g/girving/otherlab/other/install/release/lib/libpentago_core.so(_ZN7pentago3mpi8toplevelEiPPc+0x2658)[0x2aaaaada8078]
+  //     /lib64/libc.so.6(__libc_start_main+0xe6)[0x2aaaafea9bc6]
+  //     /global/homes/g/girving/otherlab/other/install/release/bin/endgame-mpi[0x4008e9]
+  // I'm not sure what the problem is, but given that it occurs in ADIOI_Flatten_datatype I'm fairly sure it'll go away if I switch to manual packing.
+  Array<uint8_t> buffer;
+  if (!rank) {
+    // On the root, we have to write out the numpy header before our samples.
+    RawArray<Vector<uint64_t,9>> all_samples(total_samples,0); // False array of all samples
+    fill_numpy_header(buffer,all_samples);
+  }
+  // Pack samples into buffer
+  int index = buffer.size();
+  buffer.resize(index+(1+8)*sizeof(uint64_t)*samples.size(),false,true);
+  for (const sample_t& s : samples) {
+    memcpy(&buffer[index],&s.board,sizeof(s.board));
+    index += sizeof(s.board);
+    memcpy(&buffer[index],&s.wins,sizeof(s.wins));
+    index += sizeof(s.wins);
   }
 
-  // Done!
+  // Write the file
+  MPI_File file;
+  file_open(comm,filename,&file);
+  CHECK(MPI_File_write_ordered(file,buffer.data(),buffer.size(),MPI_BYTE,MPI_STATUS_IGNORE));
   CHECK(MPI_File_close(&file));
-  CHECK(MPI_Type_free(&sample_type));
 }
 
 }
