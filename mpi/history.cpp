@@ -127,7 +127,10 @@ string str_event(const event_t event) {
   }
 }
 
-static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, event_t event) {
+static Array<Tuple<time_kind_t,event_t>> dependencies(const int direction, const time_kind_t kind, const event_t event) {
+  OTHER_ASSERT(abs(direction)==1);
+  BOOST_STATIC_ASSERT(compress_kind==0); // Verify that -kind != kind for kinds we care about
+
   // Parse event
   const section_t section = parse_section(event);
   const auto block = parse_block(event);
@@ -138,55 +141,86 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
 
   // See mpi/graph for summarized explanation
   Array<Tuple<time_kind_t,event_t>> deps;
-  switch (kind) {
-    case allocate_line_kind: {
+  switch (direction*kind) {
+    case -allocate_line_kind: {
       OTHER_ASSERT(ekind==line_ekind);
       break; }
-    case request_send_kind: {
+    case  response_recv_kind:
+    case -request_send_kind: {
       OTHER_ASSERT(ekind==block_lines_ekind);
+      const auto other_kind = kind==response_recv_kind ? schedule_kind : allocate_line_kind;
       const auto parent_section = section.parent(dimension).transform(symmetry_t::invert_global(parent_to_child_symmetry));
       const auto permutation = section_t::quadrant_permutation(parent_to_child_symmetry);
       const uint8_t parent_dimension = permutation.find(dimension);
       const auto block_base = Vector<uint8_t,4>(block.subset(permutation)).remove_index(parent_dimension);
-      deps.append(tuple(allocate_line_kind,line_event(parent_section,parent_dimension,block_base)));
+      deps.append(tuple(other_kind,line_event(parent_section,parent_dimension,block_base)));
       break; }
-    case response_send_kind: {
-      OTHER_ASSERT(ekind==block_lines_ekind);
-      deps.append(tuple(request_send_kind,event));
-      break; }
-    case response_recv_kind: {
+    case  request_send_kind: {
       OTHER_ASSERT(ekind==block_lines_ekind);
       deps.append(tuple(response_send_kind,event));
       break; }
-    case schedule_kind: {
+    case -response_send_kind:
+    case  response_send_kind: {
+      OTHER_ASSERT(ekind==block_lines_ekind);
+      deps.append(tuple(direction<0?request_send_kind:response_recv_kind,event));
+      break; }
+    case -response_recv_kind: {
+      OTHER_ASSERT(ekind==block_lines_ekind);
+      deps.append(tuple(response_send_kind,event));
+      break; }
+    case  allocate_line_kind:
+    case -schedule_kind: {
       OTHER_ASSERT(ekind==line_ekind);
       if (section.sum()!=35) {
+        const auto other_kind = kind==allocate_line_kind ? request_send_kind : response_recv_kind;
         const auto child_section = section.child(dimension).standardize<8>();
         const auto permutation = section_t::quadrant_permutation(symmetry_t::invert_global(child_section.y));
         const uint8_t child_dimension = permutation.find(dimension);
         const dimensions_t dimensions(child_section.y,child_dimension);
         auto child_block = Vector<uint8_t,4>(block.slice<0,3>().insert(0,dimension).subset(permutation));
-        for (uint8_t b : range(section_blocks(child_section.x)[child_dimension])) {
+        for (const uint8_t b : range(section_blocks(child_section.x)[child_dimension])) {
           child_block[child_dimension] = b;
-          deps.append(tuple(response_recv_kind,block_lines_event(child_section.x,dimensions,child_block)));
+          deps.append(tuple(other_kind,block_lines_event(child_section.x,dimensions,child_block)));
         }
       }
       break; }
-    case compute_kind: { // Note: all microline compute events have the same line event
-      OTHER_ASSERT(ekind==line_ekind);
-      deps.append(tuple(schedule_kind,event));
-      break; }
-    case wakeup_kind: {
+    case  schedule_kind: {
       OTHER_ASSERT(ekind==line_ekind);
       deps.append(tuple(compute_kind,event)); // Corresponds to many different microline compute events
       break; }
-    case output_send_kind: {
-      OTHER_ASSERT(ekind==block_line_ekind);
-      deps.append(tuple(wakeup_kind,line_event(section,dimension,block.remove_index(dimension))));
+    case -compute_kind: // Note: all microline compute events have the same line event
+    case  compute_kind: {
+      OTHER_ASSERT(ekind==line_ekind);
+      deps.append(tuple(direction<0?schedule_kind:wakeup_kind,event));
       break; }
-    case output_recv_kind: {
+    case -wakeup_kind: {
+      OTHER_ASSERT(ekind==line_ekind);
+      deps.append(tuple(compute_kind,event)); // Corresponds to many different microline compute events
+      break; }
+    case  wakeup_kind: {
+      OTHER_ASSERT(ekind==line_ekind);
+      const auto block_base = block.slice<0,3>();
+      for (const uint8_t b : range(section_blocks(section)[dimension]))
+        deps.append(tuple(output_send_kind,block_line_event(section,dimension,block_base.insert(b,dimension))));
+      break; }
+    case -output_send_kind:
+    case  output_send_kind: {
       OTHER_ASSERT(ekind==block_line_ekind);
-      deps.append(tuple(output_send_kind,event));
+      if (direction<0)
+        deps.append(tuple(wakeup_kind,line_event(section,dimension,block.remove_index(dimension))));
+      else
+        deps.append(tuple(output_recv_kind,event));
+      break; }
+    case -output_recv_kind:
+    case  output_recv_kind: {
+      OTHER_ASSERT(ekind==block_line_ekind);
+      deps.append(tuple(direction<0?output_send_kind:snappy_kind,event));
+      break; }
+    case -snappy_kind:
+    case  snappy_kind: {
+      OTHER_ASSERT(ekind==block_line_ekind);
+      if (direction<0)
+        deps.append(tuple(output_recv_kind,event));
       break; }
     default:
       break;
@@ -195,9 +229,9 @@ static Array<Tuple<time_kind_t,event_t>> dependencies(const time_kind_t kind, ev
 }
 
 // Compute the dependencies of a given event.  Returns a list of (thread,kind,event) triples.
-vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int thread, const int kind, const history_t source) {
+vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int direction, const int thread, const int kind, const history_t source) {
   vector<Tuple<int,int,history_t>> deps;
-  for (const auto kind_event : dependencies(time_kind_t(kind),source.event)) {
+  for (const auto kind_event : dependencies(direction,time_kind_t(kind),source.event)) {
     const int dep_kind = kind_event.x;
     const event_t dep_event = kind_event.y;
     // Search for event in each thread
@@ -224,8 +258,8 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
           if (e.event==dep_event)
             count++;
       }
-      throw RuntimeError(format("event_dependencies: dependency not found, count %d, source = %d %s %s, dependency = %s %s",
-        count,
+      throw RuntimeError(format("event_dependencies: dependency not found, direction = %d, count %d, source = %d %s %s, dependency = %s %s",
+        direction,count,
         thread,time_kind_names().at(kind),str_event(source.event),
         time_kind_names().at(dep_kind),str_event(dep_event)));
     }
@@ -234,11 +268,11 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
 }
 
 // Find dependencies for all dvents as a consistency check
-void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history) {
+void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int direction) {
   for (const int thread : range((int)event_sorted_history.size()))
     for (const int kind : range((int)event_sorted_history[thread].size()))
       for (const auto& event : event_sorted_history[thread][kind])
-        event_dependencies(event_sorted_history,thread,kind,event);
+        event_dependencies(event_sorted_history,direction,thread,kind,event);
 }
 
 // Compute rank-to-rank bandwidth estimates localized in time (dimensions: epoch,src,dst)
@@ -265,7 +299,7 @@ Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>&
   for (const int target_rank : range(ranks))
     for (const int kind : vec(response_recv_kind,output_recv_kind))
       for (const history_t& target : event_sorted_history[threads*target_rank][kind]) {
-        const auto deps = event_dependencies(event_sorted_history,threads*target_rank,kind,target);
+        const auto deps = event_dependencies(event_sorted_history,-1,threads*target_rank,kind,target);
         OTHER_ASSERT(deps.size()==1);
         const int source_thread = deps[0].x;
         const int source_rank = source_thread/threads;
