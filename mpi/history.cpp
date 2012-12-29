@@ -5,12 +5,14 @@
 #include <pentago/section.h>
 #include <pentago/symmetry.h>
 #include <pentago/thread.h>
+#include <other/core/array/Array3d.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/geometry/BoxScalar.h>
 #include <other/core/math/constants.h>
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
 #include <other/core/structure/Tuple.h>
+#include <other/core/utility/interrupts.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/str.h>
 namespace pentago {
@@ -233,10 +235,92 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
 
 // Find dependencies for all dvents as a consistency check
 void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history) {
-  for (int thread : range((int)event_sorted_history.size()))
-    for (int kind : range((int)event_sorted_history[thread].size()))
+  for (const int thread : range((int)event_sorted_history.size()))
+    for (const int kind : range((int)event_sorted_history[thread].size()))
       for (const auto& event : event_sorted_history[thread][kind])
         event_dependencies(event_sorted_history,thread,kind,event);
+}
+
+// Compute rank-to-rank bandwidth estimates localized in time (dimensions: epoch,src,dst)
+Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>& event_sorted_history, const int threads, const double dt_seconds) {
+  Log::Scope scope("estimate bandwidth");
+  OTHER_ASSERT(threads>1);
+  const int ranks = event_sorted_history.size()/threads;
+  OTHER_ASSERT((int)event_sorted_history.size()==ranks*threads);
+  const double dt = 1e6*dt_seconds;
+  // Count how many epochs we need
+  int64_t elapsed = 0;
+  for (auto& thread : event_sorted_history)
+    for (auto& events : thread)
+      if (events.size())
+        elapsed = max(elapsed,events.back().end.us);
+  const int epochs = int(ceil(elapsed/dt)); // Last epoch is incomplete
+  // Statics: responses, outputs, total
+  Vector<uint64_t,3> messages;
+  Vector<double,3> total_data, total_time, max_time;
+  int64_t max_time_travel = 0;
+  const double compression_ratio = .35;
+  // Traverse each large message, accumulating total data sent
+  Array<double,3> bandwidths(epochs,ranks,ranks);
+  for (const int target_rank : range(ranks))
+    for (const int kind : vec(response_recv_kind,output_recv_kind))
+      for (const history_t& target : event_sorted_history[threads*target_rank][kind]) {
+        const auto deps = event_dependencies(event_sorted_history,threads*target_rank,kind,target);
+        OTHER_ASSERT(deps.size()==1);
+        const int source_thread = deps[0].x;
+        const int source_rank = source_thread/threads;
+        OTHER_ASSERT(source_thread==source_rank*threads);
+        const history_t& source = deps[0].z;
+        const bool which = kind==output_recv_kind;
+        messages[which]++;
+        // Estimate message size
+        const section_t section = parse_section(source.event);
+        const Vector<uint8_t,4> block = parse_block(source.event);
+        const double data_size = sizeof(Vector<super_t,2>)*block_shape(section.shape(),block).product()*(kind==response_recv_kind?compression_ratio:1);
+        total_data[which] += data_size;
+        // Distribute data amongst all overlapped epochs
+        const int64_t time_travel = source.start.us - target.end.us;
+        max_time_travel = max(max_time_travel,time_travel);
+        Box<double> box(source.start.us/dt,target.end.us/dt);
+        if (box.size()<=1e-7)
+          box = Box<double>(box.center()).thickened(.5e-7);
+        total_time[which] += box.size();
+        max_time[which] = max(max_time[which],box.size());
+        const double rate = data_size/box.size();
+        for (const int epoch : range(max(0,int(box.min)),min(epochs,int(box.max)+1)))
+          bandwidths(epoch,source_rank,target_rank) += rate*Box<double>::intersect(box,Box<double>(epoch,epoch+1)).size();
+      }
+
+  // Rescale
+  bandwidths /= dt_seconds;
+
+  // Print statistics
+  cout << "dt = "<<dt_seconds<<" s"<<endl;
+  cout << "elapsed = "<<1e-6*elapsed<<" s"<<endl;
+  cout << "ranks = "<<ranks<<endl;
+  messages[2] = messages.sum();
+  total_data[2] = total_data.sum();
+  total_time[2] = total_time.sum();
+  max_time[2] = max_time.max();
+  for (int i=0;i<3;i++) {
+    cout << (i==0?"responses:":i==1?"outputs:":"total:") << endl;
+    cout << "  messages = "<<messages[i]<<endl;
+    cout << "  total data = "<<total_data[i]<<endl;
+    cout << "  total time = "<<dt_seconds*total_time[i]<<endl;
+    cout << "  average time = "<<dt_seconds*total_time[i]/messages[i]<<endl;
+    cout << "  max time = "<<dt_seconds*max_time[i]<<endl;
+    cout << "  average bandwidth = "<<total_data[i]/(1e-6*elapsed)<<endl;
+    cout << "  average bandwidth / ranks = "<<total_data[i]/(1e-6*elapsed*ranks)<<endl;
+  }
+  cout << "max time travel = "<<1e-6*max_time_travel<<endl;
+  cout << "bandwidth array stats:"<<endl;
+  const double sum = bandwidths.sum(); 
+  cout << "  sum = "<<sum<<endl;
+  cout << "  average rank bandwidth = "<<sum/epochs/ranks<<endl;
+  cout << "  average rank-to-rank bandwidth = "<<sum/epochs/sqr(ranks)<<endl;
+
+  // All done
+  return bandwidths;
 }
 
 }
@@ -249,4 +333,5 @@ void wrap_history() {
   OTHER_FUNCTION(search_thread)
   OTHER_FUNCTION(event_dependencies)
   OTHER_FUNCTION(check_dependencies)
+  OTHER_FUNCTION(estimate_bandwidth)
 }

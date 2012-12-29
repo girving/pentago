@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+
+from __future__ import division
+from numpy import *
+import optparse
+
+usage = 'usage: %prog <bandwidth.npz>'
+parser = optparse.OptionParser(usage)
+parser.add_option('-d','--no-diag',action='store_true',help='zero diagonal')
+parser.add_option('-s','--sums',action='store_true',help='plot source and target sums')
+options,args = parser.parse_args()
+if len(args)!=1:
+  parser.error('expected exactly 1 argument')
+filename, = args
+
+# Read bandwidth data
+data = load(filename)
+dt = data['dt']
+bandwidth = data['bandwidth']
+epochs,ranks,_ = bandwidth.shape
+assert ranks==bandwidth.shape[2]
+print 'dt = %g s'%dt
+print 'ranks = %d'%ranks
+print 'epochs = %d'%epochs
+print 'average bandwidth = %g'%mean(bandwidth)
+
+# Zero diagonal if desired
+if options.no_diag:
+  i = arange(ranks)
+  bandwidth[:,i,i] = 0
+
+# Plot
+import pylab
+import matplotlib.cm as cm
+fig = pylab.figure()
+m = int(ceil(sqrt(epochs)))
+n = int(ceil(epochs/m))
+for e in range(epochs):
+  axes = fig.add_subplot(n,m,e+1)
+  if options.sums:
+    pylab.plot(bandwidth[e].sum(axis=0),'g',label='source')
+    pylab.plot(bandwidth[e].sum(axis=1),'b',label='target')
+  else:
+    im = axes.imshow(bandwidth[e],cmap=cm.jet,interpolation='nearest',origin='lower')
+    fig.colorbar(im)
+  axes.set_title('%g s - %g s'%(dt*e,dt*(e+1)))
+if options.sums:
+  pylab.legend()
+pylab.show()
