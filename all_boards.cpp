@@ -4,6 +4,7 @@
 #include <pentago/symmetry.h>
 #include <pentago/count.h>
 #include <pentago/table.h>
+#include <pentago/utility/ceil_div.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/large.h>
 #include <other/core/array/sort.h>
@@ -241,7 +242,7 @@ uint64_t all_boards_stats(int n, int symmetries) {
       reduced_sections++;
       const auto shape = s.shape();
       const auto lo = (shape/8).sorted(),
-                 hi = ((shape+7)/8).sorted();
+                 hi = ceil_div(shape,8).sorted();
       const auto lop = lo.product(),
                  hip = hi.product();
       blocks.min += lop;
