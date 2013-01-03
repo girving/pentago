@@ -9,7 +9,7 @@
  * 1. Allocate way more memory than you need via a single, gigantic mmap.
  * 2. Never touch the parts you don't need.
  *
- * As consequence, we get to use all flat buffers, and everything is simple.
+ * As a consequence, we get to use all flat buffers, and everything is simple.
  * The main downside is that our memory usage per block will be the maximum
  * of the size of the compressed partially accumulated arrays.
  *
@@ -24,8 +24,6 @@
 #include <boost/noncopyable.hpp>
 namespace pentago {
 namespace mpi {
-
-using namespace other;
 
 class sparse_store_t : public boost::noncopyable {
   struct sizes_t {

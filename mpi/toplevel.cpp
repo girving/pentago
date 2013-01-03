@@ -4,6 +4,8 @@
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/config.h>
 #include <pentago/mpi/partition.h>
+#include <pentago/mpi/random_partition.h>
+#include <pentago/mpi/simple_partition.h>
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/mpi/check.h>
@@ -21,6 +23,7 @@
 #include <pentago/utility/wall_time.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/random/Random.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
 #include <sys/resource.h>
@@ -92,6 +95,14 @@ static void report_mpi_times(MPI_Comm comm, RawArray<wall_time_t> times, wall_ti
   }
 }
 
+static Ref<partition_t> make_simple_partition(const int ranks, const sections_t& sections) {
+  return new_<simple_partition_t>(ranks,sections);
+}
+
+static Ref<partition_t> make_random_partition(const uint128_t key, const int ranks, const sections_t& sections) {
+  return new_<random_partition_t>(key,ranks,sections);
+}
+
 int toplevel(int argc, char** argv) {
   // Initialize MPI
   mpi_world_t world(argc,argv);
@@ -110,9 +121,9 @@ int toplevel(int argc, char** argv) {
     if (!success)
       error("tag upper bound lookup failed");
     tag_ub = *(int*)value;
-    const int required = 1<<22;
+    const int required = 1<<(17+6+5);
     if (tag_ub<required)
-      error("tag upper bound is only %d, need at least %d: 17 bits for block, 5 for dimensions",(int)tag_ub,required);
+      error("tag upper bound is only %d, need at least %d: 17 bits for line, 6 for block, 5 for dimensions",(int)tag_ub,required);
   }
 
   // Parse command line options
@@ -129,6 +140,7 @@ int toplevel(int argc, char** argv) {
   int meaningless = 0;
   int stop_after = 0;
   int randomize = 0;
+  bool log_all = false;
   static const option options[] = {
     {"help",no_argument,0,'h'},
     {"threads",required_argument,0,'t'},
@@ -146,6 +158,7 @@ int toplevel(int argc, char** argv) {
     {"per-rank-times",no_argument,0,'z'},
     {"stop-after",required_argument,0,'S'},
     {"randomize",required_argument,0,'R'},
+    {"log-all",no_argument,0,'a'},
     {0,0,0,0}};
   for (;;) {
     int option = 0;
@@ -173,7 +186,8 @@ int toplevel(int argc, char** argv) {
                   "      --meaningless <n>      Use meaningless values the given slice\n"
                   "      --per-rank-times       Print a timing report for each rank\n"
                   "      --stop-after <n>       Stop after computing the given slice\n"
-                  "      --randomize <seed>     If nonzero, compute lines in random order using given seed\n"
+                  "      --randomize <key>      If nonzero, partition lines and blocks randomly using the given key\n"
+                  "      --log-all              Write log files for every process\n"
                << flush;
         }
         return 0;
@@ -212,6 +226,9 @@ int toplevel(int argc, char** argv) {
         break;
       case 'z':
         per_rank_times = true;
+        break;
+      case 'a':
+        log_all = true;
         break;
       default:
         MPI_Abort(MPI_COMM_WORLD,1);
@@ -263,9 +280,11 @@ int toplevel(int argc, char** argv) {
   }
 
   // Configure logging
+  if (log_all)
+    Log::cache_initial_output();
   Log::configure("endgame",rank!=0,false,rank?0:1<<30);
-  if (!rank)
-    Log::copy_to_file(format("%s/log",dir),false);
+  if (!rank || log_all)
+    Log::copy_to_file(log_all?format("%s/log-%d",dir,rank):format("%s/log",dir),false);
 
   // Allocate thread pool
   const int workers = threads-1;
@@ -280,13 +299,18 @@ int toplevel(int argc, char** argv) {
     OTHER_ASSERT(decompress(compress(data,level,unevent),data.size(),unevent)==data);
   }
 
+  // Make partition factory
+  typedef function<Ref<partition_t>(int,const sections_t&)> partition_factory_t;
+  const auto partition_factory = randomize ? partition_factory_t(curry(make_random_partition,randomize))
+                                           :                           make_simple_partition;
+
   // Run unit test if requested.  See test_mpi.py for the Python side of these tests.
   if (test.size()) {
     if (test=="write-3" || test=="write-4") {
       check_directory(comm,dir);
       const int slice = test[6]-'0';
-      const auto sections = all_boards_sections(slice,8);
-      const auto partition = new_<partition_t>(ranks,slice,sections);
+      const auto sections = new_<sections_t>(slice,all_boards_sections(slice,8));
+      const auto partition = partition_factory(ranks,sections);
       const auto blocks = meaningless_block_store(partition,rank,samples);
       write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
       write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks);
@@ -332,7 +356,7 @@ int toplevel(int argc, char** argv) {
   check_directory(comm,dir);
 
   // Compute one list of sections per slice
-  const vector<Array<const section_t>> slices = descendent_sections(section,meaningless?:35);
+  const vector<Ref<const sections_t>> slices = descendent_sections(section,meaningless?:35);
 
   // Allocate communicators
   flow_comms_t comms(comm);
@@ -347,14 +371,14 @@ int toplevel(int argc, char** argv) {
     Ptr<block_store_t> prev_blocks;
     const int first_slice = meaningless?meaningless-1:(int)slices.size()-1;
     for (int slice=first_slice;slice>=stop_after;slice--) {
-      if (!slices[slice].size())
+      if (!slices[slice]->sections.size())
         break;
       Log::Scope scope(format("slice %d",slice));
       const auto start = wall_time();
 
       // Allocate meaningless data if necessary
       if (slice+1==meaningless) {
-        prev_partition = new_<partition_t>(ranks,slice+1,slices[slice+1]);
+        prev_partition = partition_factory(ranks,slices[slice+1]);
         prev_blocks = meaningless_block_store(*prev_partition,rank,samples);
 #ifdef PENTAGO_MPI_DEBUG
         set_block_cache(store_block_cache(ref(prev_blocks)));
@@ -362,12 +386,11 @@ int toplevel(int argc, char** argv) {
       }
 
       // Partition work among processors
-      const auto partition = new_<partition_t>(ranks,slice,slices[slice]);
+      const auto partition = partition_factory(ranks,slices[slice]);
 
       // Allocate memory for all the blocks we own
-      auto lines = partition->rank_lines(rank,true);
-      const auto blocks = new_<block_store_t>(partition,rank,samples,lines);
-      lines.append_elements(partition->rank_lines(rank,false));
+      auto lines = partition->rank_lines(rank);
+      const auto blocks = make_block_store(partition,rank,samples);
 
       // Estimate peak memory usage ignoring active lines
       const int64_t partition_memory = memory_usage(prev_partition)+memory_usage(partition),
@@ -390,15 +413,11 @@ int toplevel(int argc, char** argv) {
       // Compute (and communicate)
       {
         Log::Scope scope("compute");
-        if (randomize) {
-          const int seed = index(vec(0,ranks,37),vec(randomize,rank,slice));
-          new_<Random>(seed)->shuffle(lines);
-        }
         compute_lines(comms,prev_blocks,blocks,lines,free_memory,gather_limit,line_limit);
       }
       blocks->print_compression_stats(comm);
-      const auto outputs = partition->total_nodes,
-                 inputs = prev_partition?prev_partition->total_nodes:0;
+      const auto outputs = blocks->total_nodes,
+                 inputs = prev_blocks?prev_blocks->total_nodes:0;
       total_outputs += outputs;
       total_inputs += inputs;
 

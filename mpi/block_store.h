@@ -40,22 +40,25 @@ namespace mpi {
 struct block_info_t {
   section_t section;
   Vector<uint8_t,4> block;
+  int flat_id; // Contiguous local id (probably different from local id)
 #if !PENTAGO_MPI_COMPRESS
-  int offset; // Local offset into all_data
+  Range<int> nodes; // Our piece of all_data
 #endif
   mutable uint8_t missing_dimensions; // Which incoming dimension contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
-BOOST_STATIC_ASSERT(sizeof(block_info_t)<=24);
+BOOST_STATIC_ASSERT(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS);
 
 class block_store_t : public Object {
 public:
   OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
+  const Ref<const sections_t> sections;
   const Ref<const partition_t> partition;
   const int rank;
-  const Vector<uint64_t,2> first, last; // Ranges of block and node ids
-  const Array<const block_info_t> block_info; // Information about each block we own, plus one sentinel
+  const int total_nodes; // Total number of nodes
+  const Hashtable<local_id_t,block_info_t> block_infos; // Map from local id to information about each block we own
+  const Hashtable<Tuple<section_t,Vector<uint8_t,4>>,local_id_t> block_to_local_id; // Map from block to local id
   const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
   const int required_contributions;
   spinlock_t section_counts_lock;
@@ -76,18 +79,13 @@ public:
   const NestedArray<sample_t> samples;
 
 private:
-  block_store_t(const partition_t& partition, const int rank, const int samples_per_section, Array<const line_t> lines);
+  block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section);
 public:
   ~block_store_t();
 
   // Number of blocks
-  int blocks() const {
-    return block_info.size()-1;
-  }
-
-  // Total number of nodes
-  int nodes() const {
-    return last.y-first.y;
+  int total_blocks() const {
+    return block_infos.size();
   }
 
   // Estimate current memory usage
@@ -103,12 +101,12 @@ public:
   void assert_contains(section_t section, Vector<uint8_t,4> block) const;
 
   // Generate events for the given local block
-  event_t local_block_event(int local_id) const;
-  event_t local_block_line_event(int local_id, uint8_t dimension) const;
-  event_t local_block_lines_event(int local_id, dimensions_t dimensions) const;
+  event_t local_block_event(local_id_t local_id) const;
+  event_t local_block_line_event(local_id_t local_id, uint8_t dimension) const;
+  event_t local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const;
 
   // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
-  void accumulate(int local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
+  void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
 
   // Access the data for a completed block, either by (section,block) or local block id.
   // In uncompressed mode, these are O(1) and return views into all_data.  In compressed mode they must uncompress
@@ -116,18 +114,27 @@ public:
   // give the different versions different names.
 #if PENTAGO_MPI_COMPRESS
   Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
-  Array<Vector<super_t,2>,4> uncompress_and_get(int local_id, event_t event) const;
-  Array<Vector<super_t,2>> uncompress_and_get_flat(int local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
-  RawArray<const uint8_t> get_compressed(int local_id, bool allow_incomplete=false) const;
+  Array<Vector<super_t,2>,4> uncompress_and_get(local_id_t local_id, event_t event) const;
+  Array<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
+  RawArray<const uint8_t> get_compressed(local_id_t local_id, bool allow_incomplete=false) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;
-  RawArray<const Vector<super_t,2>,4> get_raw(int local_id) const;
-  RawArray<const Vector<super_t,2>> get_raw_flat(int local_id) const;
+  RawArray<const Vector<super_t,2>,4> get_raw(local_id_t local_id) const;
+  RawArray<const Vector<super_t,2>> get_raw_flat(local_id_t local_id) const;
 #endif
+
+  // Look up info for a block
+  const block_info_t& block_info(const local_id_t local_id) const;
+  const block_info_t& block_info(const section_t section, const Vector<uint8_t,4> block) const;
 
 private:
   uint64_t base_memory_usage() const;
 };
+
+// Convenience factory routine
+static inline Ref<block_store_t> make_block_store(const partition_t& partition, const int rank, const int samples_per_section) {
+  return new_<block_store_t>(partition,rank,partition.rank_blocks(rank),samples_per_section);
+}
 
 // The kernel of count_wins factored out for use elsewhere
 Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<uint8_t,4> block, RawArray<const Vector<super_t,2>> data);

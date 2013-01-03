@@ -5,6 +5,7 @@
 #include <pentago/section.h>
 #include <pentago/symmetry.h>
 #include <pentago/thread.h>
+#include <pentago/utility/debug.h>
 #include <other/core/array/Array3d.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/geometry/BoxScalar.h>
@@ -253,15 +254,15 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
         const auto& events = event_sorted_history[t].at(dep_kind);
         for (const int i : range(max(0,events.size()-1)))
           if (events[i].event > events[i+1].event)
-            throw RuntimeError(format("event_dependencies: order failure: thread %d, kind %d, i %d (%d), events %lld %lld",t,dep_kind,i,events.size(),events[i].event,events[i+1].event));
+            THROW(RuntimeError,"event_dependencies: order failure: thread %d, kind %d, i %d (%d), events %lld %lld",t,dep_kind,i,events.size(),events[i].event,events[i+1].event);
         for (auto& e : events)
           if (e.event==dep_event)
             count++;
       }
-      throw RuntimeError(format("event_dependencies: dependency not found, direction = %d, count %d, source = %d %s %s, dependency = %s %s",
+      THROW(RuntimeError,"event_dependencies: dependency not found, direction = %d, count %d, source = %d %s %s, dependency = %s %s",
         direction,count,
         thread,time_kind_names().at(kind),str_event(source.event),
-        time_kind_names().at(dep_kind),str_event(dep_event)));
+        time_kind_names().at(dep_kind),str_event(dep_event));
     }
   }
   return deps;

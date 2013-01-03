@@ -6,6 +6,7 @@
 #include <pentago/utility/wall_time.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/geometry/Box.h>
+#include <other/core/math/uint128.h>
 #include <other/core/python/module.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/range.h>
@@ -57,6 +58,15 @@ void rasterize_history(RawArray<Vector<real,4>,2> image, const Vector<real,2> si
   }
 }
 
+// A benchmark for threefish random numbers
+uint128_t threefry_benchmark(int n) {
+  OTHER_ASSERT(n>=0);
+  uint128_t result = n;
+  for (int i=0;i<n;i++)
+    result = threefry(result,i);
+  return result;
+}
+
 }
 using namespace pentago;
 
@@ -64,4 +74,5 @@ void wrap_analyze() {
   OTHER_FUNCTION(sample_immediate_endings)
   OTHER_FUNCTION(simplify_history)
   OTHER_FUNCTION(rasterize_history)
+  OTHER_FUNCTION(threefry_benchmark)
 }

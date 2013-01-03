@@ -2,6 +2,7 @@
 
 #include <pentago/mpi/fast_compress.h>
 #include <pentago/mpi/config.h>
+#include <pentago/mpi/utility.h>
 #include <pentago/filter.h>
 #include <pentago/thread.h>
 #include <pentago/utility/memory.h>
@@ -39,8 +40,9 @@ void fast_uncompress(RawArray<const uint8_t> compressed, RawArray<Vector<super_t
   OTHER_ASSERT(compressed.size());
   if (compressed[0]) { // Compressed mode
     size_t uncompressed_size;
-    OTHER_ASSERT(   snappy::GetUncompressedLength((const char*)compressed.data()+1,compressed.size()-1,&uncompressed_size)
-                 && uncompressed_size==memory_usage(uncompressed));
+    OTHER_ASSERT(snappy::GetUncompressedLength((const char*)compressed.data()+1,compressed.size()-1,&uncompressed_size));
+    if (uncompressed_size != memory_usage(uncompressed))
+      die("fast_uncompress: expected size %zu, got %zu, event 0x%llx",uncompressed.size(),uncompressed_size,event);
     OTHER_ASSERT(snappy::RawUncompress((const char*)compressed.data()+1,compressed.size()-1,(char*)uncompressed.data()));
   } else {
     OTHER_ASSERT((size_t)compressed.size()==1+memory_usage(uncompressed));

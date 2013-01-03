@@ -1,0 +1,17 @@
+#!/usr/bin/env python
+
+from pentago import *
+from other.core import *
+import time
+
+n = 1<<27
+print 'n = %d'%n
+start = time.time()
+r = threefry_benchmark(n)
+delta = time.time()-start
+print 'r = %d'%r
+print 'time = %g s'%delta
+print 'speed = %g evals/s'%(n/delta)
+
+clock_speed = 2e9 # cycles/s
+print 'rough cycles = %g cycles/eval'%(delta*clock_speed/n)

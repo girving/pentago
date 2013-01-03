@@ -9,23 +9,44 @@ import tempfile
 import shutil
 
 def test_partition():
+  random.seed(56565656)
   init_threads(-1,-1)
-  partition_test()
+  slices = []
+  for slice in xrange(7):
+    # Grab half the sections of this slice
+    sections = all_boards_sections(slice,8)
+    random.shuffle(sections)
+    slices.append(sections_t(slice,sections[:(len(sections)+1)//2]))
+  for sections in descendent_sections([[4,4],[4,4],[4,5],[5,4]],35):
+    if len(sections.sections):
+      slices.append(sections)
+  for sections in slices:
+    for ranks in 1,2,3,5:
+      for key in 0,1,17:
+        with Log.scope('partition test: slice %d, ranks %d, key %d'%(sections.slice,ranks,key)):
+          partition = random_partition_t(key,ranks,sections) if key else simple_partition_t(ranks,sections,False)
+          partition_test(partition)
+
+def test_simple_partition():
+  init_threads(-1,-1)
+  simple_partition_test()
 
 def test_counts():
   init_threads(-1,-1)
   for slice in xrange(5):
     with Log.scope('counting slice %d'%slice):
-      sections = all_boards_sections(slice,8)
-      partition = partition_t(1,slice,sections,False)
-      blocks = meaningless_block_store(partition,0,0)
-      good_blocks = sum(product(section_shape(s)) for s in sections)
-      Log.write('blocks = %d, correct = %d'%(blocks.nodes(),good_blocks))
-      assert blocks.nodes()==good_blocks
-      bad_counts = sum_section_counts(sections,blocks.section_counts)
+      sections = sections_t(slice,all_boards_sections(slice,8))
       good_counts = meaningless_counts(all_boards(slice,1))
-      Log.write('bad counts  = %s\ngood counts = %s'%(bad_counts,good_counts))
-      assert all(bad_counts==good_counts)
+      good_nodes = sum(product(section_shape(s)) for s in sections.sections)
+      for key in 0,1,17:
+        with Log.scope('partition key %d'%key):
+          partition = random_partition_t(key,1,sections) if key else simple_partition_t(1,sections,False)
+          blocks = meaningless_block_store(partition,0,0)
+          Log.write('blocks = %d, correct = %d'%(blocks.total_nodes,good_nodes))
+          assert blocks.total_nodes==good_nodes
+          bad_counts = sum_section_counts(sections.sections,blocks.section_counts)
+          Log.write('bad counts  = %s\ngood counts = %s'%(bad_counts,good_counts))
+          assert all(bad_counts==good_counts)
 
 def run(cmd):
   Log.write(cmd)
@@ -61,7 +82,7 @@ def test_write(dir=None):
     with Log.scope('test write %d'%slice):
       # Do the same computation locally
       sections = all_boards_sections(slice,8)
-      partition = partition_t(1,slice,sections,False)
+      partition = simple_partition_t(1,sections_t(slice,sections),False)
       blocks = meaningless_block_store(partition,0,0)
 
       # Compare counts
@@ -91,16 +112,22 @@ def test_write(dir=None):
       assert total==os.stat(slice_file).st_size
       compare_blocks_with_supertensors(blocks,readers)
 
-def test_meaningless(dir=None):
+def meaningless_test(key,dir=None):
   if dir is None:
     tmpdir = TmpDir('test_meaningless')
     dir = tmpdir.name
   for slice in 4,5:
     # Compute small count slices based on meaningless data
-    dir = '%s/meaningless-%d'%(dir,slice)
-    run('%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d 00000000 --dir %s'%(mpirun(),slice,dir))
+    dir = '%s/meaningless-s%d-r%d'%(dir,slice,key)
+    run('%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d --randomize %d 00000000 --dir %s'%(mpirun(),slice,key,dir))
     # Check validity
     run('%s/check --meaningless %d %s'%(os.path.dirname(__file__),slice,dir))
+
+def test_meaningless_simple(dir=None):
+  meaningless_test(0,dir)
+
+def test_meaningless_random(dir=None):
+  meaningless_test(17,dir)
 
 def test_fast_compress():
   init_threads(-1,-1)
@@ -131,6 +158,8 @@ if __name__=='__main__':
     os.mkdir('tmp')
   test_write('tmp')
   test_counts()
-  test_meaningless('tmp')
-  partition_test()
+  test_meaningless_simple('tmp')
+  test_meaningless_random('tmp')
+  test_partition()
+  test_simple_partition()
   test_fast_compress()

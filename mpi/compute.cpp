@@ -55,6 +55,7 @@ OTHER_CONST static inline Tuple<section_t,uint8_t> standardize_child_section(sec
 line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_comm)
   : pre(pre)
   , line_event(pre.line.line_event())
+  , block_stride(block_size*block_shape(pre.line.section.shape().remove_index(pre.line.dimension),pre.line.block_base).product())
 
   // Standardize
   , standard_child_section(standardize_child_section(pre.line.section,pre.line.dimension).x)
@@ -129,7 +130,7 @@ Vector<uint8_t,4> line_details_t::input_block(int k) const {
 
 RawArray<Vector<super_t,2>> line_details_t::input_block_data(int k) const {
   OTHER_ASSERT((unsigned)k<(unsigned)input_blocks);
-  const int step = pre.line.node_step+PENTAGO_MPI_COMPRESS;
+  const int step = block_stride+PENTAGO_MPI_COMPRESS;
   const int start = step*k;
   return input.slice(start,min(start+step,input.size()));
 }
@@ -142,8 +143,8 @@ RawArray<Vector<super_t,2>> line_details_t::input_block_data(Vector<uint8_t,4> b
 
 RawArray<const Vector<super_t,2>> line_details_t::output_block_data(int k) const {
   OTHER_ASSERT((unsigned)k<pre.line.length);
-  const int start = pre.line.node_step*k;
-  return output.slice(start,min(start+pre.line.node_step,output.size()));
+  const int start = block_stride*k;
+  return output.slice(start,min(start+block_stride,output.size()));
 }
 
 int line_details_t::decrement_input_responses() {
@@ -208,7 +209,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
   const int dim_shift = 16*dim;
 
   // Prepare to index into output array
-  const int block_stride = pre.line.node_step;
+  const int block_stride = line->block_stride;
   auto output_block_shape = pre.output_shape;
   output_block_shape[dim] = block_size;
   const auto output_block_strides = strides(output_block_shape);

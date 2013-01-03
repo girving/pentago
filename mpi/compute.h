@@ -11,8 +11,6 @@
 namespace pentago {
 namespace mpi {
 
-using namespace other;
-
 /* Notes:
  *
  * 1. Unlike the out-of-core solver, here we store both input and output data in block major order (essentially a 5D array).
@@ -43,6 +41,7 @@ struct line_details_t : public boost::noncopyable {
   // Initial information
   const line_data_t pre;
   const event_t line_event;
+  const int block_stride; // Number of nodes in all blocks except possible the last
 
   // Standardization
   const section_t standard_child_section;

@@ -19,6 +19,7 @@ memory = props.add('memory','').set_required(True)
 section = props.add('section','').set_required(True)
 samples = props.add('samples',128)
 meaningless = props.add('meaningless',0)
+randomize = props.add('randomize',0)
 parser.parse(props,'Endgame prediction script',positional=[section])
 
 # 'Parse' simple properties
@@ -81,7 +82,10 @@ for slice in reversed(xrange(len(slices))):
   if not len(slices[slice]):
     break
   with Log.scope('slice %d'%slice):
-    partition = partition_t(ranks,slice,slices[slice],True)
+    if randomize:
+      partition = random_partition_t(randomize,ranks,slices[slice])
+    else:
+      partition = simple_partition_t(ranks,slices[slice],True)
     total_outputs += partition.total_nodes
     total_inputs += prev_partition.total_nodes if prev_partition else 0
     Log.write('blocks = %d'%partition.max_rank_blocks)

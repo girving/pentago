@@ -135,7 +135,7 @@ protected:
 public:
 
   bool has_section(const section_t section) const {
-    return blocks->partition->section_id.contains(section);
+    return blocks->sections->section_id.contains(section);
   }
 
   super_t extract(const bool turn, const bool aggressive, const Vector<super_t,2>& data) const {

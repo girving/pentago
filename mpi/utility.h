@@ -9,6 +9,7 @@
 namespace pentago {
 namespace mpi {
 
+using namespace other;
 using std::string;
 
 // Should we print?  Defaults to true.

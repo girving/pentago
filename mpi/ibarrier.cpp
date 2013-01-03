@@ -6,8 +6,6 @@
 namespace pentago {
 namespace mpi {
 
-using namespace other;
-
 static int parent(uint32_t rank) {
   return rank?rank^min_bit(rank):-1;
 }

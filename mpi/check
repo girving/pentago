@@ -24,14 +24,15 @@ init_threads(-1,-1)
 
 # Generate meaningless data
 if meaningless:
-  sections = all_boards_sections(meaningless,8)
-  partition = partition_t(1,meaningless,sections,False)
+  sections = sections_t(meaningless,all_boards_sections(meaningless,8))
+  partition = simple_partition_t(1,sections,False)
   with Log.scope('meaningless'):
     cache = store_block_cache(meaningless_block_store(partition,0,0),1<<30)
   set_block_cache(cache)
 
 # Process each slice that exists, keeping track of which files we've checked
-unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if f not in 'log empty.pentago' and not f.startswith('history') and not f.startswith('output-'))
+skip_pattern = re.compile('^(log(-\d+)|empty.pentago|history.*|output-.*)$')
+unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if not skip_pattern.match(f))
 random = Random(8183131)
 init_supertable(16)
 for slice in arange(36)[::-1]:

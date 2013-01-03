@@ -24,22 +24,22 @@ using std::endl;
 using std::flush;
 using std::tr1::unordered_map;
 
-static void meaningless_helper(block_store_t* const self, const int local_id) {
+static void meaningless_helper(block_store_t* const self, const local_id_t local_id) {
   const event_t event = self->local_block_event(local_id);
   thread_time_t time(meaningless_kind,event);
 
   // Prepare
-  const block_info_t* info = &self->block_info[local_id];
-  const auto base = block_size*Vector<int,4>(info->block);
-  const auto shape = block_shape(info->section.shape(),info->block);
-  const auto rmin0 = safe_rmin_slice(info->section.counts[0],base[0]+range(shape[0])),
-             rmin1 = safe_rmin_slice(info->section.counts[1],base[1]+range(shape[1])),
-             rmin2 = safe_rmin_slice(info->section.counts[2],base[2]+range(shape[2])),
-             rmin3 = safe_rmin_slice(info->section.counts[3],base[3]+range(shape[3]));
+  const block_info_t& info = self->block_info(local_id);
+  const auto base = block_size*Vector<int,4>(info.block);
+  const auto shape = block_shape(info.section.shape(),info.block);
+  const auto rmin0 = safe_rmin_slice(info.section.counts[0],base[0]+range(shape[0])),
+             rmin1 = safe_rmin_slice(info.section.counts[1],base[1]+range(shape[1])),
+             rmin2 = safe_rmin_slice(info.section.counts[2],base[2]+range(shape[2])),
+             rmin3 = safe_rmin_slice(info.section.counts[3],base[3]+range(shape[3]));
 #if PENTAGO_MPI_COMPRESS
   const auto flat_data = large_buffer<Vector<super_t,2>>(shape.product(),false);
 #else
-  const auto flat_data = self->all_data.slice(info[0].offset,info[1].offset);
+  const auto flat_data = self->all_data.slice(info.nodes);
   OTHER_ASSERT(shape.product()==flat_data.size());
 #endif
   const RawArray<Vector<super_t,2>,4> block_data(shape,flat_data.data());
@@ -60,20 +60,20 @@ static void meaningless_helper(block_store_t* const self, const int local_id) {
           // Count wins
           counts += Vector<uint64_t,3>(popcounts_over_stabilizers(board,node)); 
         }
-  info->missing_dimensions = 0;
+  info.missing_dimensions = 0;
 
   // Sample
-  for (auto& sample : self->samples[local_id])
+  for (auto& sample : self->samples[info.flat_id])
     sample.wins = block_data.flat[sample.index];
 
 #if PENTAGO_MPI_COMPRESS
   time.stop();
   // Compress data into place
-  self->store.compress_and_set(local_id,flat_data,event);
+  self->store.compress_and_set(info.flat_id,flat_data,event);
 #endif
 
   // Add to section counts
-  const int section_id = self->partition->section_id.get(info->section);
+  const int section_id = self->sections->section_id.get(info.section);
   spin_t spin(self->section_counts_lock);
   self->section_counts[section_id] += counts;
 }
@@ -82,12 +82,12 @@ Ref<block_store_t> meaningless_block_store(const partition_t& partition, const i
   Log::Scope scope("meaningless");
 
   // Allocate block store
-  const auto self = new_<block_store_t>(partition,rank,samples_per_section,partition.rank_lines(rank,true));
+  const auto self = make_block_store(partition,rank,samples_per_section);
 
   // Replace data with meaninglessness
   memset(self->section_counts.data(),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
-  for (int local_id : range(self->blocks()))
-    threads_schedule(CPU,curry(meaningless_helper,&*self,local_id));
+  for (const auto& info : self->block_infos)
+    threads_schedule(CPU,curry(meaningless_helper,&*self,info.key));
   threads_wait_all_help();
   return self;
 }
@@ -118,30 +118,29 @@ static Vector<int,4> standard_board_index(board_t board) {
 // All sparse samples must occur in this block store
 static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> data) {
   OTHER_ASSERT(boards.size()==data.size());
-  const auto& partition = *blocks.partition;
-  OTHER_ASSERT(partition.ranks==1);
-
+  OTHER_ASSERT(blocks.partition->ranks==1);
+ 
   // Partition samples by block.  This is necessary to avoid repeatedly decompressing compressed blocks.
-  vector<Array<Tuple<int,Vector<int,4>>>> block_samples(blocks.blocks());
+  Hashtable<local_id_t,Array<Tuple<int,Vector<int,4>>>> block_samples;
   for (int i=0;i<boards.size();i++) {
     const auto board = boards[i];
     check_board(board);
     const auto section = count(board);
     const auto index = standard_board_index(board);
-    const auto block = index/block_size;
-    const int local_block_id = partition.block_offsets(section,Vector<uint8_t,4>(block)).x;
-    block_samples[local_block_id].append(tuple(i,index-block_size*block));
+    const Vector<uint8_t,4> block(index/block_size);
+    block_samples.get_or_insert(blocks.block_to_local_id.get(tuple(section,block))).append(tuple(i,index-block_size*Vector<int,4>(block)));
   }
 
   // Check all samples
-  for (int b : range((int)block_samples.size())) {
-    const bool turn = blocks.block_info[b].section.sum()&1;
+  for (auto& samples : block_samples) {
+    const auto local_id = samples.key;
+    const bool turn = blocks.block_info(local_id).section.sum()&1;
 #if PENTAGO_MPI_COMPRESS
-    const auto block_data = blocks.uncompress_and_get(b,unevent);
+    const auto block_data = blocks.uncompress_and_get(local_id,unevent);
 #else
-    const auto block_data = blocks.get_raw(b);
+    const auto block_data = blocks.get_raw(local_id);
 #endif
-    for (const auto& sample : block_samples[b]) {
+    for (const auto& sample : block_samples[local_id]) {
       OTHER_ASSERT(block_data.valid(sample.y));
       auto entry = block_data[sample.y];
       entry.y = ~entry.y;
@@ -165,28 +164,28 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
           for (int i3 : range(shape[3]))
             blocks.assert_contains(section,vec<uint8_t>(i0,i1,i2,i3));
   }
-  OTHER_ASSERT(blocks.blocks()==count);
+  OTHER_ASSERT(blocks.total_blocks()==count);
 
   // Verify that all local blocks occur in the readers, and that all data matches
   unordered_map<section_t,int,Hasher> reader_id;
   for (int i=0;i<(int)readers.size();i++)
     reader_id[readers[i]->header.section] = i;
-  for (int b : range(blocks.blocks())) {
+  for (const auto& info : blocks.block_infos) {
+    const auto local_id = info.key;
     // Check that this block exists in the readers
-    const auto& info = blocks.block_info[b];
-    const auto it = reader_id.find(info.section);
+    const auto it = reader_id.find(info.data.section);
     OTHER_ASSERT(it != reader_id.end());
     const auto& reader = *readers[it->second];
 
     // Verify that all data matches
-    const auto read_data = reader.read_block(info.block).flat;
+    const auto read_data = reader.read_block(info.data.block).flat;
 #if PENTAGO_MPI_COMPRESS
-    const auto good_data = blocks.uncompress_and_get_flat(b,unevent);
+    const auto good_data = blocks.uncompress_and_get_flat(local_id,unevent);
 #else
-    const auto good_data = blocks.get_raw_flat(b);
+    const auto good_data = blocks.get_raw_flat(local_id);
 #endif
     OTHER_ASSERT(read_data.size()==good_data.size());
-    const bool turn = info.section.sum()&1;
+    const bool turn = info.data.section.sum()&1;
     for (int i=0;i<read_data.size();i++) {
       auto good = good_data[i];
       good.y = ~good.y;
@@ -296,7 +295,6 @@ static Tuple<Vector<uint64_t,3>,int> compare_readers_and_samples(const supertens
 
 }
 }
-using namespace other;
 using namespace pentago::mpi;
 
 void wrap_check() {
