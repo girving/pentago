@@ -12,7 +12,6 @@ namespace mpi {
 
 struct chunk_t;
 using std::vector;
-static void simple_partition_test() OTHER_UNUSED;
 
 // Given a set of sections, distribute all lines amongst a number of processors
 struct simple_partition_t : public partition_t {

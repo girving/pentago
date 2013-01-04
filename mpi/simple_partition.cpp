@@ -415,7 +415,7 @@ uint64_t simple_partition_t::block_to_id(section_t section, Vector<uint8_t,4> bl
   return chunk.block_id+chunk.length*I.y+j;
 }
 
-static void simple_partition_test() {
+void simple_partition_test() {
   const int stones = 24;
   const uint64_t total = 1921672470396,
                  total_blocks = 500235319;
