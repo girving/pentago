@@ -1,6 +1,7 @@
 // Partitioning of sections and lines for MPI purposes
 
 #include <pentago/mpi/sections.h>
+#include <pentago/mpi/utility.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/sort.h>
 #include <other/core/python/Class.h>
@@ -47,15 +48,16 @@ vector<Ref<const sections_t>> descendent_sections(const section_t root, const in
 
 sections_t::sections_t(const int slice, Array<const section_t> sections)
   : slice(slice)
-  , sections(sections) {
+  , sections(sections)
+  , total_blocks(0)
+  , total_nodes(0) {
 
-  // Verify that caller didn't lie about slice
-  for (const auto& section : sections)
-    OTHER_ASSERT(section.sum()==slice);
-
-  // Invert sections
-  for (int s=0;s<sections.size();s++) 
-    const_cast_(section_id).set(sections[s],s);
+  for (const int s : range(sections.size())) {
+    OTHER_ASSERT(sections[s].sum()==slice); // Verify that caller didn't lie about slice
+    const_cast_(section_id).set(sections[s],s); // Invert sections
+    const_cast_(total_blocks) += section_blocks(sections[s]).product();
+    const_cast_(total_nodes) += Vector<uint64_t,4>(sections[s].shape()).product();
+  }
 }
 
 sections_t::~sections_t() {}
@@ -79,6 +81,8 @@ void wrap_sections() {
     .OTHER_INIT(int,Array<const section_t>)
     .OTHER_FIELD(slice)
     .OTHER_FIELD(sections)
+    .OTHER_FIELD(total_blocks)
+    .OTHER_FIELD(total_nodes)
     .OTHER_METHOD(memory_usage)
     ;
 }

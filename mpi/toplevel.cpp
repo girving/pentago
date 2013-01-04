@@ -6,6 +6,7 @@
 #include <pentago/mpi/partition.h>
 #include <pentago/mpi/random_partition.h>
 #include <pentago/mpi/simple_partition.h>
+#include <pentago/mpi/load_balance.h>
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/mpi/check.h>
@@ -390,7 +391,16 @@ int toplevel(int argc, char** argv) {
 
       // Allocate memory for all the blocks we own
       auto lines = partition->rank_lines(rank);
-      const auto blocks = make_block_store(partition,rank,samples);
+      auto local_blocks = partition->rank_blocks(rank);
+      const auto blocks = new_<block_store_t>(partition,rank,local_blocks,samples);
+      {
+        Log::Scope scope("load balance");
+        const auto load = load_balance(comm,lines,local_blocks);
+        if (!rank)
+          cout << str(*load) << endl;
+        local_blocks.clean_memory();
+        #define local_blocks hide_local_blocks
+      }
 
       // Estimate peak memory usage ignoring active lines
       const int64_t partition_memory = memory_usage(prev_partition)+memory_usage(partition),

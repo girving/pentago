@@ -149,6 +149,9 @@ thread_type_t thread_type();
 // Initialize thread pools
 void init_threads(int cpu_threads, int io_threads);
 
+// Grab thread counts: cpu count, io count
+Vector<int,2> thread_counts();
+
 // Schedule a job.  Schedule at the back of the queue if !soon, or the front if soon.
 void threads_schedule(thread_type_t type, job_t&& f, bool soon=false);
 

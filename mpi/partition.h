@@ -3,9 +3,7 @@
 
 #include <pentago/mpi/line.h>
 #include <pentago/mpi/sections.h>
-#include <other/core/geometry/Box.h>
 #include <other/core/structure/Hashtable.h>
-#include <vector>
 namespace pentago {
 namespace mpi {
 
@@ -44,7 +42,10 @@ public:
   virtual Tuple<section_t,Vector<uint8_t,4>> rank_block(const int rank, const local_id_t local_id) const = 0;
 };
 
+// Create an empty partition, typically for sentinel use
 Ref<const partition_t> empty_partition(const int ranks, const int slice);
+
+// Test self consistency of a partition
 void partition_test(const partition_t& partition);
 
 }

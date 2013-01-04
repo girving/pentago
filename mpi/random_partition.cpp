@@ -38,7 +38,6 @@ random_partition_t::random_partition_t(const uint128_t key, const int ranks, con
   OTHER_ASSERT(ranks>0 && sections.slice<36);
   Log::Scope scope("random partition");
   thread_time_t time(partition_kind,unevent);
-  cout << "key = "<<str(key)<<endl;
 
   // Assign contiguous indices to all lines
   {

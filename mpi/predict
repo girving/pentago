@@ -20,6 +20,9 @@ section = props.add('section','').set_required(True)
 samples = props.add('samples',128)
 meaningless = props.add('meaningless',0)
 randomize = props.add('randomize',0)
+gather_limit = props.add('gather_limit',-1)
+line_limit = props.add('line_limit',-1)
+log_all = props.add('log_all',False)
 parser.parse(props,'Endgame prediction script',positional=[section])
 
 # 'Parse' simple properties
@@ -49,7 +52,7 @@ section = asarray(map(int,m.group(1))).reshape(4,2)
 # Configure logging and threads
 Log.configure('predict',0,0,100)
 Log.write('command = %s'%parser.command(props))
-init_threads(1,0)
+init_threads(-1,0)
 
 # Dump general information
 with Log.scope('parameters'):
@@ -72,6 +75,7 @@ block_limit = 2**17-1
 # Simulate execution
 slices = descendent_sections(section,35)
 prev_partition = None
+prev_load = None
 max_blocks = 0
 max_base_memory = 0
 min_lines = 1<<30
@@ -79,21 +83,26 @@ max_total_memory = 0
 max_save_memory = 0
 total_outputs = total_inputs = 0
 for slice in reversed(xrange(len(slices))):
-  if not len(slices[slice]):
+  if not len(slices[slice].sections):
     break
   with Log.scope('slice %d'%slice):
-    if randomize:
-      partition = random_partition_t(randomize,ranks,slices[slice])
+    if randomize():
+      partition = random_partition_t(randomize(),ranks,slices[slice])
     else:
       partition = simple_partition_t(ranks,slices[slice],True)
-    total_outputs += partition.total_nodes
-    total_inputs += prev_partition.total_nodes if prev_partition else 0
-    Log.write('blocks = %d'%partition.max_rank_blocks)
-    Log.write('nodes = %d'%partition.max_rank_nodes)
-    max_blocks = max(max_blocks,partition.max_rank_blocks)
-    if partition.max_rank_blocks>=block_limit:
-      raise RuntimeError('max rank blocks = %d > %d'%(partition.max_rank_blocks,block_limit))
-    base_memory = max_rank_memory_usage(prev_partition,partition)
+    load = serial_load_balance(partition)
+    with Log.scope('load balance'):
+      Log.write(str(load))
+    max_rank_blocks = load.blocks[1]
+    max_rank_nodes = load.block_nodes[1]
+    total_outputs += partition.sections.total_nodes
+    total_inputs += prev_partition.sections.total_nodes if prev_partition else 0
+    Log.write('blocks = %d'%max_rank_blocks)
+    Log.write('nodes = %d'%max_rank_nodes)
+    max_blocks = max(max_blocks,max_rank_blocks)
+    if max_rank_blocks>=block_limit:
+      raise RuntimeError('max rank blocks = %d > %d'%(max_rank_blocks,block_limit))
+    base_memory = max_rank_memory_usage(prev_partition,prev_load,partition,load)
     max_base_memory = max(max_base_memory,base_memory)
     Log.write('base memory = %s'%large(base_memory))
     lines = line_parallelism(base_memory)
@@ -103,8 +112,9 @@ for slice in reversed(xrange(len(slices))):
     max_total_memory = max(max_total_memory,total_memory)
     Log.write('total memory = %s'%large(total_memory))
     prev_partition = partition
+    prev_load = load
     if slice<=save:
-      save_memory = 64*partition.max_rank_nodes
+      save_memory = 64*load.block_nodes[1]
       Log.write('save memory = %s'%large(save_memory))
       max_save_memory = max(max_save_memory,save_memory)
 with Log.scope('summary'):

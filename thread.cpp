@@ -296,6 +296,11 @@ void init_threads(int cpu_threads, int io_threads) {
   time_info.total_start = time_info.local_start = wall_time();
 }
 
+Vector<int,2> thread_counts() {
+  return vec(cpu_pool?cpu_pool->count:0,
+              io_pool? io_pool->count:0);
+}
+
 void threads_schedule(thread_type_t type, job_t&& f, bool soon) {
   OTHER_ASSERT(type==CPU || type==IO);
   if (type!=CPU) OTHER_ASSERT(io_pool);

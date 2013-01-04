@@ -24,7 +24,6 @@ struct simple_partition_t : public partition_t {
   const Array<const Vector<int,2>> owner_starts, other_starts;
   const Array<const uint64_t> owner_work, other_work; // Empty unless save_work is true
   const double owner_excess, total_excess; // Initialized only if verbose
-  const uint64_t total_blocks, total_nodes;
   const int max_rank_blocks; // Maximum number of blocks owned by a rank
   const uint64_t max_rank_nodes; // Maximum number of nodes owned by a rank
 

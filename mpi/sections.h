@@ -13,6 +13,7 @@ struct sections_t : public Object {
   const int slice;
   const Array<const section_t> sections;
   const Hashtable<section_t,int> section_id; // The inverse of sections
+  const uint64_t total_blocks, total_nodes;
 
 protected:
   sections_t(const int slice, Array<const section_t> sections);

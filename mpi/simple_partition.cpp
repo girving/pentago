@@ -49,7 +49,7 @@ BOOST_STATIC_ASSERT(sizeof(chunk_t)==64);
 simple_partition_t::simple_partition_t(const int ranks, const sections_t& sections, bool save_work)
   : partition_t(ranks,sections)
   , owner_excess(inf), total_excess(inf)
-  , total_blocks(0), total_nodes(0), max_rank_blocks(0), max_rank_nodes(0) {
+  , max_rank_blocks(0), max_rank_nodes(0) {
   OTHER_ASSERT(ranks>0);
   Log::Scope scope("simple partition");
   thread_time_t time(partition_kind,unevent);
@@ -135,8 +135,8 @@ simple_partition_t::simple_partition_t(const int ranks, const sections_t& sectio
   // Remember
   const_cast_(this->owner_lines) = owner_lines;
   const_cast_(this->other_lines) = other_lines;
-  const_cast_(this->total_blocks) = block_id;
-  const_cast_(this->total_nodes) = node_offset;
+  OTHER_ASSERT(sections.total_blocks==block_id);
+  OTHER_ASSERT(sections.total_nodes==node_offset);
 
   // Partition lines between processes, attempting to equalize (1) owned work and (2) total work.
   Array<uint64_t> work_nodes(ranks), work_penalties(ranks);
@@ -273,10 +273,10 @@ Vector<uint64_t,2> simple_partition_t::rank_offsets(int rank) const {
   // This is essentially rank_lines copied and pruned to touch only the first line 
   OTHER_ASSERT(0<=rank && rank<=ranks);
   if (rank==ranks)
-    return vec(total_blocks,total_nodes);
+    return vec(sections->total_blocks,sections->total_nodes);
   const auto start = owner_starts[rank];
   if (start.x==owner_lines.size())
-    return vec(total_blocks,total_nodes);
+    return vec(sections->total_blocks,sections->total_nodes);
   const auto& chunk = owner_lines[start.x];
   return vec(chunk.block_id+chunk.length*start.y,
              chunk.node_offset+(uint64_t)chunk.line_size*start.y);
@@ -434,8 +434,8 @@ static void simple_partition_test() {
     auto partition = new_<simple_partition_t>(ranks,sections,true);
 
     // Check totals
-    OTHER_ASSERT(partition->total_nodes==total);
-    OTHER_ASSERT(partition->total_blocks==total_blocks);
+    OTHER_ASSERT(sections->total_nodes==total);
+    OTHER_ASSERT(sections->total_blocks==total_blocks);
     OTHER_ASSERT(partition->rank_offsets(ranks)==vec(total_blocks,total));
     OTHER_ASSERT(partition->owner_work.sum()==total);
     auto o = partition->other_work.sum();
@@ -538,6 +538,5 @@ void wrap_simple_partition() {
     .OTHER_FIELD(max_rank_nodes)
     .OTHER_FIELD(owner_starts)
     .OTHER_FIELD(other_starts)
-    .OTHER_FIELD(total_nodes)
     ;
 }

@@ -5,7 +5,10 @@
 #include <pentago/mpi/simple_partition.h>
 #include <pentago/utility/ceil_div.h>
 #include <pentago/utility/debug.h>
+#include <other/core/math/constants.h>
+#include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>
+#include <other/core/utility/openmp.h>
 #include <other/core/python/Class.h>
 namespace pentago {
 namespace mpi {
@@ -73,6 +76,8 @@ using namespace pentago::mpi;
 void wrap_partition() {
   typedef partition_t Self;
   Class<Self>("partition_t")
+    .OTHER_FIELD(ranks)
+    .OTHER_FIELD(sections)
     ;
   OTHER_FUNCTION(partition_test)
 }
