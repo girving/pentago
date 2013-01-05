@@ -14,8 +14,8 @@ uint64_t base_compute_memory_usage(const int lines);
 struct flow_comms_t : public boost::noncopyable {
   const int rank;
   MPI_Comm barrier_comm; // Barrier synchronization messages passed down to ibarrier_t.  Tag = barrier_tag, no data.
-  MPI_Comm request_comm; // Requests for one of our local input blocks.  Tag = request_id, no data.
-  MPI_Comm response_comm; // Responses to our block requests complete with input block data.  Tag = request_id, block data.
+  MPI_Comm request_comm; // Requests for one of our local input blocks.  Tag = request_id, data = int dimensions, int response_tag.
+  MPI_Comm response_comm; // Responses to our block requests complete with input block data.  Tag = response_tag, block data.
   MPI_Comm output_comm; // Output data to be merged into one of our local output blocks.  Tag = request_id, block data.
   MPI_Comm wakeup_comm; // Wake up messages from a worker thread to the communication thread when a line finishes.  Tag = wakeup_tag, data = &line
 

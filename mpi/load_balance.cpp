@@ -14,7 +14,7 @@ load_balance_t::load_balance_t() {}
 load_balance_t::~load_balance_t() {}
 
 Range<Box<int64_t>*> load_balance_t::boxes() {
-  return range(&lines,&block_nodes+1);
+  return range(&lines,&block_local_ids+1);
 }
 
 void load_balance_t::enlarge(const load_balance_t& load) {
@@ -23,6 +23,7 @@ void load_balance_t::enlarge(const load_balance_t& load) {
   line_nodes.enlarge(load.line_nodes);
   blocks.enlarge(load.blocks);
   block_nodes.enlarge(load.block_nodes);
+  block_local_ids.enlarge(load.block_local_ids);
 }
 
 static Ref<load_balance_t> local_load_balance(RawArray<const line_t> lines, RawArray<const local_block_t> blocks) {
@@ -36,8 +37,11 @@ static Ref<load_balance_t> local_load_balance(RawArray<const line_t> lines, RawA
     load->line_nodes += shape[line.dimension]*block_shape(shape.remove_index(line.dimension),line.block_base).product();
   }
   load->blocks = blocks.size();
-  for (auto& block : blocks)
+  for (auto& block : blocks) {
     load->block_nodes += block_shape(block.section.shape(),block.block).product();
+    load->block_local_ids.max = max(load->block_local_ids.max,block.local_id.id);
+  }
+  load->block_local_ids = load->block_local_ids.max;
   return load;
 }
 
@@ -50,7 +54,7 @@ Ref<const load_balance_t> load_balance(const MPI_Comm comm, RawArray<const line_
   const auto load = local_load_balance(lines,blocks);
   flip_min(load);
   const int rank = comm_rank(comm);
-  CHECK(MPI_Reduce(rank?&load->lines:MPI_IN_PLACE,rank?0:&load->lines,10,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+  CHECK(MPI_Reduce(rank?&load->lines:MPI_IN_PLACE,rank?0:&load->lines,12,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
   if (rank)
     for (auto& box : load->boxes())
       box = 0;
@@ -99,6 +103,7 @@ void wrap_load_balance() {
     .OTHER_FIELD(line_nodes)
     .OTHER_FIELD(blocks)
     .OTHER_FIELD(block_nodes)
+    .OTHER_FIELD(block_local_ids)
     .OTHER_STR()
     ;
   OTHER_FUNCTION(serial_load_balance)

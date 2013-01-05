@@ -69,14 +69,17 @@ def line_parallelism(base_memory):
   return (memory-base_memory)/line_cost
 speed_estimate = 455092
 
-# Limit the number of per rank blocks for tag purposes
-block_limit = 2**17-1
+# Limit the number of per rank blocks and lines for tag purposes
+local_id_limit = 2**(23-2)
+block_limit = 2**17
 
 # Simulate execution
 slices = descendent_sections(section,35)
 prev_partition = None
 prev_load = None
+max_lines = 0
 max_blocks = 0
+max_local_ids = 0
 max_base_memory = 0
 min_lines = 1<<30
 max_total_memory = 0
@@ -93,14 +96,17 @@ for slice in reversed(xrange(len(slices))):
     load = serial_load_balance(partition)
     with Log.scope('load balance'):
       Log.write(str(load))
-    max_rank_blocks = load.blocks[1]
-    max_rank_nodes = load.block_nodes[1]
+    max_rank_lines = max(load.lines)
+    max_rank_blocks = max(load.blocks)
+    max_rank_nodes = max(load.block_nodes)
     total_outputs += partition.sections.total_nodes
     total_inputs += prev_partition.sections.total_nodes if prev_partition else 0
-    Log.write('blocks = %d'%max_rank_blocks)
-    Log.write('nodes = %d'%max_rank_nodes)
+    max_lines = max(max_lines,max_rank_lines)
     max_blocks = max(max_blocks,max_rank_blocks)
-    if max_rank_blocks>=block_limit:
+    max_local_ids = max(max_local_ids,max(load.block_local_ids))
+    if max(load.block_local_ids) > local_id_limit:
+      raise RuntimeError('max local ids = %d > %d'%(max(load.block_local_ids),local_id_limit))
+    if max_rank_blocks > block_limit:
       raise RuntimeError('max rank blocks = %d > %d'%(max_rank_blocks,block_limit))
     base_memory = max_rank_memory_usage(prev_partition,prev_load,partition,load)
     max_base_memory = max(max_base_memory,base_memory)
@@ -114,11 +120,13 @@ for slice in reversed(xrange(len(slices))):
     prev_partition = partition
     prev_load = load
     if slice<=save:
-      save_memory = 64*load.block_nodes[1]
+      save_memory = 64*max(load.block_nodes)
       Log.write('save memory = %s'%large(save_memory))
       max_save_memory = max(max_save_memory,save_memory)
 with Log.scope('summary'):
+  Log.write('lines = %d'%max_lines)
   Log.write('blocks = %d'%max_blocks)
+  Log.write('local ids = %d'%max_local_ids)
   Log.write('base memory = %s'%large(max_base_memory))
   Log.write('line parallelism = %g'%min_lines)
   Log.write('total memory = %s'%large(max_total_memory))

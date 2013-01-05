@@ -114,6 +114,7 @@ int toplevel(int argc, char** argv) {
   report(comm,"mpi");
 
   // Check tag space
+  const int required_tag_ub = (1<<(15+6+2))-1;
   int tag_ub = 0;
   {
     int success = false;
@@ -122,9 +123,8 @@ int toplevel(int argc, char** argv) {
     if (!success)
       error("tag upper bound lookup failed");
     tag_ub = *(int*)value;
-    const int required = 1<<(17+6+5);
-    if (tag_ub<required)
-      error("tag upper bound is only %d, need at least %d: 17 bits for line, 6 for block, 5 for dimensions",(int)tag_ub,required);
+    if (tag_ub<required_tag_ub)
+      error("tag upper bound is only %d, need at least %d: 15 bits for line, 6 for block, 2 for dimension",tag_ub,required_tag_ub);
   }
 
   // Parse command line options
@@ -132,8 +132,8 @@ int toplevel(int argc, char** argv) {
   int specified_block_size = 8;
   int level = 26;
   int64_t memory_limit = 0;
-  int gather_limit = 100;
-  int line_limit = 100;
+  int gather_limit = 32;
+  int line_limit = 32;
   int samples = 256;
   int specified_ranks = -1;
   string dir;
@@ -341,7 +341,7 @@ int toplevel(int argc, char** argv) {
          << "\nhistory = "<<thread_history_enabled()
          << "\nwildcard recvs = "<<wildcard_recv_count
          << "\nrandomize = "<<randomize
-         << "\ntag ub = "<<tag_ub
+         << "\ntag ub = "<<tag_ub<<" ("<<required_tag_ub<<" required)"
          << endl;
 #ifdef PENTAGO_MPI_DEBUG
     cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 

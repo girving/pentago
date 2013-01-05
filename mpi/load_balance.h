@@ -13,7 +13,7 @@ struct load_balance_t : public Object {
   OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
 
   Box<int64_t> lines, line_blocks, line_nodes; // Compute counts
-  Box<int64_t> blocks, block_nodes; // Owned block counts
+  Box<int64_t> blocks, block_nodes, block_local_ids; // Owned block counts
 
 protected:
   load_balance_t();

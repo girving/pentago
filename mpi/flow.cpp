@@ -28,31 +28,40 @@ using std::endl;
 using std::make_pair;
 using std::tr1::unordered_map;
 
-static inline int request_id(local_id_t owner_block_id, dimensions_t dimensions) {
-  return 32*owner_block_id.id + dimensions.data;
+static inline int request_id_(local_id_t owner_block_id, uint8_t dimension) {
+  return (owner_block_id.id<<2) | dimension;
 }
 
-static inline local_id_t request_block_id(int request_id) {
-  return local_id_t(request_id>>5);
+static inline local_id_t request_block_id_(int request_id) {
+  return local_id_t(request_id>>2);
 }
 
-static inline dimensions_t request_dimensions(int request_id) {
-  return dimensions_t::raw(request_id&31);
+static inline uint8_t request_dimension(int request_id) {
+  return request_id&3;
+}
+
+static inline dimensions_t request_dimensions(const Vector<int,2>* buffer) {
+  return dimensions_t::raw(buffer->x);
+}
+
+static inline int request_response_tag(const Vector<int,2>* buffer) {
+  return buffer->y;
 }
 
 namespace {
 struct block_request_t : public boost::noncopyable {
   // The section is determined by the dependent line, so we don't need to store it
+  const section_t section; // child section
   const Vector<uint8_t,4> block;
   const dimensions_t dimensions;
+  const Vector<int,2> request_buffer; // dimensions, response_tag
   vector<line_details_t*> dependent_lines;
 
-  block_request_t(Vector<uint8_t,4> block, dimensions_t dimensions)
-    : block(block), dimensions(dimensions) {}
+  block_request_t(const section_t section, const Vector<uint8_t,4> block, const dimensions_t dimensions, const int response_tag)
+    : section(section), block(block), dimensions(dimensions), request_buffer(dimensions.data,response_tag) {}
 
   event_t block_lines_event() const {
-    OTHER_ASSERT(dependent_lines.size());
-    return pentago::mpi::block_lines_event(dependent_lines[0]->standard_child_section,dimensions,block);
+    return pentago::mpi::block_lines_event(section,dimensions,block);
   }
 };
 }
@@ -100,7 +109,9 @@ struct flow_t {
   Array<line_data_t*> unscheduled_lines;
 
   // Pending block requests, with internal references to the lines that depend on them.
-  Hashtable<Tuple<int,int>,block_request_t*> block_requests;
+  // There will be few enough of these that linear search is fine.
+  Array<block_request_t*> block_requests;
+  int next_response_tag;
 
   // Keep track of how much more stuff has to happen.  This includes both blocks we need to send and those we need to receive.
   ibarrier_countdown_t countdown;
@@ -112,25 +123,26 @@ struct flow_t {
   int free_lines;
 
   // Space for persistent message requests
+  Vector<Vector<int,2>,wildcard_recv_count> request_buffers;
   Vector<Array<Vector<super_t,2>>,wildcard_recv_count> output_buffers;
   uint64_t wakeup_buffer;
 
   // Wildcard callbacks
-  function<void(MPI_Status*)> barrier_callback, request_callback, wakeup_callback, response_callback;
+  function<void(MPI_Status*)> barrier_callback, wakeup_callback;
 
   flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
   ~flow_t();
 
   void schedule_lines();
   void post_barrier_recv();
-  void post_request_recv();
+  void post_request_recv(Vector<int,2>* buffer);
   void post_output_recv(Array<Vector<super_t,2>>* buffer);
   void post_wakeup_recv();
   void process_barrier(MPI_Status* status);
-  void process_request(MPI_Status* status);
+  void process_request(Vector<int,2>* buffer, MPI_Status* status);
   void process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status);
   void process_wakeup(MPI_Status* status);
-  void process_response(MPI_Status* status);
+  void process_response(block_request_t* request, MPI_Status* status);
   void finish_output_send(line_details_t* const line, MPI_Status* status);
 };
 
@@ -138,16 +150,16 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   : comms(comms)
   , input_blocks(input_blocks)
   , output_blocks(output_blocks)
+  , next_response_tag(0)
   , countdown(comms.barrier_comm,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
   , progress(countdown.remaining(),false)
   , free_memory(memory_limit)
   , free_line_gathers(line_gather_limit)
   , free_lines(line_limit)
   , barrier_callback(curry(&flow_t::process_barrier,this))
-  , request_callback(curry(&flow_t::process_request,this))
   , wakeup_callback(curry(&flow_t::process_wakeup,this))
-  , response_callback(curry(&flow_t::process_response,this))
 {
+  OTHER_ASSERT(line_gather_limit<=32); // Make sure linear search through block_requests is okay
   OTHER_ASSERT(free_line_gathers>=1);
 
   // Compute information about each line
@@ -160,8 +172,8 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
 
   // Start wildcard receives
   post_barrier_recv();
-  for (int i=0;i<wildcard_recv_count;i++)
-    post_request_recv();
+  for (auto& buffer : request_buffers)
+    post_request_recv(&buffer);
   for (auto& buffer : output_buffers)
     post_output_recv(&buffer);
   post_wakeup_recv();
@@ -207,47 +219,45 @@ void flow_t::schedule_lines() {
     else {
       OTHER_ASSERT(input_blocks);
       free_line_gathers--;
+      const auto child_section = line->standard_child_section;
       for (int b : range((int)line->input_blocks)) {
         const auto block = line->input_block(b);
-        const auto owner_and_id = input_blocks->partition->find_block(line->standard_child_section,block);
-        const int owner = owner_and_id.x;
-        const local_id_t owner_block_id = owner_and_id.y;
-        const dimensions_t dimensions(line->section_transform,line->child_dimension);
-        const auto request_id = pentago::mpi::request_id(owner_block_id,dimensions);
-        // Verify that this particular block/dimension pair hasn't been requested yet
-        auto block_request = block_requests.get_default(tuple(owner,request_id));
-        if (block_request) {
-          const auto other = block_request->dependent_lines[0];
-          die("block request %s,%s,%d from line %s,%s,%d not unique: existing request from line %s,%s,%d",
-              str(line->standard_child_section),str(block),line->child_dimension,
-              str(line->pre.line.section),str(line->pre.line.block_base),line->pre.line.dimension,
-              str(other->pre.line.section),str(other->pre.line.block_base),other->pre.line.dimension);
-        }
         // Check for an existing block request if desired
+        block_request_t* block_request = 0;
         static const bool merge_block_requests = !thread_history_enabled();
         if (merge_block_requests)
-          for (int d=0;d<32;d++) {
-            const int id = pentago::mpi::request_id(owner_block_id,dimensions_t::raw(d));
-            if (id != request_id)
-              if ((block_request = block_requests.get_default(tuple(owner,id))))
-                break;
-          }
+          for (auto request : block_requests)
+            if (request->section==child_section && request->block==block) {
+              block_request = request;
+              break;
+            }
+        // Send a new request if necessary
         if (!block_request) {
           // Send a block request message
-          thread_time_t time(request_send_kind,block_lines_event(line->standard_child_section,dimensions,block));
-          block_request = new block_request_t(block,dimensions);
-          block_requests.set(tuple(owner,request_id),block_request);
+          const dimensions_t dimensions(line->section_transform,line->child_dimension);
+          thread_time_t time(request_send_kind,block_lines_event(child_section,dimensions,block));
+          const auto owner_and_id = input_blocks->partition->find_block(child_section,block);
+          const int owner = owner_and_id.x;
+          const local_id_t owner_block_id = owner_and_id.y;
+          const int response_tag = next_response_tag++;
+          OTHER_ASSERT(response_tag<(1<<23));
+          block_request = new block_request_t(child_section,block,dimensions,response_tag);
+          block_requests.append(block_request);
           // Post receives for all responses, feeding directly into the input memory for the first line.
           // We can still do this in compressed mode since the input buffer has an extra entry to account for expansion.
           const RawArray<Vector<super_t,2>> block_data = line->input_block_data(b);
-          MPI_Request request;
+          MPI_Request response_request;
           if (PENTAGO_MPI_COMPRESS)
-            CHECK(MPI_Irecv(block_data.data(),memory_usage(block_data),MPI_BYTE,owner,request_id,comms.response_comm,&request));
+            CHECK(MPI_Irecv(block_data.data(),memory_usage(block_data),MPI_BYTE,owner,response_tag,comms.response_comm,&response_request));
           else
-            CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,request_id,comms.response_comm,&request));
-          send_empty(owner,request_id,comms.request_comm);
-          PENTAGO_MPI_TRACE("block request: owner %d, request_id %d",owner,request_id);
-          requests.add(request,response_callback);
+            CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,response_tag,comms.response_comm,&response_request));
+          // Send request
+          MPI_Request request_request;
+          const auto request_tag = request_id_(owner_block_id,line->child_dimension);
+          CHECK(MPI_Isend(&const_cast_(block_request->request_buffer),2,MPI_INT,owner,request_tag,comms.request_comm,&request_request));
+          CHECK(MPI_Request_free(&request_request));
+          PENTAGO_MPI_TRACE("block request: owner %d, request_tag %d, response_tag %d",owner,request_tag,response_tag);
+          requests.add(response_request,curry(&flow_t::process_response,this,block_request));
         }
         block_request->dependent_lines.push_back(line);
       }
@@ -266,33 +276,34 @@ void flow_t::process_barrier(MPI_Status* status) {
   post_barrier_recv();
 }
 
-void flow_t::post_request_recv() {
+void flow_t::post_request_recv(Vector<int,2>* buffer) {
   PENTAGO_MPI_TRACE("post request recv");
   MPI_Request request;
-  CHECK(MPI_Irecv(0,0,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.request_comm,&request));
-  requests.add(request,request_callback,true);
+  CHECK(MPI_Irecv(buffer,2,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.request_comm,&request));
+  requests.add(request,curry(&flow_t::process_request,this,buffer),true);
 }
 
-void flow_t::process_request(MPI_Status* status) {
+void flow_t::process_request(Vector<int,2>* buffer, MPI_Status* status) {
   OTHER_ASSERT(input_blocks);
-  const local_id_t local_block_id = request_block_id(status->MPI_TAG);
-  const auto dimensions = request_dimensions(status->MPI_TAG);
+  const local_id_t local_block_id = request_block_id_(status->MPI_TAG);
+  const auto dimensions = request_dimensions(buffer);
+  const int response_tag = request_response_tag(buffer);
   thread_time_t time(response_send_kind,input_blocks->local_block_lines_event(local_block_id,dimensions));
   PENTAGO_MPI_TRACE("process request: local block %d, dimensions %d",local_block_id.id,dimensions.data);
   // Send block data
   MPI_Request request;
 #if PENTAGO_MPI_COMPRESS
   const auto compressed_data = input_blocks->get_compressed(local_block_id);
-  CHECK(MPI_Isend((void*)compressed_data.data(),compressed_data.size(),MPI_BYTE,status->MPI_SOURCE,status->MPI_TAG,comms.response_comm,&request));
+  CHECK(MPI_Isend((void*)compressed_data.data(),compressed_data.size(),MPI_BYTE,status->MPI_SOURCE,response_tag,comms.response_comm,&request));
 #else
   const auto block_data = input_blocks->get_raw_flat(local_block_id);
-  CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,status->MPI_TAG,comms.response_comm,&request));
+  CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,status->MPI_SOURCE,response_tag,comms.response_comm,&request));
 #endif
   PENTAGO_MPI_TRACE("block response: source %d, local block id %d, dimensions %d",status->MPI_SOURCE,local_block_id.id,dimensions.data);
   // The barrier tells us when all messages are finished, so we don't need this request
   CHECK(MPI_Request_free(&request));
   // Repost wildcard receive
-  post_request_recv();
+  post_request_recv(buffer);
 }
 
 void flow_t::post_output_recv(Array<Vector<super_t,2>>* buffer) {
@@ -313,8 +324,8 @@ void flow_t::process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status
   {
     // How many elements did we receive?
     const int tag = status->MPI_TAG;
-    const local_id_t local_block_id = request_block_id(tag);
-    const uint8_t dimension = request_dimensions(tag).data;
+    const local_id_t local_block_id = request_block_id_(tag);
+    const uint8_t dimension = request_dimension(tag);
     thread_time_t time(output_recv_kind,output_blocks.local_block_line_event(local_block_id,dimension));
     const int count = get_count(status,MPI_LONG_LONG_INT);
     PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, dimension %d, count %g, tag %d",status->MPI_SOURCE,local_block_id.id,dimension,count/8.,tag);
@@ -351,7 +362,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
     const int owner = owner_and_id.x;
     const local_id_t owner_block_id = owner_and_id.y;
     const auto block_data = line->output_block_data(b);
-    const int tag = request_id(owner_block_id,dimensions_t::raw(line->pre.line.dimension));
+    const int tag = request_id_(owner_block_id,line->pre.line.dimension);
     MPI_Request request;
     CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.output_comm,&request));
     PENTAGO_MPI_TRACE("send output %p: owner %d, owner block id %d, dimension %d, count %d, tag %d",line,owner,owner_block_id.id,line->pre.line.dimension,block_data.size(),tag);
@@ -419,19 +430,15 @@ static void absorb_response(block_request_t* request, const int recv_size) {
   delete request;
 }
 
-void flow_t::process_response(MPI_Status* status) {
+void flow_t::process_response(block_request_t* request, MPI_Status* status) {
   {
-    // Look up block request
-    OTHER_ASSERT(input_blocks);
-    const int owner = status->MPI_SOURCE;
-    const int request_id = status->MPI_TAG;
-    const auto dimensions = request_dimensions(request_id);
-    const auto request = block_requests.get_default(tuple(owner,request_id));
-    if (!request)
-      die("other rank %d sent an unrequested block %lld, dimensions %d",owner,request_block_id(request_id).id,dimensions.data);
-    block_requests.erase(tuple(owner,request_id));
     thread_time_t time(response_recv_kind,request->block_lines_event());
-    PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d, dimension %d",owner,request_block_id(request_id).id,dimensions.data);
+    PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d, dimension %d",status->MPI_SOURCE,request_block_id(request_id).id,request->dimensions.data);
+
+    // Erase block request
+    const int index = block_requests.find(request); 
+    OTHER_ASSERT(block_requests.valid(index));
+    block_requests.remove_index_lazy(index);
 
     // Decrement input response counters
     for (auto line : request->dependent_lines)
