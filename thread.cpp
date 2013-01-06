@@ -2,6 +2,7 @@
 
 #include <pentago/thread.h>
 #include <pentago/utility/debug.h>
+#include <pentago/utility/spinlock.h>
 #include <pentago/utility/wall_time.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/stl.h>
@@ -16,16 +17,23 @@
 #include <set>
 namespace pentago {
 
+/****************** Configuration *****************/
+
+// Flip to enable history tracking
+#define HISTORY 0
+
+#if !OTHER_THREAD_SAFE
+#error "pentago requires thread_safe=1"
+#endif
+
+/********************** Setup *********************/
+
 using Log::cout;
 using std::endl;
 using std::flush;
 using std::deque;
 using std::set;
 using std::exception;
-
-#if !OTHER_THREAD_SAFE
-#error "pentago requires thread_safe=1"
-#endif
 
 static pthread_t master;
 
@@ -41,13 +49,10 @@ static bool is_master() {
 
 /****************** thread_time_t *****************/
 
-// Flip to enable history tracking
-#define HISTORY 0
-
 struct time_entry_t {
   wall_time_t total, local, start;
   event_t event;
-#ifdef HISTORY
+#if HISTORY
   Array<history_t> history;
 #endif
 
@@ -60,7 +65,7 @@ struct time_table_t {
   time_entry_t times[_time_kinds];
 };
 vector<time_table_t*> time_tables;
-static mutex_t time_mutex;
+static spinlock_t time_lock;
 
 struct time_info_t {
   pthread_key_t key;
@@ -73,7 +78,7 @@ struct time_info_t {
 
   void init_thread(thread_type_t type) {
     if (!pthread_getspecific(key)) {
-      lock_t lock(time_mutex);
+      spin_t spin(time_lock);
       auto table = new time_table_t;
       table->type = type;
       time_tables.push_back(table);
@@ -115,6 +120,63 @@ void thread_time_t::stop() {
     entry->start = wall_time_t(0);
     entry = 0;
   }
+}
+
+/****************** pthread locking *****************/
+
+namespace {
+
+struct mutex_t : public boost::noncopyable {
+  pthread_mutex_t mutex;
+
+  mutex_t() {
+    OTHER_ASSERT(!pthread_mutex_init(&mutex,0));
+  }
+
+  ~mutex_t() {
+    pthread_mutex_destroy(&mutex);
+  }
+};
+
+struct lock_t : public boost::noncopyable {
+  mutex_t& mutex;
+
+  lock_t(mutex_t& mutex)
+    : mutex(mutex) {
+    pthread_mutex_lock(&mutex.mutex);
+  }
+
+  ~lock_t() {
+    pthread_mutex_unlock(&mutex.mutex);
+  }
+};
+
+struct cond_t : public boost::noncopyable {
+  mutex_t& mutex;
+  pthread_cond_t cond;
+
+  cond_t(mutex_t& mutex)
+    : mutex(mutex) {
+    OTHER_ASSERT(!pthread_cond_init(&cond,0));
+  }
+
+  ~cond_t() {
+    pthread_cond_destroy(&cond);
+  }
+
+  void broadcast() {
+    pthread_cond_broadcast(&cond);
+  }
+
+  void signal() {
+    pthread_cond_signal(&cond);
+  }
+
+  void wait() {
+    pthread_cond_wait(&cond,&mutex.mutex);
+  }
+};
+
 }
 
 /****************** thread_pool_t *****************/
@@ -368,7 +430,7 @@ void threads_wait_all_help() {
 Array<wall_time_t> clear_thread_times() {
   OTHER_ASSERT(is_master());
   threads_wait_all();
-  lock_t lock(time_mutex);
+  spin_t spin(time_lock);
   wall_time_t now = wall_time();
   Array<wall_time_t> result(_time_kinds);
   for (auto table : time_tables) {
@@ -404,7 +466,7 @@ Array<wall_time_t> clear_thread_times() {
 
 Array<wall_time_t> total_thread_times() {
   clear_thread_times();
-  lock_t lock(time_mutex);
+  spin_t spin(time_lock);
   Array<wall_time_t> result(_time_kinds);
   for (auto table : time_tables)
     for (int k : range((int)_time_kinds))
@@ -472,7 +534,7 @@ bool thread_history_enabled() {
 
 vector<vector<Array<const history_t>>> thread_history() {
   clear_thread_times();
-  lock_t lock(time_mutex);
+  spin_t spin(time_lock);
   vector<vector<Array<const history_t>>> data(time_tables.size());
 #if HISTORY
   for (int t : range((int)data.size())) {

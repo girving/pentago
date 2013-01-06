@@ -18,57 +18,6 @@ using std::vector;
 using boost::function;
 struct time_entry_t;
 
-struct mutex_t : public boost::noncopyable {
-  pthread_mutex_t mutex;
-
-  mutex_t() {
-    OTHER_ASSERT(!pthread_mutex_init(&mutex,0));
-  }
-
-  ~mutex_t() {
-    pthread_mutex_destroy(&mutex);
-  }
-};
-
-struct lock_t : public boost::noncopyable {
-  mutex_t& mutex;
-
-  lock_t(mutex_t& mutex)
-    : mutex(mutex) {
-    pthread_mutex_lock(&mutex.mutex);
-  }
-
-  ~lock_t() {
-    pthread_mutex_unlock(&mutex.mutex);
-  }
-};
-
-struct cond_t : public boost::noncopyable {
-  mutex_t& mutex;
-  pthread_cond_t cond;
-
-  cond_t(mutex_t& mutex)
-    : mutex(mutex) {
-    OTHER_ASSERT(!pthread_cond_init(&cond,0));
-  }
-
-  ~cond_t() {
-    pthread_cond_destroy(&cond);
-  }
-
-  void broadcast() {
-    pthread_cond_broadcast(&cond);
-  }
-
-  void signal() {
-    pthread_cond_signal(&cond);
-  }
-
-  void wait() {
-    pthread_cond_wait(&cond,&mutex.mutex);
-  }
-};
-
 /* Our goals are to make timing (1) as fast as possible and (2) easy
  * to share across different ranks in an MPI run.  Therefore, we make
  * the questionable and perhaps temporary decision to use a fixed
