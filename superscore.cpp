@@ -16,10 +16,14 @@ using std::cout;
 using std::endl;
 
 int popcount(super_t s) {
+#if PENTAGO_SSE
   union { __m128i a; uint64_t b[2]; } c[2];
   c[0].a = s.x;
   c[1].a = s.y;
   return popcount(c[0].b[0])+popcount(c[0].b[1])+popcount(c[1].b[0])+popcount(c[1].b[1]);
+#else
+  return popcount(s.a)+popcount(s.b)+popcount(s.c)+popcount(s.d);
+#endif
 }
 
 struct superwin_info_t {
@@ -36,7 +40,8 @@ super_t super_wins(side_t side) {
   #define LOAD(q) const superwin_info_t& i##q = table[512*q+quadrant(side,q)];
   LOAD(0) LOAD(1) LOAD(2) LOAD(3)
 
-  // Prepare for reductions over unused quadrant rotations
+  // Prepare for reductions over unused quadrant rotations.  OR<i> is an all-reduce over the ith quadrant.
+#if PENTAGO_SSE
   #define OR3 \
     w.x |= w.y; \
     w.x |= _mm_shuffle_epi32(w.x,LE_MM_SHUFFLE(2,3,0,1)); \
@@ -58,6 +63,22 @@ super_t super_wins(side_t side) {
   #define OR0 OR0_HALF(w.x) OR0_HALF(w.y)
   #define OR1 OR1_HALF(w.x) OR1_HALF(w.y)
   #define OR2 OR2_HALF(w.x) OR2_HALF(w.y)
+#else // No SSE
+  #define OR3 \
+    w.a = w.b = w.c = w.d = w.a|w.b|w.c|w.d;
+  #define OR2_PART(x) \
+    x = (x|x>>32)&0x00000000ffffffff; x = x|x<<32; \
+    x = (x|x>>16)&0x0000ffff0000ffff; x = x|x<<16;
+  #define OR1_PART(x) \
+    x = (x|x>>8)&0x00ff00ff00ff00ff; x = x|x<<8; \
+    x = (x|x>>4)&0x0f0f0f0f0f0f0f0f; x = x|x<<4;
+  #define OR0_PART(x) \
+    x = (x|x>>2)&0x3333333333333333; x = x|x<<2; \
+    x = (x|x>>1)&0x5555555555555555; x = x|x<<1;
+  #define OR0 OR0_PART(w.a) OR0_PART(w.b) OR0_PART(w.c) OR0_PART(w.d)
+  #define OR1 OR1_PART(w.a) OR1_PART(w.b) OR1_PART(w.c) OR1_PART(w.d)
+  #define OR2 OR2_PART(w.a) OR2_PART(w.b) OR2_PART(w.c) OR2_PART(w.d)
+#endif
   #define WAY(base,reduction) { super_t w = base; reduction; wins |= w; }
 
   // Consider all ways to win
@@ -125,11 +146,11 @@ static void super_win_test(int steps) {
 const Vector<int,4> single_rotations[8] = {vec(1,0,0,0),vec(-1,0,0,0),vec(0,1,0,0),vec(0,-1,0,0),vec(0,0,1,0),vec(0,0,-1,0),vec(0,0,0,1),vec(0,0,0,-1)};
 
 super_t random_super(Random& random) {
-  uint64_t r0 = random.bits<uint64_t>(),
-           r1 = random.bits<uint64_t>(),
-           r2 = random.bits<uint64_t>(),
-           r3 = random.bits<uint64_t>();
-  return super_t(other::pack(r0,r1),other::pack(r2,r3));
+  const uint64_t r0 = random.bits<uint64_t>(),
+                 r1 = random.bits<uint64_t>(),
+                 r2 = random.bits<uint64_t>(),
+                 r3 = random.bits<uint64_t>();
+  return super_t(r0,r1,r2,r3);
 }
 
 static void super_rmax_test(int steps) {

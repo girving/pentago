@@ -27,6 +27,7 @@
 #include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/process.h>
+#include <boost/detail/endian.hpp>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <getopt.h>
@@ -338,6 +339,12 @@ int toplevel(int argc, char** argv) {
          << "\ngather limit = "<<gather_limit
          << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
+         << "\nsse = "<<PENTAGO_SSE
+#ifdef BOOST_BIG_ENDIAN
+         << "\nendian = big"
+#else
+         << "\nendian = little"
+#endif
          << "\nhistory = "<<thread_history_enabled()
          << "\nwildcard recvs = "<<wildcard_recv_count
          << "\nrandomize = "<<randomize

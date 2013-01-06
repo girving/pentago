@@ -235,22 +235,36 @@ super_t transform_super(symmetry_t s, super_t C) {
   // See the header for more details.
 
   // First apply the local part: C = C local'
-  #define APPLY_BOTH(f,a) ({ C.x = f(C.x,(a)); C.y = f(C.y,(a)); })
+#if PENTAGO_SSE
+  #define APPLY_ALL(f,k) ({ C.x = f(C.x,(k)); C.y = f(C.y,(k)); })
   #define ROTATE_RIGHT_MOD_4(x,k) ((_mm_srli_epi16(x,(k))&_mm_set1_epi8(0x11*(0xf>>(k))))|(_mm_slli_epi16(x,(4-(k))&3)&_mm_set1_epi8(0x11*((0xf<<(4-(k)))&0xf))))
   #define ROTATE_RIGHT_MOD_16(x,k) (_mm_srli_epi16(x,(k))|_mm_slli_epi16(x,(16-(k))&15))
   #define ROTATE_RIGHT_MOD_64(x,k) (_mm_srli_epi64(x,(k))|_mm_slli_epi64(x,(64-(k))&63))
-  APPLY_BOTH(ROTATE_RIGHT_MOD_4,s.local&3);
-  APPLY_BOTH(ROTATE_RIGHT_MOD_16,4*(s.local>>2&3));
-  APPLY_BOTH(ROTATE_RIGHT_MOD_64,16*(s.local>>4&3));
-  if (s.local&1<<6) {
+#else // No SSE
+  #define APPLY_ALL(f,k) ({ C.a = f(C.a,(k)); C.b = f(C.b,(k)); C.c = f(C.c,(k)); C.d = f(C.d,(k)); })
+  #define ROTATE_RIGHT_MOD_4(x,k)  (((x>>k)&(0x1111111111111111*(0xf   >>(k))))|(x<<(( 4-(k))&3) &(0x1111111111111111*((0xf   <<( 4-(k)))&0xf))))
+  #define ROTATE_RIGHT_MOD_16(x,k) (((x>>k)&(0x0001000100010001*(0xffff>>(k))))|(x<<((16-(k))&15)&(0x0001000100010001*((0xffff<<(16-(k)))&0xffff))))
+  #define ROTATE_RIGHT_MOD_64(x,k) (((x>>k)&(            (~(uint64_t)0)>>(k))) |(x<<((64-(k))&63)&(             (~(uint64_t)0)<<(64-(k)))))
+#endif
+  APPLY_ALL(ROTATE_RIGHT_MOD_4,s.local&3);
+  APPLY_ALL(ROTATE_RIGHT_MOD_16,4*(s.local>>2&3));
+  APPLY_ALL(ROTATE_RIGHT_MOD_64,16*(s.local>>4&3));
+#if PENTAGO_SSE
+  if (s.local&1<<6) { // Low bit of quadrant 3 rotations
     const int swap = LE_MM_SHUFFLE(2,3,0,1);
     const __m128i sx = _mm_shuffle_epi32(C.x,swap),
                   sy = _mm_shuffle_epi32(C.y,swap);
     const __m128i low = _mm_set_epi64x(0,~(uint64_t)0);
     C = super_t((sx&low)|(sy&~low),(sy&low)|(sx&~low));
   }
-  if (s.local&1<<7)
+  if (s.local&1<<7) // High bit of quadrant 3 rotations
     swap(C.x,C.y);
+#else // No SSE
+  if (s.local&1<<6) // Low bit of quadrant 3 rotations
+    C = super_t(C.b,C.c,C.d,C.a);
+  if (s.local&1<<7) // High bit of quadrant 3 rotations
+    C = super_t(C.c,C.d,C.a,C.b);
+#endif
 
   // Define quadrant transposition maps acting on the space of local rotations.  Unfortunately, if we want to be
   // as efficient as possible, we need all (4 choose 2) = 6 transpositions.  In particular, while it is possible
@@ -259,7 +273,9 @@ super_t transform_super(symmetry_t s, super_t C) {
 
   // (01), (12), and (02) are easy, since they act independently on each 64-bit chunk.  Except for the constants,
   // the code follows http://alaska-kamtchatka.blogspot.com/2011/09/4-matrix-transposition.html.
+  // LOW_TRANSPOSE(i,j) transposes quadrants i and j where i,j < 3.
   #define BIT(i) ((uint64_t)1<<(i))
+#if PENTAGO_SSE
   #define LOW_HALF_TRANSPOSE(x,i,j) ({ \
     const int ii = 1<<2*i, jj = 1<<2*j, kk = 1<<2*(3-i-j), sh = jj-ii; \
     const uint64_t other = 1|BIT(kk)|BIT(2*kk)|BIT(3*kk); \
@@ -268,7 +284,18 @@ super_t transform_super(symmetry_t s, super_t C) {
     t = (x^_mm_srli_epi64(x,2*sh))&_mm_set1_epi64x(other*(BIT(2*ii)|BIT(3*ii)|BIT(2*ii+jj)|BIT(3*ii+jj))); \
     x ^= t^_mm_slli_epi64(t,2*sh); })
   #define LOW_TRANSPOSE(i,j) ({ LOW_HALF_TRANSPOSE(C.x,i,j); LOW_HALF_TRANSPOSE(C.y,i,j); })
+#else // No SSE
+  #define LOW_QUARTER_TRANSPOSE(x,i,j) ({ \
+    const int ii = 1<<2*i, jj = 1<<2*j, kk = 1<<2*(3-i-j), sh = jj-ii; \
+    const uint64_t other = 1|BIT(kk)|BIT(2*kk)|BIT(3*kk); \
+    auto t = (x^x>>sh)&(other*(BIT(ii)|BIT(3*ii)|BIT(ii+2*jj)|BIT(3*ii+2*jj))); \
+    x ^= t^t<<sh; \
+    t = (x^x>>2*sh)&(other*(BIT(2*ii)|BIT(3*ii)|BIT(2*ii+jj)|BIT(3*ii+jj))); \
+    x ^= t^t<<2*sh; })
+  #define LOW_TRANSPOSE(i,j) ({ LOW_QUARTER_TRANSPOSE(C.a,i,j); LOW_QUARTER_TRANSPOSE(C.b,i,j); LOW_QUARTER_TRANSPOSE(C.c,i,j); LOW_QUARTER_TRANSPOSE(C.d,i,j); })
+#endif
 
+#if PENTAGO_SSE
   // Transposing quadrants 2 and 3 is analogous, but operates on 16 bit chunks instead of single bits, and knits the two __m128i's together
   #define TRANSPOSE_23() ({ \
     const auto a = other::pack<uint32_t>(0xffff0000,0xffff0000,0,0); \
@@ -280,6 +307,12 @@ super_t transform_super(symmetry_t s, super_t C) {
     t = (C.x^_mm_slli_si128(C.y,4))&m; \
     C.x ^= t; \
     C.y ^= _mm_srli_si128(t,4); })
+#else
+  // In the no SSE case, we don't have any operations that cross the high quadrant.  Therefore, we use the simple transpose algorithm.
+  #define Q(x,i) (((x)>>16*i)&0xffff)
+  #define ROW(i) (Q(C.a,i)|Q(C.b,i)<<16|Q(C.c,i)<<32|Q(C.d,i)<<48)
+  #define TRANSPOSE_23() ({ C = super_t(ROW(0),ROW(1),ROW(2),ROW(3)); })
+#endif
 
   // Hmm.  Transpositions (03) and (13) are extremely nasty, since they cross 64-bit and 128-bit chunks and also involve non-byte-aligned
   // shifts, for which there are no available 64-bit crossing instructions.  Therefore, at the cost of longer products of transpositions,
@@ -311,6 +344,7 @@ super_t transform_super(symmetry_t s, super_t C) {
   // Finally, if necessary, we conjugate by the quadrant-local reflection map, which amounts to applying the
   // negation isomorphism to each direct product term in Z_4^4.
   if (s.global&4) {
+#if PENTAGO_SSE
     #define HALF_NEGATE(x) ({ \
       /* Negate quadrant 0 rotations */ \
       auto t = (x^_mm_srli_epi16(x,2))&_mm_set1_epi8(0x22); \
@@ -328,6 +362,25 @@ super_t transform_super(symmetry_t s, super_t C) {
     auto t = (C.x^C.y)&other::pack(0,0,-1,-1);
     C.x ^= t;
     C.y ^= t;
+#else // No SSE
+    #define QUARTER_NEGATE(x) ({ \
+      /* Negate quadrant 0 rotations */ \
+      auto t = (x^x>>2)&0x2222222222222222; \
+      x ^= t^t<<2; \
+      /* Negate quadrant 1 rotations */ \
+      t = (x^x>>2*4)&0x00f000f000f000f0; \
+      x ^= t^t<<2*4; \
+      /* Negate quadrant 2 rotations */ \
+      t = (x^x>>2*16)&0x00000000ffff0000; \
+      x ^= t^t<<2*16; })
+    // Negate rotations of the first three quadrants
+    QUARTER_NEGATE(C.a);
+    QUARTER_NEGATE(C.b);
+    QUARTER_NEGATE(C.c);
+    QUARTER_NEGATE(C.d);
+    // Negate quadrant 3 rotations
+    swap(C.b,C.d);
+#endif
   }
 
   // Whew.

@@ -27,9 +27,14 @@ struct superentry_t {
   superinfo_t info;
 };
 
+#if PENTAGO_SSE
 // Unfortunately, the alignment of __m128 is 16, so super_entry_t has 8 bytes
 // of unused padding.  Maybe we can use it to store a lock in future?
 static_assert(sizeof(superentry_t)==80,"");
+#else
+// No padding here!
+static_assert(sizeof(superentry_t)==72,"");
+#endif
 
 // The current transposition table
 static int table_bits = 0;

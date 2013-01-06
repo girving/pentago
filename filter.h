@@ -16,6 +16,8 @@ void wavelet_untransform(RawArray<Vector<super_t,2>,4> data);
 
 // For inline use in loops elsewhere, here are the interleave primitives
 
+#if PENTAGO_SSE // SSE versions
+
 static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
   const __m128i mask32 = other::pack<uint32_t>(-1,0,-1,0);
   #define EXPAND1(a) ({ \
@@ -38,6 +40,7 @@ static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
                                    s00.y|_mm_slli_epi64(s10.y,1)),
                            super_t(s01.x|_mm_slli_epi64(s11.x,1),
                                    s01.y|_mm_slli_epi64(s11.y,1)));
+  #undef EXPAND1
   #undef EXPAND
 }
 
@@ -59,7 +62,58 @@ static inline Vector<super_t,2> uninterleave_super(const Vector<super_t,2>& s) {
                                    CONTRACT(s.y.x,s.y.y)),
                            super_t(CONTRACT(_mm_srli_epi64(s.x.x,1),_mm_srli_epi64(s.x.y,1)),
                                    CONTRACT(_mm_srli_epi64(s.y.x,1),_mm_srli_epi64(s.y.y,1))));
+  #undef CONTRACT1
   #undef CONTRACT
 }
+
+#else // Non-SSE versions
+
+static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
+  #define EXPAND(a) ({ /* Expand 32 bits into 64 bits with zero bits interleaved */ \
+    uint64_t _a = (a)&0x00000000ffffffff; \
+    _a = (_a|_a<<16) &0x0000ffff0000ffff; \
+    _a = (_a|_a<<8)  &0x00ff00ff00ff00ff; \
+    _a = (_a|_a<<4)  &0x0f0f0f0f0f0f0f0f; \
+    _a = (_a|_a<<2)  &0x3333333333333333; \
+    _a = (_a|_a<<1)  &0x5555555555555555; \
+    _a; })
+  #define LO(a) EXPAND(a)
+  #define HI(a) EXPAND(a>>32)
+  return Vector<super_t,2>(super_t(LO(s.x.a)|LO(s.y.a)<<1,
+                                   HI(s.x.a)|HI(s.y.a)<<1,
+                                   LO(s.x.b)|LO(s.y.b)<<1,
+                                   HI(s.x.b)|HI(s.y.b)<<1),
+                           super_t(LO(s.x.c)|LO(s.y.c)<<1,
+                                   HI(s.x.c)|HI(s.y.c)<<1,
+                                   LO(s.x.d)|LO(s.y.d)<<1,
+                                   HI(s.x.d)|HI(s.y.d)<<1));
+  #undef EXPAND
+  #undef HI
+  #undef LO
+}
+
+static inline Vector<super_t,2> uninterleave_super(const Vector<super_t,2>& s) {
+  #define CONTRACT(a) ({ /* Contact every other bit of a uint64_t into 32 bits */ \
+    uint64_t _a = (a)&0x5555555555555555; \
+    _a = (_a|_a>>1)  &0x3333333333333333; \
+    _a = (_a|_a>>2)  &0x0f0f0f0f0f0f0f0f; \
+    _a = (_a|_a>>4)  &0x00ff00ff00ff00ff; \
+    _a = (_a|_a>>8)  &0x0000ffff0000ffff; \
+    _a = (_a|_a>>16) &0x00000000ffffffff; \
+    _a; })
+  #define MERGE(lo,hi) (CONTRACT(lo)|CONTRACT(hi)<<32)
+  return Vector<super_t,2>(super_t(MERGE(s.x.a,s.x.b),
+                                   MERGE(s.x.c,s.x.d),
+                                   MERGE(s.y.a,s.y.b),
+                                   MERGE(s.y.c,s.y.d)),
+                           super_t(MERGE(s.x.a>>1,s.x.b>>1),
+                                   MERGE(s.x.c>>1,s.x.d>>1),
+                                   MERGE(s.y.a>>1,s.y.b>>1),
+                                   MERGE(s.y.c>>1,s.y.d>>1)));
+  #undef CONTRACT
+  #undef MERGE
+}
+
+#endif
 
 }
