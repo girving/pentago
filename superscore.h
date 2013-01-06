@@ -60,7 +60,7 @@ namespace pentago {
 #else
 #define PENTAGO_SSE 1
 #ifndef BOOST_LITTLE_ENDIAN
-#error "SSE is supported only in little endian mode
+#error "SSE is supported only in little endian mode"
 #endif
 #endif
 
