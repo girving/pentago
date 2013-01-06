@@ -22,6 +22,9 @@ namespace pentago {
 // Flip to enable history tracking
 #define HISTORY 0
 
+// Whether to use blocking pthread locking or nonblocking spinlocks
+#define BLOCKING 0
+
 #if !OTHER_THREAD_SAFE
 #error "pentago requires thread_safe=1"
 #endif
@@ -151,6 +154,7 @@ struct lock_t : public boost::noncopyable {
   }
 };
 
+#if BLOCKING
 struct cond_t : public boost::noncopyable {
   mutex_t& mutex;
   pthread_cond_t cond;
@@ -176,6 +180,7 @@ struct cond_t : public boost::noncopyable {
     pthread_cond_wait(&cond,&mutex.mutex);
   }
 };
+#endif
 
 }
 
@@ -191,12 +196,19 @@ public:
   const int count;
 private:
   vector<pthread_t> threads;
+#if BLOCKING
   mutex_t mutex;
   cond_t master_cond, worker_cond;
+#else
+  spinlock_t spinlock;
+  // In nonblocking mode, we busy wait outside of the spinlock to reduce starvation possibilities.  It is
+  // probably fine to access jobs.size() outside of a spinlock, but I'm not sure, so maintain our own count.
+  volatile int job_count;
+#endif
   deque<job_base_t*> jobs;
   ExceptionValue error;
-  int waiting;
-  bool die;
+  volatile int waiting; // Number of threads waiting for jobs to run
+  volatile bool die;
 
   friend void pentago::threads_wait_all();
   friend void pentago::threads_wait_all_help();
@@ -211,6 +223,7 @@ public:
 private:
   static void* worker(void* pool);
   void shutdown();
+  void set_die();
 };
 
 OTHER_DEFINE_TYPE(thread_pool_t)
@@ -218,8 +231,12 @@ OTHER_DEFINE_TYPE(thread_pool_t)
 thread_pool_t::thread_pool_t(thread_type_t type, int count, int delta_priority)
   : type(type)
   , count(count)
+#if BLOCKING
   , master_cond(mutex)
   , worker_cond(mutex)
+#else
+  , job_count(0)
+#endif
   , waiting(0)
   , die(false) {
   OTHER_ASSERT(count>0);
@@ -256,17 +273,29 @@ thread_pool_t::~thread_pool_t() {
   shutdown();
 }
 
-void thread_pool_t::shutdown() {
-  {
-    lock_t lock(mutex);
-    die = true;
-    worker_cond.broadcast();
-  }
-  for (pthread_t& thread : threads)
-    CHECK(pthread_join(thread,0));
+void thread_pool_t::set_die() {
+#if BLOCKING
+  lock_t lock(mutex);
+#else
+  spin_t spin(spinlock);
+#endif
+  die = true;
+  // Enforce the following invariant: if die = true, there are no jobs available
   for (auto job : jobs)
     delete job;
   jobs.clear();
+#if BLOCKING
+  worker_cond.broadcast();
+  master_cond.broadcast();
+#else
+  job_count = 0;
+#endif
+}
+
+void thread_pool_t::shutdown() {
+  set_die();
+  for (pthread_t& thread : threads)
+    CHECK(pthread_join(thread,0));
 }
 
 void* thread_pool_t::worker(void* pool_) {
@@ -279,13 +308,16 @@ void* thread_pool_t::worker(void* pool_) {
     job_t f;
     {
       thread_time_t time(idle,unevent);
+#if BLOCKING
+      // Blocking version using pthread mutexes and condition variables
       lock_t lock(pool.mutex);
-      while (!f) {
-        if (pool.die)
-          return 0;
-        else if (pool.jobs.size()) {
+      for (;;) {
+        if (pool.jobs.size()) {
           f.reset(pool.jobs.front());
           pool.jobs.pop_front();
+          break;
+        } else if (pool.die) {
+          return 0;
         } else {
           pool.master_cond.signal();
           pool.waiting++;
@@ -293,6 +325,40 @@ void* thread_pool_t::worker(void* pool_) {
           pool.waiting--;
         }
       }
+#else
+      // Nonblocking version using spinlocks
+      {
+        // Try once and increment waiting if unsuccessful
+        spin_t spin(pool.spinlock);
+        if (pool.job_count) {
+          f.reset(pool.jobs.front());
+          pool.jobs.pop_front();
+          pool.job_count--;
+        } else
+          pool.waiting++;
+      }
+      if (!f) {
+        // Otherwise spin until a job is found or we die.  In either case decrement waiting.
+        for (;;) {
+          // Spin without locking until something might be available.  In the common case
+          // where all worker threads wait for a significant while, this allows the master
+          // thread to snap up the spinlock without fighting against idle workings.
+          while (!pool.job_count && !pool.die);
+          // Lock and see if the job is still there
+          spin_t spin(pool.spinlock);
+          if (pool.job_count) {
+            f.reset(pool.jobs.front());
+            pool.jobs.pop_front();
+            pool.job_count--;
+            pool.waiting--;
+            break;
+          } else if (pool.die) {
+            pool.waiting--;
+            return 0;
+          }
+        }
+      }
+#endif
     }
 
     // Run the job
@@ -301,11 +367,16 @@ void* thread_pool_t::worker(void* pool_) {
     } catch (const exception& e) {
       if (throw_callback)
         throw_callback(e.what());
-      lock_t lock(pool.mutex);
-      if (!pool.error)
-        pool.error = e;
-      pool.die = true;
-      pool.master_cond.signal();
+      {
+#if BLOCKING
+        lock_t lock(pool.mutex);
+#else
+        spin_t spin(pool.spinlock);
+#endif
+        if (!pool.error)
+          pool.error = e;
+      }
+      pool.set_die();
       return 0;
     }
   }
@@ -313,7 +384,11 @@ void* thread_pool_t::worker(void* pool_) {
 
 void thread_pool_t::schedule(job_t&& f, bool soon) {
   OTHER_ASSERT(threads.size());
+#if BLOCKING
   lock_t lock(mutex);
+#else
+  spin_t spin(spinlock);
+#endif
   if (error)
     error.throw_();
   OTHER_ASSERT(!die);
@@ -321,19 +396,36 @@ void thread_pool_t::schedule(job_t&& f, bool soon) {
     jobs.push_front(f.release());
   else
     jobs.push_back(f.release());
+#if BLOCKING
   if (waiting)
     worker_cond.signal();
+#else
+  job_count++;
+#endif
 }
 
 void thread_pool_t::wait() {
   OTHER_ASSERT(is_master());
   thread_time_t time(master_idle_kind,unevent);
+#if BLOCKING
   lock_t lock(mutex);
   while (!die && (jobs.size() || waiting<count))
     master_cond.wait();
   if (error)
     error.throw_();
   OTHER_ASSERT(!die);
+#else
+  for (;;) {
+    while (!die && (job_count || waiting<count));
+    spin_t spin(spinlock);
+    if (!(!die && (job_count || waiting<count))) {
+      if (error)
+        error.throw_();
+      OTHER_ASSERT(!die);
+      break;
+    }
+  }
+#endif
 }
 
 Ptr<thread_pool_t> cpu_pool;
@@ -376,8 +468,13 @@ void threads_wait_all() {
     for (;;) {
       cpu_pool->wait();
       io_pool->wait();
+#if BLOCKING
       lock_t cpu_lock(cpu_pool->mutex);
       lock_t io_lock(io_pool->mutex);
+#else
+      spin_t cpu_spin(cpu_pool->spinlock);
+      spin_t io_spin(io_pool->spinlock);
+#endif
       if (cpu_pool->error)
         cpu_pool->error.throw_();
       if (io_pool->error)
@@ -399,12 +496,19 @@ void threads_wait_all_help() {
     // Grab a job
     job_t f;
     {
+#if BLOCKING
       lock_t lock(pool.mutex);
+#else
+      spin_t spin(pool.spinlock);
+#endif
       if (pool.die || !pool.jobs.size())
         goto wait;
       else {
         f.reset(pool.jobs.front());
         pool.jobs.pop_front();
+#if !BLOCKING
+        pool.job_count--;
+#endif
       }
     }
 
@@ -414,10 +518,16 @@ void threads_wait_all_help() {
     } catch (const exception& e) {
       if (throw_callback)
         throw_callback(e.what());
-      lock_t lock(pool.mutex);
-      if (!pool.error)
-        pool.error = e;
-      pool.die = true;
+      {
+#if BLOCKING
+        lock_t lock(pool.mutex);
+#else
+        spin_t spin(pool.spinlock);
+#endif
+        if (!pool.error)
+          pool.error = e;
+      }
+      pool.set_die();
       goto wait;
     }
   }
@@ -573,13 +683,18 @@ void write_thread_history(const string& filename) {
 
 /****************** testing *****************/
 
-static void add_noise(Array<uint128_t> data, int key, mutex_t* mutex) {
-  for (int i=0;i<data.size();i++) {
+static void add_noise(Array<uint128_t> data, int key, mutex_t* mutex, spinlock_t* spinlock) {
+  const int n = data.size();
+  for (int i=0;i<n/2;i++) {
     lock_t lock(*mutex);
     data[i] += threefry(key,i);
   }
+  for (int i=n/2;i<n;i++) {
+    spin_t spin(*spinlock);
+    data[i] += threefry(key,i);
+  }
   if (thread_type()==CPU)
-    io_pool->schedule(curry(add_noise,data,key+1,mutex));
+    io_pool->schedule(curry(add_noise,data,key+1,mutex,spinlock));
 }
 
 static void thread_pool_test() {
@@ -593,9 +708,10 @@ static void thread_pool_test() {
   for (int k=0;k<100;k++) {
     // Compute answers in parallel
     mutex_t mutex;
+    spinlock_t spinlock;
     Array<uint128_t> parallel(serial.size());
     for (int i=0;i<jobs;i++)
-      cpu_pool->schedule(curry(add_noise,parallel,2*i,&mutex));
+      cpu_pool->schedule(curry(add_noise,parallel,2*i,&mutex,&spinlock));
     threads_wait_all();
 
     // Compare
