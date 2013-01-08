@@ -28,11 +28,11 @@ using std::endl;
 using std::make_pair;
 using std::tr1::unordered_map;
 
-static inline int request_id_(local_id_t owner_block_id, uint8_t dimension) {
+static inline int request_id(local_id_t owner_block_id, uint8_t dimension) {
   return (owner_block_id.id<<2) | dimension;
 }
 
-static inline local_id_t request_block_id_(int request_id) {
+static inline local_id_t request_block_id(int request_id) {
   return local_id_t(request_id>>2);
 }
 
@@ -143,6 +143,7 @@ struct flow_t {
   void process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status);
   void process_wakeup(MPI_Status* status);
   void process_response(block_request_t* request, MPI_Status* status);
+  void send_output(line_details_t* const line, const int b);
   void finish_output_send(line_details_t* const line, MPI_Status* status);
 };
 
@@ -253,8 +254,8 @@ void flow_t::schedule_lines() {
             CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,response_tag,comms.response_comm,&response_request));
           // Send request
           MPI_Request request_request;
-          const auto request_tag = request_id_(owner_block_id,line->child_dimension);
-          CHECK(MPI_Isend(&const_cast_(block_request->request_buffer),2,MPI_INT,owner,request_tag,comms.request_comm,&request_request));
+          const auto request_tag = request_id(owner_block_id,line->child_dimension);
+          CHECK(MPI_Isend((void*)&block_request->request_buffer,2,MPI_INT,owner,request_tag,comms.request_comm,&request_request));
           CHECK(MPI_Request_free(&request_request));
           PENTAGO_MPI_TRACE("block request: owner %d, request_tag %d, response_tag %d",owner,request_tag,response_tag);
           requests.add(response_request,curry(&flow_t::process_response,this,block_request));
@@ -285,7 +286,7 @@ void flow_t::post_request_recv(Vector<int,2>* buffer) {
 
 void flow_t::process_request(Vector<int,2>* buffer, MPI_Status* status) {
   OTHER_ASSERT(input_blocks);
-  const local_id_t local_block_id = request_block_id_(status->MPI_TAG);
+  const local_id_t local_block_id = request_block_id(status->MPI_TAG);
   const auto dimensions = request_dimensions(buffer);
   const int response_tag = request_response_tag(buffer);
   thread_time_t time(response_send_kind,input_blocks->local_block_lines_event(local_block_id,dimensions));
@@ -310,13 +311,26 @@ void flow_t::post_output_recv(Array<Vector<super_t,2>>* buffer) {
   PENTAGO_MPI_TRACE("post output recv");
   MPI_Request request;
   if (!buffer->size())
-    *buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size)),false);
-  OTHER_ASSERT(buffer->size()==sqr(sqr(block_size)));
+    *buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size))+PENTAGO_MPI_COMPRESS_OUTPUTS,false);
+  OTHER_ASSERT(buffer->size()==sqr(sqr(block_size))+PENTAGO_MPI_COMPRESS_OUTPUTS);
   {
     thread_time_t time(mpi_kind,unevent);
-    CHECK(MPI_Irecv(buffer->data(),8*buffer->size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
+    if (PENTAGO_MPI_COMPRESS_OUTPUTS)
+      CHECK(MPI_Irecv(buffer->data(),memory_usage(*buffer),MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
+    else
+      CHECK(MPI_Irecv(buffer->data(),8*buffer->size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
   }
   requests.add(request,curry(&flow_t::process_output,this,buffer),true);
+}
+
+// Absorb a compressed output block
+static void absorb_compressed_output(block_store_t* output_blocks, const local_id_t local_block_id, const uint8_t dimension, Array<const uint8_t> compressed, Array<Vector<super_t,2>> buffer) {
+  // Uncompress block into temporary buffer, then copy back to buffer so that accumulate can use the temporary.
+  const auto local_buffer = local_fast_uncompress(compressed,output_blocks->local_block_line_event(local_block_id,dimension));
+  memcpy(buffer.data(),local_buffer.data(),memory_usage(local_buffer));
+  const auto block_data = buffer.slice(0,local_buffer.size());
+  // Send to block store
+  output_blocks->accumulate(local_block_id,dimension,block_data);
 }
 
 // Incoming output data for a block
@@ -324,16 +338,25 @@ void flow_t::process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status
   {
     // How many elements did we receive?
     const int tag = status->MPI_TAG;
-    const local_id_t local_block_id = request_block_id_(tag);
+    const local_id_t local_block_id = request_block_id(tag);
     const uint8_t dimension = request_dimension(tag);
-    thread_time_t time(output_recv_kind,output_blocks.local_block_line_event(local_block_id,dimension));
-    const int count = get_count(status,MPI_LONG_LONG_INT);
-    PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, dimension %d, count %g, tag %d",status->MPI_SOURCE,local_block_id.id,dimension,count/8.,tag);
-    OTHER_ASSERT(!(count&7));
-    const auto block_data = buffer->slice_own(0,count/8);
+    const auto event = output_blocks.local_block_line_event(local_block_id,dimension);
+    thread_time_t time(output_recv_kind,event);
+    if (PENTAGO_MPI_COMPRESS_OUTPUTS) {
+      const int count = get_count(status,MPI_BYTE);
+      PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, dimension %d, count %d, tag %d, event 0x%llx",status->MPI_SOURCE,local_block_id.id,dimension,count,tag,event);
+      const auto compressed = char_view_own(*buffer).slice_own(0,count);
+      // Schedule an accumulate as soon as possible to conserve memory
+      threads_schedule(CPU,curry(absorb_compressed_output,&output_blocks,local_block_id,dimension,compressed,*buffer),true);
+    } else {
+      const int count = get_count(status,MPI_LONG_LONG_INT);
+      PENTAGO_MPI_TRACE("process output block: source %d, local block id %d, dimension %d, count %g, tag %d, event 0x%llx",status->MPI_SOURCE,local_block_id.id,dimension,count/8.,tag,event);
+      OTHER_ASSERT(!(count&7));
+      const auto block_data = buffer->slice_own(0,count/8);
+      // Schedule an accumulate as soon as possible to conserve memory
+      threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,local_block_id,dimension,block_data),true);
+    }
     buffer->clean_memory();
-    // Schedule an accumulate as soon as possible to conserve memory
-    threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,local_block_id,dimension,block_data),true);
   }
   // One step closer...
   progress.progress();
@@ -344,30 +367,53 @@ void flow_t::process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status
 void flow_t::post_wakeup_recv() {
   PENTAGO_MPI_TRACE("post wakeup recv");
   MPI_Request request;
-  CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,wakeup_tag,comms.wakeup_comm,&request));
+  CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,MPI_ANY_TAG,comms.wakeup_comm,&request));
   requests.add(request,wakeup_callback,true);
 }
 
-// Line line has finished; post sends for all output blocks
+// Optionally compress an output block and send it
+void flow_t::send_output(line_details_t* const line, const int b) {
+  const auto block = line->pre.line.block(b);
+  const auto owner_and_id = output_blocks.partition->find_block(line->pre.line.section,block);
+  const int owner = owner_and_id.x;
+  const local_id_t owner_block_id = owner_and_id.y;
+  const int tag = request_id(owner_block_id,line->pre.line.dimension);
+  const auto event = line->pre.line.block_line_event(b);
+  MPI_Request request;
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
+  // Send compressed block
+  thread_time_t time(output_send_kind,event);
+  const auto compressed = line->compressed_output_block_data(b);
+  CHECK(MPI_Isend((void*)compressed.data(),compressed.size(),MPI_BYTE,owner,tag,comms.output_comm,&request));
+  PENTAGO_MPI_TRACE("send output %p: owner %d, owner block id %d, dimension %d, count %d, tag %d, event 0x%llx",line,owner,owner_block_id.id,line->pre.line.dimension,compressed.size(),tag,event);
+#else
+  // Send without compression
+  thread_time_t time(output_send_kind,event);
+  const auto block_data = line->output_block_data(b);
+  CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.output_comm,&request));
+  PENTAGO_MPI_TRACE("send output %p: owner %d, owner block id %d, dimension %d, count %d, tag %d, event 0x%llx",line,owner,owner_block_id.id,line->pre.line.dimension,block_data.size(),tag,event);
+#endif
+  requests.add(request,curry(&flow_t::finish_output_send,this,line));
+}
+
+// Line line has finished; post sends for all output blocks.  In compressed output mode, each wakeup corresponds to a single block.
 void flow_t::process_wakeup(MPI_Status* status) {
   BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
   OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
-  line_details_t* const line = (line_details_t*)wakeup_buffer; 
+  line_details_t* const line = (line_details_t*)wakeup_buffer;
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
+  const int b = status->MPI_TAG;
+  PENTAGO_MPI_TRACE("process wakeup %p: %s, block %d",line,str(line->pre.line),b);
+  OTHER_ASSERT(b<line->pre.line.length);
+  // Send one compressed block
+  send_output(line,b);
+#else
   PENTAGO_MPI_TRACE("process wakeup %p: %s",line,str(line->pre.line));
-  const function<void(MPI_Status*)> callback(curry(&flow_t::finish_output_send,this,line));
-  for (int b=0;b<line->pre.line.length;b++) {
-    const auto block = line->pre.line.block(b);
-    thread_time_t time(output_send_kind,line->pre.line.block_line_event(b));
-    const auto owner_and_id = output_blocks.partition->find_block(line->pre.line.section,block);
-    const int owner = owner_and_id.x;
-    const local_id_t owner_block_id = owner_and_id.y;
-    const auto block_data = line->output_block_data(b);
-    const int tag = request_id_(owner_block_id,line->pre.line.dimension);
-    MPI_Request request;
-    CHECK(MPI_Isend((void*)block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,tag,comms.output_comm,&request));
-    PENTAGO_MPI_TRACE("send output %p: owner %d, owner block id %d, dimension %d, count %d, tag %d",line,owner,owner_block_id.id,line->pre.line.dimension,block_data.size(),tag);
-    requests.add(request,callback);
-  }
+  OTHER_ASSERT(!status->MPI_TAG);
+  // Send all uncompressed output blocks
+  for (int b=0;b<line->pre.line.length;b++)
+    send_output(line,b);
+#endif
   post_wakeup_recv();
 }
 
@@ -387,11 +433,6 @@ void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) 
   countdown.decrement();
 }
 
-#if PENTAGO_MPI_COMPRESS
-// Thread local temporary buffer for "in place" decompression.
-static __thread Vector<super_t,2>* decompression_buffer;
-#endif
-
 static void absorb_response(block_request_t* request, const int recv_size) {
   const int lines = request->dependent_lines.size();
   OTHER_ASSERT(lines);
@@ -401,13 +442,8 @@ static void absorb_response(block_request_t* request, const int recv_size) {
   const auto event = request->block_lines_event();
 
 #if PENTAGO_MPI_COMPRESS
-  // Uncompress data into a temporary buffer
-  Vector<super_t,2>* buffer_ptr = decompression_buffer;
-  if (!buffer_ptr)
-    buffer_ptr = decompression_buffer = (Vector<super_t,2>*)malloc(sizeof(Vector<super_t,2>)*sqr(sqr(block_size)));
-  RawArray<Vector<super_t,2>> buffer(nodes,buffer_ptr);
-  fast_uncompress(char_view(first_block_data).slice(0,recv_size),buffer,event);
-  // Copy back to first dependent line
+  // Uncompress data into a temporary buffer, then copy back to first dependent line
+  const auto buffer = local_fast_uncompress(char_view(first_block_data).slice(0,recv_size),event);
   memcpy(first_block_data.data(),buffer.data(),memory_usage(buffer));
 #endif
 
@@ -433,10 +469,10 @@ static void absorb_response(block_request_t* request, const int recv_size) {
 void flow_t::process_response(block_request_t* request, MPI_Status* status) {
   {
     thread_time_t time(response_recv_kind,request->block_lines_event());
-    PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d, dimension %d",status->MPI_SOURCE,request_block_id(request_id).id,request->dimensions.data);
+    PENTAGO_MPI_TRACE("process response: owner %d, owner block id %d, dimension %d",status->MPI_SOURCE,request_block_id(status->MPI_TAG).id,request->dimensions.data);
 
     // Erase block request
-    const int index = block_requests.find(request); 
+    const int index = block_requests.find(request);
     OTHER_ASSERT(block_requests.valid(index));
     block_requests.remove_index_lazy(index);
 

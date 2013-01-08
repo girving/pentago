@@ -17,7 +17,7 @@ bool verbose();
 void set_verbose(bool verbose);
 
 // Print a message and abort without formatting
-void OTHER_NORETURN(die_helper(const string& msg));
+void OTHER_NORETURN(die_helper(const string& msg)) OTHER_COLD;
 
 // Print a message and abort
 template<class... Args> static inline void OTHER_NORETURN(die(const char* msg, const Args&... args));

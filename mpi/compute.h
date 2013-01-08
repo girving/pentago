@@ -86,7 +86,15 @@ struct line_details_t : public boost::noncopyable {
   // In compressed mode, input block data has an extra entry to account for possible expansion.
   RawArray<Vector<super_t,2>> input_block_data(int k) const;
   RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
-  RawArray<const Vector<super_t,2>> output_block_data(int k) const;
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
+  RawArray<const uint8_t> compressed_output_block_data(int k) const;
+private:
+  friend void compress_output_block(line_details_t* const line, const int b);
+  RawArray<Vector<super_t,2>> output_block_data(int k) const;
+public:
+#else
+  RawArray<Vector<super_t,2>> output_block_data(int k) const;
+#endif
 
   // Call this whenever a new input response arrives, but possibly *before* the data has been moved into place.
   // Returns the number of messages remaining.  Used by flow.cpp to throttle the number of simultaneous line gathers.

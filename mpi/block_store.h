@@ -8,7 +8,7 @@
 #include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
 #include <other/core/array/NestedArray.h>
-#ifdef PENTAGO_MPI_COMPRESS
+#if PENTAGO_MPI_COMPRESS
 #include <pentago/mpi/sparse_store.h>
 #endif
 namespace pentago {
@@ -113,9 +113,10 @@ public:
   // first, requiring O(n) time, and return new mutable buffers.  To make sure all callers know about these differences, we
   // give the different versions different names.
 #if PENTAGO_MPI_COMPRESS
-  Array<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
-  Array<Vector<super_t,2>,4> uncompress_and_get(local_id_t local_id, event_t event) const;
-  Array<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
+  // All uncompressed_and_get versions return views into a temporary, thread local buffer (the one used by local_fast_uncompress).
+  RawArray<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
+  RawArray<Vector<super_t,2>,4> uncompress_and_get(local_id_t local_id, event_t event) const;
+  RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
   RawArray<const uint8_t> get_compressed(local_id_t local_id, bool allow_incomplete=false) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;

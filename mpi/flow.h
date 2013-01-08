@@ -17,7 +17,7 @@ struct flow_comms_t : public boost::noncopyable {
   MPI_Comm request_comm; // Requests for one of our local input blocks.  Tag = request_id, data = int dimensions, int response_tag.
   MPI_Comm response_comm; // Responses to our block requests complete with input block data.  Tag = response_tag, block data.
   MPI_Comm output_comm; // Output data to be merged into one of our local output blocks.  Tag = request_id, block data.
-  MPI_Comm wakeup_comm; // Wake up messages from a worker thread to the communication thread when a line finishes.  Tag = wakeup_tag, data = &line
+  MPI_Comm wakeup_comm; // Wake up messages from a worker thread to the communication thread when a line finishes, possibly after block compression.  Tag = compress_blocks?b:0, data = &line.
 
   // Note: In compressed mode, response messages are compressed but output messages are uncompressed.  This is because
   // (1) the messages is stored compressed by the owner, so sending compressed is easy and (2) most output messages would need
@@ -29,7 +29,6 @@ struct flow_comms_t : public boost::noncopyable {
 
 // Associated tags
 const int barrier_tag = 1111; // No data
-const int wakeup_tag = 2222; // data = &line, type = MPI_LONG_LONG_INT
 
 // Compute all given lines.  Each line requires a number of blocks of data from other processors,
 // so for efficiency we overlap communication and compute.  The computation will usually be mostly

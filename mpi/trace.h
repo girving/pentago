@@ -8,7 +8,7 @@ namespace mpi {
 
 using std::string;
 
-#ifdef PENTAGO_MPI_TRACING
+#if PENTAGO_MPI_TRACING
 void mpi_trace(const string& msg);
 #define PENTAGO_MPI_TRACE(...) mpi_trace(format(__VA_ARGS__))
 #else

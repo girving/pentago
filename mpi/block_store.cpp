@@ -266,28 +266,21 @@ event_t block_store_t::local_block_lines_event(local_id_t local_id, dimensions_t
 
 #if PENTAGO_MPI_COMPRESS
 
-Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const {
+RawArray<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const {
   if (const auto* local_id = block_to_local_id.get_pointer(tuple(section,block)))
     return uncompress_and_get(*local_id,event);
   die("block_store_t::uncompress_and_get: unknown block: section %s, block %d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
 }
 
-Array<Vector<super_t,2>,4> block_store_t::uncompress_and_get(local_id_t local_id, event_t event) const {
+RawArray<Vector<super_t,2>,4> block_store_t::uncompress_and_get(local_id_t local_id, event_t event) const {
   const auto flat = uncompress_and_get_flat(local_id,event);
   const auto& info = block_info(local_id);
   const auto shape = block_shape(info.section.shape(),info.block);
-  return Array<Vector<super_t,2>,4>(shape,flat.data(),flat.borrow_owner());
+  return RawArray<Vector<super_t,2>,4>(shape,flat.data());
 }
 
-Array<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete) const {
-  const auto compressed = get_compressed(local_id,allow_incomplete);
-  const auto& info = block_info(local_id);
-  const int flat_size = block_shape(info.section.shape(),info.block).product();
-  // Uncompress into a temporary array.  For sake of simplicity, we'll hope that malloc manages to avoid fragmentation.
-  // In the future, we may want to keep a list of temporary blocks around to eliminate fragmentation entirely.
-  const auto flat = large_buffer<Vector<super_t,2>>(flat_size,false);
-  fast_uncompress(compressed,flat,event);
-  return flat;
+RawArray<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete) const {
+  return local_fast_uncompress(get_compressed(local_id,allow_incomplete),event);
 }
 
 RawArray<const uint8_t> block_store_t::get_compressed(local_id_t local_id, bool allow_incomplete) const {

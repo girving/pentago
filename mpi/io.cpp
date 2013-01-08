@@ -56,14 +56,14 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
 #if PENTAGO_MPI_COMPRESS
   // Uncompress if necessary
   const event_t event = blocks->local_block_event(local_id);
-  Array<Vector<super_t,2>> data = blocks->uncompress_and_get_flat(local_id,event);
+  const auto data = blocks->uncompress_and_get_flat(local_id,event);
 #else
   const event_t event = unevent;
 #endif
 
   // Adjust for the different format of block_store_t and apply interleave filtering
 #if PENTAGO_MPI_COMPRESS
-  const auto filtered = data.raw();
+  const auto filtered = data;
 #else
   Array<Vector<super_t,2>> filtered;
 #endif

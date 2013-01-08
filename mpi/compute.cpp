@@ -1,11 +1,13 @@
 // Core compute kernels for the MPI code
 
 #include <pentago/mpi/compute.h>
+#include <pentago/mpi/fast_compress.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/mpi/flow.h>
 #include <pentago/mpi/trace.h>
 #include <pentago/endgame.h>
 #include <pentago/utility/ceil_div.h>
+#include <pentago/utility/char_view.h>
 #include <pentago/utility/index.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/IndirectArray.h>
@@ -42,7 +44,8 @@ line_data_t::line_data_t(const line_t& line)
 
   // Estimate memory usage: expected size plus 1 entry per input block so that we can receive compressed data in place.
   const uint8_t input_blocks = ceil_div(input_shape[dim],block_size);
-  const_cast_(memory_usage) = sizeof(Vector<super_t,2>)*(input_shape.product()+output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks);
+  const uint8_t output_blocks = ceil_div(output_shape[dim],block_size);
+  const_cast_(memory_usage) = sizeof(Vector<super_t,2>)*(input_shape.product()+output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks+PENTAGO_MPI_COMPRESS_OUTPUTS*output_blocks);
 }
 
 line_data_t::~line_data_t() {}
@@ -81,7 +84,7 @@ line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_com
   , unsent_output_blocks(pre.line.length)
 
   // Allocate memory for both input and output in a single buffer
-  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks,false))
+  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks+PENTAGO_MPI_COMPRESS_OUTPUTS*pre.line.length,false))
 
   // When computation is complete, send a wakeup message here
   , wakeup_comm(wakeup_comm)
@@ -141,11 +144,19 @@ RawArray<Vector<super_t,2>> line_details_t::input_block_data(Vector<uint8_t,4> b
   return input_block_data(block[child_dim]);
 }
 
-RawArray<const Vector<super_t,2>> line_details_t::output_block_data(int k) const {
+RawArray<Vector<super_t,2>> line_details_t::output_block_data(int k) const {
   OTHER_ASSERT((unsigned)k<pre.line.length);
-  const int start = block_stride*k;
-  return output.slice(start,min(start+block_stride,output.size()));
+  const int step = block_stride+PENTAGO_MPI_COMPRESS_OUTPUTS;
+  const int start = step*k;
+  return output.slice(start,min(start+step,output.size()));
 }
+
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
+RawArray<const uint8_t> line_details_t::compressed_output_block_data(int k) const {
+  const auto compressed = char_view(output_block_data(k));
+  return compressed.slice(4,4+*(int*)compressed.data());
+}
+#endif
 
 int line_details_t::decrement_input_responses() {
   return --missing_input_responses;
@@ -167,7 +178,7 @@ static spinlock_t slow_verify_lock;
 
 static void slow_verify(const char* prefix, const bool turn, const side_t side0, const side_t side1, const Vector<super_t,2>& result, bool verbose=false) {
   // Switch from (we-win,we-win-or-tie) format to (black-wins,white-wins) format
-  auto data = result; 
+  auto data = result;
   data.y = ~data.y;
   if (turn)
     swap(data.x,data.y);
@@ -179,6 +190,26 @@ static void slow_verify(const char* prefix, const bool turn, const side_t side0,
 static OTHER_UNUSED void slow_verify(const char* prefix, const board_t board, const Vector<super_t,2>& result, bool verbose=false) {
   const bool turn = count(board).sum()&1;
   slow_verify(prefix,turn,unpack(board,turn),unpack(board,1-turn),result,verbose);
+}
+
+/*********************** compress output block ************************/
+
+void compress_output_block(line_details_t* const line, const int b) {
+  const auto block_data = line->output_block_data(b);
+  const auto event = line->pre.line.block_line_event(b);
+  // Compress into local buffer, then copy back to block_data, prepending the 4 byte length
+  const auto local_compressed = local_fast_compress(block_data.slice(0,block_data.size()-1),event);
+  OTHER_ASSERT(char_view(block_data).size()>=4+local_compressed.size());
+  const auto compressed = char_view(block_data).slice(0,4+local_compressed.size());
+  *(int*)compressed.data() = local_compressed.size();
+  memcpy(compressed.data()+4,local_compressed.data(),local_compressed.size());
+  // Send wakeup message to communication thread
+  thread_time_t wakeup(wakeup_kind,event);
+  BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(long long int));
+  MPI_Request request;
+  CHECK(MPI_Isend((void*)&line->self,1,MPI_LONG_LONG_INT,0,b,line->wakeup_comm,&request));
+  CHECK(MPI_Request_free(&request));
+  PENTAGO_MPI_TRACE("sent wakeup for %p: %s, block %d",line,str(line->pre.line),b);
 }
 
 /*********************** compute_microline ************************/
@@ -247,7 +278,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
                                                                               :0);
   const symmetry_t base_transform = line->inverse_transform*local_symmetry;
 
-#ifdef PENTAGO_MPI_DEBUG
+#if PENTAGO_MPI_DEBUG
   // Check that child data is consistent before and after transformation
   const auto child_rmin = vec(rotation_minimal_quadrants(line->standard_child_section.counts[0]),
                               rotation_minimal_quadrants(line->standard_child_section.counts[1]),
@@ -304,7 +335,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
         const int j = ir/4;
         const symmetry_t symmetry = local_symmetry_t((ir&3)<<2*dim)*base_transform*local_symmetry_t(symmetries[j]);
         const auto& child = input[((j>>block_shift)==child_length-1?last_input_base:input_base)+(block_stride+PENTAGO_MPI_COMPRESS)*(j>>block_shift)+input_stride*((j^(j<line_moves))&(block_size-1))];
-#ifdef PENTAGO_MPI_DEBUG
+#if PENTAGO_MPI_DEBUG
         const auto child_board = child_board_base|(board_t)child_rmin[child_dim].x[j^(j<line_moves)]<<16*child_dim;
         slow_verify("child inline",child_board,child,true);
         const auto after_board = flip_board(pack(new_side0,side1),turn);
@@ -317,21 +348,27 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
       }
     }
     // Finish up
-    auto& result = output[((i>>block_shift)==length-1?last_output_base:output_base)+block_stride*(i>>block_shift)+output_stride*(i&(block_size-1))];
+    auto& result = output[((i>>block_shift)==length-1?last_output_base:output_base)+(block_stride+PENTAGO_MPI_COMPRESS_OUTPUTS)*(i>>block_shift)+output_stride*(i&(block_size-1))];
     result.x = (wins&~immediate)|(wins0&~wins1);
     result.y = (not_loss&~immediate)|wins0;
   }
 
   // Are we done with this line?
   if (!--line->missing_microlines) {
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
+    // Schedule output compression
+    for (const int b : range(length))
+      threads_schedule(CPU,curry(compress_output_block,line,b));
+#else
     time.stop();
     thread_time_t wakeup(wakeup_kind,line->line_event);
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
     MPI_Request request;
-    CHECK(MPI_Isend((void*)&line->self,1,MPI_LONG_LONG_INT,0,wakeup_tag,line->wakeup_comm,&request));
+    CHECK(MPI_Isend((void*)&line->self,1,MPI_LONG_LONG_INT,0,0,line->wakeup_comm,&request));
     CHECK(MPI_Request_free(&request));
     PENTAGO_MPI_TRACE("sent wakeup for %p: %s",line,str(pre.line));
+#endif
   }
 }
 

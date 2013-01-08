@@ -339,6 +339,8 @@ int toplevel(int argc, char** argv) {
          << "\ngather limit = "<<gather_limit
          << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
+         << "\ncompress = "<<PENTAGO_MPI_COMPRESS
+         << "\ncompress outputs = "<<PENTAGO_MPI_COMPRESS_OUTPUTS
          << "\nsse = "<<PENTAGO_SSE
 #ifdef BOOST_BIG_ENDIAN
          << "\nendian = big"
@@ -350,14 +352,12 @@ int toplevel(int argc, char** argv) {
          << "\nrandomize = "<<randomize
          << "\ntag ub = "<<tag_ub<<" ("<<required_tag_ub<<" required)"
          << endl;
-#ifdef PENTAGO_MPI_DEBUG
-    cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 
-#endif
+    if (PENTAGO_MPI_DEBUG)
+      cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 
   }
 
-#ifdef PENTAGO_MPI_DEBUG
-  init_supertable(12);
-#endif
+  if (PENTAGO_MPI_DEBUG)
+    init_supertable(12);
 
   // For paranoia's sake, generate dummy file to make sure the directory works.
   // It would be very sad to have the computation run for an hour and then choke.
@@ -388,9 +388,8 @@ int toplevel(int argc, char** argv) {
       if (slice+1==meaningless) {
         prev_partition = partition_factory(ranks,slices[slice+1]);
         prev_blocks = meaningless_block_store(*prev_partition,rank,samples);
-#ifdef PENTAGO_MPI_DEBUG
-        set_block_cache(store_block_cache(ref(prev_blocks)));
-#endif
+        if (PENTAGO_MPI_DEBUG)
+          set_block_cache(store_block_cache(ref(prev_blocks),uint64_t(1)<<28));
       }
 
       // Partition work among processors

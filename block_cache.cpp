@@ -148,7 +148,7 @@ public:
     const auto it = block_cache.find(key);
     if (it != block_cache.end())
       return it->second;
-    const auto data = blocks->uncompress_and_get(section,block,unevent);
+    const auto data = blocks->uncompress_and_get(section,block,unevent).copy();
     const auto memory = memory_usage(data);
     if (free_memory < memory)
       THROW(RuntimeError,"store_block_cache_t: memory limit of %s exceeded (%zu blocks loaded)",large(memory_limit),block_cache.size());
