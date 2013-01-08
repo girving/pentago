@@ -23,6 +23,7 @@ randomize = props.add('randomize',0)
 gather_limit = props.add('gather_limit',-1)
 line_limit = props.add('line_limit',-1)
 log_all = props.add('log_all',False)
+per_rank_times = props.add('per_rank_times',False)
 parser.parse(props,'Endgame prediction script',positional=[section])
 
 # 'Parse' simple properties
