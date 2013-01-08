@@ -5,6 +5,7 @@
 #include <pentago/mpi/utility.h>
 #include <pentago/filter.h>
 #include <pentago/thread.h>
+#include <pentago/utility/ceil_div.h>
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/RawArray.h>
@@ -69,7 +70,7 @@ void fast_uncompress(RawArray<const uint8_t> compressed, RawArray<Vector<super_t
 
 // Thread local temporary buffer for local compression and decompression.
 static inline RawArray<Vector<super_t,2>> local_buffer() {
-  const int count = sqr(sqr(block_size))+1;
+  const int count = ceil_div(raw_max_fast_compressed_size,sizeof(Vector<super_t,2>));
   static __thread Vector<super_t,2>* buffer = 0;
   if (!buffer)
     buffer = (Vector<super_t,2>*)malloc(sizeof(Vector<super_t,2>)*count);
