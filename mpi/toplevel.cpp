@@ -339,6 +339,7 @@ int toplevel(int argc, char** argv) {
          << "\ngather limit = "<<gather_limit
          << "\nline limit = "<<line_limit
          << "\nmode = "<<(OTHER_DEBUG_ONLY(1)+0?"debug":"optimized")
+         << "\nfunnel = "<<PENTAGO_MPI_FUNNEL
          << "\ncompress = "<<PENTAGO_MPI_COMPRESS
          << "\ncompress outputs = "<<PENTAGO_MPI_COMPRESS_OUTPUTS
          << "\nsse = "<<PENTAGO_SSE

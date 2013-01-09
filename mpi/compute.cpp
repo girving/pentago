@@ -55,7 +55,7 @@ OTHER_CONST static inline Tuple<section_t,uint8_t> standardize_child_section(sec
   return section.child(dimension).standardize<8>();
 }
 
-line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_comm)
+line_details_t::line_details_t(const line_data_t& pre, BOOST_PP_IF(PENTAGO_MPI_FUNNEL,const wakeup_t& wakeup, const MPI_Comm wakeup_comm))
   : pre(pre)
   , line_event(pre.line.line_event())
   , block_stride(block_size*block_shape(pre.line.section.shape().remove_index(pre.line.dimension),pre.line.block_base).product())
@@ -87,8 +87,13 @@ line_details_t::line_details_t(const line_data_t& pre, const MPI_Comm wakeup_com
   , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks+PENTAGO_MPI_COMPRESS_OUTPUTS*pre.line.length,false))
 
   // When computation is complete, send a wakeup message here
+#if PENTAGO_MPI_FUNNEL
+  , wakeup(wakeup)
+#else
   , wakeup_comm(wakeup_comm)
-  , self(this) {
+  , self(this)
+#endif
+{
 
   // Split buffer into two pieces
   const int split = pre.input_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks;
@@ -193,6 +198,7 @@ static OTHER_UNUSED void slow_verify(const char* prefix, const board_t board, co
 }
 
 /*********************** compress output block ************************/
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
 
 void compress_output_block(line_details_t* const line, const int b) {
   const auto block_data = line->output_block_data(b);
@@ -204,14 +210,19 @@ void compress_output_block(line_details_t* const line, const int b) {
   *(int*)compressed.data() = local_compressed.size();
   memcpy(compressed.data()+4,local_compressed.data(),local_compressed.size());
   // Send wakeup message to communication thread
-  thread_time_t wakeup(wakeup_kind,event);
+  thread_time_t time(wakeup_kind,event);
+#if PENTAGO_MPI_FUNNEL
+  line->wakeup(line,b);
+#else
   BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(long long int));
   MPI_Request request;
   CHECK(MPI_Isend((void*)&line->self,1,MPI_LONG_LONG_INT,0,b,line->wakeup_comm,&request));
   CHECK(MPI_Request_free(&request));
+#endif
   PENTAGO_MPI_TRACE("sent wakeup for %p: %s, block %d",line,str(line->pre.line),b);
 }
 
+#endif
 /*********************** compute_microline ************************/
 
 // Compute a single 1D line through a section (a 1D component of a block line)
@@ -361,14 +372,18 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
       threads_schedule(CPU,curry(compress_output_block,line,b));
 #else
     time.stop();
-    thread_time_t wakeup(wakeup_kind,line->line_event);
+    thread_time_t time(wakeup_kind,line->line_event);
+#if PENTAGO_MPI_FUNNEL
+    line->wakeup(line);
+#else
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
     MPI_Request request;
     CHECK(MPI_Isend((void*)&line->self,1,MPI_LONG_LONG_INT,0,0,line->wakeup_comm,&request));
     CHECK(MPI_Request_free(&request));
-    PENTAGO_MPI_TRACE("sent wakeup for %p: %s",line,str(pre.line));
 #endif
+#endif
+    PENTAGO_MPI_TRACE("sent wakeup for %p: %s",line,str(pre.line));
   }
 }
 

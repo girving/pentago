@@ -79,11 +79,22 @@ void send_empty(int rank, int tag, MPI_Comm comm) {
   CHECK(MPI_Request_free(&request));
 }
 
+static string str_thread_support(const int support) {
+  switch (support) {
+    case MPI_THREAD_SINGLE: return "single";
+    case MPI_THREAD_FUNNELED: return "funneled";
+    case MPI_THREAD_SERIALIZED: return "serialized";
+    case MPI_THREAD_MULTIPLE: return "multiple";
+    default: return format("unknown (%d)",support);
+  }
+}
+
 mpi_world_t::mpi_world_t(int& argc, char**& argv) {
+  const int required = PENTAGO_MPI_FUNNEL?MPI_THREAD_FUNNELED:MPI_THREAD_MULTIPLE;
   int provided;
-  CHECK(MPI_Init_thread(&argc,&argv,MPI_THREAD_MULTIPLE,&provided));
-  if (provided<MPI_THREAD_MULTIPLE)
-    die("Insufficent MPI thread support: required = multiple, provided = %d",provided);
+  CHECK(MPI_Init_thread(&argc,&argv,required,&provided));
+  if (provided<required)
+    die("Insufficent MPI thread support: required = %s, provided = %s",str_thread_support(required),str_thread_support(provided));
 
   // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
   debug::set_error_callback(static_cast<debug::ErrorCallback>(die_helper));

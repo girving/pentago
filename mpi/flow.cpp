@@ -83,16 +83,19 @@ flow_comms_t::flow_comms_t(MPI_Comm comm)
   , request_comm(comm_dup(comm))
   , response_comm(comm_dup(comm))
   , output_comm(comm_dup(comm))
-  , wakeup_comm(comm_dup(MPI_COMM_SELF)) {
-  OTHER_ASSERT(!comm_rank(wakeup_comm));
-}
+#if !PENTAGO_MPI_FUNNEL
+  , wakeup_comm(comm_dup(MPI_COMM_SELF))
+#endif
+{}
 
 flow_comms_t::~flow_comms_t() {
   CHECK(MPI_Comm_free(&barrier_comm));
   CHECK(MPI_Comm_free(&request_comm));
   CHECK(MPI_Comm_free(&response_comm));
   CHECK(MPI_Comm_free(&output_comm));
+#if !PENTAGO_MPI_FUNNEL
   CHECK(MPI_Comm_free(&wakeup_comm));
+#endif
 }
 
 // Leave flow_t outside an anonymous namespace to reduce backtrace sizes
@@ -125,10 +128,17 @@ struct flow_t {
   // Space for persistent message requests
   Vector<Vector<int,2>,wildcard_recv_count> request_buffers;
   Vector<Array<Vector<super_t,2>>,wildcard_recv_count> output_buffers;
-  uint64_t wakeup_buffer;
 
   // Wildcard callbacks
-  function<void(MPI_Status*)> barrier_callback, wakeup_callback;
+  const function<void(MPI_Status*)> barrier_callback;
+
+  // Wakeup support
+#if PENTAGO_MPI_FUNNEL
+  const line_details_t::wakeup_t wakeup_callback;
+#else
+  uint64_t wakeup_buffer;
+  const function<void(MPI_Status*)> wakeup_callback;
+#endif
 
   flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
   ~flow_t();
@@ -137,14 +147,21 @@ struct flow_t {
   void post_barrier_recv();
   void post_request_recv(Vector<int,2>* buffer);
   void post_output_recv(Array<Vector<super_t,2>>* buffer);
-  void post_wakeup_recv();
   void process_barrier(MPI_Status* status);
   void process_request(Vector<int,2>* buffer, MPI_Status* status);
   void process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status);
-  void process_wakeup(MPI_Status* status);
   void process_response(block_request_t* request, MPI_Status* status);
   void send_output(line_details_t* const line, const int b);
   void finish_output_send(line_details_t* const line, MPI_Status* status);
+
+  // Wakeup support
+  void wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA const int b,));
+#if PENTAGO_MPI_FUNNEL
+  void post_wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA const int b,));
+#else
+  void post_wakeup_recv();
+  void process_wakeup(MPI_Status* status);
+#endif
 };
 
 flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit)
@@ -158,7 +175,11 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , free_line_gathers(line_gather_limit)
   , free_lines(line_limit)
   , barrier_callback(curry(&flow_t::process_barrier,this))
+#if PENTAGO_MPI_FUNNEL
+  , wakeup_callback(curry(&flow_t::post_wakeup,this))
+#else
   , wakeup_callback(curry(&flow_t::process_wakeup,this))
+#endif
 {
   OTHER_ASSERT(line_gather_limit<=32); // Make sure linear search through block_requests is okay
   OTHER_ASSERT(free_line_gathers>=1);
@@ -177,7 +198,9 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
     post_request_recv(&buffer);
   for (auto& buffer : output_buffers)
     post_output_recv(&buffer);
+#if !PENTAGO_MPI_FUNNEL
   post_wakeup_recv();
+#endif
 
   // Schedule some lines
   schedule_lines();
@@ -211,7 +234,7 @@ void flow_t::schedule_lines() {
       unscheduled_lines.pop();
       free_memory -= line_memory;
       free_lines--;
-      line = new line_details_t(*preline,comms.wakeup_comm);
+      line = new line_details_t(*preline,BOOST_PP_IF(PENTAGO_MPI_FUNNEL,wakeup_callback,comms.wakeup_comm));
       PENTAGO_MPI_TRACE("allocate line %p: %s",line,str(line->pre.line));
     }
     // Request all input blocks
@@ -364,12 +387,14 @@ void flow_t::process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status
   post_output_recv(buffer);
 }
 
+#if !PENTAGO_MPI_FUNNEL
 void flow_t::post_wakeup_recv() {
   PENTAGO_MPI_TRACE("post wakeup recv");
   MPI_Request request;
-  CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,MPI_ANY_TAG,comms.wakeup_comm,&request));
+  CHECK(MPI_Irecv(&wakeup_buffer,1,MPI_LONG_LONG_INT,0,PENTAGO_MPI_COMPRESS_OUTPUTS?MPI_ANY_TAG:0,comms.wakeup_comm,&request));
   requests.add(request,wakeup_callback,true);
 }
+#endif
 
 // Optionally compress an output block and send it
 void flow_t::send_output(line_details_t* const line, const int b) {
@@ -397,25 +422,35 @@ void flow_t::send_output(line_details_t* const line, const int b) {
 }
 
 // Line line has finished; post sends for all output blocks.  In compressed output mode, each wakeup corresponds to a single block.
-void flow_t::process_wakeup(MPI_Status* status) {
-  BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
-  OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
-  line_details_t* const line = (line_details_t*)wakeup_buffer;
+void flow_t::wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA const int b,)) {
 #if PENTAGO_MPI_COMPRESS_OUTPUTS
-  const int b = status->MPI_TAG;
   PENTAGO_MPI_TRACE("process wakeup %p: %s, block %d",line,str(line->pre.line),b);
   OTHER_ASSERT(b<line->pre.line.length);
   // Send one compressed block
   send_output(line,b);
 #else
   PENTAGO_MPI_TRACE("process wakeup %p: %s",line,str(line->pre.line));
-  OTHER_ASSERT(!status->MPI_TAG);
   // Send all uncompressed output blocks
   for (int b=0;b<line->pre.line.length;b++)
     send_output(line,b);
 #endif
+}
+
+#if PENTAGO_MPI_FUNNEL
+// Register a wakeup callback for the communication thread
+void flow_t::post_wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,BOOST_PP_COMMA const int b,)) {
+  requests.add_immediate(curry(&flow_t::wakeup,this,line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,BOOST_PP_COMMA b,)));
+}
+#else
+// Process a wakeup message from a worker thread
+void flow_t::process_wakeup(MPI_Status* status) {
+  BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
+  OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
+  line_details_t* const line = (line_details_t*)wakeup_buffer;
+  wakeup(line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA status->MPI_TAG,));
   post_wakeup_recv();
 }
+#endif
 
 void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) {
   const int remaining = line->decrement_unsent_output_blocks();

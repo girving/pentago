@@ -20,6 +20,10 @@
 // Whether or not to send output blocks compressed
 #define PENTAGO_MPI_COMPRESS_OUTPUTS 0
 
+// If true, poll for requests using MPI_Testsome instead of blocking
+// with MPI_Waitsome.  This allows use of MPI_THREAD_FUNNELED.
+#define PENTAGO_MPI_FUNNEL 0
+
 namespace pentago {
 
 // We fix the block size at compile time for optimization reasons

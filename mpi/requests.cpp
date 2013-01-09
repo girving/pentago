@@ -10,7 +10,11 @@ requests_t::requests_t() {}
 
 requests_t::~requests_t() {
   if (requests.size())
-    die("request_t destructing before all requests are complete.  Refusing to wait without being told.");
+    die("request_t destructing before %zu requests are complete.  Refusing to wait without being told",requests.size());
+#if PENTAGO_MPI_FUNNEL
+  if (immediates.size())
+    die("request_t destructing before %zu immediates are complete",immediates.size());
+#endif
 }
 
 void requests_t::add(MPI_Request request, const function<void(MPI_Status*)>& callback, bool cancellable) {
@@ -19,14 +23,41 @@ void requests_t::add(MPI_Request request, const function<void(MPI_Status*)>& cal
   cancellables.append(cancellable);
 }
 
-void requests_t::checksome(bool wait) {
+void requests_t::waitsome() {
+#if PENTAGO_MPI_FUNNEL
+  for (;;) {
+    // MPI_Testsome
+    if (checksome())
+      return;
+    // Check for messages from worker threads
+    job_t callback;
+    {
+      spin_t spin(immediate_lock);
+      if (immediates.size()) {
+        callback.reset(immediates.back());
+        immediates.pop_back();
+      }
+    }
+    if (callback) {
+      callback();
+      return;
+    }
+  }
+#else
+  // MPI_Waitsome
+  OTHER_ASSERT(checksome());
+#endif
+}
+
+int requests_t::checksome() {
   vector<Tuple<function<void(MPI_Status*)>,MPI_Status*>> pending;
   int n = requests.size();
+  OTHER_ASSERT(n);
   MPI_Status statuses[n];
   {
     int indices[n];
     int finished;
-    const auto check = wait?MPI_Waitsome:MPI_Testsome;
+    const auto check = PENTAGO_MPI_FUNNEL?MPI_Testsome:MPI_Waitsome;
     {
       thread_time_t time(wait_kind,unevent);
       CHECK(check(n,requests.data(),&finished,indices,statuses));
@@ -55,9 +86,14 @@ void requests_t::checksome(bool wait) {
   // Launch pending callbacks
   for (auto& pair : pending)
     pair.x(pair.y);
+  return pending.size();
 }
 
 void requests_t::cancel_and_waitall() {
+#if PENTAGO_MPI_FUNNEL
+  spin_t spin(immediate_lock);
+  OTHER_ASSERT(!immediates.size());
+#endif
   callbacks.clear();
   for (int i=0;i<requests.size();i++) {
     OTHER_ASSERT(cancellables[i]);
