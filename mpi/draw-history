@@ -29,6 +29,9 @@ scales = Prop('scales',(1,1))
 # Picked point
 picked = Prop('picked',(0,-1))
 
+# Initialize threads
+init_threads(-1,0)
+
 @cache
 def directions():
   dirs = []

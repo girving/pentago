@@ -13,6 +13,8 @@
 #include <other/core/python/module.h>
 #include <other/core/python/stl.h>
 #include <other/core/structure/Tuple.h>
+#include <other/core/utility/curry.h>
+#include <other/core/utility/openmp.h>
 #include <other/core/utility/interrupts.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/str.h>
@@ -268,12 +270,21 @@ vector<Tuple<int,int,history_t>> event_dependencies(const vector<vector<Array<co
   return deps;
 }
 
+static void check_helper(const vector<vector<Array<const history_t>>>* const event_sorted_history, const int direction, const int thread, const int kind, RawArray<const history_t> events) {
+  for (const auto& event : events)
+    event_dependencies(*event_sorted_history,direction,thread,kind,event);
+}
+
 // Find dependencies for all dvents as a consistency check
 void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history, const int direction) {
+  const int jobs = 16;
   for (const int thread : range((int)event_sorted_history.size()))
-    for (const int kind : range((int)event_sorted_history[thread].size()))
-      for (const auto& event : event_sorted_history[thread][kind])
-        event_dependencies(event_sorted_history,direction,thread,kind,event);
+    for (const int kind : range((int)event_sorted_history[thread].size())) {
+      const auto events = event_sorted_history[thread][kind].raw();
+      for (const int job : range(jobs))
+        threads_schedule(CPU,curry(check_helper,&event_sorted_history,direction,thread,kind,events.slice(partition_loop(events.size(),jobs,job))));
+    }
+  threads_wait_all();
 }
 
 // Compute rank-to-rank bandwidth estimates localized in time (dimensions: epoch,src,dst)
