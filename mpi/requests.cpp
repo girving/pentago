@@ -24,69 +24,70 @@ void requests_t::add(MPI_Request request, const function<void(MPI_Status*)>& cal
 }
 
 void requests_t::waitsome() {
-#if PENTAGO_MPI_FUNNEL
+  thread_time_t time(wait_kind,unevent);
   for (;;) {
-    // MPI_Testsome
-    if (checksome())
-      return;
-    // Check for messages from worker threads
-    job_t callback;
+    // Check for MPI request completions
     {
-      spin_t spin(immediate_lock);
-      if (immediates.size()) {
-        callback.reset(immediates.back());
-        immediates.pop_back();
-      }
-    }
-    if (callback) {
-      callback();
-      return;
-    }
-  }
-#else
-  // MPI_Waitsome
-  OTHER_ASSERT(checksome());
-#endif
-}
-
-int requests_t::checksome() {
-  vector<Tuple<function<void(MPI_Status*)>,MPI_Status*>> pending;
-  int n = requests.size();
-  OTHER_ASSERT(n);
-  MPI_Status statuses[n];
-  {
-    int indices[n];
-    int finished;
-    const auto check = PENTAGO_MPI_FUNNEL?MPI_Testsome:MPI_Waitsome;
-    {
-      thread_time_t time(wait_kind,unevent);
+      int n = requests.size();
+      OTHER_ASSERT(n);
+      MPI_Status statuses[n];
+      int indices[n];
+      int finished;
+      const auto check = PENTAGO_MPI_FUNNEL?MPI_Testsome:MPI_Waitsome;
       CHECK(check(n,requests.data(),&finished,indices,statuses));
+      if (finished) { // If any requests finished, call their callbacks and return
+        time.stop();
+        // Add requested callback to pending list
+        vector<Tuple<function<void(MPI_Status*)>,MPI_Status*>> pending(finished);
+        for (int i=0;i<finished;i++) {
+          int j = indices[i];
+          if (callbacks[j]) {
+            swap(pending[i].x,callbacks[j]);
+            pending[i].y = &statuses[i];
+          }
+        }
+        // The MPI standard doesn't appear to specify whether the indices are sorted.  Removing an unsorted list
+        // of elements from an array is very unpleasant, so we sort.  If they're already sorted, this is cheap.
+        insertion_sort(finished,indices);
+        // Prune away satisfied requests
+        for (int i=finished-1;i>=0;i--) {
+          int j = indices[i];
+          requests.remove_index_lazy(j);
+          cancellables.remove_index_lazy(j);
+          callbacks[j].swap(callbacks[--n]);
+        }
+        callbacks.resize(n);
+        // Launch pending callbacks
+        for (auto& pair : pending)
+          pair.x(pair.y);
+        return;
+      } else if (!PENTAGO_MPI_FUNNEL)
+        die("MPI_Waitsome completed with zero requests out of %d",n);
     }
-    // Add requested callback to pending list
-    pending.resize(finished);
-    for (int i=0;i<finished;i++) {
-      int j = indices[i];
-      if (callbacks[j]) {
-        swap(pending[i].x,callbacks[j]);
-        pending[i].y = &statuses[i];
+#if PENTAGO_MPI_FUNNEL
+    // Check for messages from worker threads
+    { 
+      // Pull callbacks off shared pile
+      immediate_lock.lock();
+      const int n = immediates.size();
+      job_base_t* ready[n];
+      if (n)
+        memcpy(ready,&immediates[0],sizeof(job_base_t*)*n);
+      immediates.clear();
+      immediate_lock.unlock();
+      // If we have any, run them
+      if (n) {
+        time.stop();
+        // If exceptions are thrown here there'd be a memory leak, but we don't allow exceptions.
+        for (const auto job : ready) {
+          (*job)();
+          delete job;
+        }
+        return;
       }
     }
-    // The MPI standard doesn't appear to specify whether the indices are sorted.  Removing an unsorted list
-    // of elements from an array is very unpleasant, so we sort.  If they're already sorted, this is cheap.
-    insertion_sort(finished,indices);
-    // Prune away satisfied requests
-    for (int i=finished-1;i>=0;i--) {
-      int j = indices[i];
-      requests.remove_index_lazy(j);
-      cancellables.remove_index_lazy(j);
-      callbacks[j].swap(callbacks[--n]);
-    }
-    callbacks.resize(n);
+#endif
   }
-  // Launch pending callbacks
-  for (auto& pair : pending)
-    pair.x(pair.y);
-  return pending.size();
 }
 
 void requests_t::cancel_and_waitall() {

@@ -65,10 +65,6 @@ public:
     immediates.push_back(job.release());
   }
 #endif
-
-private:
-  // Calls PENTAGO_MPI_FUNNEL ? MPI_Testsome : MPI_Waitsome, process resulting completion callbacks, and return the number of completions.
-  int checksome();
 };
 
 }
