@@ -155,9 +155,10 @@ struct flow_t {
   void finish_output_send(line_details_t* const line, MPI_Status* status);
 
   // Wakeup support
-  void wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA const int b,));
+  typedef line_details_t::wakeup_block_t wakeup_block_t;
+  void wakeup(line_details_t* const line, const wakeup_block_t b);
 #if PENTAGO_MPI_FUNNEL
-  void post_wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA const int b,));
+  void post_wakeup(line_details_t* const line, const wakeup_block_t b);
 #else
   void post_wakeup_recv();
   void process_wakeup(MPI_Status* status);
@@ -422,7 +423,7 @@ void flow_t::send_output(line_details_t* const line, const int b) {
 }
 
 // Line line has finished; post sends for all output blocks.  In compressed output mode, each wakeup corresponds to a single block.
-void flow_t::wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA const int b,)) {
+void flow_t::wakeup(line_details_t* const line, const wakeup_block_t b) {
 #if PENTAGO_MPI_COMPRESS_OUTPUTS
   PENTAGO_MPI_TRACE("process wakeup %p: %s, block %d",line,str(line->pre.line),b);
   OTHER_ASSERT(b<line->pre.line.length);
@@ -438,8 +439,8 @@ void flow_t::wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_
 
 #if PENTAGO_MPI_FUNNEL
 // Register a wakeup callback for the communication thread
-void flow_t::post_wakeup(line_details_t* const line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,BOOST_PP_COMMA const int b,)) {
-  requests.add_immediate(curry(&flow_t::wakeup,this,line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,BOOST_PP_COMMA b,)));
+void flow_t::post_wakeup(line_details_t* const line, const wakeup_block_t b) {
+  requests.add_immediate(curry(&flow_t::wakeup,this,line,b));
 }
 #else
 // Process a wakeup message from a worker thread
@@ -447,7 +448,7 @@ void flow_t::process_wakeup(MPI_Status* status) {
   BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
   OTHER_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
   line_details_t* const line = (line_details_t*)wakeup_buffer;
-  wakeup(line BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS, BOOST_PP_COMMA status->MPI_TAG,));
+  wakeup(line,BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,status->MPI_TAG,unit()));
   post_wakeup_recv();
 }
 #endif

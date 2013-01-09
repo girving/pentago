@@ -74,7 +74,8 @@ struct line_details_t : public boost::noncopyable {
 
   // When computation is complete, send a wakeup message here
 #if PENTAGO_MPI_FUNNEL
-  typedef function<void(line_details_t* BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,BOOST_PP_COMMA int,))> wakeup_t;
+  typedef BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,int,unit) wakeup_block_t;
+  typedef function<void(line_details_t*,wakeup_block_t)> wakeup_t;
   const wakeup_t wakeup;
 #else
   const MPI_Comm wakeup_comm;

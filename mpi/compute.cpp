@@ -374,7 +374,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
     time.stop();
     thread_time_t time(wakeup_kind,line->line_event);
 #if PENTAGO_MPI_FUNNEL
-    line->wakeup(line);
+    line->wakeup(line,unit());
 #else
     BOOST_STATIC_ASSERT(sizeof(line_data_t*)==sizeof(long long int));
     // Send a pointer to ourselves to the communication thread
