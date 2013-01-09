@@ -94,6 +94,8 @@ Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size) {
   void* pointer = (void*)p;
 #endif
   auto* buffer = (aligned_buffer_t*)malloc(sizeof(aligned_buffer_t));
+  if (!buffer)
+    THROW(bad_alloc);
   (void)PyObject_INIT(buffer,&buffer->pytype);
   buffer->size = size;
   buffer->start = start;

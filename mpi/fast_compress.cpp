@@ -72,8 +72,11 @@ void fast_uncompress(RawArray<const uint8_t> compressed, RawArray<Vector<super_t
 static inline RawArray<Vector<super_t,2>> local_buffer() {
   const int count = ceil_div(raw_max_fast_compressed_size,sizeof(Vector<super_t,2>));
   static __thread Vector<super_t,2>* buffer = 0;
-  if (!buffer)
+  if (!buffer) {
     buffer = (Vector<super_t,2>*)malloc(sizeof(Vector<super_t,2>)*count);
+    if (!buffer)
+      die("local_fast_compress/uncompress: failed to allocate thread local buffer of size %zu",sizeof(Vector<super_t,2>)*count);
+  }
   return RawArray<Vector<super_t,2>>(count,buffer);
 }
 

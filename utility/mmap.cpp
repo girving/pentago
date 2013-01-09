@@ -11,6 +11,7 @@
 namespace pentago {
 
 using std::vector;
+using std::bad_alloc;
 
 namespace {
 
@@ -83,6 +84,8 @@ Tuple<void*,PyObject*> mmap_buffer_helper(size_t size) {
   if (start==MAP_FAILED)
     THROW(RuntimeError,"anonymous mmap failed, size = %zu",size);
   auto* buffer = (mmap_buffer_t*)malloc(sizeof(mmap_buffer_t));
+  if (!buffer)
+    THROW(bad_alloc);
   (void)PyObject_INIT(buffer,&buffer->pytype);
   buffer->size = size;
   buffer->start = start;
