@@ -73,8 +73,8 @@ struct line_details_t : public boost::noncopyable {
   const Array<Vector<super_t,2>> input, output;
 
   // When computation is complete, send a wakeup message here
-#if PENTAGO_MPI_FUNNEL
   typedef BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,int,unit) wakeup_block_t;
+#if PENTAGO_MPI_FUNNEL
   typedef function<void(line_details_t*,wakeup_block_t)> wakeup_t;
   const wakeup_t wakeup;
 #else
