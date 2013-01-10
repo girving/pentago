@@ -5,7 +5,7 @@
 #include <pentago/utility/debug.h>
 #include <other/core/array/Array.h>
 #include <other/core/array/NdArray.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/interrupts.h>
 #include <cmath>

@@ -3,7 +3,7 @@
 #include <pentago/score.h>
 #include <other/core/math/min.h>
 #include <other/core/math/popcount.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 namespace pentago {
 
 using namespace other;

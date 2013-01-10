@@ -6,7 +6,7 @@
 #include <other/core/math/integer_log.h>
 #include <other/core/random/Random.h>
 #include <other/core/structure/Hashtable.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/utility/interrupts.h>
 namespace pentago {
 

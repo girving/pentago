@@ -2,7 +2,7 @@
 
 #include <pentago/moves.h>
 #include <other/core/array/Array.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 namespace pentago {
 
 using namespace other;

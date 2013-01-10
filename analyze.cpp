@@ -7,7 +7,7 @@
 #include <other/core/array/Array2d.h>
 #include <other/core/geometry/Box.h>
 #include <other/core/math/uint128.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/range.h>
 namespace pentago {

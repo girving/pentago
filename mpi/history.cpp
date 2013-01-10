@@ -10,7 +10,7 @@
 #include <other/core/array/IndirectArray.h>
 #include <other/core/geometry/BoxScalar.h>
 #include <other/core/math/constants.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/python/stl.h>
 #include <other/core/structure/Tuple.h>
 #include <other/core/utility/curry.h>

@@ -9,7 +9,7 @@
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/index.h>
 #include <pentago/utility/memory.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/python/stl.h>
 #include <other/core/utility/curry.h>
 #include <other/core/utility/ProgressIndicator.h>

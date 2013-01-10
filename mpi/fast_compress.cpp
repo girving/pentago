@@ -9,7 +9,7 @@
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/RawArray.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <snappy.h>
 namespace pentago {
 namespace mpi {

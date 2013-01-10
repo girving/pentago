@@ -15,7 +15,7 @@
 #include <other/core/array/NestedArray.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/ExceptionValue.h>
 #include <other/core/random/Random.h>

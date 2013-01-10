@@ -4,7 +4,7 @@
 #include <pentago/moves.h>
 #include <pentago/superengine.h>
 #include <pentago/utility/debug.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/structure/Hashtable.h>
 namespace pentago {
 

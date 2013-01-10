@@ -8,7 +8,7 @@
 #include <other/core/array/Array4d.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/math/sse.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 namespace pentago {
 
 using std::cout;

@@ -5,7 +5,7 @@
 #include <pentago/utility/debug.h>
 #include <other/core/array/Array.h>
 #include <other/core/math/popcount.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/structure/Tuple.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/str.h>

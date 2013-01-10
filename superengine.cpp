@@ -9,7 +9,7 @@
 #include <pentago/trace.h>
 #include <pentago/block_cache.h>
 #include <pentago/utility/sort.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/python/stl.h>
 #include <other/core/structure/Hashtable.h>
 #include <other/core/structure/Tuple.h>

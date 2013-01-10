@@ -5,7 +5,7 @@
 #include <pentago/symmetry.h>
 #include <other/core/array/sort.h>
 #include <other/core/math/uint128.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/random/Random.h>
 #include <other/core/structure/Hashtable.h>
 #include <other/core/utility/Hasher.h>

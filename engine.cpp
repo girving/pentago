@@ -7,7 +7,7 @@
 #include <pentago/table.h>
 #include <pentago/utility/sort.h>
 #include <other/core/math/min.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/utility/interrupts.h>
 namespace pentago {
 

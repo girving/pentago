@@ -4,7 +4,7 @@
 #include <pentago/utility/debug.h>
 #include <other/core/array/NdArray.h>
 #include <other/core/math/popcount.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/random/Random.h>
 #include <other/core/utility/format.h>
 #include <other/core/utility/interrupts.h>

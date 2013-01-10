@@ -1,7 +1,7 @@
 // Statistics
 
 #include <pentago/stat.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <other/core/python/stl.h>
 #include <other/core/utility/time.h>
 namespace pentago {

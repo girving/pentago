@@ -5,7 +5,7 @@
 #include <pentago/utility/debug.h>
 #include <pentago/utility/memory.h>
 #include <other/core/array/Array2d.h>
-#include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 #include <sys/mman.h>
 #include <vector>
 namespace pentago {
