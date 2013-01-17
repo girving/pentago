@@ -4,6 +4,7 @@
 from __future__ import division
 import os
 import sys
+import hashlib
 from numpy import *
 from other.core import *
 from other.core.value import parser
@@ -38,8 +39,12 @@ def bits(x):
     x //= 2
   return '0b'+s
 
-def ahash(*args):
-    return hash(''.join(asarray(a).tostring() for a in args))
+def check(*args):
+  '''Usage: check(arrays,expected)'''
+  expected = args[-1]
+  data = ''.join(asarray(a).tostring() for a in args[:-1])
+  hash = hashlib.sha1(data).hexdigest()
+  assert expected==hash, "hash mismatch: expected '%s', got '%s'"%(expected,hash)
 
 @cache
 def win_patterns():
@@ -103,7 +108,7 @@ def win_contributions():
         for i,w in enumerate(wins):
           if w&qb and not ~b&(w&qb):
             table[q,v] |= 1<<(2*i)
-  assert ahash(table)==5134745501271341312
+  check(table,'4e5cf35e82fceecd464d73c3de35e6af4f75ee34')
   return table
 
 @remember
@@ -123,7 +128,7 @@ def rotations():
           right |= qbit(y,2-x)
     assert popcount(v)==popcount(left)==popcount(right)
     table[v] = left,right
-  assert ahash(table)==-631278374917950784
+  check(table,'195f19d49311f82139a18ae681592de02b9954bc')
   return table
 
 @remember
@@ -164,7 +169,7 @@ def unrotated_win_distances():
         qp = (pat>>16*q)&0x1ff
         d = if_(s1&qp,4,count[qp&~s0])
         table[q,b,i] |= d<<4*j
-  assert ahash(table)==8251429364477897294
+  check(table,'02b780e3172e11b861dd3106fc068ccb59cebc1c')
   return [('uint64_t','unrotated_win_distances','0x%xL',table)]
 
 @remember
@@ -197,7 +202,7 @@ def arbitrarily_rotated_win_distances():
         qp = (pat>>16*q)&0x1ff
         d = (if_(s1&qp,4,count[qp&~s0])).min(axis=-1)
         table[q,b,i] |= d<<4*j
-  assert ahash(table)==-3594567715319576186
+  check(table,'b1bd000ba42513ee696f065503d68f62b98ac85e')
   return [('uint64_t','arbitrarily_rotated_win_distances','0x%xL',table)]
 
 @remember
@@ -233,7 +238,7 @@ def rotated_win_distances():
           for r in 0,1:
             d = minimum(d,if_(rotations_[s1,r]&qp,4,count[qp&~rotations_[s0,r]]))
         table[q,b,i] |= d<<3*j
-  assert ahash(table)==-1851827180569519993
+  check(table,'6fc4ae84c574d330f38e3f07b37ece103fa80c45')
   return [('uint64_t','rotated_win_distances','0x%xL',table)]
 
 @cache
@@ -247,7 +252,7 @@ def reflections():
           r |= qbit(2-y,2-x) # Reflect about x = y line
     assert popcount(v)==popcount(r)
     table[v] = r
-  assert ahash(table)==-2942482400364239360
+  check(table,'2b23dc37f4bc1008eba3df0ee1b7815675b658bf')
   return table
 
 @remember
@@ -266,7 +271,7 @@ def pack():
       if v&2**i:
         pv += 3**i
     pack[v] = pv
-  assert ahash(pack)==3488108636539942373
+  check(pack,'b86e92ca7f525bd398ba376616219831e3f4f1a5')
   return pack
 
 @remember
@@ -287,7 +292,7 @@ def unpack():
         p1 += 2**i
       vv //= 3
     unpack[v] = p0,p1
-  assert ahash(unpack)==-3185216453998868236
+  check(unpack,'99e742106ae60b62c0bb71dee15789ef1eb761a0')
   return unpack
 
 @remember
@@ -316,8 +321,8 @@ def moves():
   flat = asarray([x for mv in moves for x in mv])
   assert len(flat)==offsets[-1]
   assert len(flat)<2**16
-  assert ahash(offsets)==-1634244574290319362
-  assert ahash(flat)==72249306322598272
+  check(offsets,'15b71d6e563787b098860ae0afb1d1aede6e91c2')
+  check(flat,'1aef3a03571fe13f0ab71173d79da107c65436e0')
   return [('uint16_t','move_offsets','%d',offsets)
          ,('uint16_t','move_flat','%d',flat)]
 
@@ -362,7 +367,7 @@ def superwin_info():
             print '  %s'%(c,)
   # Pack into 64-bit chunks
   info = packbits(info.astype(int8).swapaxes(-4,-1).swapaxes(-3,-2).reshape(-1,8)[:,::-1]).view(uint64).reshape(4,512,5,4)
-  assert ahash(info)==-6962575331390442688
+  check(info,'668eb0a940489f434f804d994698a4fc85f5b576')
   return [('uint64_t','superwin_info','0x%xL',info)]
 
 @remember
@@ -441,7 +446,7 @@ def commute_global_local_symmetries():
   # Generate lookup table
   table = all(conjugations==local.reshape(-1,1,1,36),axis=-1).argmax(axis=0)
   assert table.shape==(8,256)
-  assert ahash(table)==4955614325833109504
+  check(table,'e051d034c07bfa79fa62273b05839aedf446d499')
   return [('uint8_t','commute_global_local_symmetries','%d',table)]
 
 @remember
@@ -457,7 +462,7 @@ def superstandardize_table():
     shape[i] = 4
     return arange(4).reshape(*shape)
   table = sum([v(i)*4**rotate[v(4),i] for i in xrange(4)]).argmin(axis=-1).T.ravel()
-  assert ahash(table)==-1406557380251171136
+  check(table,'dd4f59fea3135a860e76ed397b8f1863b23cc17b')
   return [('uint8_t','superstandardize_table','%d',table)]
 
 @remember
@@ -513,10 +518,10 @@ def rotation_minimal_quadrants():
   # Save as a nested array
   offsets = cumsum(hstack([0,map(len,rmins)]))
   flat = hstack(rmins)
-  assert ahash(offsets)==4726690024650118399
-  assert ahash(flat)==6304851227730504324
-  assert ahash(inverse)==-5354860874702610752
-  assert ahash(moved)==-2598296920393596729
+  check(offsets,'7e450e73e0d54bd3591710e10f4aa76dbcbbd715')
+  check(flat,'8f48bb94ad675de569b07cca98a2e930b06b45ac')
+  check(inverse,'339369694f78d4a197db8dc41a1f41300ba4f46c')
+  check(moved,'dce212878aaebbcd995a8a0308335972bd1d5ef7')
   return [('uint16_t','rotation_minimal_quadrants_offsets','%d',offsets)
          ,('uint16_t','rotation_minimal_quadrants_flat','%d',hstack(rmins))
          ,('uint16_t','rotation_minimal_quadrants_inverse','%d',inverse)
