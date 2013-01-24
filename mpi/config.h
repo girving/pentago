@@ -25,6 +25,7 @@
 #define PENTAGO_MPI_FUNNEL 0
 
 namespace pentago {
+namespace mpi {
 
 // We fix the block size at compile time for optimization reasons
 const int block_size = 8;
@@ -40,4 +41,5 @@ const bool snappy_filter = true;
 // This significantly improves latency.
 const int wildcard_recv_count = 8;
 
+}
 }

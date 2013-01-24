@@ -1,17 +1,15 @@
-Import('env external library program toplevel')
+Import('env child external library toplevel')
 
 toplevel('pentago','#.')
 external('zlib',libs=['z'])
 external('lzma',libs=['lzma'])
 external('snappy',libs=['snappy'])
 
+child(env,'mpi')
+
 generated = ['gen/%s'%f for f in 'tables.h tables.cpp'.split()]
 env.Command(generated,'precompute.py','./precompute.py --prefix ${TARGET.dir}')
 
-env = env.Clone(use_mpi=1,use_zlib=1,use_lzma=1,use_snappy=1)
+env = env.Clone(use_zlib=1,use_lzma=1,use_snappy=1)
 env.Append(CPPPATH=['.'],CXXFLAGS='-Wno-invalid-offsetof')
-library(env,'pentago_core',['other_core'],extra=['gen/tables.cpp'],skip=['main.cpp'])
-
-env = env.Clone()
-env.Append(LIBS=['pentago_core','other_core'])
-program(env,'endgame-mpi','mpi/main.cpp')
+library(env,'pentago_core',['other_core'],extra=['gen/tables.cpp'],skip=['mpi'])

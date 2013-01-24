@@ -24,16 +24,4 @@ OTHER_PYTHON_MODULE(pentago_core) {
   OTHER_WRAP(aligned)
   OTHER_WRAP(section)
   OTHER_WRAP(block_cache)
-
-  // MPI
-  OTHER_WRAP(sections)
-  OTHER_WRAP(partition)
-  OTHER_WRAP(simple_partition)
-  OTHER_WRAP(random_partition)
-  OTHER_WRAP(block_store)
-  OTHER_WRAP(predict)
-  OTHER_WRAP(check)
-  OTHER_WRAP(history)
-  OTHER_WRAP(fast_compress)
-  OTHER_WRAP(load_balance)
 }

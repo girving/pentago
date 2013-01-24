@@ -31,9 +31,12 @@ struct section_t {
     : counts(counts) {}
 
   uint64_t sig() const {
-    uint64_t s;
-    memcpy(&s,&counts,8);
-    return s;
+    // This used to be a memcpy, but is now explicitly little endian for portability.
+    // Ideally this would be merged with microsig below, but unfortunately it shows up in file formats.
+    return            counts[0].x     +((uint64_t)counts[0].y<<8)
+          +((uint64_t)counts[1].x<<16)+((uint64_t)counts[1].y<<24)
+          +((uint64_t)counts[2].x<<32)+((uint64_t)counts[2].y<<40)
+          +((uint64_t)counts[3].x<<48)+((uint64_t)counts[3].y<<56);
   }
 
   uint32_t microsig() const {

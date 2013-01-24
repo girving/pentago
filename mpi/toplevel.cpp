@@ -13,6 +13,7 @@
 #include <pentago/mpi/trace.h>
 #include <pentago/all_boards.h>
 #include <pentago/block_cache.h>
+#include <pentago/mpi/store_block_cache.h>
 #include <pentago/thread.h>
 #include <pentago/compress.h>
 #include <pentago/superengine.h>
