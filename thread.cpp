@@ -23,7 +23,7 @@ namespace pentago {
 #define HISTORY 0
 
 // Whether to use blocking pthread locking or nonblocking spinlocks
-#define BLOCKING 1
+#define BLOCKING 0
 
 #if !OTHER_THREAD_SAFE
 #error "pentago requires thread_safe=1"
