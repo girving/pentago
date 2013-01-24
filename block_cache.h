@@ -11,17 +11,17 @@ struct section_t;
 struct supertensor_reader_t;
 using std::vector;
 
-struct block_cache_t : public Object {
-  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
+struct OTHER_EXPORT block_cache_t : public Object {
+  OTHER_DECLARE_TYPE(OTHER_EXPORT)
 
 protected:
-  block_cache_t();
+  OTHER_EXPORT block_cache_t();
 public:
-  ~block_cache_t();
+  OTHER_EXPORT ~block_cache_t();
 
   // Warning: Very slow, use only inside low depth searches
-  bool lookup(const bool aggressive, const board_t board, super_t& wins) const;
-  bool lookup(const bool aggressive, const side_t side0, const side_t side1, super_t& wins) const;
+  OTHER_EXPORT bool lookup(const bool aggressive, const board_t board, super_t& wins) const;
+  OTHER_EXPORT bool lookup(const bool aggressive, const side_t side0, const side_t side1, super_t& wins) const;
 
 private:
   virtual int block_size() const = 0;
@@ -31,6 +31,6 @@ private:
 };
 
 // Generate a block cache from one or more supertensor files
-Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_reader_t>> readers, const uint64_t memory_limit);
+OTHER_EXPORT Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_reader_t>> readers, const uint64_t memory_limit);
 
 }

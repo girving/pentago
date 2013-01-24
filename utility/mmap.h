@@ -9,7 +9,7 @@ namespace pentago {
 using namespace other;
 
 // Allocate a large buffer via mmap and return buffer and owner.
-Tuple<void*,PyObject*> mmap_buffer_helper(size_t size);
+OTHER_EXPORT Tuple<void*,PyObject*> mmap_buffer_helper(size_t size);
 
 // Allocate a large buffer using mmap.  The data will be zero initialized.
 template<class T> static inline Array<T> mmap_buffer(int size) {

@@ -11,12 +11,12 @@ using namespace other;
   (pentago::maybe_throw<Error>(__VA_ARGS__))
 
 // If nonzero, this function is called instead of throwing an exception.
-extern debug::ErrorCallback throw_callback;
+OTHER_EXPORT extern debug::ErrorCallback throw_callback;
 
 // Everything beyond here is internals
 
-template<class Error> void maybe_throw() __attribute__ ((noreturn));
-template<class Error> void maybe_throw(const char* msg) __attribute__ ((noreturn));
+template<class Error> OTHER_EXPORT void maybe_throw() __attribute__ ((noreturn));
+template<class Error> OTHER_EXPORT void maybe_throw(const char* msg) __attribute__ ((noreturn));
 
 template<class Error,class First,class... Rest> static inline void __attribute__ ((noreturn)) maybe_throw(const char* fmt, const First& first, const Rest&... rest) {
   maybe_throw<Error>(format(fmt,first,rest...).c_str());

@@ -74,7 +74,7 @@ struct supertensor_blob_t {
 
 const int supertensor_magic_size = 20;
 extern const char single_supertensor_magic[21];
-extern const char multiple_supertensor_magic[21];
+OTHER_EXPORT extern const char multiple_supertensor_magic[21];
 
 struct supertensor_header_t {
   static const int header_size = 85;
@@ -90,11 +90,11 @@ struct supertensor_header_t {
   uint32_t filter; // algorithm used to preprocess superscore data before zlib compression (0 for none)
   supertensor_blob_t index; // size and location of the compressed block index
 
-  supertensor_header_t();
-  supertensor_header_t(section_t section, int block_size, int filter); // Initialize everything except for valid and index
+  OTHER_EXPORT supertensor_header_t();
+  OTHER_EXPORT supertensor_header_t(section_t section, int block_size, int filter); // Initialize everything except for valid and index
 
   Vector<int,4> block_shape(Vector<uint8_t,4> block) const;
-  void pack(RawArray<uint8_t> buffer) const;
+  OTHER_EXPORT void pack(RawArray<uint8_t> buffer) const;
 };
 
 // RAII holder for a file descriptor
@@ -111,7 +111,7 @@ public:
 };
 
 struct supertensor_reader_t : public Object {
-  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
+  OTHER_DECLARE_TYPE(OTHER_EXPORT)
 
   const Ref<const fildes_t> fd;
   const supertensor_header_t header;
@@ -125,10 +125,10 @@ public:
   ~supertensor_reader_t();
 
   // Read a block of data from disk
-  Array<Vector<super_t,2>,4> read_block(Vector<uint8_t,4> block) const;
+  OTHER_EXPORT Array<Vector<super_t,2>,4> read_block(Vector<uint8_t,4> block) const;
 
   // Read a block eventually, and call a (thread safe) function once the read completes
-  void schedule_read_block(Vector<uint8_t,4> block, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;
+  OTHER_EXPORT void schedule_read_block(Vector<uint8_t,4> block, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;
 
   // Schedule several block reads together
   void schedule_read_blocks(RawArray<const Vector<uint8_t,4>> blocks, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;

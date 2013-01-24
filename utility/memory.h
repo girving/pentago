@@ -54,13 +54,13 @@ template<class T> static inline Array<T> large_buffer(int size, bool zero) {
 }
 
 // Extract memory usage information
-Array<uint64_t> memory_info();
+OTHER_EXPORT Array<uint64_t> memory_info();
 
 // Generate a process memory usage report
-string memory_report(RawArray<const uint64_t> info);
+OTHER_EXPORT string memory_report(RawArray<const uint64_t> info);
 
 // Note a large allocation or deallocation
-void report_large_alloc(ssize_t change);
+OTHER_EXPORT void report_large_alloc(ssize_t change);
 
 
 }

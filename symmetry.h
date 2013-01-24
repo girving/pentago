@@ -115,15 +115,15 @@ board_t transform_board(symmetry_t s, board_t board) OTHER_CONST;
 //             iff g'xgy in C
 // Thus, we define
 //   s(C) = gy(C) = {x in L | g'xgy in C} = {gzy'g' | z in C}
-super_t transform_super(symmetry_t s, super_t super) OTHER_CONST;
+OTHER_EXPORT super_t transform_super(symmetry_t s, super_t super) OTHER_CONST;
 
 // Given b, find s minimizing s(b), and return s(b),s
 Tuple<board_t,symmetry_t> superstandardize(board_t board) OTHER_CONST;
 Tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) OTHER_CONST;
 
 // A meaningless function invariant to global board transformations.  Extremely slow.
-bool meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
-super_t super_meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
+OTHER_EXPORT bool meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
+OTHER_EXPORT super_t super_meaningless(board_t board, uint64_t salt=0) OTHER_CONST;
 
 ostream& operator<<(ostream& output, symmetry_t s);
 ostream& operator<<(ostream& output, local_symmetry_t s);

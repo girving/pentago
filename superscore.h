@@ -290,18 +290,18 @@ struct superinfo_t {
 static inline super_t rmax(super_t f) OTHER_CONST; // Definition below
 
 // Given a single side, compute all rotations which yield five in a row
-extern super_t super_wins(side_t side) OTHER_CONST;
+OTHER_EXPORT super_t super_wins(side_t side) OTHER_CONST;
 
 // Do not use in performance critical code
-extern const Vector<int,4> single_rotations[8];
+OTHER_EXPORT extern const Vector<int,4> single_rotations[8];
 
-extern uint8_t first(super_t s);
+OTHER_EXPORT uint8_t first(super_t s);
 
-extern super_t random_super(Random& random);
+OTHER_EXPORT super_t random_super(Random& random);
 
-extern ostream& operator<<(ostream& output, super_t s);
+OTHER_EXPORT ostream& operator<<(ostream& output, super_t s);
 
-extern int popcount(super_t s);
+OTHER_EXPORT int popcount(super_t s);
 
 #if PENTAGO_SSE // SSE version of rmax
 

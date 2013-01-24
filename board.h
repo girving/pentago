@@ -77,25 +77,25 @@ static inline int count_stones(board_t board) {
 }
 
 // Check whose turn it is (assuming black moved first)
-extern bool black_to_move(board_t board);
+OTHER_EXPORT bool black_to_move(board_t board);
 
 // Throw ValueError if a board is invalid
-extern void check_board(board_t board);
+OTHER_EXPORT void check_board(board_t board);
 
-extern board_t standardize(board_t board);
+OTHER_EXPORT board_t standardize(board_t board);
 
 // Random board and side generation
-extern side_t random_side(Random& random);
-extern board_t random_board(Random& random);
+OTHER_EXPORT side_t random_side(Random& random);
+OTHER_EXPORT board_t random_board(Random& random);
 
 // Generate a random board with n stones
-extern board_t random_board(Random& random, int n);
+OTHER_EXPORT board_t random_board(Random& random, int n);
 
 // Maybe swap sides
 static inline board_t flip_board(board_t board, bool turn) {
   return pack(unpack(board,turn),unpack(board,1-turn));
 }
 
-extern string str_board(board_t board);
+OTHER_EXPORT string str_board(board_t board);
 
 }

@@ -9,7 +9,7 @@ namespace pentago {
 using namespace other;
 
 // Allocate an aligned buffer with the given properties, and return buffer and owner.
-Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size);
+OTHER_EXPORT Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size);
 
 // Allocate an aligned, uninitialized array of the given type and size
 template<class T> Array<T> aligned_buffer(int size) {

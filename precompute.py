@@ -555,13 +555,13 @@ def save(filename,tables):
     file = open('%s/%s.%s'%(prefix(),filename,('h' if header else 'cpp')),'w')
     print>>file, note
     if header:
-      print>>file, '#pragma once\n\n#include <stdint.h>'
+      print>>file, '#pragma once\n\n#include <other/core/utility/config.h>\n#include <stdint.h>'
     else:
       print>>file, '#include "%s.h"'%filename
     print>>file, 'namespace pentago {\n'
     for type,name,format,data in tables:
       if header:
-        print>>file, 'extern const %s %s%s;'%(type,name,cpp_sizes(data))
+        print>>file, 'OTHER_EXPORT extern const %s %s%s;'%(type,name,cpp_sizes(data))
       else:
         print>>file, 'const %s %s%s = %s;'%(type,name,cpp_sizes(data),cpp_init(format,data))
     print>>file, '\n}'

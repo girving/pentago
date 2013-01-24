@@ -64,7 +64,7 @@ enum time_kind_t {
 };
 
 // Convert time_kind_t to string
-vector<const char*> time_kind_names();
+OTHER_EXPORT vector<const char*> time_kind_names();
 
 // The top 3 bits are for the event kind
 typedef uint64_t event_t;
@@ -78,37 +78,37 @@ const event_t ekind_mask        = event_t(7)<<61;
 class thread_time_t : public boost::noncopyable {
   time_entry_t* entry;
 public:
-  thread_time_t(time_kind_t kind, event_t event);
-  ~thread_time_t();
-  void stop(); // Stop early
+  OTHER_EXPORT thread_time_t(time_kind_t kind, event_t event);
+  OTHER_EXPORT ~thread_time_t();
+  OTHER_EXPORT void stop(); // Stop early
 };
 
 // Extract local times and reset them to zero
-Array<wall_time_t> clear_thread_times();
+OTHER_EXPORT Array<wall_time_t> clear_thread_times();
 
 // Extract total thread times
-Array<wall_time_t> total_thread_times();
+OTHER_EXPORT Array<wall_time_t> total_thread_times();
 
 // Print a timing report
-void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
+OTHER_EXPORT void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
 
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
-thread_type_t thread_type();
+OTHER_EXPORT thread_type_t thread_type();
 
 // Initialize thread pools
-void init_threads(int cpu_threads, int io_threads);
+OTHER_EXPORT void init_threads(int cpu_threads, int io_threads);
 
 // Grab thread counts: cpu count, io count
-Vector<int,2> thread_counts();
+OTHER_EXPORT Vector<int,2> thread_counts();
 
 // Schedule a job.  Schedule at the back of the queue if !soon, or the front if soon.
-void threads_schedule(thread_type_t type, job_t&& f, bool soon=false);
+OTHER_EXPORT void threads_schedule(thread_type_t type, job_t&& f, bool soon=false);
 
 // Wait for all jobs to complete
-void threads_wait_all();
+OTHER_EXPORT void threads_wait_all();
 
 // Join the CPU thread pool until all jobs complete
-void threads_wait_all_help();
+OTHER_EXPORT void threads_wait_all_help();
 
 // A historical event
 struct history_t {
@@ -123,8 +123,8 @@ struct history_t {
 };
 
 // Operations on tracked history.  If history is untracked, these are trivial.
-bool thread_history_enabled();
-vector<vector<Array<const history_t>>> thread_history();
-void write_thread_history(const string& filename);
+OTHER_EXPORT bool thread_history_enabled();
+OTHER_EXPORT vector<vector<Array<const history_t>>> thread_history();
+OTHER_EXPORT void write_thread_history(const string& filename);
 
 }

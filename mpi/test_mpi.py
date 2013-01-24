@@ -2,6 +2,7 @@
 
 from __future__ import division
 from pentago import *
+from pentago_mpi import *
 from other.core import *
 from other.core.utility import Log
 import subprocess
