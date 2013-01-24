@@ -1,6 +1,7 @@
 // Add commas to large integers
 #pragma once
 
+#include <stdint.h>
 #include <string>
 namespace pentago {
 

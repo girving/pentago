@@ -160,8 +160,13 @@ struct super_t {
     a = b = c = d = 0;
   }
 
-  super_t(uint64_t a, uint64_t b, uint64_t c, uint64_t d) // Use little endian argument order unconditionally
+  // Use little endian argument order unconditionally
+  super_t(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
+#if defined(BOOST_LITTLE_ENDIAN)
     : a(a), b(b), c(c), d(d) {}
+#elif defined(BOOST_BIG_ENDIAN)
+    : d(d), c(c), b(b), a(a) {}
+#endif
 
   static super_t identity() {
     return super_t(1,0,0,0);

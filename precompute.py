@@ -42,7 +42,7 @@ def bits(x):
 def check(*args):
   '''Usage: check(arrays,expected)'''
   expected = args[-1]
-  data = ''.join(asarray(a).tostring() for a in args[:-1])
+  data = ''.join(a.astype(a.dtype.newbyteorder('<')).tostring() for a in args[:-1])
   hash = hashlib.sha1(data).hexdigest()
   assert expected==hash, "hash mismatch: expected '%s', got '%s'"%(expected,hash)
 
@@ -333,10 +333,12 @@ def superwin_info():
   for i in xrange(3):
     all_rotations[:,i+1] = rotations()[all_rotations[:,i],0]
   ways = win_patterns().view(int16).reshape(32,4)
+  if sys.byteorder=='big': # Fix order if necessary
+    ways = ways[:,::-1]
   types = dict(map(reversed,enumerate('h v dl dh da'.split()))) # horizontal, vertical, diagonal lo/hi/assist
   patterns = 'v v - - | h - h - | - h - h | - - v v | dl - da dl | dh da - dh | da dl dl - | - dh dh da'
   patterns = [p.split() for p in patterns.split('|')]
-  info = zeros((4,512,5,4,4,4,4),bool)
+  info = zeros((4,512,5,4,4,4,4),bool) # Indexed by quadrants, quadrant state, superwin_info field, r0, r1, r2, r3
   for pattern in patterns:
     debug = False # pattern=='- dh dh da'.split()
     if debug: b = [0,136,50,64]
@@ -365,9 +367,17 @@ def superwin_info():
           print '  changed = %d'%len(changed)
           for c in changed:
             print '  %s'%(c,)
-  # Pack into 64-bit chunks
-  info = packbits(info.astype(int8).swapaxes(-4,-1).swapaxes(-3,-2).reshape(-1,8)[:,::-1]).view(uint64).reshape(4,512,5,4)
+  # Switch to r3, r2, r1, r0 major order to match super_t
+  info = info.astype(int8).swapaxes(-4,-1).swapaxes(-3,-2)
+  # packbits uses big endian bit order (on all platforms), so flip around to little endian before packing
+  info = packbits(info.reshape(-1,8)[:,::-1])
+  # Check hash before converting to final endianness
   check(info,'668eb0a940489f434f804d994698a4fc85f5b576')
+  # Account for big endianness if necessary.  Note that the byte order for the entire 256 bit super_t is reversed
+  if sys.byteorder=='big':
+    info = info.reshape(-1,256//8)[:,::-1]
+  # Interpret as 64 bit chunks
+  info = ascontiguousarray(info).view(uint64)
   return [('uint64_t','superwin_info','0x%xL',info)]
 
 @remember
