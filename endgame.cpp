@@ -224,7 +224,7 @@ static void endgame_read_block_slice(section_t desired_section, const supertenso
   Array<Vector<uint8_t,4>> slice;
   for (const int k : range(helper.slice_blocks[0]))
     for (const int l : range(helper.slice_blocks[1]))
-      slice.append(in_order(helper.reorder,vec<uint8_t>(i,j,k,l)));
+      slice.append(in_order(helper.reorder,Vector<uint8_t,4>(i,j,k,l)));
   reader.schedule_read_blocks(slice,curry(&read_helper_t::process_block,&helper));
   threads_wait_all();
 }
@@ -403,7 +403,7 @@ static void endgame_write_block_slice(supertensor_writer_t& writer, Ptr<superten
     Array<Vector<uint8_t,4>> slice;
     for (const int k : range(helper.slice_blocks[0]))
       for (const int l : range(helper.slice_blocks[1]))
-        slice.append(in_order(order,vec<uint8_t>(i,j,k,l)));
+        slice.append(in_order(order,Vector<uint8_t,4>(i,j,k,l)));
     first_pass->schedule_read_blocks(slice,curry(&write_helper_t::process_block,&helper));
   }
   threads_wait_all();

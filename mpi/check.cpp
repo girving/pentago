@@ -162,7 +162,7 @@ static void compare_blocks_with_supertensors(const block_store_t& blocks, const 
       for (int i1 : range(shape[1]))
         for (int i2 : range(shape[2]))
           for (int i3 : range(shape[3]))
-            blocks.assert_contains(section,vec<uint8_t>(i0,i1,i2,i3));
+            blocks.assert_contains(section,Vector<uint8_t,4>(i0,i1,i2,i3));
   }
   OTHER_ASSERT(blocks.total_blocks()==count);
 
@@ -282,7 +282,7 @@ static Tuple<Vector<uint64_t,3>,int> compare_readers_and_samples(const supertens
       for (int i2 : range(blocks[2]))
         for (int i3 : range(blocks[3])) {
           auto sub = new subcompare_t;
-          const auto block = sub->block = vec<uint8_t>(i0,i1,i2,i3);
+          const auto block = sub->block = Vector<uint8_t,4>(i0,i1,i2,i3);
           const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)> process = curry(process_data,&self,sub,block_samples.at(index(blocks,Vector<int,4>(block))).raw());
           reader.schedule_read_block(block,process);
           if (old_reader)
