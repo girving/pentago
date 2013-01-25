@@ -79,7 +79,7 @@ OTHER_EXPORT extern const char multiple_supertensor_magic[21];
 struct supertensor_header_t {
   static const int header_size = 85;
 
-  char magic[20]; // = "pentago supertensor\n"
+  Vector<char,20> magic; // = "pentago supertensor\n"
   uint32_t version; // see version history above
   bool valid; // was the file finished?
   uint32_t stones; // total number of stones
@@ -95,6 +95,7 @@ struct supertensor_header_t {
 
   Vector<int,4> block_shape(Vector<uint8_t,4> block) const;
   OTHER_EXPORT void pack(RawArray<uint8_t> buffer) const;
+  OTHER_EXPORT static supertensor_header_t unpack(RawArray<const uint8_t> buffer);
 };
 
 // RAII holder for a file descriptor
@@ -148,16 +149,16 @@ struct supertensor_writer_t : public Object {
   const Ref<fildes_t> fd;
   supertensor_header_t header; // incomplete until finalize is called
   const int level; // zlib compression level
+private:
   const Array<supertensor_blob_t,4> index;
   uint64_t next_offset;
   mutable spinlock_t offset_lock;
 
-protected:
   supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level);
 public:
   ~supertensor_writer_t();
 
-  // Write a block of data to disk now
+  // Write a block of data to disk now, destroying it in the process.
   void write_block(Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data);
 
   // Write a block of data eventually, destroying it in the process.

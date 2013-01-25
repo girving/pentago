@@ -7,6 +7,7 @@
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/debug.h>
+#include <pentago/utility/endian.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/python/Class.h>
 #include <other/core/python/to_python.h>
@@ -17,8 +18,8 @@
 #include <other/core/utility/curry.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/str.h>
-#include <fcntl.h>
 #include <unistd.h>
+#include <fcntl.h>
 namespace pentago {
 
 using std::cout;
@@ -51,6 +52,15 @@ Vector<int,4> supertensor_header_t::block_shape(Vector<uint8_t,4> block) const {
     bs[i] = block[i]+1<blocks[i]?block_size:shape[i]-block_size*(blocks[i]-1);
   return bs;
 }
+
+#ifdef BOOST_BIG_ENDIAN
+static inline supertensor_blob_t to_little_endian(supertensor_blob_t blob) {
+  blob.uncompressed_size = to_little_endian(blob.uncompressed_size);
+  blob.compressed_size = to_little_endian(blob.compressed_size);
+  blob.offset = to_little_endian(blob.offset);
+  return blob;
+}
+#endif
 
 void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Array<uint8_t>)>& cont) {
   // Check consistency
@@ -122,51 +132,45 @@ static const string& check_extension(const string& path) {
   return path;
 }
 
-namespace {
-struct field_t {
-  int header_offset, file_offset, size;
-
-  field_t(int header_offset, int file_offset, int size)
-    : header_offset(header_offset), file_offset(file_offset), size(size) {}
-};
-}
-
-// List of offset,size pairs
-static Array<const field_t> header_fields() {
-  Array<field_t> fields;
-  supertensor_header_t h;
-  int offset = 0;
-  #define FIELD(f) \
-    fields.append(field_t((char*)&h.f-(char*)&h,offset,sizeof(h.f))); \
-    offset += sizeof(h.f);
-  FIELD(magic);
-  FIELD(version);
-  FIELD(valid);
-  FIELD(stones);
-  FIELD(section);
-  FIELD(shape);
-  FIELD(block_size);
-  FIELD(blocks);
-  FIELD(filter);
-  FIELD(index);
-  #undef FIELD
-  return fields;
-}
+#define HEADER_FIELDS() \
+  FIELD(magic) \
+  FIELD(version) \
+  FIELD(valid) \
+  FIELD(stones) \
+  FIELD(section) \
+  FIELD(shape) \
+  FIELD(block_size) \
+  FIELD(blocks) \
+  FIELD(filter) \
+  FIELD(index)
 
 void supertensor_header_t::pack(RawArray<uint8_t> buffer) const {
   OTHER_ASSERT(buffer.size()==header_size);
-  static const Array<const field_t> fields = header_fields();
   int next = 0;
-  for (auto f : fields) {
-    memcpy(buffer.data()+next,(char*)this+f.header_offset,f.size);
-    next += f.size;
-  }
+  #define FIELD(f) ({ \
+    OTHER_ASSERT(next+sizeof(f)<=header_size); \
+    const auto le = to_little_endian(f); \
+    memcpy(buffer.data()+next,&le,sizeof(le)); \
+    next += sizeof(le); });
+  HEADER_FIELDS()
+  #undef FIELD
+  OTHER_ASSERT(next==header_size);
 }
 
-static int total_field_size(RawArray<const field_t> fields) {
-  const int size = fields.project<int,&field_t::size>().sum();
-  OTHER_ASSERT(supertensor_header_t::header_size==size);
-  return size;
+supertensor_header_t supertensor_header_t::unpack(RawArray<const uint8_t> buffer) {
+  OTHER_ASSERT(buffer.size()==header_size);
+  supertensor_header_t h;
+  int next = 0;
+  #define FIELD(f) ({ \
+    OTHER_ASSERT(next+sizeof(h.f)<=header_size); \
+    decltype(h.f) le; \
+    memcpy(&le,buffer.data()+next,sizeof(le)); \
+    h.f = to_little_endian(le); \
+    next += sizeof(le); });
+  HEADER_FIELDS()
+  #undef FIELD
+  OTHER_ASSERT(next==header_size);
+  return h;
 }
 
 static void save_index(Vector<int,4> blocks, Array<const supertensor_blob_t,4>* dst, Array<const uint8_t> src) {
@@ -189,21 +193,18 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
     THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
 
   // Read header
-  const auto fields = header_fields();
-  const int header_size = total_field_size(fields);
-  char buffer[header_size];
+  const int header_size = supertensor_header_t::header_size;
+  uint8_t buffer[header_size];
   ssize_t r = pread(fd->fd,buffer,header_size,header_offset);
   if (r < 0)
     THROW(IOError,"invalid supertensor file \"%s\": error reading header, %s",path,strerror(errno));
   if (r < header_size)
     THROW(IOError,"invalid supertensor file \"%s\": unexpected end of file during header",path);
-  supertensor_header_t h;
-  for (auto f : fields)
-    memcpy((char*)&h+f.header_offset,buffer+f.file_offset,f.size);
+  const auto h = supertensor_header_t::unpack(RawArray<const uint8_t>(header_size,buffer));
   const_cast_(header) = h;
 
   // Verify header
-  if (memcmp(h.magic,single_supertensor_magic,20))
+  if (memcmp(&h.magic,single_supertensor_magic,20))
     THROW(IOError,"invalid supertensor file \"%s\": incorrect magic string",path);
   if (h.version!=2 && h.version!=3)
     THROW(IOError,"supertensor file \"%s\" has unknown version %d",path,h.version);
@@ -224,6 +225,7 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
   threads_schedule(IO,curry(read_and_uncompress,fd->fd,h.index,function<void(Array<uint8_t>)>(curry(save_index,Vector<int,4>(h.blocks),&index))));
   threads_wait_all();
   OTHER_ASSERT((index.shape==Vector<int,4>(h.blocks)));
+  to_little_endian_inplace(index.flat.const_cast_());
   const_cast_(this->index) = index;
 }
 
@@ -245,6 +247,7 @@ static Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape
   OTHER_ASSERT(thread_type()==CPU);
   OTHER_ASSERT(raw_data.size()==(int)sizeof(Vector<super_t,2>)*block_shape.product());
   Array<Vector<super_t,2>,4> data(block_shape,(Vector<super_t,2>*)raw_data.data(),raw_data.borrow_owner());
+  to_little_endian_inplace(data.flat);
   switch (filter) {
     case 0: break;
     case 1: uninterleave(data.flat); break;
@@ -274,8 +277,7 @@ uint64_t supertensor_reader_t::total_size() const {
 
 // Write header at offset 0, and return the header size
 static uint64_t write_header(int fd, const supertensor_header_t& h) {
-  const auto fields = header_fields();
-  const int header_size = total_field_size(fields);
+  const int header_size = supertensor_header_t::header_size;
   uint8_t buffer[header_size];
   h.pack(RawArray<uint8_t>(header_size,buffer));
   ssize_t w = pwrite(fd,buffer,header_size,0);
@@ -295,7 +297,7 @@ supertensor_header_t::supertensor_header_t(section_t section, int block_size, in
   , block_size(block_size)
   , blocks((shape+block_size-1)/block_size)
   , filter(filter) {
-  memcpy(magic,single_supertensor_magic,20);
+  memcpy(&magic,single_supertensor_magic,20);
   index.uncompressed_size = index.compressed_size = index.offset = 0;
   // valid and index must be filled in later
 }
@@ -333,6 +335,7 @@ static Array<uint8_t> filter(int filter, Array<Vector<super_t,2>,4> data) {
     case 1: interleave(data.flat); break;
     default: THROW(ValueError,"supertensor_writer_t::write_block: unknown filter %d",filter);
   }
+  to_little_endian_inplace(data.flat);
   return char_view_own(data.flat);
 }
 
@@ -360,6 +363,7 @@ void supertensor_writer_t::finalize() {
 
   // Write index
   supertensor_header_t h = header;
+  to_little_endian_inplace(index.flat);
   threads_schedule(CPU,curry(&Self::compress_and_write,this,&h.index,char_view_own(index.flat)));
   threads_wait_all();
 

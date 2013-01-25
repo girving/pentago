@@ -153,6 +153,17 @@ super_t random_super(Random& random) {
   return super_t(r0,r1,r2,r3);
 }
 
+static NdArray<super_t> random_supers(const uint128_t key, Array<const int> shape) {
+  NdArray<super_t> supers(shape,false);
+  for (const int i : range(supers.flat.size())) {
+    const auto ab = threefry(key,2*i),
+               cd = threefry(key,2*i+1);
+    supers.flat[i] = super_t(uint64_t(ab),uint64_t(ab>>64),
+                             uint64_t(cd),uint64_t(cd>>64));
+  }
+  return supers;
+}
+
 static void super_rmax_test(int steps) {
   Ref<Random> random = new_<Random>(1740291);
   for (int step=0;step<steps;step++) {
@@ -243,4 +254,5 @@ void wrap_superscore() {
   OTHER_FUNCTION(super_bool_test)
   OTHER_FUNCTION(super_popcount)
   OTHER_FUNCTION(super_popcounts)
+  OTHER_FUNCTION(random_supers)
 }
