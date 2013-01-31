@@ -7,20 +7,25 @@ from pentago.section import *
 from other.core import *
 from other.core.utility import Log
 from other.core.value import parser
+import glob
 
 # Parse properties
 props = PropManager()
 old_dir = props.add('old','../old-data-15july2012')
 dir = props.add('dir','data').set_required(1)
-meaningless = props.add('meaningless',0)
 parser.parse(props,'Compare MPI results with out-of-core results',positional=[dir])
 old_dir = old_dir()
 dir = os.path.normpath(dir())
-meaningless = meaningless()
 
 # Configure logging and threads
 Log.configure('check mpi',False,False,100)
 init_threads(-1,-1)
+
+# Check whether the data is meaningless
+meaningless = 0
+for f in glob.glob(dir+'/meaningless-*'):
+  assert not meaningless
+  meaningless = int(f.split('-')[-1])
 
 # Generate meaningless data
 if meaningless:
@@ -31,7 +36,7 @@ if meaningless:
   set_block_cache(cache)
 
 # Process each slice that exists, keeping track of which files we've checked
-skip_pattern = re.compile('^(?:log(?:-\d+)?|empty.pentago|history.*|output-.*)$')
+skip_pattern = re.compile('^(?:log(?:-\d+)?|empty.pentago|history.*|output-.*|meaningless-\d)$')
 unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if not skip_pattern.match(f))
 random = Random(8183131)
 init_supertable(16)

@@ -109,6 +109,17 @@ static Ref<partition_t> make_random_partition(const uint128_t key, const int ran
   return new_<random_partition_t>(key,ranks,sections);
 }
 
+// Record whether we're meaningless
+static void write_meaningless(const MPI_Comm comm, const string& dir, const int meaningless) {
+  if (meaningless && !comm_rank(comm)) {
+    // touch meaningless-<n>
+    const auto name = format("%s/meaningless-%d",dir,meaningless);
+    FILE* file = fopen(name.c_str(),"wb");
+    if (!file)
+      die("failed to touch '%s': %s",name,strerror(errno));
+  }
+}
+
 int toplevel(int argc, char** argv) {
   // Initialize MPI
   mpi_world_t world(argc,argv);
@@ -315,6 +326,7 @@ int toplevel(int argc, char** argv) {
     if (test=="write-3" || test=="write-4") {
       check_directory(comm,dir);
       const int slice = test[6]-'0';
+      write_meaningless(comm,dir,slice);
       const auto sections = new_<sections_t>(slice,all_boards_sections(slice,8));
       const auto partition = partition_factory(ranks,sections);
       const auto blocks = meaningless_block_store(partition,rank,samples);
@@ -354,6 +366,7 @@ int toplevel(int argc, char** argv) {
 #endif
          << "\nhistory = "<<thread_history_enabled()
          << "\nwildcard recvs = "<<wildcard_recv_count
+         << "\nmeaningless = "<<meaningless
          << "\nrandomize = "<<randomize
          << "\ntag ub = "<<tag_ub<<" ("<<required_tag_ub<<" required)"
          << endl;
@@ -367,6 +380,9 @@ int toplevel(int argc, char** argv) {
   // For paranoia's sake, generate dummy file to make sure the directory works.
   // It would be very sad to have the computation run for an hour and then choke.
   check_directory(comm,dir);
+
+  // Record whether we're meaningless
+  write_meaningless(comm,dir,meaningless);
 
   // Compute one list of sections per slice
   const vector<Ref<const sections_t>> slices = descendent_sections(section,meaningless?:35);
