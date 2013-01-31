@@ -85,7 +85,6 @@ for slice in arange(36)[::-1]:
       else:
         Log.write('WARNING: No slice file found, skipping consistency check for slice %d'%slice)
 
-
 # Yell if any files remain
 if unchecked:
   print 'strange files: %s'%' '.join(sorted(unchecked))

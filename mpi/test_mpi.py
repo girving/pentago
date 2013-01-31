@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 from __future__ import division
-from pentago import *
 from other.core import *
 from other.core.utility import Log
 import subprocess
 import tempfile
 import shutil
+import sys
 
 nop = False
 
@@ -22,6 +22,8 @@ def check(dir):
 
 @cache
 def mpirun():
+  if nop:
+    return 'mpirun'
   cmds = 'mpirun','aprun'
   devnull = open(os.devnull,'w')
   for cmd in 'mpirun','aprun':
