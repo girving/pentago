@@ -9,7 +9,7 @@ using namespace other;
 
 // Should we print?  Defaults to true.
 bool verbose();
-void set_verbose(bool verbose);
+OTHER_EXPORT void set_verbose(bool verbose);
 
 #define THROW(Error,...) \
   (pentago::maybe_throw<Error>(__VA_ARGS__))
@@ -21,7 +21,7 @@ OTHER_EXPORT extern debug::ErrorCallback throw_callback;
 OTHER_EXPORT extern debug::ErrorCallback die_callback;
   
 // Print a message and abort without formatting
-void OTHER_NORETURN(die_helper(const string& msg)) OTHER_COLD;
+OTHER_EXPORT void OTHER_NORETURN(die_helper(const string& msg)) OTHER_COLD;
 
 // Print a message and abort
 template<class... Args> static inline void OTHER_NORETURN(die(const char* msg, const Args&... args));

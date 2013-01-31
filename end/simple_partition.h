@@ -15,7 +15,7 @@ using std::vector;
 
 // Given a set of sections, distribute all lines amongst a number of processors
 struct simple_partition_t : public partition_t {
-  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
+  OTHER_DECLARE_TYPE(OTHER_EXPORT)
   typedef partition_t Base;
 
   const Array<const chunk_t> owner_lines, other_lines;
@@ -27,7 +27,7 @@ struct simple_partition_t : public partition_t {
   const uint64_t max_rank_nodes; // Maximum number of nodes owned by a rank
 
 protected:
-  simple_partition_t(const int ranks, const sections_t& sections, bool save_work=false);
+  OTHER_EXPORT simple_partition_t(const int ranks, const sections_t& sections, bool save_work=false);
 public:
   ~simple_partition_t();
 

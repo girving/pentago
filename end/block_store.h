@@ -51,7 +51,7 @@ BOOST_STATIC_ASSERT(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS);
 
 class block_store_t : public Object {
 public:
-  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
+  OTHER_DECLARE_TYPE(OTHER_EXPORT)
 
   const Ref<const sections_t> sections;
   const Ref<const partition_t> partition;
@@ -79,7 +79,7 @@ public:
   const NestedArray<sample_t> samples;
 
 private:
-  block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section);
+  OTHER_EXPORT block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section);
 public:
   ~block_store_t();
 
@@ -92,21 +92,21 @@ public:
   uint64_t current_memory_usage() const;
 
   // Estimate peak memory usage.  In compressed mode, this is based on a hard coded guess as to how well snappy compresses.
-  uint64_t estimate_peak_memory_usage() const;
+  OTHER_EXPORT uint64_t estimate_peak_memory_usage() const;
 
   // Print statistics about block compression.
-  void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
+  OTHER_EXPORT void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
 
   // Verify that we own the given block
   void assert_contains(section_t section, Vector<uint8_t,4> block) const;
 
   // Generate events for the given local block
-  event_t local_block_event(local_id_t local_id) const;
-  event_t local_block_line_event(local_id_t local_id, uint8_t dimension) const;
-  event_t local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const;
+  OTHER_EXPORT event_t local_block_event(local_id_t local_id) const;
+  OTHER_EXPORT event_t local_block_line_event(local_id_t local_id, uint8_t dimension) const;
+  OTHER_EXPORT event_t local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const;
 
   // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
-  void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
+  OTHER_EXPORT void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
 
   // Access the data for a completed block, either by (section,block) or local block id.
   // In uncompressed mode, these are O(1) and return views into all_data.  In compressed mode they must uncompress
@@ -116,8 +116,8 @@ public:
   // All uncompressed_and_get versions return views into a temporary, thread local buffer (the one used by local_fast_uncompress).
   RawArray<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
   RawArray<Vector<super_t,2>,4> uncompress_and_get(local_id_t local_id, event_t event) const;
-  RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
-  RawArray<const uint8_t> get_compressed(local_id_t local_id, bool allow_incomplete=false) const;
+  OTHER_EXPORT RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
+  OTHER_EXPORT RawArray<const uint8_t> get_compressed(local_id_t local_id, bool allow_incomplete=false) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>,4> get_raw(local_id_t local_id) const;

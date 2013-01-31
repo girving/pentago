@@ -24,7 +24,7 @@ RawArray<uint8_t> local_fast_compress(RawArray<Vector<super_t,2>> uncompressed, 
 
 // Uncompress into a thread local buffer (the same buffer used by fast_uncompress).
 // The returned view is valid until the next call to either local_fast_compress or local_fast_uncompress.
-RawArray<Vector<super_t,2>> local_fast_uncompress(RawArray<const uint8_t> compressed, const event_t event);
+OTHER_EXPORT RawArray<Vector<super_t,2>> local_fast_uncompress(RawArray<const uint8_t> compressed, const event_t event);
 
 }
 }

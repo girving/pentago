@@ -33,7 +33,7 @@ struct line_data_t {
   const Vector<int,4> output_shape;
   const uint64_t memory_usage;
 
-  line_data_t(const line_t& line);
+  OTHER_EXPORT line_data_t(const line_t& line);
   ~line_data_t();
 };
 
@@ -78,41 +78,41 @@ struct line_details_t : public boost::noncopyable {
   const wakeup_t wakeup;
   const line_details_t* const self; // Buffer for wakeup message
 
-  line_details_t(const line_data_t& pre, const wakeup_t& wakeup);
-  ~line_details_t();
+  OTHER_EXPORT line_details_t(const line_data_t& pre, const wakeup_t& wakeup);
+  OTHER_EXPORT ~line_details_t();
 
   // Get the kth input block
-  Vector<uint8_t,4> input_block(int k) const;
+  OTHER_EXPORT Vector<uint8_t,4> input_block(int k) const;
 
   // Extract the data for the kth block of either the input or output array.
   // In compressed mode, input block data has an extra entry to account for possible expansion.
-  RawArray<Vector<super_t,2>> input_block_data(int k) const;
-  RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
+  OTHER_EXPORT RawArray<Vector<super_t,2>> input_block_data(int k) const;
+  OTHER_EXPORT RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
 #if PENTAGO_MPI_COMPRESS_OUTPUTS
   RawArray<const uint8_t> compressed_output_block_data(int k) const;
 private:
   friend void compress_output_block(line_details_t* const line, const int b);
-  RawArray<Vector<super_t,2>> output_block_data(int k) const;
+  OTHER_EXPORT RawArray<Vector<super_t,2>> output_block_data(int k) const;
 public:
 #else
-  RawArray<Vector<super_t,2>> output_block_data(int k) const;
+  OTHER_EXPORT RawArray<Vector<super_t,2>> output_block_data(int k) const;
 #endif
 
   // Call this whenever a new input response arrives, but possibly *before* the data has been moved into place.
   // Returns the number of messages remaining.  Used by flow.cpp to throttle the number of simultaneous line gathers.
   // Warning: *Not* thread safe, so call only from flow.cpp.
-  int decrement_input_responses();
+  OTHER_EXPORT int decrement_input_responses();
 
   // Call this whenever a new block is in place.  Used as a request callback for when MPI_Irecv's finish.
   // When the count hits zero, the line will be automatically schedule.
-  void decrement_missing_input_blocks();
+  OTHER_EXPORT void decrement_missing_input_blocks();
 
   // Decrement the number of unsent output blocks, and return the number remaining.
-  int decrement_unsent_output_blocks();
+  OTHER_EXPORT int decrement_unsent_output_blocks();
 };
 
 // Schedule a line computation (called once all input blocks are in place)
-void schedule_compute_line(line_details_t& line);
+OTHER_EXPORT void schedule_compute_line(line_details_t& line);
 
 }
 }

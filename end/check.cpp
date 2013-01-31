@@ -1,5 +1,6 @@
 // Helper functions for testing purposes
 
+#include <pentago/end/check.h>
 #include <pentago/end/block_store.h>
 #include <pentago/end/blocks.h>
 #include <pentago/base/count.h>

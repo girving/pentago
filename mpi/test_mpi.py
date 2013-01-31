@@ -81,7 +81,7 @@ def meaningless_test(key,dir=None):
     dir = '%s/meaningless-s%d-r%d'%(dir,slice,key)
     run('%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d --randomize %d 00000000 --dir %s'%(mpirun(),slice,key,dir))
     # Check validity
-    run('%s/check --meaningless %d %s'%(os.path.dirname(__file__),slice,dir))
+    run('%s/../end/check --meaningless %d %s'%(os.path.dirname(__file__),slice,dir))
 
 def test_meaningless_simple(dir=None):
   meaningless_test(0,dir)

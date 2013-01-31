@@ -12,7 +12,7 @@ struct sheaf_t;
 
 // Given a set of sections, distribute all lines and blocks amongst a number of processors
 struct random_partition_t : public partition_t {
-  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
+  OTHER_DECLARE_TYPE(OTHER_EXPORT)
   typedef partition_t Base;
 
   const uint128_t key; // Key for random number generation
@@ -21,7 +21,7 @@ struct random_partition_t : public partition_t {
   const Hashtable<Tuple<section_t,uint8_t>,int> sheaf_id; // Map from section,dimension to sheaf index
 
 protected:
-  random_partition_t(const uint128_t key, const int ranks, const sections_t& sections);
+  OTHER_EXPORT random_partition_t(const uint128_t key, const int ranks, const sections_t& sections);
 public:
   ~random_partition_t();
 

@@ -9,7 +9,7 @@ namespace end {
 
 // Given a set of sections, distribute all lines amongst a number of processors
 struct partition_t : public Object {
-  OTHER_DECLARE_TYPE(OTHER_NO_EXPORT)
+  OTHER_DECLARE_TYPE(OTHER_EXPORT)
 
   const int ranks;
   const Ref<const sections_t> sections;
@@ -43,7 +43,7 @@ public:
 };
 
 // Create an empty partition, typically for sentinel use
-Ref<const partition_t> empty_partition(const int ranks, const int slice);
+OTHER_EXPORT Ref<const partition_t> empty_partition(const int ranks, const int slice);
 
 // Test self consistency of a partition
 void partition_test(const partition_t& partition);

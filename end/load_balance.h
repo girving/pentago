@@ -26,10 +26,10 @@ public:
 };
 
 // Print load balancing statistics
-string str(const load_balance_t& load);
+OTHER_EXPORT string str(const load_balance_t& load);
 
 // Compute load balance information given rank_lines and rank_blocks.  The result is valid only on the root.
-Ref<const load_balance_t> load_balance(const reduction_t<int64_t,max_op>& reduce_max, RawArray<const line_t> lines, RawArray<const local_block_t> blocks);
+OTHER_EXPORT Ref<const load_balance_t> load_balance(const reduction_t<int64_t,max_op>& reduce_max, RawArray<const line_t> lines, RawArray<const local_block_t> blocks);
 
 // Compute local balance information in a single process environment
 Ref<const load_balance_t> serial_load_balance(const partition_t& partition);

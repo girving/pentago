@@ -4,7 +4,7 @@
 namespace pentago {
 namespace end {
 
-Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank, const int samples_per_section);
+OTHER_EXPORT Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank, const int samples_per_section);
 
 }
 }
