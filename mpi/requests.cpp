@@ -2,6 +2,7 @@
 
 #include <pentago/mpi/requests.h>
 #include <pentago/mpi/utility.h>
+#include <pentago/utility/debug.h>
 #include <pentago/utility/sort.h>
 namespace pentago {
 namespace mpi {

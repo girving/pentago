@@ -1,10 +1,13 @@
 // Parallel I/O for slice files
 #pragma once
 
-#include <pentago/mpi/block_store.h>
-#include <pentago/mpi/config.h>
+#include <pentago/end/block_store.h>
+#include <pentago/end/config.h>
+#include <mpi.h>
 namespace pentago {
 namespace mpi {
+
+using namespace pentago::end;
 
 // Write all data to a single slice file.  Collective.
 void write_sections(const MPI_Comm comm, const string& filename, const block_store_t& blocks, const int level);

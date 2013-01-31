@@ -54,6 +54,13 @@ static inline section_t to_little_endian(const section_t s) {
   return s;
 }
 
+static inline supertensor_blob_t to_little_endian(supertensor_blob_t blob) {
+  blob.uncompressed_size = to_little_endian(blob.uncompressed_size);
+  blob.compressed_size = to_little_endian(blob.compressed_size);
+  blob.offset = to_little_endian(blob.offset);
+  return blob;
+}
+
 template<class T,int d> static inline Vector<T,d> to_little_endian(const Vector<T,d>& x) {
   Vector<T,d> le;
   for (int i=0;i<d;i++)

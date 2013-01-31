@@ -2,11 +2,14 @@
 
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
-#include <pentago/filter.h>
-#include <pentago/compress.h>
-#include <pentago/supertensor.h>
+#include <pentago/end/blocks.h>
+#include <pentago/data/filter.h>
+#include <pentago/data/compress.h>
+#include <pentago/data/supertensor.h>
 #include <pentago/utility/aligned.h>
+#include <pentago/utility/debug.h>
 #include <pentago/utility/char_view.h>
+#include <pentago/utility/endian.h>
 #include <pentago/utility/index.h>
 #include <pentago/utility/memory.h>
 #include <other/core/python/numpy.h>
@@ -17,14 +20,13 @@
 #include <other/core/utility/Hasher.h>
 #include <other/core/utility/Log.h>
 #include <other/core/utility/openmp.h>
-#include <tr1/unordered_map>
 namespace pentago {
 namespace mpi {
 
 using Log::cout;
 using std::endl;
 using std::make_pair;
-using std::tr1::unordered_map;
+using namespace pentago::mpi;
 
 /* Notes:
  *
@@ -43,8 +45,9 @@ using std::tr1::unordered_map;
  * 4. For now, we hard code interleave filtering (filter = 1)
  */
 
-static void compress_and_store(Array<uint8_t>* dst, RawArray<const uint8_t> data, int level) {
-  *dst = compress(data,level,unevent);
+static void compress_and_store(Array<uint8_t>* dst, RawArray<supertensor_blob_t> data, int level) {
+  to_little_endian_inplace(data);
+  *dst = compress(char_view(data),level,unevent);
 }
 
 #if PENTAGO_MPI_COMPRESS
@@ -74,10 +77,10 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
 #endif
     if (!turn)
       for (int i=0;i<data.size();i++)
-        filtered[i] = interleave_super(vec(data[i].x,~data[i].y));
+        filtered[i] = to_little_endian(interleave_super(vec(data[i].x,~data[i].y)));
     else
       for (int i=0;i<data.size();i++)
-        filtered[i] = interleave_super(vec(~data[i].y,data[i].x));
+        filtered[i] = to_little_endian(interleave_super(vec(~data[i].y,data[i].x)));
   }
   // Compress
   *dst = compress(char_view(filtered),level,event);
@@ -255,7 +258,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   vector<Array<uint8_t>> compressed_block_indexes(section_range.size());
   for (const int sid : section_range) {
     compressed_block_indexes[sid-section_range.lo] = Array<uint8_t>();
-    threads_schedule(CPU,curry(compress_and_store,&compressed_block_indexes[sid-section_range.lo],char_view(block_indexes[sid-section_range.lo].flat),level));
+    threads_schedule(CPU,curry(compress_and_store,&compressed_block_indexes[sid-section_range.lo],block_indexes[sid-section_range.lo].flat,level));
   }
   threads_wait_all_help();
   vector<Array<supertensor_blob_t,4>>().swap(block_indexes);
@@ -307,13 +310,16 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     #define HEADER(pointer,size) \
       memcpy(headers.data()+offset,pointer,size); \
       offset += size;
-    const uint32_t version = 3;
-    const uint32_t section_count = sections.size();
-    const uint32_t section_header_size = supertensor_header_t::header_size;
+    #define LE_HEADER(value) \
+      value = to_little_endian(value); \
+      HEADER(&value,sizeof(value));
+    uint32_t version = 3;
+    uint32_t section_count = sections.size();
+    uint32_t section_header_size = supertensor_header_t::header_size;
     HEADER(multiple_supertensor_magic,supertensor_magic_size);
-    HEADER(&version,sizeof(uint32_t))
-    HEADER(&section_count,sizeof(uint32_t))
-    HEADER(&section_header_size,sizeof(uint32_t))
+    LE_HEADER(version)
+    LE_HEADER(section_count)
+    LE_HEADER(section_header_size)
     for (int s=0;s<sections.size();s++) {
       supertensor_header_t sh(sections[s],block_size,filter);
       sh.valid = true;
@@ -365,7 +371,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
     data[i].set(sections.sections[i].sig(),wins,losses,counts[i].z);
   }
 
-  // Pack numpy buffer
+  // Pack numpy buffer.  Endianness is handled in the numpy header.
   Array<uint8_t> buffer(256+memory_usage(data),false);
   size_t data_size = fill_numpy_header(buffer,data);
   OTHER_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size()); 
@@ -380,6 +386,16 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
   CHECK(MPI_File_close(&file));
 }
 
+// The 64 bit part of big endianness is handled by numpy, so we're left with everything up to 256 bits
+static inline void semiswap(Vector<super_t,2>& s) {
+#if defined(BOOST_BIG_ENDIAN)
+  swap(s.x.a,s.x.d);
+  swap(s.x.b,s.x.c);
+  swap(s.y.a,s.y.d);
+  swap(s.y.b,s.y.c);
+#endif
+}
+
 void write_sparse_samples(const MPI_Comm comm, const string& filename, block_store_t& blocks) {
   thread_time_t time(write_sparse_kind,unevent);
   const int rank = comm_rank(comm);
@@ -389,12 +405,15 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, block_sto
   typedef block_store_t::sample_t sample_t;
   const RawArray<sample_t> samples = blocks.samples.flat;
   if (!turn) // Black to play
-    for (auto& sample : samples)
+    for (auto& sample : samples) {
       sample.wins.y = ~sample.wins.y;
+      semiswap(sample.wins);
+    }
   else // White to play
     for (auto& sample : samples) {
       sample.wins.y = ~sample.wins.y;
       swap(sample.wins.x,sample.wins.y);
+      semiswap(sample.wins);
     }
 
   // Count total samples and send to root

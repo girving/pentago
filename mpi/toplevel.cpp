@@ -2,23 +2,26 @@
 
 #include <pentago/mpi/toplevel.h>
 #include <pentago/mpi/flow.h>
-#include <pentago/mpi/config.h>
-#include <pentago/mpi/partition.h>
-#include <pentago/mpi/random_partition.h>
-#include <pentago/mpi/simple_partition.h>
-#include <pentago/mpi/load_balance.h>
+#include <pentago/mpi/reduction.h>
+#include <pentago/end/config.h>
+#include <pentago/end/partition.h>
+#include <pentago/end/predict.h>
+#include <pentago/end/random_partition.h>
+#include <pentago/end/simple_partition.h>
+#include <pentago/end/load_balance.h>
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
-#include <pentago/mpi/check.h>
+#include <pentago/end/check.h>
 #include <pentago/mpi/trace.h>
-#include <pentago/all_boards.h>
-#include <pentago/block_cache.h>
-#include <pentago/mpi/store_block_cache.h>
-#include <pentago/thread.h>
-#include <pentago/compress.h>
-#include <pentago/superengine.h>
-#include <pentago/supertable.h>
+#include <pentago/base/all_boards.h>
+#include <pentago/data/block_cache.h>
+#include <pentago/end/store_block_cache.h>
+#include <pentago/utility/thread.h>
+#include <pentago/data/compress.h>
+#include <pentago/search/superengine.h>
+#include <pentago/search/supertable.h>
 #include <pentago/utility/aligned.h>
+#include <pentago/utility/debug.h>
 #include <pentago/utility/index.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
@@ -403,7 +406,7 @@ int toplevel(int argc, char** argv) {
       const auto blocks = new_<block_store_t>(partition,rank,local_blocks,samples);
       {
         Log::Scope scope("load balance");
-        const auto load = load_balance(comm,lines,local_blocks);
+        const auto load = load_balance(reduction<int64_t,max_op>(comm),lines,local_blocks);
         if (!rank)
           cout << str(*load) << endl;
         local_blocks.clean_memory();
@@ -433,7 +436,7 @@ int toplevel(int argc, char** argv) {
         Log::Scope scope("compute");
         compute_lines(comms,prev_blocks,blocks,lines,free_memory,gather_limit,line_limit);
       }
-      blocks->print_compression_stats(comm);
+      blocks->print_compression_stats(reduction<double,sum_op>(comm));
       const auto outputs = blocks->total_nodes,
                  inputs = prev_blocks?prev_blocks->total_nodes:0;
       total_outputs += outputs;

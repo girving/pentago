@@ -11,25 +11,6 @@ namespace mpi {
 using Log::cerr;
 using std::endl;
 
-static bool verbose_ = true;
-
-bool verbose() {
-  return verbose_;
-}
-
-void set_verbose(bool verbose) {
-  verbose_ = verbose;
-}
-
-void die_helper(const string& msg) {
-  cerr << "\nrank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
-  process::backtrace();
-  if (getenv("OTHER_BREAK_ON_ASSERT"))
-    breakpoint();
-  MPI_Abort(MPI_COMM_WORLD,1);
-  abort();
-}
-
 void check_failed(const char* file, const char* function, int line, const char* call, int result) {
   die("%s:%s:%d: %s failed: %s",file,function,line,call,error_string(result));
 }
@@ -39,10 +20,6 @@ string error_string(int code) {
   char error[MPI_MAX_ERROR_STRING];
   MPI_Error_string(code,error,&length);
   return error;
-}
-
-Vector<int,4> section_blocks(section_t section) {
-  return ceil_div(section.shape(),block_size);
 }
 
 int comm_size(MPI_Comm comm) {
@@ -89,6 +66,16 @@ static string str_thread_support(const int support) {
   }
 }
 
+static void OTHER_NORETURN(mpi_die_helper(const string& msg));
+static void                mpi_die_helper(const string& msg) {
+  cerr << "\nrank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
+  process::backtrace();
+  if (getenv("OTHER_BREAK_ON_ASSERT"))
+    breakpoint();
+  MPI_Abort(MPI_COMM_WORLD,1);
+  abort();
+}
+
 mpi_world_t::mpi_world_t(int& argc, char**& argv) {
   const int required = PENTAGO_MPI_FUNNEL?MPI_THREAD_FUNNELED:MPI_THREAD_MULTIPLE;
   int provided;
@@ -98,6 +85,7 @@ mpi_world_t::mpi_world_t(int& argc, char**& argv) {
 
   // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
   debug::set_error_callback(static_cast<debug::ErrorCallback>(die_helper));
+  die_callback = mpi_die_helper;
   throw_callback = die_helper;
 
   // Make MPI errors return so that we can check the error codes ourselves

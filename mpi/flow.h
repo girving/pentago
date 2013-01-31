@@ -1,14 +1,15 @@
 // Endgame computation structure code with overlapped communication and compute
 #pragma once
 
-#include <pentago/mpi/block_store.h>
+#include <pentago/end/block_store.h>
+#include <mpi.h>
 namespace pentago {
+namespace end {
+struct line_data_t;
+}
 namespace mpi {
 
-struct line_data_t;
-
-// Estimate base memory usage of compute (ignoring active lines)
-uint64_t base_compute_memory_usage(const int lines);
+using namespace pentago::end;
 
 // The various communications used by compute_lines, and their associated messages
 struct flow_comms_t : public boost::noncopyable {

@@ -2,6 +2,7 @@
 
 #include <pentago/mpi/ibarrier.h>
 #include <pentago/mpi/utility.h>
+#include <pentago/utility/debug.h>
 #include <other/core/math/integer_log.h>
 namespace pentago {
 namespace mpi {

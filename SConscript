@@ -8,7 +8,7 @@ external('snappy',libs=['snappy'])
 child(env,'mpi')
 
 generated = ['gen/%s'%f for f in 'tables.h tables.cpp'.split()]
-env.Command(generated,'precompute.py','./precompute.py --prefix ${TARGET.dir}')
+env.Command(generated,'base/precompute.py','base/precompute.py --prefix ${TARGET.dir}')
 
 env = env.Clone(use_zlib=1,use_lzma=1,use_snappy=1)
 env.Append(CPPPATH=['.'],CXXFLAGS='-Wno-invalid-offsetof')

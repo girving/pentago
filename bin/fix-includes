@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+'''Fix pentago include directories'''
+
+import os
+import re
+import sys
+import fileinput
+import subprocess
+from collections import defaultdict
+
+# Find pentago root
+root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[0]))))
+print 'cd %s'%root
+os.chdir(root)
+
+# List files
+files = subprocess.Popen('find pentago -name *.h -o -name *.cpp'.split(),stdout=subprocess.PIPE).communicate()[0]
+files = [f for f in files.split() if '/build/' not in f]
+
+# Generate map from basename to full path
+full = defaultdict(lambda:[])
+collisions = set()
+for f in files:
+  full[os.path.basename(f)].append(f)
+
+# Print collisions
+print 'collisions:'
+for b,fs in full.items():
+  if len(fs)>1:
+    print '  %s -> %s'%(b,' '.join(fs))
+
+include = re.compile('^#include <(pentago/.*)>$')
+
+# Enforce proper directory dependencies
+allowed = ('utility base'
+          ,'base utility'
+          ,'data utility base'
+          ,'search utility base'
+          ,'end utility base data'
+          ,'mpi utility base end data search'
+          ,'bin utility base'
+          ,'old base utility search data')
+allowed = dict((s[0],frozenset(s[1:])) for rule in allowed for s in [rule.split()])
+bad = False
+for file in files:
+  src = os.path.basename(os.path.dirname(file))
+  for line in open(file):
+    m = include.match(line)
+    if m:
+      path = m.group(1)
+      dst = os.path.basename(os.path.dirname(path))
+      if dst!=src and dst not in allowed[src]:
+        print 'bad include: %s -> %s'%(file,path)
+        bad = True
+if bad:
+  sys.exit(1)
+
+# Fix includes
+for line in fileinput.input(files=files,inplace=1):
+  m = include.match(line) 
+  if m:
+    path = m.group(1)
+    base = os.path.basename(path)
+    paths = full[base]
+    if len(paths)==1:
+      print '#include <%s>'%paths[0]
+    else:
+      print line,
+  else:
+    print line,

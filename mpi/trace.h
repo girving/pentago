@@ -1,7 +1,7 @@
 // Tracing code for debugging purposes
 #pragma once
 
-#include <pentago/mpi/config.h>
+#include <pentago/end/config.h>
 #include <other/core/utility/format.h>
 namespace pentago {
 namespace mpi {
