@@ -137,14 +137,14 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     for (const auto& c : compressed)
       local_size += c.size();
     OTHER_ASSERT(local_size<(1u<<31));
-    CHECK(MPI_Exscan(&local_size,&previous,1,MPI_LONG_LONG_INT,MPI_SUM,comm));
+    CHECK(MPI_Exscan(&local_size,&previous,1,datatype<uint64_t>(),MPI_SUM,comm));
   }
 
   // Broadcast offset of first block index to everyone
   uint64_t block_index_start = rank==ranks-1?header_size+previous+local_size:0;
   {
     thread_time_t time(write_sections_kind,event);
-    CHECK(MPI_Bcast(&block_index_start,1,MPI_LONG_LONG_INT,ranks-1,comm));
+    CHECK(MPI_Bcast(&block_index_start,1,datatype<uint64_t>(),ranks-1,comm));
   }
 
   // Compute local block offsets
@@ -271,7 +271,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     local_block_indexes_size += compressed_block_indexes[sid-section_range.lo].size();
   OTHER_ASSERT(local_block_indexes_size<(1u<<31));
   uint64_t previous_block_indexes_size = 0;
-  CHECK(MPI_Exscan(&local_block_indexes_size,&previous_block_indexes_size,1,MPI_LONG_LONG_INT,MPI_SUM,comm));
+  CHECK(MPI_Exscan(&local_block_indexes_size,&previous_block_indexes_size,1,datatype<uint64_t>(),MPI_SUM,comm));
   const uint64_t local_block_index_start = block_index_start+previous_block_indexes_size;
 
   // Send all block index blobs to root
@@ -285,7 +285,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     blob.offset = next_block_index_offset;
     next_block_index_offset += blob.compressed_size;
   }
-  CHECK(MPI_Reduce(rank?index_blobs.data():MPI_IN_PLACE,index_blobs.data(),sizeof(supertensor_blob_t)/sizeof(uint64_t)*sections.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
+  CHECK(MPI_Reduce(rank?index_blobs.data():MPI_IN_PLACE,index_blobs.data(),sizeof(supertensor_blob_t)/sizeof(uint64_t)*sections.size(),datatype<uint64_t>(),MPI_SUM,0,comm));
   if (rank)
     index_blobs = Array<supertensor_blob_t>();
 
@@ -353,13 +353,16 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
   // Reduce win counts down to root, destroying them in the process
   const int rank = comm_rank(comm);
   const RawArray<Vector<uint64_t,3>> counts = blocks.section_counts;
-  if (rank) {
-    CHECK(MPI_Reduce(counts.data(),0,3*counts.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
-    // Only the root does the actual writing
-    return;
+  {
+    const auto flat_counts = scalar_view(counts);
+    if (rank) {
+      CHECK(MPI_Reduce(flat_counts.data(),0,flat_counts.size(),datatype<uint64_t>(),MPI_SUM,0,comm));
+      // Only the root does the actual writing
+      return;
+    }
+    // From here on we're the root
+    CHECK(MPI_Reduce(MPI_IN_PLACE,flat_counts.data(),flat_counts.size(),datatype<uint64_t>(),MPI_SUM,0,comm));
   }
-  // From here on we're the root
-  CHECK(MPI_Reduce(MPI_IN_PLACE,counts.data(),3*counts.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
 
   // Prepare data array
   Array<Vector<uint64_t,4>> data(counts.size(),false);

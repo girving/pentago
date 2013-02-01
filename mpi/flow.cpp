@@ -258,7 +258,7 @@ void flow_t::schedule_lines() {
           if (PENTAGO_MPI_COMPRESS)
             CHECK(MPI_Irecv(block_data.data(),memory_usage(block_data),MPI_BYTE,owner,response_tag,comms.response_comm,&response_request));
           else
-            CHECK(MPI_Irecv(block_data.data(),8*block_data.size(),MPI_LONG_LONG_INT,owner,response_tag,comms.response_comm,&response_request));
+            CHECK(MPI_Irecv((uint64_t*)block_data.data(),8*block_data.size(),datatype<uint64_t>(),owner,response_tag,comms.response_comm,&response_request));
           // Send request
           MPI_Request request_request;
           const auto request_tag = request_id(owner_block_id,line->child_dimension);
@@ -287,7 +287,7 @@ void flow_t::process_barrier(MPI_Status* status) {
 void flow_t::post_request_recv(Vector<int,2>* buffer) {
   PENTAGO_MPI_TRACE("post request recv");
   MPI_Request request;
-  CHECK(MPI_Irecv(buffer,2,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.request_comm,&request));
+  CHECK(MPI_Irecv((int*)buffer,2,MPI_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.request_comm,&request));
   requests.add(request,curry(&flow_t::process_request,this,buffer),true);
 }
 
@@ -325,7 +325,7 @@ void flow_t::post_output_recv(Array<Vector<super_t,2>>* buffer) {
     if (PENTAGO_MPI_COMPRESS_OUTPUTS)
       CHECK(MPI_Irecv(buffer->data(),memory_usage(*buffer),MPI_BYTE,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
     else
-      CHECK(MPI_Irecv(buffer->data(),8*buffer->size(),MPI_LONG_LONG_INT,MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
+      CHECK(MPI_Irecv((uint64_t*)buffer->data(),8*buffer->size(),datatype<uint64_t>(),MPI_ANY_SOURCE,MPI_ANY_TAG,comms.output_comm,&request));
   }
   requests.add(request,curry(&flow_t::process_output,this,buffer),true);
 }

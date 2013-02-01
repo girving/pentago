@@ -71,7 +71,7 @@ static section_t parse_section(const string& s) {
 static void report(MPI_Comm comm, const char* name) {
   const int rank = comm_rank(comm);
   Array<uint64_t> info = memory_info();
-  CHECK(MPI_Reduce(rank?info.data():MPI_IN_PLACE,info.data(),info.size(),MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+  CHECK(MPI_Reduce(rank?info.data():MPI_IN_PLACE,info.data(),info.size(),datatype<uint64_t>(),MPI_MAX,0,comm));
   if (!rank)
     cout << "memory "<<name<<": "<<memory_report(info)<<endl;
 }
@@ -81,14 +81,14 @@ static void report_mpi_times(MPI_Comm comm, RawArray<wall_time_t> times, wall_ti
             ranks = comm_size(comm);
   if (per_rank_times && ranks>1) {
     Array<wall_time_t,2> all_times(ranks,times.size(),false);
-    CHECK(MPI_Gather(times.data(),times.size(),MPI_LONG_LONG_INT,all_times.data(),times.size(),MPI_LONG_LONG_INT,0,comm));
+    CHECK(MPI_Gather((int64_t*)times.data(),times.size(),datatype<int64_t>(),(int64_t*)all_times.data(),times.size(),datatype<int64_t>(),0,comm));
     if (!rank) {
       Log::Scope scope("per rank times");
       for (int r=0;r<ranks;r++)
         report_thread_times(all_times[r],format("%d",r));
     }
   }
-  CHECK(MPI_Reduce(rank?times.data():MPI_IN_PLACE,times.data(),times.size(),MPI_LONG_LONG_INT,MPI_SUM,0,comm));
+  CHECK(MPI_Reduce(rank?(int64_t*)times.data():MPI_IN_PLACE,(int64_t*)times.data(),times.size(),datatype<int64_t>(),MPI_SUM,0,comm));
   if (!rank) {
     report_thread_times(times);
     const double core_time = elapsed.seconds()*threads*comm_size(comm);
@@ -439,7 +439,7 @@ int toplevel(int argc, char** argv) {
       const int64_t free_memory = memory_limit-base_memory;
       {
         int64_t numbers[5] = {partition_memory,block_memory,line_memory,base_memory,-free_memory};
-        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,MPI_LONG_LONG_INT,MPI_MAX,0,comm));
+        CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,datatype<int64_t>(),MPI_MAX,0,comm));
         if (!rank) {
           cout << "memory usage: partitions = "<<numbers[0]<<", blocks = "<<large(numbers[1])<<", lines = "<<numbers[2]<<", total = "<<large(numbers[3])<<", free = "<<large(-numbers[4])<<endl;
           cout << "line parallelism = "<<-numbers[4]/(2*13762560)<<endl;

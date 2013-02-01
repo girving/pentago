@@ -9,12 +9,6 @@
 namespace pentago {
 namespace mpi {
 
-// Map from C++ types to MPI types
-template<class T> static inline MPI_Datatype datatype();
-template<> inline MPI_Datatype datatype<double>()    { return MPI_DOUBLE; }
-template<> inline MPI_Datatype datatype<long>()      { return MPI_LONG; }
-template<> inline MPI_Datatype datatype<long long>() { return MPI_LONG_LONG; }
-
 // Map from op_t to MPI_Op
 template<op_t op> static inline MPI_Op mpi_op();
 template<> inline MPI_Op mpi_op<sum_op>() { return MPI_SUM; }

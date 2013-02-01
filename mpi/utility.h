@@ -39,5 +39,13 @@ struct mpi_world_t : public boost::noncopyable {
   ~mpi_world_t();
 };
 
+// Map from C++ types to MPI types
+template<class T> static inline MPI_Datatype datatype();
+template<> inline MPI_Datatype datatype<double>()             { return MPI_DOUBLE; }
+template<> inline MPI_Datatype datatype<long>()               { return MPI_LONG; }
+template<> inline MPI_Datatype datatype<long long>()          { return MPI_LONG_LONG; }
+template<> inline MPI_Datatype datatype<unsigned long>()      { return MPI_UNSIGNED_LONG; }
+template<> inline MPI_Datatype datatype<unsigned long long>() { return MPI_UNSIGNED_LONG_LONG; }
+
 }
 }
