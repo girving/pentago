@@ -21,7 +21,7 @@
 
 // If true, poll for requests using MPI_Testsome instead of blocking
 // with MPI_Waitsome.  This allows use of MPI_THREAD_FUNNELED.
-#define PENTAGO_MPI_FUNNEL 0
+#define PENTAGO_MPI_FUNNEL 1
 
 namespace pentago {
 namespace end {
