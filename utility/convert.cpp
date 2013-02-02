@@ -1,4 +1,5 @@
 // Instantiate necessary python conversions
+#ifdef OTHER_PYTHON
 
 #include <pentago/utility/convert.h>
 #include <pentago/base/section.h>
@@ -72,3 +73,4 @@ PyObject* to_python(history_t event) {
 }
 
 }
+#endif

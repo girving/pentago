@@ -6,6 +6,7 @@
 #include <pentago/utility/debug.h>
 #include <pentago/utility/memory.h>
 #include <sys/mman.h>
+#include <errno.h>
 namespace pentago {
 namespace end {
 

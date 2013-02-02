@@ -7,6 +7,7 @@
 #include <other/core/utility/format.h>
 #include <other/core/utility/Log.h>
 #include <other/core/vector/Vector.h>
+#include <stdio.h>
 #ifdef __APPLE__
 #include <mach/mach.h>
 #include <mach/task.h>

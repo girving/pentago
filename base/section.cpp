@@ -145,6 +145,7 @@ PyObject* to_python(const section_t& section) {
   return to_python(section.counts);
 }
 
+#ifdef OTHER_PYTHON
 } namespace other {
 pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
   pentago::section_t s(from_python<Vector<Vector<uint8_t,2>,4>>(object));
@@ -153,6 +154,7 @@ pentago::section_t FromPython<pentago::section_t>::convert(PyObject* object) {
   return s;
 }
 } namespace pentago {
+#endif
 
 board_t random_board(Random& random, const section_t& section) {
   board_t board = 0;

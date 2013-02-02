@@ -1,9 +1,9 @@
 Import('env child external library toplevel')
 
 toplevel('pentago','#.')
-external('zlib',libs=['z'])
-external('lzma',libs=['lzma'])
-external('snappy',libs=['snappy'])
+external('zlib',libs=['z'],flags=['PENTAGO_ZLIB'],pattern=r'\bcompress.cpp')
+external('lzma',libs=['lzma'],flags=['PENTAGO_LZMA'],pattern=r'\bcompress.cpp')
+external('snappy',libs=['snappy'],flags=['PENTAGO_SNAPPY'],pattern=r'\bfast_compress.cpp')
 
 child(env,'mpi')
 

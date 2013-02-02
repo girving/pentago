@@ -44,6 +44,7 @@ void print_stats() {
   cout << ", speed = "<<uint64_t(total_expanded_nodes/elapsed)<<" nodes/s"<<endl;
 }
 
+#ifdef OTHER_PYTHON
 static unordered_map<string,Ref<> > stats() {
   double time = get_time();
   unordered_map<string,Ref<> > stats;
@@ -54,6 +55,7 @@ static unordered_map<string,Ref<> > stats() {
   stats.insert(make_pair(string("nodes/second"),steal_ref_check(to_python(uint64_t(total_expanded_nodes/(time-start_time))))));
   return stats;
 }
+#endif
 
 }
 using namespace pentago;
@@ -62,5 +64,7 @@ using namespace other::python;
 void wrap_stat() {
   OTHER_FUNCTION(clear_stats)
   OTHER_FUNCTION(print_stats)
+#ifdef OTHER_PYTHON
   OTHER_FUNCTION(stats)
+#endif
 }

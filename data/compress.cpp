@@ -4,10 +4,13 @@
 #include <pentago/utility/thread.h>
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/debug.h>
+#ifdef PENTAGO_ZLIB
 #include <zlib.h>
+#endif
 #include <lzma.h>
 namespace pentago {
 
+#ifdef PENTAGO_ZLIB
 static const char* zlib_error(int z) {
   return z==Z_MEM_ERROR?"out of memory"
         :z==Z_BUF_ERROR?"insufficient output buffer space"
@@ -15,6 +18,13 @@ static const char* zlib_error(int z) {
         :z==Z_STREAM_ERROR?"invalid level"
         :"unknown error";
 }
+#else
+static void OTHER_NORETURN(no_zlib(const int level));
+static void                no_zlib(const int level) {
+  throw NotImplementedError(level>=0 ? format("compress: level %d not supported, compiled without zlib support",level)
+                                     : "uncompress failed: compiled without zlib support");
+}
+#endif
 
 static const char* lzma_error(lzma_ret r) {
   switch (r) {
@@ -41,6 +51,7 @@ static bool is_lzma(RawArray<const uint8_t> data) {
 Array<uint8_t> compress(RawArray<const uint8_t> data, int level, event_t event) {
   thread_time_t time(compress_kind,event);
   if (level<20) { // zlib
+#ifdef PENTAGO_ZLIB
     size_t dest_size = compressBound(data.size());
     OTHER_ASSERT(dest_size<(uint64_t)1<<31);
     Array<uint8_t> compressed(dest_size,false);
@@ -48,6 +59,9 @@ Array<uint8_t> compress(RawArray<const uint8_t> data, int level, event_t event) 
     if (z!=Z_OK)
       THROW(IOError,"zlib failure in compress_and_write: %s",zlib_error(z));
     return compressed.slice_own(0,dest_size);
+#else
+    no_zlib(level);
+#endif
   } else { // lzma
     size_t dest_size = lzma_stream_buffer_bound(data.size());
     OTHER_ASSERT(dest_size<(uint64_t)1<<31);
@@ -62,8 +76,12 @@ Array<uint8_t> compress(RawArray<const uint8_t> data, int level, event_t event) 
 
 size_t compress_memusage(int level) {
   if (level<20) { // zlib
+#ifdef PENTAGO_ZLIB
     OTHER_ASSERT(1<=level && level<=MAX_MEM_LEVEL);
     return (1<<(MAX_WBITS+2))+(1<<(level+9));
+#else
+    no_zlib(level);
+#endif
   } else // lzma
     return lzma_easy_encoder_memusage(level-20);
 }
@@ -74,9 +92,13 @@ Array<uint8_t> decompress(Array<const uint8_t> compressed, const size_t uncompre
   size_t dest_size = uncompressed_size;
   Array<uint8_t> uncompressed = aligned_buffer<uint8_t>(dest_size);
   if (!is_lzma(compressed)) { // zlib
+#ifdef PENTAGO_ZLIB
     int z = uncompress((uint8_t*)uncompressed.data(),&dest_size,compressed.data(),compressed.size());
     if (z!=Z_OK)
       THROW(IOError,"zlib failure in read_and_uncompress: %s",zlib_error(z));
+#else
+    no_zlib(-1);
+#endif
   } else { // lzma
     const uint32_t flags = LZMA_TELL_NO_CHECK | LZMA_TELL_UNSUPPORTED_CHECK;
     uint64_t memlimit = UINT64_MAX;

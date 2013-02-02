@@ -17,7 +17,7 @@ namespace {
 
 struct mmap_buffer_t : public boost::noncopyable {
   OTHER_DECLARE_TYPE(OTHER_NO_EXPORT) // Declare pytype
-  PyObject_HEAD // Reference counter and pointer to type object
+  OTHER_PY_OBJECT_HEAD // Reference counter and pointer to type object
   size_t size; // Size of memory block
   void* start; // Owning pointer to start of block
 };
@@ -29,6 +29,8 @@ static void free_buffer(PyObject* object) {
   free(buffer);
   report_large_alloc(-size);
 }
+
+#ifdef OTHER_PYTHON
 
 PyTypeObject mmap_buffer_t::pytype = {
   PyObject_HEAD_INIT(&PyType_Type)
@@ -73,6 +75,15 @@ PyTypeObject mmap_buffer_t::pytype = {
   0,                          // tp_free
 };
 
+#else // non-python stub
+
+PyTypeObject mmap_buffer_t::pytype = {
+  "pentago.mmap_buffer_t",    // tp_name
+  free_buffer,                // tp_dealloc
+};
+
+#endif
+
 // All necessary mmap_buffer_t::pytpe fields are filled in, so no PyType_Ready is needed
 
 }
@@ -86,7 +97,7 @@ Tuple<void*,PyObject*> mmap_buffer_helper(size_t size) {
   auto* buffer = (mmap_buffer_t*)malloc(sizeof(mmap_buffer_t));
   if (!buffer)
     THROW(bad_alloc);
-  (void)PyObject_INIT(buffer,&buffer->pytype);
+  (void)OTHER_PY_OBJECT_INIT(buffer,&buffer->pytype);
   buffer->size = size;
   buffer->start = start;
   report_large_alloc(size);

@@ -20,6 +20,7 @@
 #include <other/core/utility/str.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 namespace pentago {
 
 using std::cout;
@@ -41,9 +42,11 @@ OTHER_DEFINE_TYPE(supertensor_header_py)
 OTHER_DEFINE_TYPE(supertensor_reader_t)
 OTHER_DEFINE_TYPE(supertensor_writer_t)
 
+#ifdef OTHER_PYTHON
 static PyObject* to_python(const supertensor_header_t& h) {
   return to_python(new_<supertensor_header_py>(h));
 }
+#endif
 
 Vector<int,4> supertensor_header_t::block_shape(Vector<uint8_t,4> block) const {
   OTHER_ASSERT(block.min()>=0 && all_less_equal(Vector<uint16_t,4>(block),blocks));

@@ -4,6 +4,7 @@
 #include <other/core/math/min.h>
 #include <other/core/math/popcount.h>
 #include <other/core/python/wrap.h>
+#include <other/core/utility/debug.h>
 namespace pentago {
 
 using namespace other;

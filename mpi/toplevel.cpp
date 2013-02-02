@@ -35,6 +35,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <getopt.h>
+#include <errno.h>
 namespace pentago {
 namespace mpi {
 
