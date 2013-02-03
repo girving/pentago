@@ -12,9 +12,6 @@ def add_section_props(props):
   data_dir = props.add('dir','data').set_help('top level data directory')
   symmetries = props.add('symmetries',8).set_help('number of symmetries used to standardize sections')
 
-def show_section(s):
-  return '%d-'%sum(s)+''.join(map(str,ravel(s)))
-
 def section_file(s):
   return os.path.join(data_dir(),'section-%s.pentago'%show_section(s))
 

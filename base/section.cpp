@@ -248,6 +248,7 @@ using namespace other::python;
 void wrap_section() {
   OTHER_FUNCTION(section_shape)
   OTHER_FUNCTION(section_valid)
+  OTHER_FUNCTION_2(show_section,static_cast<string(*)(const section_t&)>(str))
   OTHER_FUNCTION(standardize_section)
   OTHER_FUNCTION(rmin_test)
   OTHER_FUNCTION(board_section)
