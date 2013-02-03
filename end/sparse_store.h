@@ -57,7 +57,7 @@ public:
   void set_size(int array, int size) const;
 
   // Get access to the entire buffer available to this array.  This must be used with care:
-  // most of it is likely to be non-resident, so loop through the entire thing could cause
+  // most of it is likely to be non-resident, so looping through the entire thing could cause
   // massive swapping.  Write or read only the part you need, then call set_size if necessary.
   RawArray<uint8_t> whole_buffer(int array) const;
 
