@@ -6,6 +6,7 @@ from pentago import *
 from other.core import *
 from other.core.utility import Log
 from other.core.value import parser
+import hashlib
 import glob
 
 # Parse properties
@@ -18,6 +19,7 @@ dir = os.path.normpath(dir())
 
 # Configure logging and threads
 Log.configure('check mpi',False,False,100)
+Log.write('dir = %s'%dir)
 init_threads(-1,-1)
 
 # Check whether the data is meaningless
@@ -34,6 +36,40 @@ if meaningless:
     cache = store_block_cache(meaningless_block_store(partition,0,0),1<<30)
   set_block_cache(cache)
 
+# Memorize the hashes of .pentago files from unit tests
+if meaningless:
+  hashes = {r'empty.pentago':'0e6efa078eacb8dd20787f09ec9b4693355bfda3'
+           ,r'meaningless-s4-r\d+/slice-0.pentago':'64ff1b2f49e25db61bf393c3de11ce74c7e52605'
+           ,r'meaningless-s4-r\d+/slice-1.pentago':'00fd7a12b67bb05b891d15cda1682d5c072b93c1'
+           ,r'meaningless-s5-r\d+/slice-0.pentago':'66b2d8a3327879fcb75b51644e4160a2066c605f'
+           ,r'meaningless-s5-r\d+/slice-1.pentago':'aa0d47a7c827b8ff8de50c16700e333f99602a39'
+           ,r'meaningless-s4-r0/slice-2.pentago':'2a2e6bf617c8624c7fd6cb4a74ea42439102f329'
+           ,r'meaningless-s4-r0/slice-3.pentago':'72a769dcf4fa47f881d4997785a0134e50b610aa'
+           ,r'meaningless-s4-r17/slice-2.pentago':'f54b5c1bea1261f01b75da2eb0a2748d78eb6b39'
+           ,r'meaningless-s4-r17/slice-3.pentago':'7754a4235a373f5c5f00d78957e5caa996c27928'
+           ,r'meaningless-s5-r0/slice-2.pentago':'ec29c1cc2d72eb92a2d204dcd92c8e3d37121d50'
+           ,r'meaningless-s5-r0/slice-3.pentago':'5c1bb0b5610cb8c46dec498b316aac7974ee055d'
+           ,r'meaningless-s5-r0/slice-4.pentago':'e0d48b631d3f12a61d33fea9822dc46ba70d8eb8'
+           ,r'meaningless-s5-r17/slice-2.pentago':'a9a6c589b4a58a5e773c62bc3d993a3000417c69'
+           ,r'meaningless-s5-r17/slice-3.pentago':'3e1b9ab9bbd75ba9d16fd95b303b16a6fe413d24'
+           ,r'meaningless-s5-r17/slice-4.pentago':'0a948c604ba9cc2d356ec125fc3d2131552eb478'
+           ,r'write-3/slice-3.pentago':'4241e562b57deecd6a948f682719f817e7cb44f2'
+           ,r'write-4/slice-4.pentago':'c42d21eaa6d881a7ef7c496e5ddbccc2f756d597'}
+  hashes = [(re.compile('.*/%s$'%k),v) for k,v in hashes.items()]
+  def check_hash(file):
+    for p,h in hashes:
+      if p.match(file):
+        h2 = hashlib.sha1(open(file).read()).hexdigest()
+        Log.write('sha1sum %s = %s'%(os.path.basename(file),h2))
+        if h != h2:
+          raise ValueError('%s: expected sha1sum %s, got %s'%(file,h,h2))
+        break
+    else:
+      raise ValueError("don't know correct sha1sum for %s"%file)
+else:
+  def check_hash(file):
+    pass
+
 def to_native(x):
   return x.astype(x.dtype.newbyteorder('='))
 
@@ -43,6 +79,7 @@ unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if not skip_pattern
 random = Random(8183131)
 init_supertable(16)
 for slice in arange(36)[::-1]:
+  empty_file = '%s/empty.pentago'%dir
   counts_file = '%s/counts-%d.npy'%(dir,slice)
   sparse_file = '%s/sparse-%d.npy'%(dir,slice)
   slice_file = '%s/slice-%d.pentago'%(dir,slice)
@@ -70,8 +107,12 @@ for slice in arange(36)[::-1]:
       with Log.scope('validity'):
         endgame_sparse_verify(sample_boards,sample_wins,random,len(sample_boards))
 
+      # Check empty.pentago hash
+      check_hash(empty_file)
+
       # Open slice file
       if os.path.exists(slice_file):
+        check_hash(slice_file)
         readers = open_supertensors(slice_file)
         assert 20+3*4+sum(reader.total_size() for reader in readers)==os.stat(slice_file).st_size
         assert len(counts)==len(readers)
