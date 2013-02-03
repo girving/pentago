@@ -8,6 +8,7 @@ from other.core.utility import Log
 from other.core.value import parser
 import hashlib
 import glob
+import sys
 
 # Parse properties
 props = PropManager()
@@ -91,6 +92,8 @@ for slice in arange(36)[::-1]:
       assert samples.dtype==uint64
       sample_boards = samples[:,0].copy()
       sample_wins = samples[:,1:].copy().reshape(-1,2,4)
+      if sys.byteorder=='big':
+        sample_wins = sample_wins[...,::-1].copy()
       unchecked.remove(sparse_file)
 
       # Read counts
