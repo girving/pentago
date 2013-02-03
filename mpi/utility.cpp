@@ -50,12 +50,6 @@ int get_count(MPI_Status* status, MPI_Datatype datatype) {
   return count;
 }
 
-void send_empty(int rank, int tag, MPI_Comm comm) {
-  MPI_Request request;
-  CHECK(MPI_Isend(0,0,MPI_INT,rank,tag,comm,&request));
-  CHECK(MPI_Request_free(&request));
-}
-
 static string str_thread_support(const int support) {
   switch (support) {
     case MPI_THREAD_SINGLE: return "single";

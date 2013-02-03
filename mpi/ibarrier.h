@@ -6,6 +6,7 @@
 namespace pentago {
 namespace mpi {
 
+class requests_t;
 struct ibarrier_countdown_t;
 
 // Warning: ibarrier_t is *not* thread safe
@@ -13,6 +14,7 @@ class ibarrier_t : public boost::noncopyable {
   const MPI_Comm comm;
   const int tag;
 private:
+  requests_t& requests;
   const int ranks;
   const int rank;
   bool started_;
@@ -21,7 +23,7 @@ private:
 public:
 
   // Construct but don't yet activate the barrier
-  ibarrier_t(MPI_Comm comm, int tag); 
+  ibarrier_t(MPI_Comm comm, requests_t& requests, int tag); 
   ~ibarrier_t();
 
   // Start the barrier operation.  Call only once.
@@ -51,7 +53,7 @@ private:
   int count;
 public:
 
-  ibarrier_countdown_t(MPI_Comm comm, int tag, int count);
+  ibarrier_countdown_t(MPI_Comm comm, requests_t& requests, int tag, int count);
   ~ibarrier_countdown_t();
 
   int remaining() const {

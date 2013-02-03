@@ -31,7 +31,6 @@ int comm_size(MPI_Comm comm);
 int comm_rank(MPI_Comm comm);
 MPI_Comm comm_dup(MPI_Comm comm);
 int get_count(MPI_Status* status, MPI_Datatype datatype);
-void send_empty(int rank, int tag, MPI_Comm comm); // Send an empty message
 
 // Init and finalize
 struct mpi_world_t : public boost::noncopyable {

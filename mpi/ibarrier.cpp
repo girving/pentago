@@ -1,6 +1,7 @@
 // A nonblocking version of MPI_Barrier
 
 #include <pentago/mpi/ibarrier.h>
+#include <pentago/mpi/requests.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/utility/debug.h>
 #include <other/core/math/integer_log.h>
@@ -11,9 +12,16 @@ static int parent(uint32_t rank) {
   return rank?rank^min_bit(rank):-1;
 }
 
-ibarrier_t::ibarrier_t(MPI_Comm comm, int tag)
+static void send_empty(int rank, int tag, MPI_Comm comm, requests_t& requests) {
+  MPI_Request request;
+  CHECK(MPI_Isend(0,0,MPI_INT,rank,tag,comm,&request));
+  requests.free(request);
+}
+
+ibarrier_t::ibarrier_t(MPI_Comm comm, requests_t& requests, int tag)
   : comm(comm)
   , tag(tag)
+  , requests(requests)
   , ranks(comm_size(comm))
   , rank(comm_rank(comm))
   , started_(false)
@@ -70,9 +78,9 @@ void ibarrier_t::decrement() {
     if (!rank) { // We're the root, so all ranks have called start.  Begin upwards phase.
       set_done();
       // Send an extra message to ourselves so that it suffices to check done() only after recv()
-      send_empty(0,tag,comm);
+      send_empty(0,tag,comm,requests);
     } else // Send started messages downwards
-      send_empty(parent(rank),tag,comm);
+      send_empty(parent(rank),tag,comm,requests);
   }
 }
 
@@ -81,13 +89,13 @@ void ibarrier_t::set_done() {
   done_ = true;
   // Send done messages upwards
   for (int jump = 1; rank+jump<ranks && !(rank&jump); jump *= 2)
-    send_empty(rank+jump,tag,comm);
+    send_empty(rank+jump,tag,comm,requests);
 }
 
 /********************** ibarrier_countdown_t ***********************/
 
-ibarrier_countdown_t::ibarrier_countdown_t(MPI_Comm comm, int tag, int count)
-  : barrier(comm,tag)
+ibarrier_countdown_t::ibarrier_countdown_t(MPI_Comm comm, requests_t& requests, int tag, int count)
+  : barrier(comm,requests,tag)
   , count(count) {
   OTHER_ASSERT(count>=0);
   if (!count)

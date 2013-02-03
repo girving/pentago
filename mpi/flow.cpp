@@ -159,7 +159,7 @@ flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_b
   , input_blocks(input_blocks)
   , output_blocks(output_blocks)
   , next_response_tag(0)
-  , countdown(comms.barrier_comm,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
+  , countdown(comms.barrier_comm,requests,barrier_tag,total_blocks(lines)+output_blocks.required_contributions)
   , progress(countdown.remaining(),false)
   , free_memory(memory_limit)
   , free_line_gathers(line_gather_limit)
@@ -263,7 +263,7 @@ void flow_t::schedule_lines() {
           MPI_Request request_request;
           const auto request_tag = request_id(owner_block_id,line->child_dimension);
           CHECK(MPI_Isend((void*)&block_request->request_buffer,2,MPI_INT,owner,request_tag,comms.request_comm,&request_request));
-          CHECK(MPI_Request_free(&request_request));
+          requests.free(request_request);
           PENTAGO_MPI_TRACE("block request: owner %d, request_tag %d, response_tag %d",owner,request_tag,response_tag);
           requests.add(response_request,curry(&flow_t::process_response,this,block_request));
         }
@@ -309,7 +309,7 @@ void flow_t::process_request(Vector<int,2>* buffer, MPI_Status* status) {
 #endif
   PENTAGO_MPI_TRACE("block response: source %d, local block id %d, dimensions %d",status->MPI_SOURCE,local_block_id.id,dimensions.data);
   // The barrier tells us when all messages are finished, so we don't need this request
-  CHECK(MPI_Request_free(&request));
+  requests.free(request);
   // Repost wildcard receive
   post_request_recv(buffer);
 }
@@ -432,6 +432,8 @@ void flow_t::post_wakeup(line_details_t& line, const wakeup_block_t b) {
   // Send a pointer to ourselves to the communication thread
   MPI_Request request;
   CHECK(MPI_Isend((void*)&line.self,1,MPI_LONG_LONG_INT,0,wakeup_tag(b),comms.wakeup_comm,&request));
+  // Since requests_t::free is not thread safe, we're forced to use MPI_Request_free here.
+  // This is bad, because http://blogs.cisco.com/performance/mpi_request_free-is-evil.
   CHECK(MPI_Request_free(&request));
 #endif
 }

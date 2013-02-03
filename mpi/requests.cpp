@@ -24,6 +24,12 @@ void requests_t::add(MPI_Request request, const function<void(MPI_Status*)>& cal
   cancellables.append(cancellable);
 }
 
+void requests_t::free(MPI_Request request) {
+  requests.append(request);
+  callbacks.push_back(function<void(MPI_Status*)>());
+  cancellables.append(true);
+}
+
 void requests_t::waitsome() {
   thread_time_t time(wait_kind,unevent);
   for (;;) {
@@ -60,7 +66,8 @@ void requests_t::waitsome() {
         callbacks.resize(n);
         // Launch pending callbacks
         for (auto& pair : pending)
-          pair.x(pair.y);
+          if (pair.x)
+            pair.x(pair.y);
         return;
       } else if (!PENTAGO_MPI_FUNNEL)
         die("MPI_Waitsome completed with zero requests out of %d",n);
