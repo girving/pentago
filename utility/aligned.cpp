@@ -91,6 +91,9 @@ Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size_t size) {
   if (!size)
     return tuple((void*)0,(PyObject*)0);
 #ifndef __APPLE__
+#ifdef __bgq__
+  alignment = max(alignment,size_t(32)); // See https://wiki.alcf.anl.gov/parts/index.php/Blue_Gene/Q#Allocating_Memory
+#endif
   void* start;
   if (posix_memalign(&start,alignment,size))
     THROW(bad_alloc);
