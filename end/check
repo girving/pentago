@@ -34,6 +34,9 @@ if meaningless:
     cache = store_block_cache(meaningless_block_store(partition,0,0),1<<30)
   set_block_cache(cache)
 
+def to_native(x):
+  return x.astype(x.dtype.newbyteorder('='))
+
 # Process each slice that exists, keeping track of which files we've checked
 skip_pattern = re.compile('^(?:log(?:-\d+)?|empty.pentago|history.*|output-.*|meaningless-\d)$')
 unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if not skip_pattern.match(f))
@@ -46,19 +49,21 @@ for slice in arange(36)[::-1]:
   if os.path.exists(counts_file):
     with Log.scope('check slice %d'%slice):
       # Read sparse samples
-      samples = load(sparse_file)
+      samples = to_native(load(sparse_file))
       assert samples.shape[1]==9
       assert samples.dtype==uint64
       sample_boards = samples[:,0].copy()
       sample_wins = samples[:,1:].copy().reshape(-1,2,4)
       unchecked.remove(sparse_file)
 
-      # Read counts and sparse samples
-      counts = load(counts_file)
+      # Read counts
+      counts = to_native(load(counts_file))
       assert samples.shape[0]==256*counts.shape[0]
       assert counts.shape[1]==4
       assert counts.dtype==uint64
-      Log.write('sections = %s'%' '.join(map(show_section,counts[:,0].copy().view(uint8).reshape(-1,4,2))))
+      sections = ascontiguousarray(counts[:,0].astype(counts.dtype.newbyteorder('<'))).view(uint8).reshape(-1,4,2)
+      counts = counts[:,1:]
+      Log.write('sections = %s'%' '.join(map(show_section,sections)))
       unchecked.remove(counts_file)
 
       # Compare against superengine
@@ -69,17 +74,16 @@ for slice in arange(36)[::-1]:
       if os.path.exists(slice_file):
         readers = open_supertensors(slice_file)
         assert 20+3*4+sum(reader.total_size() for reader in readers)==os.stat(slice_file).st_size
-        assert counts.shape==(len(readers),4)
+        assert len(counts)==len(readers)
         unchecked.remove(slice_file)
 
         # Check each section and block
         with Log.scope('consistency'):
-          for reader,counts in zip(readers,counts):
-            section = reader.header.section
-            assert all(section==counts[:1].view(uint8).reshape(4,2))
+          for reader,section,counts in zip(readers,sections,counts):
+            assert all(reader.header.section==section)
             old_reader = None if meaningless or not old_dir else supertensor_reader_t('%s/section-%s.pentago'%(old_dir,show_section(section)))
             counts2,samples_found = compare_readers_and_samples(reader,old_reader,sample_boards,sample_wins)
-            assert all(counts[1:]==counts2)
+            assert all(counts==counts2)
             assert samples_found==256
       else:
         Log.write('WARNING: No slice file found, skipping consistency check for slice %d'%slice)

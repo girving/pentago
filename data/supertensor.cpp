@@ -408,6 +408,8 @@ vector<Ref<supertensor_reader_t>> open_supertensors(const string& path) {
     ssize_t r = pread(fd->fd,header,sizeof(header),20);
     if (r < (int)sizeof(header))
       THROW(IOError,"invalid multiple supertensor file \"%s\": error reading global header, %s",path,r<0?strerror(errno):"unexpected eof");
+    for (auto& h: header)
+      h = to_little_endian(h);
     if (header[0] != 3)
       THROW(IOError,"multiple supertensor file \"%s\" has unknown version %d",path,header[0]);
     if (header[1] >= 8239)
