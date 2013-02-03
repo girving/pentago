@@ -241,10 +241,13 @@ thread_pool_t::thread_pool_t(thread_type_t type, int count, int delta_priority)
   , die(false) {
   OTHER_ASSERT(count>0);
 
-  // Adjust priority
+  // Prepare to create threads
   pthread_attr_t attr;
-  sched_param sched;
   CHECK(pthread_attr_init(&attr));
+
+  // Adjust priority
+#if !defined(__bgq__)
+  sched_param sched;
   CHECK(pthread_attr_getschedparam(&attr,&sched));
   int policy;
   CHECK(pthread_attr_getschedpolicy(&attr,&policy));
@@ -253,6 +256,10 @@ thread_pool_t::thread_pool_t(thread_type_t type, int count, int delta_priority)
   sched.sched_priority = range.clamp(old_priority+delta_priority);
   cout << (type==CPU?"cpu":type==IO?"io":"<unknown>")<<" thread pool: threads = "<<count<<", priority = "<<sched.sched_priority<<endl;
   CHECK(pthread_attr_setschedparam(&attr,&sched));
+#else
+  // Thread priority setting doesn't seem to work on BlueGene
+  cout << (type==CPU?"cpu":type==IO?"io":"<unknown>")<<" thread pool: threads = "<<count<<", priority = <unchanged>"<<endl;
+#endif
 
   // Create threads
   for (int id=0;id<count;id++) {
