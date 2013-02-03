@@ -5,5 +5,5 @@ env.Append(CPPPATH=['..'],CXXFLAGS='-Wno-invalid-offsetof')
 library(env,'pentago_mpi',['other_core','pentago_core'],skip=['main.cpp'])
 
 env = env.Clone()
-env.Append(LIBS=['pentago_mpi','pentago_core','other_core'])
+env.Append(LIBS=['pentago_mpi','pentago_core','other_core','m'])
 program(env,'endgame-mpi','main.cpp')

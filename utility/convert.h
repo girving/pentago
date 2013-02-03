@@ -1,4 +1,6 @@
 // Instantiate necessary python conversions
+#pragma once
+#ifdef OTHER_PYTHON
 
 #include <other/core/python/forward.h>
 #include <other/core/vector/forward.h>
@@ -18,3 +20,5 @@ template<> struct FromPython<pentago::history_t>{OTHER_EXPORT static pentago::hi
 namespace pentago {
 OTHER_EXPORT other::PyObject* to_python(history_t event);
 }
+
+#endif
