@@ -94,6 +94,9 @@ public:
   // Estimate peak memory usage.  In compressed mode, this is based on a hard coded guess as to how well snappy compresses.
   OTHER_EXPORT uint64_t estimate_peak_memory_usage() const;
 
+  // Estimate the memory usage of the underlying store (for use in predict.cpp).
+  OTHER_EXPORT static uint64_t estimate_peak_store_memory_usage(const int blocks, const uint64_t nodes);
+
   // Print statistics about block compression.
   OTHER_EXPORT void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
 

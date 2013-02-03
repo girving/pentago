@@ -137,6 +137,14 @@ uint64_t block_store_t::estimate_peak_memory_usage() const {
 #endif
 }
 
+uint64_t block_store_t::estimate_peak_store_memory_usage(const int blocks, const uint64_t nodes) {
+#if PENTAGO_MPI_COMPRESS
+  return sparse_store_t::estimate_peak_memory_usage(blocks,snappy_compression_estimate*sizeof(Vector<super_t,2>)*nodes); // store
+#else
+  return sizeof(Vector<super_t,2>)*nodes; // all_data
+#endif
+}
+
 const block_info_t& block_store_t::block_info(const local_id_t local_id) const {
   if (const auto* info = block_infos.get_pointer(local_id))
     return *info;

@@ -28,11 +28,7 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Pt
   const auto memory = partition_memory // partition_t
                     + 2*sizeof(block_store_t) // block_store_t
                     + sizeof(block_info_t)*blocks // block_store_t.block_info
-#if PENTAGO_MPI_COMPRESS
-                    + sparse_store_t::estimate_peak_memory_usage(blocks,snappy_compression_estimate*sizeof(Vector<super_t,2>)*nodes) // block_store_t.store
-#else
-                    + sizeof(Vector<super_t,2>)*nodes // block_store_t.all_data
-#endif
+                    + block_store_t::estimate_peak_store_memory_usage(blocks,nodes) // block_store_t.store
                     + sizeof(Vector<uint64_t,3>)*(prev_partition->sections->sections.size()+partition.sections->sections.size()) // block_store_t.section_counts
                     + sizeof(line_t)*lines+base_compute_memory_usage(lines); // line_t and line_data_t
   return memory;
