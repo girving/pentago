@@ -51,8 +51,9 @@ public:
   // If the request can be safely cancelled, and the callback skipped, specify accordingly.
   void add(MPI_Request request, const function<void(MPI_Status* status)>& callback, bool cancellable=false);
 
-  // A safe replacement for MPI_Request_free: register a cancellable request with no callback.
+  // A safer replacement for MPI_Request_free: register a cancellable request with no callback.
   // For why we don't use MPI_Request_free, see http://blogs.cisco.com/performance/mpi_request_free-is-evil.
+  // Any buffers associated with the request can be safely used or freed once the requests_t destructs.
   void free(MPI_Request request);
 
   // Check for completed requests, blocking until at least one completes.
