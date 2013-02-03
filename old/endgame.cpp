@@ -60,7 +60,7 @@ void endgame_verify_board(const char* prefix, const board_t board, const Vector<
         section_t section;
         for (int i=0;i<4;i++)
           section.counts[i] = count(quadrant(board,i));
-        THROW(RuntimeError,"%s failed: section %s, board %lld, rotation %d, fast %d, slow %d",prefix,str(section),board,r,fast,slow);
+        THROW(RuntimeError,"%s failed: section %s, turn %d, board %lld, rotation %d, fast %d, slow %d",prefix,str(section),turn,board,r,fast,slow);
       }
     }
 }
