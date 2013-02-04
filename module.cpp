@@ -38,4 +38,5 @@ OTHER_PYTHON_MODULE(pentago_core) {
   OTHER_WRAP(fast_compress)
   OTHER_WRAP(load_balance)
   OTHER_WRAP(store_block_cache)
+  OTHER_WRAP(compacting_store)
 }

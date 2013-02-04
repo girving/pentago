@@ -24,7 +24,7 @@ OTHER_EXPORT extern debug::ErrorCallback die_callback;
 OTHER_EXPORT void OTHER_NORETURN(die_helper(const string& msg)) OTHER_COLD;
 
 // Print a message and abort
-template<class... Args> static inline void OTHER_NORETURN(die(const char* msg, const Args&... args));
+template<class... Args> static inline void OTHER_NORETURN(die(const char* msg, const Args&... args)) OTHER_COLD;
 template<class... Args> static inline void                die(const char* msg, const Args&... args) {
   die_helper(format(msg,args...));
 } 

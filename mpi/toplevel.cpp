@@ -249,7 +249,7 @@ int toplevel(int argc, char** argv) {
         log_all = true;
         break;
       default:
-        MPI_Abort(MPI_COMM_WORLD,1);
+        error("impossible option character %d",c);
     }
   }
   if (argc-optind != 1 && !test.size())
@@ -322,15 +322,17 @@ int toplevel(int argc, char** argv) {
   const auto partition_factory = randomize ? partition_factory_t(curry(make_random_partition,randomize))
                                            :                           make_simple_partition;
 
-  // Run unit test if requested.  See test_mpi.py for the Python side of these tests.
+  // Run a unit test if requested.  See test_mpi.py for the Python side of these tests.
   if (test.size()) {
-    if (test=="write-3" || test=="write-4") {
+    if (test=="write-2" || test=="write-3" || test=="write-4") {
       check_directory(comm,dir);
       const int slice = test[6]-'0';
       write_meaningless(comm,dir,slice);
       const auto sections = new_<sections_t>(slice,all_boards_sections(slice,8));
       const auto partition = partition_factory(ranks,sections);
-      const auto blocks = meaningless_block_store(partition,rank,samples);
+      const auto store = new_<compacting_store_t>(estimate_block_heap_size(partition,rank));
+      const auto blocks = meaningless_block_store(partition,rank,samples,store);
+      Log::Scope scope("write");
       write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
       write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks);
       write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
@@ -378,7 +380,7 @@ int toplevel(int argc, char** argv) {
   if (PENTAGO_MPI_DEBUG)
     init_supertable(12);
 
-  // For paranoia's sake, generate dummy file to make sure the directory works.
+  // For paranoia's sake, generate a dummy file to make sure the directory works.
   // It would be very sad to have the computation run for an hour and then choke.
   check_directory(comm,dir);
 
@@ -391,6 +393,29 @@ int toplevel(int argc, char** argv) {
   // Allocate communicators
   flow_comms_t comms(comm);
   report(comm,"base");
+
+  // Allocate the space needed for block storage
+  uint64_t heap_size = 0;
+  {
+    Log::Scope scope("estimate");
+    uint64_t prev_size = 0;
+    // Note that we compute first_slice differently from below in the meaningless case.
+    const int first_slice = meaningless?meaningless:(int)slices.size()-1;
+    for (int slice=first_slice;slice>=stop_after;slice--) {
+      if (!slices[slice]->sections.size())
+        break;
+      const auto size = estimate_block_heap_size(partition_factory(ranks,slices[slice]),rank);
+      heap_size = max(heap_size,prev_size+size);
+      prev_size = size;
+    }
+    cout << "heap size = "<<heap_size<<endl;
+    const int min_heap_size = 1<<26;
+    if (heap_size < min_heap_size) {
+      cout << "raising heap size to a minimum of "<<min_heap_size<<endl;
+      heap_size = min_heap_size;
+    }
+  }
+  const auto store = new_<compacting_store_t>(heap_size);
 
   // Compute each slice in turn
   wall_time_t total_elapsed;
@@ -409,7 +434,7 @@ int toplevel(int argc, char** argv) {
       // Allocate meaningless data if necessary
       if (slice+1==meaningless) {
         prev_partition = partition_factory(ranks,slices[slice+1]);
-        prev_blocks = meaningless_block_store(*prev_partition,rank,samples);
+        prev_blocks = meaningless_block_store(*prev_partition,rank,samples,store);
         if (PENTAGO_MPI_DEBUG)
           set_block_cache(store_block_cache(ref(prev_blocks),uint64_t(1)<<28));
       }
@@ -420,7 +445,7 @@ int toplevel(int argc, char** argv) {
       // Allocate memory for all the blocks we own
       auto lines = partition->rank_lines(rank);
       auto local_blocks = partition->rank_blocks(rank);
-      const auto blocks = new_<block_store_t>(partition,rank,local_blocks,samples);
+      const auto blocks = new_<block_store_t>(partition,rank,local_blocks,samples,store);
       {
         Log::Scope scope("load balance");
         const auto load = load_balance(reduction<int64_t,max_op>(comm),lines,local_blocks);
@@ -431,39 +456,47 @@ int toplevel(int argc, char** argv) {
       }
 
       // Estimate peak memory usage ignoring active lines
-      const int64_t partition_memory = memory_usage(prev_partition)+memory_usage(partition),
-                    block_memory = (prev_blocks?prev_blocks->estimate_peak_memory_usage():0)+blocks->estimate_peak_memory_usage(),
+      const int64_t store_memory = memory_usage(store),
+                    partition_memory = memory_usage(prev_partition)+memory_usage(partition),
+                    base_block_memory = (prev_blocks?prev_blocks->base_memory_usage():0)+blocks->base_memory_usage(),
                     line_memory = memory_usage(lines)+base_compute_memory_usage(lines.size()),
-                    base_memory = partition_memory+block_memory+line_memory;
+                    base_memory = store_memory+partition_memory+base_block_memory+line_memory;
       if (memory_limit <= base_memory)
         die("memory limit exceeded: base = %s, limit = %s",large(base_memory),large(memory_limit));
       const int64_t free_memory = memory_limit-base_memory;
       {
-        int64_t numbers[5] = {partition_memory,block_memory,line_memory,base_memory,-free_memory};
+        int64_t numbers[6] = {store_memory,partition_memory,base_block_memory,line_memory,base_memory,-free_memory};
         CHECK(MPI_Reduce(rank?numbers:MPI_IN_PLACE,numbers,5,datatype<int64_t>(),MPI_MAX,0,comm));
         if (!rank) {
-          cout << "memory usage: partitions = "<<numbers[0]<<", blocks = "<<large(numbers[1])<<", lines = "<<numbers[2]<<", total = "<<large(numbers[3])<<", free = "<<large(-numbers[4])<<endl;
-          cout << "line parallelism = "<<-numbers[4]/(2*13762560)<<endl;
+          cout << "memory usage: store = "<<large(numbers[0])<<", partitions = "<<numbers[1]<<", blocks = "<<large(numbers[2])<<", lines = "<<numbers[3]<<", total = "<<large(numbers[4])<<", free = "<<large(-numbers[5])<<endl;
+          cout << "line parallelism = "<<-numbers[5]/(2*13762560)<<endl;
         }
       }
       report(comm,"compute");
+
+      // Count inputs
+      const auto inputs = prev_blocks?prev_blocks->total_nodes:0;
+      total_inputs += inputs;
 
       // Compute (and communicate)
       {
         Log::Scope scope("compute");
         compute_lines(comms,prev_blocks,blocks,lines,free_memory,gather_limit,line_limit);
       }
-      blocks->print_compression_stats(reduction<double,sum_op>(comm));
-      const auto outputs = blocks->total_nodes,
-                 inputs = prev_blocks?prev_blocks->total_nodes:0;
-      total_outputs += outputs;
-      total_inputs += inputs;
 
       // Deallocate obsolete slice
       prev_partition = partition;
       prev_blocks = blocks;
       lines.clean_memory();
       report(comm,"free");
+
+      // Freeze newly computed blocks in preparation for use as inputs
+      blocks->store.freeze();
+
+      // Count outputs
+      blocks->print_compression_stats(reduction<double,sum_op>(comm));
+      const auto outputs = blocks->total_nodes;
+      total_outputs += outputs;
 
       // Write various information to disk
       {

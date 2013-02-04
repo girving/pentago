@@ -34,7 +34,8 @@ if meaningless:
   sections = sections_t(meaningless,all_boards_sections(meaningless,8))
   partition = simple_partition_t(1,sections,False)
   with Log.scope('meaningless'):
-    cache = store_block_cache(meaningless_block_store(partition,0,0),1<<30)
+    store = compacting_store_t(estimate_block_heap_size(partition,0))
+    cache = store_block_cache(meaningless_block_store(partition,0,0,store),1<<30)
   set_block_cache(cache)
 
 # Memorize the hashes of .pentago files from unit tests

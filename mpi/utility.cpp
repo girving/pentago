@@ -60,13 +60,14 @@ static string str_thread_support(const int support) {
   }
 }
 
-static void OTHER_NORETURN(mpi_die_helper(const string& msg));
+static void OTHER_NORETURN(mpi_die_helper(const string& msg)) OTHER_COLD;
 static void                mpi_die_helper(const string& msg) {
   cerr << "\nrank " << comm_rank(MPI_COMM_WORLD) << ": " << msg << endl;
   process::backtrace();
   if (getenv("OTHER_BREAK_ON_ASSERT"))
     breakpoint();
-  MPI_Abort(MPI_COMM_WORLD,1);
+  // Ideally we would call MPI_Abort here, but that's technically disallowed if we're not
+  // running in MPI_THREAD_MULTIPLE mode.  Therefore, we bail more forcefully.
   abort();
 }
 
@@ -78,9 +79,9 @@ mpi_world_t::mpi_world_t(int& argc, char**& argv) {
     die("Insufficent MPI thread support: required = %s, provided = %s",str_thread_support(required),str_thread_support(provided));
 
   // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
-  debug::set_error_callback(static_cast<debug::ErrorCallback>(die_helper));
+  debug::set_error_callback(static_cast<debug::ErrorCallback>(mpi_die_helper));
   die_callback = mpi_die_helper;
-  throw_callback = die_helper;
+  throw_callback = mpi_die_helper;
 
   // Make MPI errors return so that we can check the error codes ourselves
   MPI_Comm_set_errhandler(MPI_COMM_WORLD,MPI_ERRORS_RETURN);

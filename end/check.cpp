@@ -3,6 +3,7 @@
 #include <pentago/end/check.h>
 #include <pentago/end/block_store.h>
 #include <pentago/end/blocks.h>
+#include <pentago/end/fast_compress.h>
 #include <pentago/base/count.h>
 #include <pentago/base/symmetry.h>
 #include <pentago/data/supertensor.h>
@@ -68,7 +69,11 @@ static void meaningless_helper(block_store_t* const self, const local_id_t local
 #if PENTAGO_MPI_COMPRESS
   time.stop();
   // Compress data into place
-  self->store.compress_and_set(info.flat_id,flat_data,event);
+  {
+    const auto compressed = local_fast_compress(flat_data,event);
+    thread_time_t time(compacting_kind,event);
+    compacting_store_t::lock_t(self->store,info.flat_id).set(compressed);
+  }
 #endif
 
   // Add to section counts
@@ -77,17 +82,20 @@ static void meaningless_helper(block_store_t* const self, const local_id_t local
   self->section_counts[section_id] += counts;
 }
 
-Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank, const int samples_per_section) {
+Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
   Log::Scope scope("meaningless");
 
   // Allocate block store
-  const auto self = make_block_store(partition,rank,samples_per_section);
+  const auto self = make_block_store(partition,rank,samples_per_section,store);
 
   // Replace data with meaninglessness
   memset(self->section_counts.data(),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
   for (const auto& info : self->block_infos)
     threads_schedule(CPU,curry(meaningless_helper,&*self,info.key));
   threads_wait_all_help();
+
+  // Freeze meaningless data and return
+  self->store.freeze();
   return self;
 }
 

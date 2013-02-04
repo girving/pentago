@@ -9,7 +9,7 @@
 #include <pentago/utility/spinlock.h>
 #include <other/core/array/NestedArray.h>
 #if PENTAGO_MPI_COMPRESS
-#include <pentago/end/sparse_store.h>
+#include <pentago/end/compacting_store.h>
 #endif
 namespace pentago {
 namespace end {
@@ -41,9 +41,6 @@ struct block_info_t {
   section_t section;
   Vector<uint8_t,4> block;
   int flat_id; // Contiguous local id (probably different from local id)
-#if !PENTAGO_MPI_COMPRESS
-  Range<int> nodes; // Our piece of all_data
-#endif
   mutable uint8_t missing_dimensions; // Which incoming dimension contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
@@ -62,12 +59,7 @@ public:
   const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
   const int required_contributions;
   spinlock_t section_counts_lock;
-
-#if PENTAGO_MPI_COMPRESS
-  sparse_store_t store;
-#else
-  const Array<Vector<super_t,2>> all_data;
-#endif
+  compacting_store_t::group_t store; // Underlying data storage
 
   // Space for sparse samples (filled in as blocks complete).  These are stored in native
   // block_store_t format, and must be transformed before being written to disk.
@@ -79,7 +71,7 @@ public:
   const NestedArray<sample_t> samples;
 
 private:
-  OTHER_EXPORT block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section);
+  OTHER_EXPORT block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store);
 public:
   ~block_store_t();
 
@@ -88,14 +80,8 @@ public:
     return block_infos.size();
   }
 
-  // Estimate current memory usage
-  uint64_t current_memory_usage() const;
-
-  // Estimate peak memory usage.  In compressed mode, this is based on a hard coded guess as to how well snappy compresses.
-  OTHER_EXPORT uint64_t estimate_peak_memory_usage() const;
-
-  // Estimate the memory usage of the underlying store (for use in predict.cpp).
-  OTHER_EXPORT static uint64_t estimate_peak_store_memory_usage(const int blocks, const uint64_t nodes);
+  // Compute memory usage ignoring the store
+  OTHER_EXPORT uint64_t base_memory_usage() const;
 
   // Print statistics about block compression.
   OTHER_EXPORT void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
@@ -119,8 +105,8 @@ public:
   // All uncompressed_and_get versions return views into a temporary, thread local buffer (the one used by local_fast_uncompress).
   RawArray<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
   RawArray<Vector<super_t,2>,4> uncompress_and_get(local_id_t local_id, event_t event) const;
-  OTHER_EXPORT RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete=false) const; // allow_incomplete for internal use only
-  OTHER_EXPORT RawArray<const uint8_t> get_compressed(local_id_t local_id, bool allow_incomplete=false) const;
+  OTHER_EXPORT RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event) const;
+  OTHER_EXPORT RawArray<const uint8_t> get_compressed(local_id_t local_id) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>,4> get_raw(local_id_t local_id) const;
@@ -130,14 +116,11 @@ public:
   // Look up info for a block
   const block_info_t& block_info(const local_id_t local_id) const;
   const block_info_t& block_info(const section_t section, const Vector<uint8_t,4> block) const;
-
-private:
-  uint64_t base_memory_usage() const;
 };
 
 // Convenience factory routine
-static inline Ref<block_store_t> make_block_store(const partition_t& partition, const int rank, const int samples_per_section) {
-  return new_<block_store_t>(partition,rank,partition.rank_blocks(rank),samples_per_section);
+static inline Ref<block_store_t> make_block_store(const partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
+  return new_<block_store_t>(partition,rank,partition.rank_blocks(rank),samples_per_section,store);
 }
 
 // The kernel of count_wins factored out for use elsewhere

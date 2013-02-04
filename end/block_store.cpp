@@ -24,16 +24,14 @@ using std::make_pair;
 using Log::cout;
 using std::endl;
 
-block_store_t::block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section)
+block_store_t::block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store)
   : sections(partition.sections)
   , partition(ref(partition))
   , rank(rank)
   , total_nodes(0) // set below
   , section_counts(sections->sections.size())
   , required_contributions(0) // set below
-#if PENTAGO_MPI_COMPRESS
-  , store(blocks.size(),raw_max_fast_compressed_size)
-#endif
+  , store(store,blocks.size())
 {
   uint64_t total_nodes = 0;
   uint64_t total_count = 0;
@@ -120,31 +118,6 @@ uint64_t block_store_t::base_memory_usage() const {
   return sizeof(block_store_t)+pentago::memory_usage(block_infos)+pentago::memory_usage(section_counts);
 }
 
-uint64_t block_store_t::current_memory_usage() const {
-  return base_memory_usage()
-#if PENTAGO_MPI_COMPRESS
-    +store.current_memory_usage();
-#else
-    +pentago::memory_usage(all_data);
-#endif
-}
-
-uint64_t block_store_t::estimate_peak_memory_usage() const {
-#if PENTAGO_MPI_COMPRESS
-  return base_memory_usage()+sparse_store_t::estimate_peak_memory_usage(total_blocks(),snappy_compression_estimate*sizeof(Vector<super_t,2>)*(total_nodes));
-#else
-  return current_memory_usage();
-#endif
-}
-
-uint64_t block_store_t::estimate_peak_store_memory_usage(const int blocks, const uint64_t nodes) {
-#if PENTAGO_MPI_COMPRESS
-  return sparse_store_t::estimate_peak_memory_usage(blocks,snappy_compression_estimate*sizeof(Vector<super_t,2>)*nodes); // store
-#else
-  return sizeof(Vector<super_t,2>)*nodes; // all_data
-#endif
-}
-
 const block_info_t& block_store_t::block_info(const local_id_t local_id) const {
   if (const auto* info = block_infos.get_pointer(local_id))
     return *info;
@@ -163,35 +136,27 @@ void block_store_t::print_compression_stats(const reduction_t<double,sum_op>& re
   // We're going to compute the mean and variance of the compression ratio for a randomly chosen *byte*.
   // First integrate moments 0, 1, and 2.
   uint64_t uncompressed_ = 0;
-  uint64_t compressed_ = 0,
-           peak_compressed_ = 0;
-  double sqr_compressed = 0,
-         peak_sqr_compressed = 0;
+  uint64_t compressed_ = 0;
+  double sqr_compressed = 0;
   for (auto& info : block_infos) {
     const int flat_id = info.data.flat_id;
     const int k = 64*block_shape(info.data.section.shape(),info.data.block).product();
     uncompressed_ += k;
-    compressed_ += store.size(flat_id);
-    peak_compressed_ += store.peak_size(flat_id);
-    sqr_compressed += sqr((double)store.size(flat_id))/k;
-    peak_sqr_compressed += sqr((double)store.peak_size(flat_id))/k;
+    const int size = store.get_frozen(flat_id).size();
+    compressed_ += size;
+    sqr_compressed += sqr((double)size)/k;
   }
   // Reduce to rank 0
-  double numbers[5] = {(double)uncompressed_,(double)compressed_,(double)peak_compressed_,sqr_compressed,peak_sqr_compressed};
-  const bool root = !reduce_sum || reduce_sum(RawArray<double>(5,numbers));
+  double numbers[3] = {(double)uncompressed_,(double)compressed_,sqr_compressed};
+  const bool root = !reduce_sum || reduce_sum(RawArray<double>(3,numbers));
   // Compute statistics
   if (root) {
     const double uncompressed = numbers[0],
                  compressed = numbers[1],
-                 peak_compressed = numbers[2];
-    sqr_compressed = numbers[3];
-    peak_sqr_compressed = numbers[4];
+                 sqr_compressed = numbers[2];
     const double mean = compressed/uncompressed,
-                 dev = sqrt(sqr_compressed/uncompressed-sqr(mean)),
-                 peak_mean = peak_compressed/uncompressed,
-                 peak_dev = sqrt(peak_sqr_compressed/uncompressed-sqr(peak_mean));
-    cout << "compression ratio      = "<<mean<<" +- "<<dev<<endl; 
-    cout << "peak compression ratio = "<<peak_mean<<" +- "<<peak_dev<<endl; 
+                 dev = sqrt(sqr_compressed/uncompressed-sqr(mean));
+    cout << "compression ratio = "<<mean<<" +- "<<dev<<endl;
   }
 #endif
 }
@@ -226,13 +191,17 @@ void block_store_t::accumulate(local_id_t local_id, uint8_t dimension, RawArray<
   }
 #else // PENTAGO_MPI_COMPRESS
   spin_t spin(info.lock);
+  compacting_store_t::lock_t alock(store,flat_id);
   // If previous contributions exist, uncompress the old data and combine it with the new
-  if (store.size(flat_id)) {
-    const auto old_data = uncompress_and_get_flat(local_id,event,true);
-    thread_time_t time(accumulate_kind,event);
-    OTHER_ASSERT(new_data.size()==old_data.size());
-    for (int i=0;i<new_data.size();i++)
-      new_data[i] |= old_data[i];
+  {
+    const auto old_compressed = alock.get(); 
+    if (old_compressed.size()) {
+      const auto old_data = local_fast_uncompress(old_compressed,event);      
+      thread_time_t time(accumulate_kind,event);
+      OTHER_ASSERT(new_data.size()==old_data.size());
+      for (int i=0;i<new_data.size();i++)
+        new_data[i] |= old_data[i];
+    }
   }
   // If all contributions are in place, count and sample
   OTHER_ASSERT(info.missing_dimensions&1<<dimension);
@@ -247,7 +216,9 @@ void block_store_t::accumulate(local_id_t local_id, uint8_t dimension, RawArray<
     section_counts[section_id] += counts;
   }
   // Compress data into place
-  store.compress_and_set(flat_id,new_data,event);
+  const auto new_compressed = local_fast_compress(new_data,event);
+  thread_time_t time(compacting_kind,event);
+  alock.set(new_compressed);
 #endif
 }
 
@@ -287,15 +258,14 @@ RawArray<Vector<super_t,2>,4> block_store_t::uncompress_and_get(local_id_t local
   return RawArray<Vector<super_t,2>,4>(shape,flat.data());
 }
 
-RawArray<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(local_id_t local_id, event_t event, bool allow_incomplete) const {
-  return local_fast_uncompress(get_compressed(local_id,allow_incomplete),event);
+RawArray<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(local_id_t local_id, event_t event) const {
+  return local_fast_uncompress(get_compressed(local_id),event);
 }
 
-RawArray<const uint8_t> block_store_t::get_compressed(local_id_t local_id, bool allow_incomplete) const {
+RawArray<const uint8_t> block_store_t::get_compressed(local_id_t local_id) const {
   const auto& info = block_info(local_id);
-  if (!allow_incomplete)
-    OTHER_ASSERT(!info.missing_dimensions);
-  return store.current_buffer(info.flat_id);
+  OTHER_ASSERT(!info.missing_dimensions);
+  return store.get_frozen(info.flat_id);
 }
 
 #else

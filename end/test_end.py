@@ -41,7 +41,8 @@ def test_counts():
       for key in 0,1,17:
         with Log.scope('partition key %d'%key):
           partition = random_partition_t(key,1,sections) if key else simple_partition_t(1,sections,False)
-          blocks = meaningless_block_store(partition,0,0)
+          store = compacting_store_t(estimate_block_heap_size(partition,0))
+          blocks = meaningless_block_store(partition,0,0,store)
           Log.write('blocks = %d, correct = %d'%(blocks.total_nodes,good_nodes))
           assert blocks.total_nodes==good_nodes
           bad_counts = sum_section_counts(sections.sections,blocks.section_counts)
@@ -70,6 +71,10 @@ def test_fast_compress():
     compressed = compress_check(bad)
     assert compressed[0]==0
     assert len(compressed)==bad.nbytes+1
+
+def test_compacting_store():
+  init_threads(-1,-1)
+  compacting_store_test()
   
 if __name__=='__main__':
   Log.configure('test',False,False,100)

@@ -52,6 +52,7 @@ enum time_kind_t {
   wakeup_kind,
   output_send_kind,
   output_recv_kind,
+  compacting_kind,
   master_idle_kind,
   cpu_idle_kind,
   io_idle_kind,

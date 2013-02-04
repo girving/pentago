@@ -31,7 +31,14 @@ const int block_size = 8;
 const int block_shift = 3;
 
 // Hopefully conservative estimate of snappy's compression ratio on our data
-const double snappy_compression_estimate = .45;
+const double snappy_compression_estimate = .4;
+
+#if PENTAGO_MPI_COMPRESS
+// Extra space used to reduce garbage collection frequency in compacting_store_t
+const double compacting_store_heap_ratio = 1.1;
+// If we go below this level, we die rather than thrash horribly.
+const double compacting_store_min_free_ratio = .02;
+#endif
 
 // Whether or not to use interleave filtered to precondition snappy
 const bool snappy_filter = true;

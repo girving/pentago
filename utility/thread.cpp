@@ -620,6 +620,7 @@ vector<const char*> time_kind_names() {
   FIELD(wakeup)
   FIELD(output_send)
   FIELD(output_recv)
+  FIELD(compacting)
   FIELD(master_idle)
   FIELD(cpu_idle)
   FIELD(io_idle)

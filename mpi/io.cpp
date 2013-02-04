@@ -342,7 +342,8 @@ void check_directory(const MPI_Comm comm, const string& dir) {
   const int samples_per_section = 0;
   const Array<const section_t> sections;
   const auto partition = empty_partition(comm_size(comm),slice);
-  const auto blocks = make_block_store(partition,rank,samples_per_section);
+  const auto store = new_<compacting_store_t>(0);
+  const auto blocks = make_block_store(partition,rank,samples_per_section,store);
   write_sections(comm,format("%s/empty.pentago",dir),blocks,0);
 }
 

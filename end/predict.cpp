@@ -16,6 +16,21 @@ uint64_t base_compute_memory_usage(const int lines) {
   return (2*sizeof(void*)+sizeof(line_data_t))*lines;
 }
 
+static uint64_t estimate_block_heap_size(const uint64_t blocks, const uint64_t nodes) {
+  const uint64_t raw = sizeof(Vector<super_t,2>)*nodes;
+#if PENTAGO_MPI_COMPRESS
+  // In compressed mode, we tack an extra kilobyte onto each block for safety.
+  return 1024*blocks+size_t(compacting_store_heap_ratio*snappy_compression_estimate*raw);
+#else
+  return raw;
+#endif
+}
+
+uint64_t estimate_block_heap_size(const partition_t& partition, const int rank) {
+  const auto counts = partition.rank_counts(rank);
+  return estimate_block_heap_size(counts.x,counts.y);
+}
+
 static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Ptr<const load_balance_t> prev_load_, const partition_t& partition, const load_balance_t& load) {
   OTHER_ASSERT(!!prev_partition_==!!prev_load_);
   const auto prev_partition = prev_partition_?ref(prev_partition_):empty_partition(partition.ranks,0);
@@ -25,11 +40,12 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Pt
   const auto lines  = load.lines.max;
   const auto blocks = load.blocks.max+prev_load->blocks.max;
   const auto nodes  = load.block_nodes.max+prev_load->block_nodes.max;
+  const auto heap   = estimate_block_heap_size(blocks,nodes);
   const auto memory = partition_memory // partition_t
                     + 2*sizeof(block_store_t) // block_store_t
                     + sizeof(block_info_t)*blocks // block_store_t.block_info
-                    + block_store_t::estimate_peak_store_memory_usage(blocks,nodes) // block_store_t.store
                     + sizeof(Vector<uint64_t,3>)*(prev_partition->sections->sections.size()+partition.sections->sections.size()) // block_store_t.section_counts
+                    + compacting_store_t::memory_usage(blocks,heap) // compacting_store_t
                     + sizeof(line_t)*lines+base_compute_memory_usage(lines); // line_t and line_data_t
   return memory;
 }
@@ -39,5 +55,6 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Pt
 using namespace pentago::end;
 
 void wrap_predict() {
+  OTHER_FUNCTION_2(estimate_block_heap_size,static_cast<uint64_t(*)(const partition_t&,const int)>(estimate_block_heap_size))
   OTHER_FUNCTION(max_rank_memory_usage)
 }
