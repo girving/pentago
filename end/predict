@@ -4,7 +4,6 @@ from __future__ import division
 from other.core import *
 from other.core.value import parser
 from pentago import *
-from pentago.section import *
 import re
 
 # Mimic options to endgame-mpi

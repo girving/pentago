@@ -12,6 +12,7 @@
 #include <other/core/utility/Log.h>
 #include <other/core/utility/str.h>
 #include <sys/mman.h>
+#include <errno.h>
 namespace pentago {
 namespace end {
 
