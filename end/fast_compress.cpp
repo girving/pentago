@@ -10,6 +10,7 @@
 #include <pentago/utility/memory.h>
 #include <other/core/array/RawArray.h>
 #include <other/core/python/wrap.h>
+#include <other/core/utility/process.h>
 #include <snappy.h>
 namespace pentago {
 namespace end {
@@ -68,14 +69,32 @@ void fast_uncompress(RawArray<const uint8_t> compressed, RawArray<Vector<super_t
     die("fast_uncompress: expected count %d, got %d, event 0x%llx",uncompressed.size(),count,event);
 }
 
+#define USE_PTHREADS 1
+
+#if USE_PTHREADS
+static pthread_key_t buffer_key;
+__attribute__((constructor)) static void create_buffer_key() {
+  const int r = pthread_key_create(&buffer_key,free);
+  if (r)
+    die("local_fast_compress/uncompress: failed to create thread local buffer pthread key: %s",strerror(r));
+}
+#endif
+
 // Thread local temporary buffer for local compression and decompression.
 static inline RawArray<Vector<super_t,2>> local_buffer() {
   const int count = ceil_div(raw_max_fast_compressed_size,sizeof(Vector<super_t,2>));
+#if USE_PTHREADS
+  auto buffer = (Vector<super_t,2>*)pthread_getspecific(buffer_key);
+#else
   static __thread Vector<super_t,2>* buffer = 0;
+#endif
   if (!buffer) {
     buffer = (Vector<super_t,2>*)malloc(sizeof(Vector<super_t,2>)*count);
     if (!buffer)
       die("local_fast_compress/uncompress: failed to allocate thread local buffer of size %zu",sizeof(Vector<super_t,2>)*count);
+#if USE_PTHREADS
+    pthread_setspecific(buffer_key,buffer); 
+#endif
   }
   return RawArray<Vector<super_t,2>>(count,buffer);
 }
