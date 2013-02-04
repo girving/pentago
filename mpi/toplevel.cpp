@@ -77,7 +77,7 @@ static void report(MPI_Comm comm, const char* name) {
     cout << "memory "<<name<<": "<<memory_report(info)<<endl;
 }
 
-static void report_mpi_times(MPI_Comm comm, RawArray<wall_time_t> times, wall_time_t elapsed, uint64_t outputs, uint64_t inputs) {
+static void report_mpi_times(const MPI_Comm comm, RawArray<wall_time_t> times, const wall_time_t elapsed, const uint64_t local_outputs, const uint64_t local_inputs) {
   const int rank = comm_rank(comm),
             ranks = comm_size(comm);
   if (per_rank_times && ranks>1) {
@@ -90,9 +90,13 @@ static void report_mpi_times(MPI_Comm comm, RawArray<wall_time_t> times, wall_ti
     }
   }
   CHECK(MPI_Reduce(rank?(int64_t*)times.data():MPI_IN_PLACE,(int64_t*)times.data(),times.size(),datatype<int64_t>(),MPI_SUM,0,comm));
+  uint64_t counts[2] = {local_outputs,local_inputs};
+  CHECK(MPI_Reduce(rank?counts:MPI_IN_PLACE,counts,2,datatype<uint64_t>(),MPI_SUM,0,comm));
   if (!rank) {
     report_thread_times(times);
     const double core_time = elapsed.seconds()*threads*comm_size(comm);
+    const uint64_t outputs = counts[0],
+                   inputs = counts[1];
     const double output_speed = outputs/core_time,
                  input_speed = inputs/core_time,
                  speed = output_speed+input_speed;
@@ -419,8 +423,8 @@ int toplevel(int argc, char** argv) {
 
   // Compute each slice in turn
   wall_time_t total_elapsed;
-  uint64_t total_outputs = 0,
-           total_inputs = 0;
+  uint64_t total_local_outputs = 0,
+           total_local_inputs = 0;
   {
     Ptr<partition_t> prev_partition;
     Ptr<block_store_t> prev_blocks;
@@ -475,8 +479,8 @@ int toplevel(int argc, char** argv) {
       report(comm,"compute");
 
       // Count inputs
-      const auto inputs = prev_blocks?prev_blocks->total_nodes:0;
-      total_inputs += inputs;
+      const auto local_inputs = prev_blocks?prev_blocks->total_nodes:0;
+      total_local_inputs += local_inputs;
 
       // Compute (and communicate)
       {
@@ -492,11 +496,11 @@ int toplevel(int argc, char** argv) {
 
       // Freeze newly computed blocks in preparation for use as inputs
       blocks->store.freeze();
-
-      // Count outputs
       blocks->print_compression_stats(reduction<double,sum_op>(comm));
-      const auto outputs = blocks->total_nodes;
-      total_outputs += outputs;
+
+      // Count local outputs
+      const auto local_outputs = blocks->total_nodes;
+      total_local_outputs += local_outputs;
 
       // Write various information to disk
       {
@@ -510,12 +514,12 @@ int toplevel(int argc, char** argv) {
       // Dump timing
       const auto elapsed = wall_time()-start;
       total_elapsed += elapsed;
-      report_mpi_times(comm,clear_thread_times(),elapsed,outputs,inputs);
+      report_mpi_times(comm,clear_thread_times(),elapsed,local_outputs,local_inputs);
     }
   }
 
   // Dump total timing
-  report_mpi_times(comm,total_thread_times(),total_elapsed,total_outputs,total_inputs);
+  report_mpi_times(comm,total_thread_times(),total_elapsed,total_local_outputs,total_local_inputs);
   report(comm,"final");
   write_thread_history(format("%s/history-r%d",dir,rank));
   return 0;
