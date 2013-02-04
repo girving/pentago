@@ -45,10 +45,13 @@ def read_history(dir):
   with Log.scope('read'):
     names = glob.glob(dir+'/history-r*')
     ranks = [None]*len(names)
+    assert ranks
     for name in names:
       m = re.search(r'history-r(\d+)',name)
       rank = int(m.group(1))
       data = fromfile(name,dtype=int64).reshape(-1,3)
+      if not (data[0][0]&0xffffffff): # Check for bad endianness
+        data = data.view(data.dtype.newbyteorder('<')).astype(data.dtype.newbyteorder('>')).view(int64)
       threads,kinds,_ = data[0]
       ranks[rank] = [[data[data[i][0]:data[i][1]] for kind in xrange(kinds) for i in (1+thread*kinds+kind,)] for thread in xrange(threads)]
   return [thread for rank in ranks for thread in rank],len(ranks)
