@@ -131,4 +131,6 @@ with Log.scope('summary'):
   Log.write('line parallelism = %g'%min_lines)
   Log.write('total memory = %s'%large(max_total_memory))
   Log.write('save memory = %s'%large(max_save_memory))
+  Log.write('total inputs = %s'%large(total_inputs))
+  Log.write('total outputs = %s'%large(total_outputs))
   Log.write('time estimate = %g s'%((total_outputs+total_inputs)/speed_estimate/ranks/threads))
