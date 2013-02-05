@@ -109,6 +109,14 @@ RawArray<Vector<super_t,2>> local_fast_uncompress(RawArray<const uint8_t> compre
   return uncompressed.slice(0,fast_uncompress_helper(compressed,uncompressed,event));
 }
 
+// For testing purposes
+static Array<uint8_t> local_fast_compress_test(RawArray<Vector<super_t,2>> uncompressed) {
+  return local_fast_compress(uncompressed,unevent).copy();
+}
+static Array<Vector<super_t,2>> local_fast_uncompress_test(RawArray<const uint8_t> compressed) {
+  return local_fast_uncompress(compressed,unevent).copy();
+}
+
 }
 }
 using namespace pentago::end;
@@ -116,4 +124,6 @@ using namespace pentago::end;
 void wrap_fast_compress() {
   OTHER_FUNCTION(fast_compress)
   OTHER_FUNCTION(fast_uncompress)
+  OTHER_FUNCTION(local_fast_compress_test)
+  OTHER_FUNCTION(local_fast_uncompress_test)
 }

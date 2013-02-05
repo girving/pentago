@@ -49,28 +49,35 @@ def test_counts():
           Log.write('bad counts  = %s\ngood counts = %s'%(bad_counts,good_counts))
           assert all(bad_counts==good_counts)
 
-def test_fast_compress():
+def test_fast_compress(local=False):
   init_threads(-1,-1)
   def compress_check(input):
-    buffer = empty(64+7*input.nbytes//6,dtype=uint8)
-    compressed = buffer[:fast_compress(input.copy(),buffer,0)]
-    output = empty_like(input)
-    fast_uncompress(compressed,output,0)
+    if local:
+      compressed = local_fast_compress_test(input.copy())
+      output = local_fast_uncompress_test(compressed) 
+    else:
+      buffer = empty(64+7*input.nbytes//6,dtype=uint8)
+      compressed = buffer[:fast_compress(input.copy(),buffer,0)]
+      output = empty_like(input)
+      fast_uncompress(compressed,output,0)
     assert all(input==output)
     return compressed
   # Test a highly compressible sequence
-  regular = arange(64//4*18731).view(uint64).reshape(-1,2,4)
+  regular = arange(64//4*1873).view(uint64).reshape(-1,2,4)
   compressed = compress_check(regular)
   assert compressed[0]==1
   ratio = len(compressed)/regular.nbytes
   assert ratio < .314
   # Test various random (incompressible) sequences
   random.seed(18731)
-  for n in 0,64,64*18731:
+  for n in 0,64,64*1873:
     bad = fromstring(random.bytes(n),dtype=uint64).reshape(-1,2,4)
     compressed = compress_check(bad)
     assert compressed[0]==0
     assert len(compressed)==bad.nbytes+1
+
+def test_local_fast_compress():
+  test_fast_compress(local=True)
 
 def test_compacting_store():
   init_threads(-1,-1)
@@ -82,3 +89,4 @@ if __name__=='__main__':
   test_partition()
   test_simple_partition()
   test_fast_compress()
+  test_local_fast_compress()
