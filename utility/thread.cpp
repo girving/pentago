@@ -13,6 +13,7 @@
 #include <other/core/utility/process.h>
 #include <other/core/utility/stl.h>
 #include <other/core/geometry/Box.h>
+#include <stdio.h>
 #include <deque>
 #include <set>
 namespace pentago {
