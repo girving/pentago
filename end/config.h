@@ -5,7 +5,9 @@
 #error "mpi.h already included"
 #endif
 
+// Remove obsolete C++ bindings
 #define OMPI_SKIP_MPICXX 1
+#define MPICH_SKIP_MPICXX 1
 
 // Whether to enable expensive consistency checking
 #define PENTAGO_MPI_DEBUG 0
