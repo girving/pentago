@@ -142,7 +142,7 @@ void supertensor_header_t::pack(RawArray<uint8_t> buffer) const {
   OTHER_ASSERT(buffer.size()==header_size);
   int next = 0;
   #define FIELD(f) ({ \
-    OTHER_ASSERT(next+sizeof(f)<=header_size); \
+    OTHER_ASSERT(next+sizeof(f)<=size_t(header_size)); \
     const auto le = to_little_endian(f); \
     memcpy(buffer.data()+next,&le,sizeof(le)); \
     next += sizeof(le); });
@@ -156,7 +156,7 @@ supertensor_header_t supertensor_header_t::unpack(RawArray<const uint8_t> buffer
   supertensor_header_t h;
   int next = 0;
   #define FIELD(f) ({ \
-    OTHER_ASSERT(next+sizeof(h.f)<=header_size); \
+    OTHER_ASSERT(next+sizeof(h.f)<=size_t(header_size)); \
     decltype(h.f) le; \
     memcpy(&le,buffer.data()+next,sizeof(le)); \
     h.f = to_little_endian(le); \

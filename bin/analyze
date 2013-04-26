@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
 from __future__ import division
-import precompute
 from other.core import *
 from other.core.value import parser
 from pentago import *
+from pentago.base import precompute
 
 def random_board(n):
   s = hstack([16*q+arange(9) for q in xrange(4)])

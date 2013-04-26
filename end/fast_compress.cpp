@@ -54,7 +54,7 @@ static inline int fast_uncompress_helper(RawArray<const uint8_t> compressed, Raw
     count = uncompressed_size/n;
   } else {
     OTHER_ASSERT((size_t)compressed.size()<=1+memory_usage(uncompressed) && !((compressed.size()-1)&(n-1)));
-    memcpy(uncompressed.data(),compressed.data()+1,memory_usage(uncompressed));
+    memcpy(uncompressed.data(),compressed.data()+1,compressed.size()-1);
     count = compressed.size()/n;
   }
   // Unfilter
@@ -69,7 +69,12 @@ void fast_uncompress(RawArray<const uint8_t> compressed, RawArray<Vector<super_t
     die("fast_uncompress: expected count %d, got %d, event 0x%llx",uncompressed.size(),count,event);
 }
 
+#ifdef __clang__
+// __thread is broken under clang on BlueGene, so use pthread function calls instead
 #define USE_PTHREADS 1
+#else
+#define USE_PTHREADS 0
+#endif
 
 #if USE_PTHREADS
 static pthread_key_t buffer_key;

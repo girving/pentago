@@ -136,7 +136,7 @@ int toplevel(int argc, char** argv) {
   report(comm,"mpi");
 
   // Check tag space
-  const int required_tag_ub = (1<<(15+6+2))-1;
+  const int required_tag_ub = (1<<(14+6+2))-1;
   int tag_ub = 0;
   {
     int success = false;
@@ -146,7 +146,7 @@ int toplevel(int argc, char** argv) {
       error("tag upper bound lookup failed");
     tag_ub = *(int*)value;
     if (tag_ub<required_tag_ub)
-      error("tag upper bound is only %d, need at least %d: 15 bits for line, 6 for block, 2 for dimension",tag_ub,required_tag_ub);
+      error("tag upper bound is only %d, need at least %d: 14 bits for line, 6 for block, 2 for dimension",tag_ub,required_tag_ub);
   }
 
   // Parse command line options
@@ -414,7 +414,7 @@ int toplevel(int argc, char** argv) {
       prev_size = size;
     }
     cout << "heap size = "<<heap_size<<endl;
-    const int min_heap_size = 1<<26;
+    const uint64_t min_heap_size = 1<<26;
     if (heap_size < min_heap_size) {
       cout << "raising heap size to a minimum of "<<min_heap_size<<endl;
       heap_size = min_heap_size;

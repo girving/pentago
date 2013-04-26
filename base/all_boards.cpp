@@ -230,8 +230,7 @@ uint64_t all_boards_stats(int n, int symmetries) {
   int reduced_sections = 0;
   uint64_t max_section = 0;
   Box<uint64_t> blocks = 0;
-  Box<uint64_t> slices1 = 0;
-  Box<uint64_t> slices2 = 0;
+  Box<uint64_t> lines = 0;
   uint64_t total = 0;
   uint64_t reduced_total = 0;
   for (section_t s : sections) {
@@ -247,16 +246,14 @@ uint64_t all_boards_stats(int n, int symmetries) {
                  hip = hi.product();
       blocks.min += lop;
       blocks.max += hip;
-      slices1.min += lop?lop/lo.x+lop/lo.y+lop/lo.z+lop/lo.w:0;
-      slices1.max += hip/hi.x+hip/hi.y+hip/hi.z+hip/hi.w;
-      slices2.min += lo.x*lo.y+lo.z*lo.w;
-      slices2.max += hi.x*hi.y+hi.z*hi.w;
+      lines.min += lop?lop/lo.x+lop/lo.y+lop/lo.z+lop/lo.w:0;
+      lines.max += hip/hi.x+hip/hi.y+hip/hi.z+hip/hi.w;
       reduced_total += size;
     }
   }
   const uint64_t exact = count_boards(n,2048);
-  cout << format("n = %2d, simple count = %17s, ratio = %5.3f (unreduced %5.3f), sections = %*d (unreduced %5d), blocks = %9lld %9lld, slices = %8lld %9lld / %7lld %7lld, max section = %14s, mean = %.4g",
-    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,slices1.min,slices1.max,slices2.min,slices2.max,large(max_section),(double)reduced_total/reduced_sections) << endl;
+  cout << format("n = %2d, simple count = %17s, ratio = %5.3f (unreduced %5.3f), sections = %*d (unreduced %5d), blocks = %9lld %9lld, lines = %8lld %9lld, max section = %14s, mean = %.4g",
+    n,large(reduced_total),(double)reduced_total/exact,(double)total/exact,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,lines.min,lines.max,large(max_section),(double)reduced_total/reduced_sections) << endl;
   OTHER_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;
 }
