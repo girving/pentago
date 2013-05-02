@@ -37,6 +37,7 @@ class requests_t : public boost::noncopyable {
   // List of callbacks registered by other threads for immediate call.
   spinlock_t immediate_lock;
   vector<job_base_t*> immediates;
+  volatile int immediate_count;
 #endif
 public:
 
@@ -69,6 +70,7 @@ public:
   void add_immediate(job_t&& job) {
     spin_t spin(immediate_lock);
     immediates.push_back(job.release());
+    immediate_count++;
   }
 #endif
 };

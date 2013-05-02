@@ -7,14 +7,15 @@
 namespace pentago {
 namespace mpi {
 
-requests_t::requests_t() {}
+requests_t::requests_t()
+  : immediate_count(0) {}
 
 requests_t::~requests_t() {
   if (requests.size())
     die("request_t destructing before %zu requests are complete.  Refusing to wait without being told",requests.size());
 #if PENTAGO_MPI_FUNNEL
-  if (immediates.size())
-    die("request_t destructing before %zu immediates are complete",immediates.size());
+  if (immediate_count)
+    die("request_t destructing before %d immediates are complete",immediate_count);
 #endif
 }
 
@@ -74,14 +75,16 @@ void requests_t::waitsome() {
     }
 #if PENTAGO_MPI_FUNNEL
     // Check for messages from worker threads
-    { 
+    if (immediate_count) {
       // Pull callbacks off shared pile
       immediate_lock.lock();
-      const int n = immediates.size();
+      const int n = immediate_count;
       job_base_t* ready[n];
-      if (n)
+      if (n) {
+        immediate_count = 0;
         memcpy(ready,&immediates[0],sizeof(job_base_t*)*n);
-      immediates.clear();
+        immediates.clear();
+      }
       immediate_lock.unlock();
       // If we have any, run them
       if (n) {
@@ -101,7 +104,7 @@ void requests_t::waitsome() {
 void requests_t::cancel_and_waitall() {
 #if PENTAGO_MPI_FUNNEL
   spin_t spin(immediate_lock);
-  OTHER_ASSERT(!immediates.size());
+  OTHER_ASSERT(!immediate_count);
 #endif
   callbacks.clear();
   for (int i=0;i<requests.size();i++) {
