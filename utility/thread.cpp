@@ -98,6 +98,8 @@ thread_type_t thread_type() {
   return table->type;
 }
 
+#if PENTAGO_TIMING
+
 static inline time_entry_t& time_entry(time_kind_t kind) {
   auto table = (time_table_t*)pthread_getspecific(time_info.key);
   OTHER_ASSERT(table);
@@ -125,6 +127,8 @@ void thread_time_t::stop() {
     entry = 0;
   }
 }
+
+#endif
 
 /****************** pthread locking *****************/
 

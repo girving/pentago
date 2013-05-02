@@ -76,6 +76,11 @@ const event_t block_line_ekind  = event_t(3)<<61;
 const event_t block_lines_ekind = event_t(5)<<61; // Used to be 4, but the format changed
 const event_t ekind_mask        = event_t(7)<<61;
 
+// Whether to enable timing
+#define PENTAGO_TIMING 1
+
+#if PENTAGO_TIMING
+
 class thread_time_t : public boost::noncopyable {
   time_entry_t* entry;
 public:
@@ -83,6 +88,17 @@ public:
   OTHER_EXPORT ~thread_time_t();
   OTHER_EXPORT void stop(); // Stop early
 };
+
+#else
+
+class thread_time_t : public boost::noncopyable {
+public:
+  thread_time_t(time_kind_t kind, event_t event) {}
+  ~thread_time_t() {}
+  void stop() {}
+};
+
+#endif
 
 // Extract local times and reset them to zero
 OTHER_EXPORT Array<wall_time_t> clear_thread_times();
