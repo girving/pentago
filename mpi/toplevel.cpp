@@ -366,7 +366,7 @@ int toplevel(int argc, char** argv) {
          << "\nfunnel = "<<PENTAGO_MPI_FUNNEL
          << "\ncompress = "<<PENTAGO_MPI_COMPRESS
          << "\ncompress outputs = "<<PENTAGO_MPI_COMPRESS_OUTPUTS
-         << "\ntiming = "<<PENTAGO_MPI_TIMING
+         << "\ntiming = "<<PENTAGO_TIMING
          << "\nsse = "<<PENTAGO_SSE
 #ifdef BOOST_BIG_ENDIAN
          << "\nendian = big"
