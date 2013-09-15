@@ -30,7 +30,9 @@ struct superentry_t {
 #if PENTAGO_SSE
 // Unfortunately, the alignment of __m128 is 16, so super_entry_t has 8 bytes
 // of unused padding.  Maybe we can use it to store a lock in future?
+#if !defined(__COVERITY__)
 static_assert(sizeof(superentry_t)==80,"");
+#endif
 #else
 // No padding here!
 static_assert(sizeof(superentry_t)==72,"");
