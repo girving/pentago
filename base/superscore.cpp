@@ -103,7 +103,7 @@ static void super_win_test(int steps) {
 
   // Test super_wins
   Ref<Random> random = new_<Random>(1740291);
-  Array<int> counts = IdentityMap(37).copy();
+  Array<int> counts = arange(37).copy();
   swap(counts[0],counts[5]);
   for (int count : counts) {
     // Determine how many stones we need to pick with replacement to get roughly count stones

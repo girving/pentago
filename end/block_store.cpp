@@ -86,7 +86,7 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, RawAr
         sample_counts[block_info(*local_id).flat_id]++;
     }
   }
-  const_cast_(samples) = NestedArray<sample_t>(sample_counts,false);
+  const_cast_(samples) = Nested<sample_t>(sample_counts,false);
 
   // Prepare to collect random samples from each block.  Note that this duplicates the loop from above.
   for (const auto section : sections->sections) {

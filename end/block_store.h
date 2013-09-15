@@ -7,7 +7,7 @@
 #include <pentago/end/config.h>
 #include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
-#include <other/core/array/NestedArray.h>
+#include <other/core/array/Nested.h>
 #if PENTAGO_MPI_COMPRESS
 #include <pentago/end/compacting_store.h>
 #endif
@@ -68,7 +68,7 @@ public:
     int index; // Index into flattened block data array
     Vector<super_t,2> wins;
   };
-  const NestedArray<sample_t> samples;
+  const Nested<sample_t> samples;
 
 private:
   OTHER_EXPORT block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store);

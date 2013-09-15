@@ -79,7 +79,7 @@ mpi_world_t::mpi_world_t(int& argc, char**& argv) {
     die("Insufficent MPI thread support: required = %s, provided = %s",str_thread_support(required),str_thread_support(provided));
 
   // Call die instead of throwing exceptions from OTHER_ASSERT, OTHER_NOT_IMPLEMENTED, and THROW.
-  debug::set_error_callback(static_cast<debug::ErrorCallback>(mpi_die_helper));
+  set_error_callback(static_cast<ErrorCallback>(mpi_die_helper));
   die_callback = mpi_die_helper;
   throw_callback = mpi_die_helper;
 

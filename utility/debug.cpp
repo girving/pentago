@@ -20,7 +20,7 @@ void set_verbose(bool verbose) {
   verbose_ = verbose;
 }
 
-debug::ErrorCallback throw_callback, die_callback;
+ErrorCallback throw_callback, die_callback;
 
 void die_helper(const string& msg) {
   if (die_callback)

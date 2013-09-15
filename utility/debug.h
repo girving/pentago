@@ -15,10 +15,10 @@ OTHER_EXPORT void set_verbose(bool verbose);
   (pentago::maybe_throw<Error>(__VA_ARGS__))
 
 // If nonzero, this function is called instead of throwing an exception.
-OTHER_EXPORT extern debug::ErrorCallback throw_callback;
+OTHER_EXPORT extern ErrorCallback throw_callback;
 
 // If nonzero, die_helper calls this function to quit
-OTHER_EXPORT extern debug::ErrorCallback die_callback;
+OTHER_EXPORT extern ErrorCallback die_callback;
   
 // Print a message and abort without formatting
 OTHER_EXPORT void OTHER_NORETURN(die_helper(const string& msg)) OTHER_COLD;

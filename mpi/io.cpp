@@ -211,7 +211,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     CHECK(MPI_Type_commit(&block_blob_datatype));
 
     // Construct send buffer
-    const NestedArray<block_blob_t> send_buffer(send_counts,false);
+    const Nested<block_blob_t> send_buffer(send_counts,false);
     const auto remaining = send_counts.copy();
     for (const int b : range(local_blocks)) {
       const auto& info = *flat_info[b]; 
@@ -236,7 +236,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     }
 
     // Communicate
-    const NestedArray<block_blob_t> recv_buffer(recv_counts,false);
+    const Nested<block_blob_t> recv_buffer(recv_counts,false);
     CHECK(MPI_Alltoallv(send_buffer.flat.data(),send_counts.data(),send_buffer.offsets.const_cast_().data(),block_blob_datatype,
                         recv_buffer.flat.data(),recv_counts.data(),recv_buffer.offsets.const_cast_().data(),block_blob_datatype,comm));
     CHECK(MPI_Type_free(&block_blob_datatype));

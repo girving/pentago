@@ -6,7 +6,7 @@ from other.core import *
 from other.core.value import parser
 from other.core.utility import tryfile
 from other.gui import *
-from pentago.interface import *
+from pentago.bin.interface import *
 from OpenGL import GL
 import glob
 

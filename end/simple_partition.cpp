@@ -286,7 +286,7 @@ Vector<uint64_t,2> simple_partition_t::rank_offsets(int rank) const {
 
 Array<const line_t> simple_partition_t::rank_lines(int rank) const {
   auto lines = rank_lines(rank,true);
-  lines.append_elements(rank_lines(rank,false));
+  lines.extend(rank_lines(rank,false));
   return lines;
 }
 

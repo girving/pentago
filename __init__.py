@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
-from .interface import *
 import pentago_core
+from pentago_core import *
 
 def large(n):
   s = str(n)

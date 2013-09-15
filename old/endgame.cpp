@@ -12,7 +12,7 @@
 #include <pentago/utility/debug.h>
 #include <other/core/array/Array2d.h>
 #include <other/core/array/Array4d.h>
-#include <other/core/array/NestedArray.h>
+#include <other/core/array/Nested.h>
 #include <other/core/array/IndirectArray.h>
 #include <other/core/math/integer_log.h>
 #include <other/core/python/wrap.h>
@@ -106,7 +106,7 @@ static void endgame_sparse_verify(RawArray<const board_t> boards, RawArray<const
   OTHER_ASSERT(boards.size()==wins.size());
   OTHER_ASSERT((unsigned)samples<=(unsigned)boards.size());
   // Check samples in random order
-  Array<int> permutation = IdentityMap(boards.size()).copy();
+  Array<int> permutation = arange(boards.size()).copy();
   ProgressIndicator progress(samples,true);
   for (int i=0;i<samples;i++) {
     swap(permutation[i],permutation[random.uniform<int>(i,boards.size())]);
@@ -244,16 +244,16 @@ struct sparse_sample_t : public Object {
 
   const supertensor_header_t header;
   const Vector<int,4> blocks;
-  const NestedArray<const Vector<int,4>> samples;
-  const NestedArray<board_t> block_boards;
-  const NestedArray<Vector<super_t,2>> block_wins;
+  const Nested<const Vector<int,4>> samples;
+  const Nested<board_t> block_boards;
+  const Nested<Vector<super_t,2>> block_wins;
 
   sparse_sample_t(const supertensor_writer_t& writer, int count)
     : header(writer.header)
     , blocks(header.blocks)
     , samples(random_samples(count))
-    , block_boards(NestedArray<board_t>::zeros_like(samples))
-    , block_wins(NestedArray<Vector<super_t,2>>::zeros_like(samples)) {}
+    , block_boards(Nested<board_t>::zeros_like(samples))
+    , block_wins(Nested<Vector<super_t,2>>::zeros_like(samples)) {}
 
   int block_index(const Vector<uint8_t,4>& block) const {
     OTHER_ASSERT(   (unsigned)block[0]<(unsigned)blocks[0]
@@ -263,7 +263,7 @@ struct sparse_sample_t : public Object {
     return ((block[0]*blocks[1]+block[1])*blocks[2]+block[2])*blocks[3]+block[3];
   }
 
-  NestedArray<const Vector<int,4>> random_samples(int count) const {
+  Nested<const Vector<int,4>> random_samples(int count) const {
     OTHER_ASSERT(count>=0);
     const int block_size = header.block_size;
     const Vector<int,4> shape = header.section.shape();
@@ -275,7 +275,7 @@ struct sparse_sample_t : public Object {
         I[a] = random->uniform<int>(0,shape[a]);
       counts[I/block_size]++; 
     }
-    NestedArray<Vector<int,4>> samples(counts.flat,false);
+    Nested<Vector<int,4>> samples(counts.flat,false);
     for (const Vector<int,4>& I : flat_samples) {
       const auto block = I/block_size;
       const int b = block_index(Vector<uint8_t,4>(block));
