@@ -120,7 +120,7 @@ static section_t standardize_section(section_t s, int symmetries) {
 
 bool section_t::valid() const {
   for (int i=0;i<4;i++)
-    if (!(0<=counts[i].x && 0<=counts[i].y && counts[i].sum()<=9))
+    if ((int)counts[i].x+counts[i].y > 9)
       return false;
   const int black = counts[0].x+counts[1].x+counts[2].x+counts[3].x,
             white = counts[0].y+counts[1].y+counts[2].y+counts[3].y;

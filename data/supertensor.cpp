@@ -49,7 +49,7 @@ static PyObject* to_python(const supertensor_header_t& h) {
 #endif
 
 Vector<int,4> supertensor_header_t::block_shape(Vector<uint8_t,4> block) const {
-  OTHER_ASSERT(block.min()>=0 && all_less_equal(Vector<uint16_t,4>(block),blocks));
+  OTHER_ASSERT(all_less_equal(Vector<uint16_t,4>(block),blocks));
   Vector<int,4> bs;
   for (int i=0;i<4;i++)
     bs[i] = block[i]+1<blocks[i]?block_size:shape[i]-block_size*(blocks[i]-1);

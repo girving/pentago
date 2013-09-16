@@ -3,6 +3,7 @@
 from __future__ import division
 from other.core import *
 from pentago import *
+from pentago.bin.interface import *
 
 randint = random.randint
 

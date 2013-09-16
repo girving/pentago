@@ -108,12 +108,14 @@ void trace_check(bool aggressive, int depth, board_t board, superinfo_t info, co
   info.wins = transform_super(symmetry,info.wins);
   // Compare with what we know
   const superinfo_t* known_info = known.get_pointer(tuple(depth,board));
-  const super_t errors = known_info?(known_info->wins^info.wins)&known_info->known&info.known:super_t(0);
-  if (errors) {
-    const uint8_t r = first(errors);
-    cout << format("trace check failed in %s: depth %d, board %lld, aggressive %d, stones %d, rotation %d, correct %d, got %d",
-      context,depth,board,aggressive,count_stones(board),r,known_info->wins(r),info.wins(r))<<endl;
-    trace_error(aggressive,depth,board,format("%s.trace_check",context).c_str());
+  if (known_info) {
+    const super_t errors = (known_info->wins^info.wins)&known_info->known&info.known;
+    if (errors) {
+      const uint8_t r = first(errors);
+      cout << format("trace check failed in %s: depth %d, board %lld, aggressive %d, stones %d, rotation %d, correct %d, got %d",
+        context,depth,board,aggressive,count_stones(board),r,known_info->wins(r),info.wins(r))<<endl;
+      trace_error(aggressive,depth,board,format("%s.trace_check",context).c_str());
+    }
   }
 }
 

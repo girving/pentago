@@ -280,7 +280,7 @@ Vector<uint64_t,2> simple_partition_t::rank_offsets(int rank) const {
   if (start.x==owner_lines.size())
     return vec(sections->total_blocks,sections->total_nodes);
   const auto& chunk = owner_lines[start.x];
-  return vec(chunk.block_id+chunk.length*start.y,
+  return vec(chunk.block_id+(uint64_t)chunk.length*start.y,
              chunk.node_offset+(uint64_t)chunk.line_size*start.y);
 }
 
@@ -414,7 +414,7 @@ uint64_t simple_partition_t::block_to_id(section_t section, Vector<uint8_t,4> bl
   const auto I = block_to_line(section,block);
   const auto& chunk = owner_lines[I.x];
   const int j = block[chunk.dimension];
-  return chunk.block_id+chunk.length*I.y+j;
+  return chunk.block_id+(uint64_t)chunk.length*I.y+j;
 }
 
 void simple_partition_test() {

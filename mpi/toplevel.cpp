@@ -123,6 +123,7 @@ static void write_meaningless(const MPI_Comm comm, const string& dir, const int 
     FILE* file = fopen(name.c_str(),"wb");
     if (!file)
       die("failed to touch '%s': %s",name,strerror(errno));
+    fclose(file);
   }
 }
 

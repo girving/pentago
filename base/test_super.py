@@ -2,6 +2,7 @@
 
 from __future__ import division
 from pentago import *
+import pentago_core as engine
 
 def test_wins():
   try:

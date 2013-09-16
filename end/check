@@ -9,11 +9,13 @@ from other.core.value import parser
 import hashlib
 import glob
 import sys
+import re
 
 # Parse properties
 props = PropManager()
 old_dir = props.add('old','../old-data-15july2012')
-dirs = props.add('dir',[]).set_required(1)
+dirs = props.add('dir',None).set_required(1)
+dirs.set([])
 parser.parse(props,'Compare MPI results with out-of-core results',positional=[dirs])
 old_dir = old_dir()
 

@@ -58,7 +58,7 @@ score_t lookup(board_t board) {
   assert(table_type!=blank_table);
   STAT(total_lookups++);
   uint64_t h = hash_board(board);
-  uint64_t entry = table[h&((1<<table_bits)-1)];
+  uint64_t entry = table[h&(((uint64_t)1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits) {
     STAT(successful_lookups++);
     return entry&score_mask;
@@ -69,14 +69,14 @@ score_t lookup(board_t board) {
 void store(board_t board, score_t score) {
   assert(table_type!=blank_table);
   uint64_t h = hash_board(board);
-  uint64_t& entry = table[h&((1<<table_bits)-1)];
+  uint64_t& entry = table[h&(((uint64_t)1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
 }
 
 Tuple<Array<board_t>,Array<score_t> > read_table(int max_count, int min_depth) {
   OTHER_ASSERT(table_bits>=10 && table_type!=blank_table);
-  const uint64_t size = (1<<table_bits)-1;
+  const uint64_t size = ((uint64_t)1<<table_bits)-1;
   OTHER_ASSERT((uint64_t)table.size()==size);
   Array<board_t> boards;
   Array<score_t> scores;
