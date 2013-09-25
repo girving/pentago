@@ -23,7 +23,8 @@ namespace pentago {
 // Flip to enable history tracking
 #define HISTORY 0
 
-// Whether to use blocking pthread locking or nonblocking spinlocks
+// Whether to use blocking pthread locking or nonblocking spinlocks.
+// Use nonblocking mode (0) except for testing purposes.
 #define BLOCKING 0
 
 #if !OTHER_THREAD_SAFE
