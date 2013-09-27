@@ -14,8 +14,9 @@ import re
 # Parse properties
 props = PropManager()
 old_dir = props.add('old','../old-data-15july2012')
-dirs = props.add('dir',None).set_required(1)
+dirs = props.add('dir',None).set_required(1).set_hidden(1)
 dirs.set([])
+pad_io = props.add('pad_io',pentago_end_pad_io).set_help('whether or not to expect padding when checking sha1 hashes')
 parser.parse(props,'Compare MPI results with out-of-core results',positional=[dirs])
 old_dir = old_dir()
 
@@ -43,29 +44,32 @@ for dir in dirs():
 
     # Memorize the hashes of .pentago files from unit tests
     if meaningless:
-      hashes = {r'empty.pentago':'0e6efa078eacb8dd20787f09ec9b4693355bfda3'
-               ,r'meaningless-s4-r\d+/slice-0.pentago':'64ff1b2f49e25db61bf393c3de11ce74c7e52605'
-               ,r'meaningless-s4-r\d+/slice-1.pentago':'00fd7a12b67bb05b891d15cda1682d5c072b93c1'
-               ,r'meaningless-s5-r\d+/slice-0.pentago':'66b2d8a3327879fcb75b51644e4160a2066c605f'
-               ,r'meaningless-s5-r\d+/slice-1.pentago':'aa0d47a7c827b8ff8de50c16700e333f99602a39'
-               ,r'meaningless-s4-r0/slice-2.pentago':'2a2e6bf617c8624c7fd6cb4a74ea42439102f329'
-               ,r'meaningless-s4-r0/slice-3.pentago':'72a769dcf4fa47f881d4997785a0134e50b610aa'
-               ,r'meaningless-s4-r17/slice-2.pentago':'f54b5c1bea1261f01b75da2eb0a2748d78eb6b39'
-               ,r'meaningless-s4-r17/slice-3.pentago':'7754a4235a373f5c5f00d78957e5caa996c27928'
-               ,r'meaningless-s5-r0/slice-2.pentago':'ec29c1cc2d72eb92a2d204dcd92c8e3d37121d50'
-               ,r'meaningless-s5-r0/slice-3.pentago':'5c1bb0b5610cb8c46dec498b316aac7974ee055d'
-               ,r'meaningless-s5-r0/slice-4.pentago':'e0d48b631d3f12a61d33fea9822dc46ba70d8eb8'
-               ,r'meaningless-s5-r17/slice-2.pentago':'a9a6c589b4a58a5e773c62bc3d993a3000417c69'
-               ,r'meaningless-s5-r17/slice-3.pentago':'3e1b9ab9bbd75ba9d16fd95b303b16a6fe413d24'
-               ,r'meaningless-s5-r17/slice-4.pentago':'0a948c604ba9cc2d356ec125fc3d2131552eb478'
-               ,r'write-3/slice-3.pentago':'4241e562b57deecd6a948f682719f817e7cb44f2'
-               ,r'write-4/slice-4.pentago':'c42d21eaa6d881a7ef7c496e5ddbccc2f756d597'}
+      hashes = {r'empty.pentago':'0e6efa078eacb8dd20787f09ec9b4693355bfda3 2f500627ac2fe3f62d9670bfa3ce00cdd94537a8'
+               ,r'meaningless-s4-r0/slice-0.pentago':'64ff1b2f49e25db61bf393c3de11ce74c7e52605 5b677b0778edb5b6703e84fc85c002ed6f8c8085'
+               ,r'meaningless-s4-r17/slice-0.pentago':'64ff1b2f49e25db61bf393c3de11ce74c7e52605 7f2a056a7ca95129eaa1f2cc4fbd7cfefcab56bd'
+               ,r'meaningless-s4-r\d+/slice-1.pentago':'00fd7a12b67bb05b891d15cda1682d5c072b93c1 bbdf25459d2475f46683514f7ad1ae34224f2f64'
+               ,r'meaningless-s5-r0/slice-0.pentago':'66b2d8a3327879fcb75b51644e4160a2066c605f ae37f9af95ab20fd644cc890b2ababf7e20964ca'
+               ,r'meaningless-s5-r17/slice-0.pentago':'66b2d8a3327879fcb75b51644e4160a2066c605f f5ec8c9c3425443a981a0d4f406ad64883b2c8eb'
+               ,r'meaningless-s5-r\d+/slice-1.pentago':'aa0d47a7c827b8ff8de50c16700e333f99602a39 8c4ebf7867506c60ebd5d3f4a57ea7327d5c853d'
+               ,r'meaningless-s4-r0/slice-2.pentago':'2a2e6bf617c8624c7fd6cb4a74ea42439102f329 e9f829447980b2d427bf96002332704c65c37015'
+               ,r'meaningless-s4-r0/slice-3.pentago':'72a769dcf4fa47f881d4997785a0134e50b610aa db33d83c472e53fcf669e8c75bd277f8c5caecf7'
+               ,r'meaningless-s4-r17/slice-2.pentago':'f54b5c1bea1261f01b75da2eb0a2748d78eb6b39 23bdbf069ecd68c01524a4b6075bcaba03613a9e'
+               ,r'meaningless-s4-r17/slice-3.pentago':'7754a4235a373f5c5f00d78957e5caa996c27928 9b06ad92f6a9ec982944d93438f8b40cb3cf763f'
+               ,r'meaningless-s5-r0/slice-2.pentago':'ec29c1cc2d72eb92a2d204dcd92c8e3d37121d50 6d1c0774631a5260b4ae2a22658f7f5b1036fc2e'
+               ,r'meaningless-s5-r0/slice-3.pentago':'5c1bb0b5610cb8c46dec498b316aac7974ee055d f3ff4a5b2b78060c7d32d5c18b6f8ff9f6276f3d'
+               ,r'meaningless-s5-r0/slice-4.pentago':'e0d48b631d3f12a61d33fea9822dc46ba70d8eb8 3f6d11649725a13b11774f889e181642ac63b41d'
+               ,r'meaningless-s5-r17/slice-2.pentago':'a9a6c589b4a58a5e773c62bc3d993a3000417c69 6c0438587aaac9a7d64815f9d629f1efeaa86183'
+               ,r'meaningless-s5-r17/slice-3.pentago':'3e1b9ab9bbd75ba9d16fd95b303b16a6fe413d24 539650866f5e742555b74cc39553b4b181220245'
+               ,r'meaningless-s5-r17/slice-4.pentago':'0a948c604ba9cc2d356ec125fc3d2131552eb478 5bfb025e5729d39dc7785f75baae8099510656cc'
+               ,r'write-3/slice-3.pentago':'4241e562b57deecd6a948f682719f817e7cb44f2 f12bc166507f4b31bf877f41583a989d32b3876c'
+               ,r'write-4/slice-4.pentago':'c42d21eaa6d881a7ef7c496e5ddbccc2f756d597 bae84659c091f92add4f3fa7725210fb0a0212eb'}
       hashes = [(re.compile('.*/%s$'%k),v) for k,v in hashes.items()]
       def check_hash(file):
         for p,h in hashes:
           if p.match(file):
             h2 = hashlib.sha1(open(file).read()).hexdigest()
             Log.write('sha1sum %s = %s'%(os.path.basename(file),h2))
+            h = h.split()[pad_io()]
             if h != h2:
               raise ValueError('%s: expected sha1sum %s, got %s'%(file,h,h2))
             break
@@ -121,7 +125,12 @@ for dir in dirs():
           if os.path.exists(slice_file):
             check_hash(slice_file)
             readers = open_supertensors(slice_file)
-            assert 20+3*4+sum(reader.total_size() for reader in readers)==os.stat(slice_file).st_size
+            expected_size = 20+3*4+sum(reader.total_size() for reader in readers)
+            actual_size = os.stat(slice_file).st_size
+            if pad_io():
+              assert expected_size <= actual_size
+            else:
+              assert expected_size == actual_size
             assert len(counts)==len(readers)
             unchecked.remove(slice_file)
 

@@ -49,6 +49,10 @@ const bool snappy_filter = true;
 // This significantly improves latency.
 const int wildcard_recv_count = 8;
 
+// If true, pad output formats to avoid degenerate calls to MPI_File_write_at_all.
+// This will hopefully work around a bug in Cray MPI.
+const bool pad_io = true;
+
 using namespace pentago;
 
 }

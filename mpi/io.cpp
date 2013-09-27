@@ -130,7 +130,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   const auto sections = partition.sections->sections.raw();
   const auto& section_id = partition.sections->section_id;
   const uint64_t header_size = supertensor_magic_size+3*sizeof(uint32_t)+supertensor_header_t::header_size*sections.size();
-  uint64_t local_size = 0;
+  uint64_t local_size = pad_io;
   uint64_t previous = 0;
   {
     thread_time_t time(write_sections_kind,event);
@@ -158,6 +158,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
       block_blobs[b].compressed_size = compressed[b].size();
       block_blobs[b+1].offset = block_blobs[b].offset+compressed[b].size();
     }
+    block_blobs.back().offset += pad_io;
     OTHER_ASSERT(block_blobs.back().offset==header_size+previous+local_size);
   }
 
@@ -171,6 +172,8 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
       next += c.size();
       c.clean_memory();
     }
+    if (pad_io)
+      buffer[next++] = 0;
     OTHER_ASSERT(next==buffer.size());
     vector<Array<uint8_t>>().swap(compressed);
 
@@ -266,7 +269,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
   // Compute block index offsets
   thread_time_t time(write_sections_kind,event);
-  uint64_t local_block_indexes_size = 0;
+  uint64_t local_block_indexes_size = pad_io;
   for (const int sid : section_range)
     local_block_indexes_size += compressed_block_indexes[sid-section_range.lo].size();
   OTHER_ASSERT(local_block_indexes_size<(1u<<31));
@@ -277,13 +280,15 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   // Send all block index blobs to root
   Array<supertensor_blob_t> index_blobs(sections.size(),false);
   memset(index_blobs.data(),0,sizeof(supertensor_blob_t)*sections.size());
-  uint64_t next_block_index_offset = local_block_index_start;
-  for (const int sid : section_range) {
-    auto& blob = index_blobs[sid];
-    blob.uncompressed_size = sizeof(supertensor_blob_t)*section_blocks(sections[sid]).product();
-    blob.compressed_size = compressed_block_indexes[sid-section_range.lo].size();
-    blob.offset = next_block_index_offset;
-    next_block_index_offset += blob.compressed_size;
+  {
+    uint64_t next_block_index_offset = local_block_index_start;
+    for (const int sid : section_range) {
+      auto& blob = index_blobs[sid];
+      blob.uncompressed_size = sizeof(supertensor_blob_t)*section_blocks(sections[sid]).product();
+      blob.compressed_size = compressed_block_indexes[sid-section_range.lo].size();
+      blob.offset = next_block_index_offset;
+      next_block_index_offset += blob.compressed_size;
+    }
   }
   CHECK(MPI_Reduce(rank?index_blobs.data():MPI_IN_PLACE,index_blobs.data(),sizeof(supertensor_blob_t)/sizeof(uint64_t)*sections.size(),datatype<uint64_t>(),MPI_SUM,0,comm));
   if (rank)
@@ -291,11 +296,16 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
 
   // Concatenate compressed block indexes into one buffer
   Array<uint8_t> all_block_indexes(local_block_indexes_size,false);
-  uint64_t next_block_index = 0;
-  for (const int sid : section_range) {
-    const auto block_index = compressed_block_indexes[sid-section_range.lo].raw();
-    memcpy(all_block_indexes.data()+next_block_index,block_index.data(),block_index.size());
-    next_block_index += block_index.size();
+  {
+    int next_block_index = 0;
+    for (const int sid : section_range) {
+      const auto block_index = compressed_block_indexes[sid-section_range.lo].raw();
+      memcpy(all_block_indexes.data()+next_block_index,block_index.data(),block_index.size());
+      next_block_index += block_index.size();
+    }
+    if (pad_io)
+      all_block_indexes[next_block_index++] = 0;
+    OTHER_ASSERT(next_block_index==all_block_indexes.size());
   }
 
   // Write all block indexes

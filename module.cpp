@@ -1,6 +1,8 @@
 // Pentago python module
 
+#include <pentago/end/config.h>
 #include <other/core/python/module.h>
+#include <other/core/python/wrap.h>
 
 OTHER_PYTHON_MODULE(pentago_core) {
   OTHER_WRAP(board)
@@ -39,4 +41,7 @@ OTHER_PYTHON_MODULE(pentago_core) {
   OTHER_WRAP(load_balance)
   OTHER_WRAP(store_block_cache)
   OTHER_WRAP(compacting_store)
+
+  // Configuration
+  OTHER_OBJECT_2(pentago_end_pad_io,pentago::end::pad_io)
 }
