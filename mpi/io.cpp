@@ -277,7 +277,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   // Send all block index blobs to root
   Array<supertensor_blob_t> index_blobs(sections.size(),false);
   memset(index_blobs.data(),0,sizeof(supertensor_blob_t)*sections.size());
-  int next_block_index_offset = local_block_index_start;
+  uint64_t next_block_index_offset = local_block_index_start;
   for (const int sid : section_range) {
     auto& blob = index_blobs[sid];
     blob.uncompressed_size = sizeof(supertensor_blob_t)*section_blocks(sections[sid]).product();
