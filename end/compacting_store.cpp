@@ -27,7 +27,7 @@ static const int alignment = 128;
 static const int alignment = 64;
 #endif
 
-static const uint64_t align_size(const uint64_t size) {
+static uint64_t align_size(const uint64_t size) {
   return (size+alignment-1)&~(alignment-1);
 }
 
