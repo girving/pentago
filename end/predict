@@ -84,6 +84,7 @@ max_base_memory = 0
 min_lines = 1<<30
 max_total_memory = 0
 max_save_memory = 0
+total_save_bytes = 0
 total_outputs = total_inputs = 0
 for slice in reversed(xrange(len(slices))):
   if not len(slices[slice].sections):
@@ -123,6 +124,9 @@ for slice in reversed(xrange(len(slices))):
       save_memory = 64*max(load.block_nodes)
       Log.write('save memory = %s'%large(save_memory))
       max_save_memory = max(max_save_memory,save_memory)
+      save_bytes = 64*partition.sections.total_nodes
+      Log.write('save size = %s'%large(save_bytes))
+      total_save_bytes += save_bytes
 with Log.scope('summary'):
   Log.write('lines = %d'%max_lines)
   Log.write('blocks = %d'%max_blocks)
@@ -133,4 +137,5 @@ with Log.scope('summary'):
   Log.write('save memory = %s'%large(max_save_memory))
   Log.write('total inputs = %s'%large(total_inputs))
   Log.write('total outputs = %s'%large(total_outputs))
+  Log.write('save bytes = %s'%large(total_save_bytes))
   Log.write('time estimate = %g s'%((total_outputs+total_inputs)/speed_estimate/ranks/threads))
