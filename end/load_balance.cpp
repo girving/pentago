@@ -6,6 +6,7 @@
 #include <other/core/utility/curry.h>
 #include <other/core/utility/openmp.h>
 #include <other/core/python/Class.h>
+#include <other/core/utility/interrupts.h>
 namespace pentago {
 namespace end {
 
@@ -28,6 +29,7 @@ void load_balance_t::enlarge(const load_balance_t& load) {
 }
 
 static Ref<load_balance_t> local_load_balance(RawArray<const line_t> lines, RawArray<const local_block_t> blocks) {
+  check_interrupts();
   const auto load = new_<load_balance_t>();
   for (Box<int64_t>& box : load->boxes())
     box = 0;
