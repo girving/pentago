@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+'''Symmetry-related exploration'''
+
+from __future__ import division
+import os
+import sys
+from geode import *
+from geode.value import parser
+
+props = PropManager()
+adjacent = props.add('adjacent',False).set_help('require adjacent transpositions')
+avoid_hard = props.add('avoid_hard',False).set_help('avoid hard transpositions')
+parser.parse(props,'Explorations of the dihedral group')
+
+identity = asmatrix(eye(4,dtype=int))
+
+def permutation(*p):
+  A = zeros((len(p),)*2,int)
+  A[p,arange(len(p))] = 1
+  return asmatrix(A)
+
+def transposition(i,j):
+  p = arange(4)
+  p[i],p[j] = p[j],p[i]
+  return permutation(*p)
+
+def transpositions(adjacent):
+  if adjacent:
+    return [transposition(i,i+1) for i in xrange(3)]
+  else:
+    avoid = avoid_hard()
+    return [transposition(i,j) for i in xrange(4) for j in xrange(4) if i<j and (not avoid or j!=3 or i==2)]
+
+def untransposition(t):
+  for i in xrange(4):
+    for j in xrange(i+1,4):
+      if all(t==transposition(i,j)):
+        return i,j
+
+def pow(x,n):
+  if n==0:
+    return identity
+  else:
+    return x*pow(x,n-1)
+
+def prod(seq):
+  p = identity 
+  for x in seq:
+    p = p*x
+  return p
+
+def sequences(space,n):
+  if n==0:
+    yield ()
+  elif n==1:
+    for x in space:
+      yield (x,)
+  else:
+    for s in sequences(space,n-1):
+      for x in space:
+        yield s+(x,)
+
+def express(p,adjacent):
+  # Find all the minimal ways of expressing p as a product of transpositions
+  trans = transpositions(adjacent)
+  for n in xrange(20):
+    ways = [s for s in sequences(trans,n) if all(prod(s)==p)]
+    if ways:
+      return ways
+  assert False
+
+def dihedral():
+  # The generators of the dihedral group D_4
+  r = permutation(2,0,3,1) # 90 degree left rotation
+  s = permutation(3,1,2,0) # reflection about x = y line
+  # Express each element of the dihedral group as a product of transpositions
+  offsets = [0]
+  for i in 0,1:
+    for j in xrange(4):
+      ways = express(pow(s,i)*pow(r,j),adjacent())
+      offsets.append(offsets[-1]+len(ways[0]))
+      print 's^%d r^%d ='%(i,j)
+      for way in ways:
+        print '  %s'%''.join('(%d%d)'%untransposition(t) for t in way)
+      print
+  print 'offsets = {%s}'%','.join(map(str,offsets))
+
+if __name__=='__main__':
+  dihedral()

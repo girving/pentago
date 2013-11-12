@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import division
-from other.core import *
-from other.core.value import parser
+from geode import *
+from geode.value import parser
 from pentago import *
 from pentago.base import precompute
 

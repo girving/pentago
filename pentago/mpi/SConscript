@@ -1,0 +1,9 @@
+Import('env library program')
+
+env = env.Clone(need_mpi=1,need_zlib=1,need_lzma=1,need_snappy=1)
+env.Append(CPPPATH=['..'],CXXFLAGS='-Wno-invalid-offsetof')
+library(env,'pentago_mpi',['pentago_core'],skip=['main.cpp'])
+
+env = env.Clone()
+env.Append(LIBS=['pentago_mpi','pentago_core','m'])
+program(env,'endgame-mpi','main.cpp')

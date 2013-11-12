@@ -6,8 +6,8 @@ import re
 import sys
 import optparse
 from interface import *
-from other.core import *
-from other.core.value import parser
+from geode import *
+from geode.value import parser
 
 # Properties
 props = PropManager()

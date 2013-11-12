@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from pentago import *
-from other.core import *
+from geode import *
 import time
 
 n = 1<<27

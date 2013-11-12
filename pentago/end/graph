@@ -1,0 +1,58 @@
+Format:
+
+action(args):
+  -- precondition
+  actions
+
+-----------------------
+
+accumulate(block):
+  -- finished uncompressed data arrives at owner rank
+  uncompress(block) 
+  accumulate(block)
+  count(block) if all accumulates are done
+  compress(block)
+
+compute(microline):
+  -- all input block data uncompressed into place 
+  
+
+---------------------------------------------------------------
+
+Data flows as follows:
+
+For each line L, we have a set of inputs blocks In(L) and output blocks Out(L).
+Each such block B is owned by a given process Owner(B).  Line L is computed
+on process Owner(L).
+
+1. At some point, P = Owner(L) allocates memory for L.                              - allocate_line_kind: line
+2. P sends requests to each Q = Owner(B) for B in In(L).                            - request_send_kind:  block_lines
+3. Each Q replies with compressed block data.                                       - response_send_kind: block_lines
+4. As requests arrive, they are uncompressed into L's input memory.                 - response_recv_kind: block_lines
+5. Once all inputs are in place, P schedules L's compute.                           - schedule_kind:      line
+6. When compute finishes, P wakes up the master thread                              - wakeup_kind:        line
+7. When compute finishes, P sends uncompressed output block data to Owner(Out(L)).  - output_send_kind:   block_line
+8. Each Q in Owner(Out(L)) receives new data, uncompresses the old data if          - output_recv_kind:   block_line
+   necessary, merges, counts if necessary, and compresses back into place.
+
+Progress.  We need to record events for each of these, along with their associated
+global block or line ids, and string everything together.
+
+-------------------------------------------------------------------
+
+Refresh:
+
+slice n: All positions with n total stones
+section s: All positions with given numbers of stones of each side in each quadrant.
+           Has the shape a 4D array.
+block b: An 8x8x8x8 block of a 4D section array
+line l: A 1D strip of blocks from a given section.
+
+Representation:
+
+Section: 32 bits (8 * 4 bits)
+Block index: 24 bits (4 * 6 bits)
+Block: 56 = 32+24 bits
+Line: 52 = 32+18+2 bits (section + dimension + 3/4 block)
+
+Microline: 52 + 0 (no need to record which microline we're dealing with)

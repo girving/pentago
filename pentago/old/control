@@ -1,0 +1,131 @@
+#!/usr/bin/env python
+
+from __future__ import division
+from geode import *
+from geode.value import parser
+from section import *
+from collections import defaultdict
+
+# Parse command line
+props = PropManager()
+add_section_props(props)
+command = props.add('command','').set_allowed('test'.split()).set_required(1).set_help('what to do')
+save = props.add('save',18).set_help('largest slice to save')
+seed = props.add('seed',-1).set_help('random seed, or negative for nondeterministic')
+end = props.add('end',36).set_help('pretend the game ends earlier for debugging purposes')
+parser.parse(props,'Pentago cluster submission script',positional=[command])
+command = command()
+save = save()
+end = end()
+
+### Define job types
+class job_t(object):
+  '''Expected fields: name, cmd, deps, priority
+     Expected methods: simulate()'''
+  pass
+
+class compute_t(object):
+  def __init__(self,section,deps,level=4):
+    s = show_section(section)
+    self.section = section
+    self.name = 'solve-%s'%s
+    self.cmd = './endgame --level %d %s'%(level,s)
+    self.deps = deps
+    self.priority = 0
+
+  def simulate(self,files):
+    section = self.section
+    if sum(section)!=end:
+      for child in section_children(section):
+        assert section_file(child) in files
+    files.add(section_file(section))
+
+class delete_t(object):
+  def __init__(self,section,deps):
+    self.section = section
+    self.name = 'clean-%s'%show_section(section)
+    self.cmd = 'rm %s'%section_file(section)
+    self.deps = deps
+    self.priority = 1
+
+  def simulate(self,files):
+    files.remove(section_file(self.section))
+
+def shash(section):
+  return tuple(ravel(section))
+
+def simulate(jobs):
+  # Build backwards map from dep to job
+  dependent = defaultdict(lambda:[])
+  for job in jobs:
+    for dep in job.deps:
+      dependent[dep].append(job) 
+
+  # Build degree map
+  available = []
+  degree = {}
+  for job in jobs:
+    degree[job] = len(job.deps)
+    if not job.deps:
+      available.append(job)
+
+  # Prepare
+  files = set()
+  random.seed(seed() if seed()>0 else None)
+
+  # Run jobs randomly
+  while available:
+    i = random.randint(len(available))
+    available[i],available[-1] = available[-1],available[i]
+    job = available.pop()
+    Log.write(job.cmd) 
+    job.simulate(files)
+    for d in dependent[job]:
+      degree[d] -= 1
+      if not degree[d]:
+        available.append(d)
+  return files
+
+def main():
+  Log.configure('control',0,0,100)
+
+  # Compute job list
+  with Log.scope('jobs'):
+    jobs = []
+    sjob = {}
+    sections = [all_boards_sections(n,symmetries()) for n in xrange(end+1)]
+    for n in xrange(end,-1,-1):
+      # Compute this slice
+      for section in sections[n]:
+        if end==36 or n<end:
+          deps = [sjob[shash(child)] for child in section_children(section)]
+        else:
+          deps = []
+        level = 26 if n<=save else 4
+        job = compute_t(section,deps,level)
+        sjob[shash(section)] = job
+        jobs.append(job)
+      # Delete the previous slice if desired
+      if save<=n<end:
+        for section in sections[n+1]:
+          deps = [sjob[shash(parent)] for parent in section_parents(section)]
+          jobs.append(delete_t(section,deps))
+      Log.write('n = %d, jobs = %d'%(n,len(jobs)))
+    # Check consistency
+    total = sum(len(s) for s in sections)
+    saved = sum(len(s) for s in sections[:save+1])
+    Log.write('total sections = %d, saved sections = %d, jobs = %d'%(total,saved,len(jobs)))
+    if end==36:
+      assert total==108204
+    assert len(jobs)==2*total-saved
+
+  # Simulate, for now
+  if command=='test':
+    with Log.scope('simulate'):
+      with Log.scope('tasks'):
+        files = simulate(jobs)
+      Log.write('remaining files = %d'%len(files))
+      assert len(files)==saved
+
+if __name__=='__main__':
+  main()
