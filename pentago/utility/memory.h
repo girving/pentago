@@ -38,6 +38,10 @@ template<class T,int d> static inline uint64_t memory_usage(const Array<T,d>& ar
   return sizeof(T)*array.flat.size();
 }
 
+template<class T,bool f> static inline uint64_t memory_usage(const Nested<T,f>& array) {
+  return memory_usage(array.offsets)+memory_usage(array.flat);
+}
+
 template<class TK,class T> static inline uint64_t memory_usage(const Hashtable<TK,T>& table) {
   return sizeof(HashtableEntry<TK,T>)*table.max_size();
 }

@@ -3,6 +3,7 @@
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/end/blocks.h>
+#include <pentago/end/restart_partition.h>
 #include <pentago/data/filter.h>
 #include <pentago/data/compress.h>
 #include <pentago/data/supertensor.h>
@@ -51,7 +52,7 @@ static void compress_and_store(Array<uint8_t>* dst, RawArray<supertensor_blob_t>
 }
 
 #if PENTAGO_MPI_COMPRESS
-static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* progress, Array<uint8_t>* dst, const block_store_t* blocks, local_id_t local_id, int level, bool turn) {
+static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* progress, Array<uint8_t>* dst, const readable_block_store_t* blocks, local_id_t local_id, int level, bool turn) {
 #else
 static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* progress, Array<uint8_t>* dst, RawArray<const Vector<super_t,2>> data, int level, bool turn) {
 #endif
@@ -64,7 +65,7 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
   const event_t event = unevent;
 #endif
 
-  // Adjust for the different format of block_store_t and apply interleave filtering
+  // Adjust for the different format of readable_block_store_t and apply interleave filtering
 #if PENTAGO_MPI_COMPRESS
   const auto filtered = data;
 #else
@@ -85,7 +86,7 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
   // Compress
   *dst = compress(char_view(filtered),level,event);
   // Tick
-  spin_t spin(progress->x); 
+  spin_t spin(progress->x);
   progress->y.progress();
 }
 
@@ -96,7 +97,7 @@ static void file_open(const MPI_Comm comm, const string& filename, MPI_File* fil
     die("failed to open '%s' for writing: %s",filename,error_string(r));
 }
 
-void write_sections(const MPI_Comm comm, const string& filename, const block_store_t& blocks, const int level) {
+void write_sections(const MPI_Comm comm, const string& filename, const readable_block_store_t& blocks, const int level) {
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   const auto& partition = *blocks.partition;
@@ -182,7 +183,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   }
 
   // Now we need to write the block indexes, which requires sending all block offsets in a given section
-  // to one processor for compression and writing.  
+  // to one processor for compression and writing.
   //
   // We used to take advantage of the fact that in the simple partitioning scheme each rank owns blocks
   // from at most a few sections, so it is reasonably efficient to send one message per rank per section.
@@ -201,7 +202,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     // Count the number of blobs to send to each process
     const Array<int> send_counts(ranks);
     for (const int b : range(local_blocks)) {
-      const auto& info = *flat_info[b]; 
+      const auto& info = *flat_info[b];
       const int sid = section_id.get(info.section);
       send_counts[partition_loop_inverse(sections.size(),ranks,sid)]++;
     }
@@ -217,7 +218,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
     const Nested<block_blob_t> send_buffer(send_counts,false);
     const auto remaining = send_counts.copy();
     for (const int b : range(local_blocks)) {
-      const auto& info = *flat_info[b]; 
+      const auto& info = *flat_info[b];
       const int sid = section_id.get(info.section);
       const int rank = partition_loop_inverse(sections.size(),ranks,sid);
       send_buffer(rank,--remaining[rank]) = tuple(sid,info.block,block_blobs[b]);
@@ -312,7 +313,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   CHECK(MPI_File_write_at_all(file,local_block_index_start,all_block_indexes.data(),all_block_indexes.size(),MPI_BYTE,MPI_STATUS_IGNORE));
   all_block_indexes.clean_memory();
   #define all_block_indexes hide_all_block_indexes
- 
+
   // On rank 0, write all section headers
   if (!rank) {
     Array<uint8_t> headers(header_size,false);
@@ -346,6 +347,151 @@ void write_sections(const MPI_Comm comm, const string& filename, const block_sto
   CHECK(MPI_File_close(&file));
 }
 
+static Ref<const restart_partition_t> read_partition(const MPI_Comm comm, RawArray<const Ref<const supertensor_reader_t>> tensors) {
+  Log::Scope scope("partition");
+  const int ranks = comm_size(comm),
+            rank = comm_rank(comm);
+
+  // On master, read supertensor header information and compute partition
+  const auto partition = !rank ? new_<restart_partition_t>(ranks,tensors) : Ptr<restart_partition_t>();
+
+
+  // Broadcast partition information to everyone
+  auto counts = !rank ? Vector<uint64_t,4>(partition->sections->slice,
+                                           partition->sections->sections.size(),
+                                           partition->partition.offsets.size(),
+                                           partition->partition.flat.size())
+                       : Vector<uint64_t,4>();
+  CHECK(MPI_Bcast(&counts,counts.m,datatype<uint64_t>(),0,comm));
+  const auto sections = !rank ? partition->sections->sections.const_cast_() : Array<section_t>(counts[1],false);
+  const auto offsets  = !rank ? partition->partition.offsets .const_cast_() : Array<int>(counts[2],false);
+  const auto flat     = !rank ? partition->partition.flat    .const_cast_() : Array<Tuple<int,Vector<uint8_t,4>>>(counts[3],false);
+  CHECK(MPI_Bcast(sections.data(),memory_usage(sections),MPI_BYTE,0,comm));
+  CHECK(MPI_Bcast(offsets.data() ,memory_usage(offsets) ,MPI_BYTE,0,comm));
+  CHECK(MPI_Bcast(flat.data()    ,memory_usage(flat)    ,MPI_BYTE,0,comm));
+
+  // Assemble result
+  return !rank ? ref(partition)
+               : new_<restart_partition_t>(ranks,new_<sections_t>(counts[0],sections),
+                                           Nested<Tuple<int,Vector<uint8_t,4>>>(offsets,flat));
+}
+
+static uint64_t file_size(const MPI_Comm comm, const string& filename) {
+  const int rank = comm_rank(comm);
+  uint64_t size;
+  if (!rank) {
+    struct stat st;
+    if (stat(filename.c_str(),&st))
+      die("read_sections: can't stat %s: %s",filename,strerror(errno));
+    size = st.st_size;
+  }
+  CHECK(MPI_Bcast(&size,1,datatype<uint64_t>(),0,comm));
+  return size;
+}
+
+Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store) {
+  Log::Scope scope("read sections");
+
+  // Read header infromation and compute partitions
+  const int ranks = comm_size(comm),
+            rank = comm_rank(comm);
+  const auto tensors = !rank ? open_supertensors(filename,CPU) : vector<Ref<const supertensor_reader_t>>();
+  const auto partition = read_partition(comm,tensors);
+
+  // Slurp in the entire file
+  const auto total_size = file_size(comm,filename);
+  Array<char> raw;
+  {
+    Log::Scope scope("read data");
+    const auto our_size = partition_loop(total_size,ranks,rank).size();
+    GEODE_ASSERT(our_size<uint64_t(numeric_limits<int>::max()));
+    raw.resize(our_size,false);
+    MPI_File file;
+    const int r = MPI_File_open(comm,(char*)filename.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
+    if (r != MPI_SUCCESS)
+      die("failed to open '%s' for reading: %s",filename,error_string(r));
+    CHECK(MPI_File_read_ordered(file,raw.data(),raw.size(),MPI_BYTE,MPI_STATUS_IGNORE));
+    CHECK(MPI_File_close(&file));
+  }
+
+  // Tell all processors where their data comes from
+  Array<supertensor_blob_t> blobs(partition->partition[rank].size(),false);
+  if (!rank) {
+    Nested<supertensor_blob_t,false> all_blobs;
+    for (const int r : range(ranks)) {
+      all_blobs.append_empty();
+      for (const auto& b : partition->partition[r])
+        all_blobs.append_to_back(tensors[b.x]->index[Vector<int,4>(b.y)]);
+    }
+    const auto sendcounts = all_blobs.sizes();
+    sendcounts *= 3;
+    const auto displs = (3*all_blobs.offsets).copy();
+    CHECK(MPI_Scatterv(all_blobs.flat.data(),sendcounts.data(),displs.data(),datatype<uint64_t>(),
+                       blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
+  } else
+    CHECK(MPI_Scatterv(0,0,0,datatype<uint64_t>(),
+                       blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
+
+  // Allocate ordered compressed memory
+  uint64_t compressed_total = 0;
+  Array<int> compressed_sizes(blobs.size());
+  for (const int b : range(blobs.size())) {
+    compressed_total += blobs[b].compressed_size;
+    compressed_sizes[b] = blobs[b].compressed_size;
+  }
+  GEODE_ASSERT(compressed_total<uint64_t(numeric_limits<int>::max()));
+  Nested<uint8_t> compressed(compressed_sizes);
+
+  // Just for fun, we rearrange the data using one-sided communication
+  {
+    Log::Scope scope("shuffle");
+    MPI_Win win;
+    CHECK(MPI_Win_create(raw.data(),raw.size(),1,MPI_INFO_NULL,comm,&win));
+    CHECK(MPI_Win_fence(MPI_MODE_NOPUT|MPI_MODE_NOPRECEDE,win));
+    for (const int b : range(blobs.size())) {
+      const auto blob = blobs[b];
+      const auto blob_range = blob.offset+range(blob.compressed_size);
+      for (const int r : range(partition_loop_inverse(total_size,ranks,blob_range.lo),
+                               partition_loop_inverse(total_size,ranks,blob_range.hi-1)+1)) {
+        const auto r_range = partition_loop(total_size,ranks,r);
+        GEODE_ASSERT(r_range.lo<blob_range.hi && blob_range.lo<r_range.hi);
+        const auto common = range(max(blob_range.lo,r_range.lo),min(blob_range.hi,r_range.hi));
+        CHECK(MPI_Get(&compressed(b,common.lo-blob_range.lo),common.size(),MPI_BYTE,
+                                  r,common.lo-   r_range.lo ,common.size(),MPI_BYTE,win));
+      }
+    }
+    CHECK(MPI_Win_fence(MPI_MODE_NOSUCCEED,win));
+    CHECK(MPI_Win_free(&win));
+    raw.clean_memory();
+  }
+
+  // Decompose data into block store
+  {
+    Log::Scope scope("decompress");
+    const bool turn = partition->sections->slice&1;
+    const auto blocks = new_<restart_block_store_t>(partition,rank,partition->rank_blocks(rank),store);
+    spinlock_t progress_lock;
+    ProgressIndicator progress(blobs.size());
+    for (const int b : range(blobs.size()))
+      threads_schedule(CPU,[=,&progress_lock,&progress](){
+        const auto filtered = decompress(compressed[b],blobs[b].uncompressed_size,unevent);
+        const auto unfiltered = large_buffer<Vector<super_t,2>>(filtered.size()/sizeof(Vector<super_t,2>),false);
+        for (const int i : range(unfiltered.size())) {
+          Vector<super_t,2> s;
+          memcpy(&s,&filtered[sizeof(s)*i],sizeof(s));
+          s = uninterleave_super(from_little_endian(s));
+          unfiltered[i] = !turn ? vec(s.x,~s.y) : vec(s.y,~s.x);
+        }
+        blocks->set(local_id_t(b),unfiltered);
+        spin_t spin(progress_lock);
+        progress.progress();
+      });
+    threads_wait_all_help();
+    blocks->store.freeze();
+    return blocks;
+  }
+}
+
 void check_directory(const MPI_Comm comm, const string& dir) {
   const int slice = 24;
   const int rank = comm_rank(comm);
@@ -357,7 +503,7 @@ void check_directory(const MPI_Comm comm, const string& dir) {
   write_sections(comm,format("%s/empty.pentago",dir),blocks,0);
 }
 
-void write_counts(const MPI_Comm comm, const string& filename, const block_store_t& blocks) {
+void write_counts(const MPI_Comm comm, const string& filename, const accumulating_block_store_t& blocks) {
   thread_time_t time(write_counts_kind,unevent);
   const sections_t& sections = blocks.sections;
 
@@ -388,7 +534,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const block_store
   // Pack numpy buffer.  Endianness is handled in the numpy header.
   Array<uint8_t> buffer(256+memory_usage(data),false);
   size_t data_size = fill_numpy_header(buffer,data);
-  GEODE_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size()); 
+  GEODE_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size());
   int header_size = buffer.size();
   buffer.resize(header_size+data_size,false,true);
   memcpy(buffer.data()+header_size,data.data(),data_size);
@@ -410,13 +556,13 @@ static inline void semiswap(Vector<super_t,2>& s) {
 #endif
 }
 
-void write_sparse_samples(const MPI_Comm comm, const string& filename, block_store_t& blocks) {
+void write_sparse_samples(const MPI_Comm comm, const string& filename, accumulating_block_store_t& blocks) {
   thread_time_t time(write_sparse_kind,unevent);
   const int rank = comm_rank(comm);
   const bool turn = blocks.sections->slice&1;
 
   // Mangle samples into correct output format in place
-  typedef block_store_t::sample_t sample_t;
+  typedef accumulating_block_store_t::sample_t sample_t;
   const RawArray<sample_t> samples = blocks.samples.flat;
   if (!turn) // Black to play
     for (auto& sample : samples) {

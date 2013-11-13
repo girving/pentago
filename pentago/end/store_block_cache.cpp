@@ -20,7 +20,7 @@ struct store_block_cache_t : public block_cache_t {
   GEODE_DECLARE_TYPE(GEODE_NO_EXPORT)
   typedef block_cache_t Base;
 
-  const Ref<const block_store_t> blocks;
+  const Ref<const readable_block_store_t> blocks;
 #if PENTAGO_MPI_COMPRESS
   const uint64_t memory_limit;
   mutable unordered_map<Tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
@@ -28,7 +28,7 @@ struct store_block_cache_t : public block_cache_t {
 #endif
 
 protected:
-  store_block_cache_t(const block_store_t& blocks, const uint64_t memory_limit)
+  store_block_cache_t(const readable_block_store_t& blocks, const uint64_t memory_limit)
     : blocks(ref(blocks))
 #if PENTAGO_MPI_COMPRESS
     , memory_limit(memory_limit)
@@ -72,7 +72,7 @@ public:
 GEODE_DEFINE_TYPE(store_block_cache_t)
 }
 
-Ref<const block_cache_t> store_block_cache(const block_store_t& blocks, const uint64_t memory_limit) {
+Ref<const block_cache_t> store_block_cache(const readable_block_store_t& blocks, const uint64_t memory_limit) {
   return new_<store_block_cache_t>(blocks,memory_limit);
 }
 

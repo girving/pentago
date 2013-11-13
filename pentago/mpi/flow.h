@@ -40,7 +40,7 @@ const int barrier_tag = 1111; // No data
 //
 // The number of lines to speculate is controlled by (1) an arbitrary memory limit in bytes and
 // (2) a limit on the number of lines in communication at any given time.
-void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
+void compute_lines(const flow_comms_t& comms, const Ptr<const readable_block_store_t> input_blocks, accumulating_block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
 
 }
 }

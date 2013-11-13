@@ -97,8 +97,8 @@ flow_comms_t::~flow_comms_t() {
 
 struct flow_t {
   const flow_comms_t& comms;
-  const Ptr<const block_store_t> input_blocks;
-  block_store_t& output_blocks;
+  const Ptr<const readable_block_store_t> input_blocks;
+  accumulating_block_store_t& output_blocks;
 
   // Pending requests, including wildcard requests for responding to block requests and output messages
   requests_t requests;
@@ -129,7 +129,7 @@ struct flow_t {
   uint64_t wakeup_buffer;
 #endif
 
-  flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
+  flow_t(const flow_comms_t& comms, const Ptr<const readable_block_store_t> input_blocks, accumulating_block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
   ~flow_t();
 
   void schedule_lines();
@@ -153,7 +153,7 @@ struct flow_t {
 #endif
 };
 
-flow_t::flow_t(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit)
+flow_t::flow_t(const flow_comms_t& comms, const Ptr<const readable_block_store_t> input_blocks, accumulating_block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit)
   : comms(comms)
   , input_blocks(input_blocks)
   , output_blocks(output_blocks)
@@ -330,7 +330,7 @@ void flow_t::post_output_recv(Array<Vector<super_t,2>>* buffer) {
 }
 
 // Absorb a compressed output block
-static void absorb_compressed_output(block_store_t* output_blocks, const local_id_t local_block_id, const uint8_t dimension, Array<const uint8_t> compressed, Array<Vector<super_t,2>> buffer) {
+static void absorb_compressed_output(accumulating_block_store_t* output_blocks, const local_id_t local_block_id, const uint8_t dimension, Array<const uint8_t> compressed, Array<Vector<super_t,2>> buffer) {
   // Uncompress block into temporary buffer, then copy back to buffer so that accumulate can use the temporary.
   const auto local_buffer = local_fast_uncompress(compressed,output_blocks->local_block_line_event(local_block_id,dimension));
   memcpy(buffer.data(),local_buffer.data(),memory_usage(local_buffer));
@@ -360,7 +360,7 @@ void flow_t::process_output(Array<Vector<super_t,2>>* buffer, MPI_Status* status
       GEODE_ASSERT(!(count&7));
       const auto block_data = buffer->slice_own(0,count/8);
       // Schedule an accumulate as soon as possible to conserve memory
-      threads_schedule(CPU,curry(&block_store_t::accumulate,&output_blocks,local_block_id,dimension,block_data),true);
+      threads_schedule(CPU,curry(&accumulating_block_store_t::accumulate,&output_blocks,local_block_id,dimension,block_data),true);
     }
     buffer->clean_memory();
   }
@@ -523,7 +523,7 @@ void flow_t::process_response(block_request_t* request, MPI_Status* status) {
   schedule_lines();
 }
 
-void compute_lines(const flow_comms_t& comms, const Ptr<const block_store_t> input_blocks, block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit) {
+void compute_lines(const flow_comms_t& comms, const Ptr<const readable_block_store_t> input_blocks, accumulating_block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit) {
   // Everything happens in this helper class
   flow_t(comms,input_blocks,output_blocks,lines,memory_limit,line_gather_limit,line_limit);
 }

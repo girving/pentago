@@ -19,11 +19,17 @@ using Log::cout;
 using std::endl;
 using namespace geode;
 
+GEODE_DEFINE_TYPE(block_partition_t)
 GEODE_DEFINE_TYPE(partition_t)
 
-partition_t::partition_t(const int ranks, const sections_t& sections)
+block_partition_t::block_partition_t(const int ranks, const sections_t& sections)
   : ranks(ranks)
   , sections(ref(sections)) {}
+
+block_partition_t::~block_partition_t() {}
+
+partition_t::partition_t(const int ranks, const sections_t& sections)
+  : Base(ranks,sections) {}
 
 partition_t::~partition_t() {}
 
@@ -77,10 +83,16 @@ void partition_test(const partition_t& partition) {
 using namespace pentago::end;
 
 void wrap_partition() {
-  typedef partition_t Self;
-  Class<Self>("partition_t")
-    .GEODE_FIELD(ranks)
-    .GEODE_FIELD(sections)
-    ;
+  {
+    typedef block_partition_t Self;
+    Class<Self>("base_partition_t")
+      .GEODE_FIELD(ranks)
+      .GEODE_FIELD(sections)
+      ;
+  } {
+    typedef partition_t Self;
+    Class<Self>("partition_t")
+      ;
+  }
   GEODE_FUNCTION(partition_test)
 }

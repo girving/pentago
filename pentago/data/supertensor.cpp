@@ -58,7 +58,6 @@ Vector<int,4> supertensor_header_t::block_shape(Vector<uint8_t,4> block) const {
 
 void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Array<uint8_t>)>& cont) {
   // Check consistency
-  GEODE_ASSERT(thread_type()==IO);
   GEODE_ASSERT(blob.compressed_size<(uint64_t)1<<31);
   GEODE_ASSERT(!blob.uncompressed_size || blob.offset);
 
@@ -172,17 +171,17 @@ static void save_index(Vector<int,4> blocks, Array<const supertensor_blob_t,4>* 
   *dst = Array<const supertensor_blob_t,4>(blocks,(const supertensor_blob_t*)src.data(),src.borrow_owner());
 }
 
-supertensor_reader_t::supertensor_reader_t(const string& path)
+supertensor_reader_t::supertensor_reader_t(const string& path, const thread_type_t io)
   : fd(new_<fildes_t>(check_extension(path),O_RDONLY)) {
-  initialize(path,0);
+  initialize(path,0,io);
 }
 
-supertensor_reader_t::supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset)
+supertensor_reader_t::supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset, const thread_type_t io)
   : fd(ref(fd)) {
-  initialize(path,header_offset);
+  initialize(path,header_offset,io);
 }
 
-void supertensor_reader_t::initialize(const string& path, const uint64_t header_offset) {
+void supertensor_reader_t::initialize(const string& path, const uint64_t header_offset, const thread_type_t io) {
   if (fd->fd < 0)
     THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
 
@@ -216,7 +215,7 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
 
   // Read block index
   Array<const supertensor_blob_t,4> index;
-  threads_schedule(IO,curry(read_and_uncompress,fd->fd,h.index,function<void(Array<uint8_t>)>(curry(save_index,Vector<int,4>(h.blocks),&index))));
+  threads_schedule(io,curry(read_and_uncompress,fd->fd,h.index,function<void(Array<uint8_t>)>(curry(save_index,Vector<int,4>(h.blocks),&index))));
   threads_wait_all();
   GEODE_ASSERT((index.shape==Vector<int,4>(h.blocks)));
   to_little_endian_inplace(index.flat.const_cast_());
@@ -388,7 +387,7 @@ uint64_t supertensor_writer_t::uncompressed_size(Vector<uint8_t,4> block) const 
   return index[Vector<int,4>(block)].uncompressed_size;
 }
 
-vector<Ref<supertensor_reader_t>> open_supertensors(const string& path) {
+vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, const thread_type_t io) {
   const auto fd = new_<fildes_t>(check_extension(path),O_RDONLY);
   if (fd->fd < 0)
     THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
@@ -400,9 +399,9 @@ vector<Ref<supertensor_reader_t>> open_supertensors(const string& path) {
     THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,r<0?strerror(errno):"unexpected eof");
 
   // Branch on type
-  vector<Ref<supertensor_reader_t>> readers;
+  vector<Ref<const supertensor_reader_t>> readers;
   if (!memcmp(buffer,single_supertensor_magic,20))
-    readers.push_back(new_<supertensor_reader_t>(path,fd,0));
+    readers.push_back(new_<supertensor_reader_t>(path,fd,0,io));
   else if (!memcmp(buffer,multiple_supertensor_magic,20)) {
     uint32_t header[3];
     ssize_t r = pread(fd->fd,header,sizeof(header),20);
@@ -416,10 +415,14 @@ vector<Ref<supertensor_reader_t>> open_supertensors(const string& path) {
       THROW(IOError,"multiple supertensor file \"%s\" has weird section count %d",path,header[1]);
     const size_t offset = 20+3*sizeof(uint32_t);
     for (int s=0;s<(int)header[1];s++)
-      readers.push_back(new_<supertensor_reader_t>(path,fd,offset+header[2]*s));
+      readers.push_back(new_<supertensor_reader_t>(path,fd,offset+header[2]*s,io));
   } else
     THROW(IOError,"invalid supertensor file \"%s\": bad magic string",path);
   return readers;
+}
+
+static vector<Ref<const supertensor_reader_t>> open_supertensors_py(const string& path) {
+  return open_supertensors(path);
 }
 
 }
@@ -460,5 +463,5 @@ void wrap_supertensor() {
     ;}
 
   GEODE_FUNCTION_2(compress,pentago::compress)
-  GEODE_FUNCTION(open_supertensors)
+  GEODE_FUNCTION_2(open_supertensors,open_supertensors_py)
 }

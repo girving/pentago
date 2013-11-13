@@ -46,34 +46,24 @@ struct block_info_t {
 };
 BOOST_STATIC_ASSERT(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS);
 
-class block_store_t : public Object {
+// A readable block store, not including counts and samples
+class readable_block_store_t : public Object {
 public:
   GEODE_DECLARE_TYPE(GEODE_EXPORT)
 
   const Ref<const sections_t> sections;
-  const Ref<const partition_t> partition;
+  const Ref<const block_partition_t> partition;
   const int rank;
   const int total_nodes; // Total number of nodes
   const Hashtable<local_id_t,block_info_t> block_infos; // Map from local id to information about each block we own
   const Hashtable<Tuple<section_t,Vector<uint8_t,4>>,local_id_t> block_to_local_id; // Map from block to local id
-  const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
   const int required_contributions;
-  spinlock_t section_counts_lock;
   compacting_store_t::group_t store; // Underlying data storage
 
-  // Space for sparse samples (filled in as blocks complete).  These are stored in native
-  // block_store_t format, and must be transformed before being written to disk.
-  struct sample_t {
-    board_t board;
-    int index; // Index into flattened block data array
-    Vector<super_t,2> wins;
-  };
-  const Nested<sample_t> samples;
-
-private:
-  GEODE_EXPORT block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store);
+protected:
+  GEODE_EXPORT readable_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, compacting_store_t& store);
 public:
-  ~block_store_t();
+  ~readable_block_store_t();
 
   // Number of blocks
   int total_blocks() const {
@@ -81,7 +71,7 @@ public:
   }
 
   // Compute memory usage ignoring the store
-  GEODE_EXPORT uint64_t base_memory_usage() const;
+  GEODE_EXPORT virtual uint64_t base_memory_usage() const;
 
   // Print statistics about block compression.
   GEODE_EXPORT void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
@@ -93,9 +83,6 @@ public:
   GEODE_EXPORT event_t local_block_event(local_id_t local_id) const;
   GEODE_EXPORT event_t local_block_line_event(local_id_t local_id, uint8_t dimension) const;
   GEODE_EXPORT event_t local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const;
-
-  // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
-  GEODE_EXPORT void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
 
   // Access the data for a completed block, either by (section,block) or local block id.
   // In uncompressed mode, these are O(1) and return views into all_data.  In compressed mode they must uncompress
@@ -118,9 +105,54 @@ public:
   const block_info_t& block_info(const section_t section, const Vector<uint8_t,4> block) const;
 };
 
+// Accumulating block store, including counts and samples
+class accumulating_block_store_t : public readable_block_store_t {
+public:
+  GEODE_DECLARE_TYPE(GEODE_EXPORT)
+  typedef readable_block_store_t Base;
+
+  const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
+  spinlock_t section_counts_lock;
+
+  // Space for sparse samples (filled in as blocks complete).  These are stored in native
+  // block store format, and must be transformed before being written to disk.
+  struct sample_t {
+    board_t board;
+    int index; // Index into flattened block data array
+    Vector<super_t,2> wins;
+  };
+  const Nested<sample_t> samples;
+
+protected:
+  GEODE_EXPORT accumulating_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store);
+public:
+  ~accumulating_block_store_t();
+
+  // Compute memory usage ignoring the store
+  GEODE_EXPORT virtual uint64_t base_memory_usage() const;
+
+  // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
+  GEODE_EXPORT void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
+};
+
+// Nonaccumulating writable block store for use with restarts
+class restart_block_store_t : public readable_block_store_t {
+public:
+  GEODE_DECLARE_TYPE(GEODE_EXPORT)
+  typedef readable_block_store_t Base;
+
+protected:
+  GEODE_EXPORT restart_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, compacting_store_t& store);
+public:
+  ~restart_block_store_t();
+
+  // Set completed block data.  new_data is destroyed.  This function is thread safe.
+  GEODE_EXPORT void set(local_id_t local_id, RawArray<Vector<super_t,2>> new_data);
+};
+
 // Convenience factory routine
-static inline Ref<block_store_t> make_block_store(const partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
-  return new_<block_store_t>(partition,rank,partition.rank_blocks(rank),samples_per_section,store);
+static inline Ref<accumulating_block_store_t> make_block_store(const block_partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
+  return new_<accumulating_block_store_t>(partition,rank,partition.rank_blocks(rank),samples_per_section,store);
 }
 
 // The kernel of count_wins factored out for use elsewhere

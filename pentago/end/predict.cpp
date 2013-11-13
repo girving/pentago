@@ -26,7 +26,7 @@ static uint64_t estimate_block_heap_size(const uint64_t blocks, const uint64_t n
 #endif
 }
 
-uint64_t estimate_block_heap_size(const partition_t& partition, const int rank) {
+uint64_t estimate_block_heap_size(const block_partition_t& partition, const int rank) {
   const auto counts = partition.rank_counts(rank);
   return estimate_block_heap_size(counts.x,counts.y);
 }
@@ -42,9 +42,9 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Pt
   const auto nodes  = load.block_nodes.max+prev_load->block_nodes.max;
   const auto heap   = estimate_block_heap_size(blocks,nodes);
   const auto memory = partition_memory // partition_t
-                    + 2*sizeof(block_store_t) // block_store_t
-                    + sizeof(block_info_t)*blocks // block_store_t.block_info
-                    + sizeof(Vector<uint64_t,3>)*(prev_partition->sections->sections.size()+partition.sections->sections.size()) // block_store_t.section_counts
+                    + 2*sizeof(accumulating_block_store_t) // block_store
+                    + sizeof(block_info_t)*blocks // block_store.block_info
+                    + sizeof(Vector<uint64_t,3>)*(prev_partition->sections->sections.size()+partition.sections->sections.size()) // block_store.section_counts
                     + compacting_store_t::memory_usage(blocks,heap) // compacting_store_t
                     + sizeof(line_t)*lines+base_compute_memory_usage(lines); // line_t and line_data_t
   return memory;
@@ -55,6 +55,6 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Pt
 using namespace pentago::end;
 
 void wrap_predict() {
-  GEODE_FUNCTION_2(estimate_block_heap_size,static_cast<uint64_t(*)(const partition_t&,const int)>(estimate_block_heap_size))
+  GEODE_FUNCTION_2(estimate_block_heap_size,static_cast<uint64_t(*)(const block_partition_t&,const int)>(estimate_block_heap_size))
   GEODE_FUNCTION(max_rank_memory_usage)
 }

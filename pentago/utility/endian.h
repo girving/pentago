@@ -75,4 +75,9 @@ template<class TA> static inline void to_little_endian_inplace(const TA& data) {
 
 #endif
 
+// Same as to_little_endian, but useful for documentation purposes
+template<class T> static inline T from_little_endian(const T& x) {
+  return to_little_endian(x);
+}
+
 }

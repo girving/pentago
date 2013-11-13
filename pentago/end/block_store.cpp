@@ -18,17 +18,18 @@
 namespace pentago {
 namespace end {
 
-GEODE_DEFINE_TYPE(block_store_t)
+GEODE_DEFINE_TYPE(readable_block_store_t)
+GEODE_DEFINE_TYPE(accumulating_block_store_t)
+GEODE_DEFINE_TYPE(restart_block_store_t)
 using std::make_pair;
 using Log::cout;
 using std::endl;
 
-block_store_t::block_store_t(const partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store)
+readable_block_store_t::readable_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, compacting_store_t& store)
   : sections(partition.sections)
   , partition(ref(partition))
   , rank(rank)
   , total_nodes(0) // set below
-  , section_counts(sections->sections.size())
   , required_contributions(0) // set below
   , store(store,blocks.size())
 {
@@ -68,7 +69,11 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, RawAr
   // Allocate space for all blocks as one huge array, and zero it to indicate losses.
   const_cast_(this->all_data) = large_buffer<Vector<super_t,2>>(total_nodes,true);
 #endif
+}
 
+accumulating_block_store_t::accumulating_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store)
+  : Base(partition,rank,blocks,store)
+  , section_counts(sections->sections.size()) {
   // Count random samples in each block
   Array<int> sample_counts(total_blocks());
   for (const auto section : sections->sections) {
@@ -111,26 +116,35 @@ block_store_t::block_store_t(const partition_t& partition, const int rank, RawAr
   }
 }
 
-block_store_t::~block_store_t() {}
+restart_block_store_t::restart_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, compacting_store_t& store)
+  : Base(partition,rank,blocks,store) {}
 
-uint64_t block_store_t::base_memory_usage() const {
-  return sizeof(block_store_t)+pentago::memory_usage(block_infos)+pentago::memory_usage(section_counts);
+readable_block_store_t::~readable_block_store_t() {}
+accumulating_block_store_t::~accumulating_block_store_t() {}
+restart_block_store_t::~restart_block_store_t() {}
+
+uint64_t readable_block_store_t::base_memory_usage() const {
+  return sizeof(readable_block_store_t)+pentago::memory_usage(block_infos);
 }
 
-const block_info_t& block_store_t::block_info(const local_id_t local_id) const {
+uint64_t accumulating_block_store_t::base_memory_usage() const {
+  return Base::base_memory_usage()+pentago::memory_usage(section_counts);
+}
+
+const block_info_t& readable_block_store_t::block_info(const local_id_t local_id) const {
   if (const auto* info = block_infos.get_pointer(local_id))
     return *info;
   const auto block = partition->rank_block(rank,local_id);
-  die("block_store_t::block_info: invalid local id %d, block %s",local_id.id,str(block));
+  die("readable_block_store_t::block_info: invalid local id %d, block %s",local_id.id,str(block));
 }
 
-const block_info_t& block_store_t::block_info(const section_t section, const Vector<uint8_t,4> block) const {
+const block_info_t& readable_block_store_t::block_info(const section_t section, const Vector<uint8_t,4> block) const {
   if (const auto* local_id = block_to_local_id.get_pointer(tuple(section,block)))
     return block_info(*local_id);
-  die("block_store_t::block_info: unknown block: section %s, block %d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
+  die("readable_block_store_t::block_info: unknown block: section %s, block %d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
 }
 
-void block_store_t::print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const {
+void readable_block_store_t::print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const {
 #if PENTAGO_MPI_COMPRESS
   // We're going to compute the mean and variance of the compression ratio for a randomly chosen *byte*.
   // First integrate moments 0, 1, and 2.
@@ -160,7 +174,7 @@ void block_store_t::print_compression_stats(const reduction_t<double,sum_op>& re
 #endif
 }
 
-void block_store_t::accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data) {
+void accumulating_block_store_t::accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data) {
   GEODE_ASSERT(dimension<4);
   const auto& info = block_info(local_id);
   const int flat_id = info.flat_id;
@@ -221,47 +235,70 @@ void block_store_t::accumulate(local_id_t local_id, uint8_t dimension, RawArray<
 #endif
 }
 
-void block_store_t::assert_contains(section_t section, Vector<uint8_t,4> block) const {
+void restart_block_store_t::set(local_id_t local_id, RawArray<Vector<super_t,2>> new_data) {
+  const auto& info = block_info(local_id);
+  const int flat_id = info.flat_id;
+  const event_t event = block_event(info.section,info.block);
+#if !PENTAGO_MPI_COMPRESS
+  const auto local_data = all_data.slice(info.nodes);
+  GEODE_ASSERT(local_data.size()==new_data.size());
+  spin_t spin(info.lock);
+  GEODE_ASSERT(info.missing_dimensions);
+  info.missing_dimensions = 0;
+  local_data = new_data;
+#else // PENTAGO_MPI_COMPRESS
+  spin_t spin(info.lock);
+  GEODE_ASSERT(info.missing_dimensions);
+  info.missing_dimensions = 0;
+  compacting_store_t::lock_t alock(store,flat_id);
+  // Compress data into place
+  const auto new_compressed = local_fast_compress(new_data,event);
+  thread_time_t time(compacting_kind,event);
+  alock.set(new_compressed);
+#endif
+}
+
+void readable_block_store_t::assert_contains(section_t section, Vector<uint8_t,4> block) const {
   block_info(section,block);
 }
 
-event_t block_store_t::local_block_event(local_id_t local_id) const {
+event_t readable_block_store_t::local_block_event(local_id_t local_id) const {
   const auto& info = block_info(local_id);
   return block_event(info.section,info.block);
 }
 
-event_t block_store_t::local_block_line_event(local_id_t local_id, uint8_t dimension) const {
+event_t readable_block_store_t::local_block_line_event(local_id_t local_id, uint8_t dimension) const {
   if (dimension>=4)
-    die("block_store_t::local_block_line_event: local_id %d, blocks %d, dimension %d",local_id.id,total_blocks(),dimension);
+    die("readable_block_store_t::local_block_line_event: local_id %d, blocks %d, dimension %d",local_id.id,total_blocks(),dimension);
   const auto& info = block_info(local_id);
   return block_line_event(info.section,dimension,info.block);
 }
 
-event_t block_store_t::local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const {
+event_t readable_block_store_t::local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const {
   const auto& info = block_info(local_id);
   return block_lines_event(info.section,dimensions,info.block);
 }
 
 #if PENTAGO_MPI_COMPRESS
 
-RawArray<Vector<super_t,2>,4> block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const {
+RawArray<Vector<super_t,2>,4> readable_block_store_t::uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const {
   if (const auto* local_id = block_to_local_id.get_pointer(tuple(section,block)))
     return uncompress_and_get(*local_id,event);
-  die("block_store_t::uncompress_and_get: unknown block: section %s, block %d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
+  die("readable_block_store_t::uncompress_and_get: unknown block: section %s, block %d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
 }
 
-RawArray<Vector<super_t,2>,4> block_store_t::uncompress_and_get(local_id_t local_id, event_t event) const {
+RawArray<Vector<super_t,2>,4> readable_block_store_t::uncompress_and_get(local_id_t local_id, event_t event) const {
   const auto flat = uncompress_and_get_flat(local_id,event);
   const auto& info = block_info(local_id);
   const auto shape = block_shape(info.section.shape(),info.block);
   return RawArray<Vector<super_t,2>,4>(shape,flat.data());
 }
 
-RawArray<Vector<super_t,2>> block_store_t::uncompress_and_get_flat(local_id_t local_id, event_t event) const {
+RawArray<Vector<super_t,2>> readable_block_store_t::uncompress_and_get_flat(local_id_t local_id, event_t event) const {
   return local_fast_uncompress(get_compressed(local_id),event);
 }
 
-RawArray<const uint8_t> block_store_t::get_compressed(local_id_t local_id) const {
+RawArray<const uint8_t> readable_block_store_t::get_compressed(local_id_t local_id) const {
   const auto& info = block_info(local_id);
   GEODE_ASSERT(!info.missing_dimensions);
   return store.get_frozen(info.flat_id);
@@ -269,7 +306,7 @@ RawArray<const uint8_t> block_store_t::get_compressed(local_id_t local_id) const
 
 #else
 
-RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Vector<uint8_t,4> block) const {
+RawArray<const Vector<super_t,2>,4> readable_block_store_t::get_raw(section_t section, Vector<uint8_t,4> block) const {
   const auto& info = block_info(section,block);
   GEODE_ASSERT(!info.missing_dimensions);
   const auto shape = block_shape(section.shape(),block);
@@ -277,13 +314,13 @@ RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(section_t section, Ve
   return RawArray<const Vector<super_t,2>,4>(shape,all_data.data()+info.nodes.lo);
 }
 
-RawArray<const Vector<super_t,2>> block_store_t::get_raw_flat(local_id_t local_id) const {
+RawArray<const Vector<super_t,2>> readable_block_store_t::get_raw_flat(local_id_t local_id) const {
   const auto& info = block_info.get(local_id);
   GEODE_ASSERT(!info.missing_dimensions);
   return all_data.slice(info.nodes);
 }
 
-RawArray<const Vector<super_t,2>,4> block_store_t::get_raw(local_id_t local_id) const {
+RawArray<const Vector<super_t,2>,4> readable_block_store_t::get_raw(local_id_t local_id) const {
   const auto& info = block_info.get(local_id);
   GEODE_ASSERT(!info.missing_dimensions);
   const auto flat = all_data.slice(info.nodes);
@@ -320,10 +357,20 @@ Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<uint8_
 using namespace pentago::end;
 
 void wrap_block_store() {
-  typedef block_store_t Self;
-  Class<Self>("block_store_t")
-    .GEODE_METHOD(total_blocks)
-    .GEODE_FIELD(total_nodes)
-    .GEODE_FIELD(section_counts)
-    ;
+  {
+    typedef readable_block_store_t Self;
+    Class<Self>("readable_block_store_t")
+      .GEODE_METHOD(total_blocks)
+      .GEODE_FIELD(total_nodes)
+      ;
+  } {
+    typedef accumulating_block_store_t Self;
+    Class<Self>("accumulating_block_store_t")
+      .GEODE_FIELD(section_counts)
+      ;
+  } {
+    typedef restart_block_store_t Self;
+    Class<Self>("restart_block_store_t")
+      ;
+  }
 }

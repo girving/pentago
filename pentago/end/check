@@ -17,6 +17,7 @@ old_dir = props.add('old','../old-data-15july2012')
 dirs = props.add('dir',None).set_required(1).set_hidden(1)
 dirs.set([])
 pad_io = props.add('pad_io',pentago_end_pad_io).set_help('whether or not to expect padding when checking sha1 hashes')
+restart = props.add('restart',False)
 parser.parse(props,'Compare MPI results with out-of-core results',positional=[dirs])
 old_dir = old_dir()
 
@@ -92,6 +93,7 @@ for dir in dirs():
       counts_file = '%s/counts-%d.npy'%(dir,slice)
       sparse_file = '%s/sparse-%d.npy'%(dir,slice)
       slice_file = '%s/slice-%d.pentago'%(dir,slice)
+      restart_file = '%s/slice-%d-restart.pentago'%(dir,slice)
       if os.path.exists(counts_file):
         with Log.scope('check slice %d'%slice):
           # Read sparse samples
@@ -142,6 +144,23 @@ for dir in dirs():
                 counts2,samples_found = compare_readers_and_samples(reader,old_reader,sample_boards,sample_wins)
                 assert all(counts==counts2)
                 assert samples_found==256
+
+            # Check restart consistency
+            assert restart()==os.path.exists(restart_file)
+            if restart():
+              with Log.scope('restart'):
+                restarts = open_supertensors(restart_file)
+                unchecked.remove(restart_file)
+                assert len(readers)==len(restarts)
+                for read0,read1 in zip(readers,restarts):
+                  assert all(read0.header.section==read1.header.section)
+                  r0,r1,r2,r3 = map(xrange,read0.header.blocks)
+                  for i0 in r0:
+                    for i1 in r1:
+                      for i2 in r2:
+                        for i3 in r3:
+                          b = i0,i1,i2,i3
+                          assert all(read0.read_block(b)==read1.read_block(b))
           else:
             Log.write('WARNING: No slice file found, skipping consistency check for slice %d'%slice)
 

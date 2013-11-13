@@ -24,7 +24,7 @@ using Log::cout;
 using std::endl;
 using std::flush;
 
-static void meaningless_helper(block_store_t* const self, const local_id_t local_id) {
+static void meaningless_helper(accumulating_block_store_t* const self, const local_id_t local_id) {
   const event_t event = self->local_block_event(local_id);
   thread_time_t time(meaningless_kind,event);
 
@@ -82,7 +82,7 @@ static void meaningless_helper(block_store_t* const self, const local_id_t local
   self->section_counts[section_id] += counts;
 }
 
-Ref<block_store_t> meaningless_block_store(const partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
+Ref<accumulating_block_store_t> meaningless_block_store(const block_partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
   Log::Scope scope("meaningless");
 
   // Allocate block store
@@ -123,7 +123,7 @@ static Vector<int,4> standard_board_index(board_t board) {
 }
 
 // All sparse samples must occur in this block store
-static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> data) {
+static void compare_blocks_with_sparse_samples(const readable_block_store_t& blocks, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> data) {
   GEODE_ASSERT(boards.size()==data.size());
   GEODE_ASSERT(blocks.partition->ranks==1);
  
@@ -158,7 +158,7 @@ static void compare_blocks_with_sparse_samples(const block_store_t& blocks, RawA
   }
 }
 
-static void compare_blocks_with_supertensors(const block_store_t& blocks, const vector<Ref<supertensor_reader_t>>& readers) {
+static void compare_blocks_with_supertensors(const readable_block_store_t& blocks, const vector<Ref<supertensor_reader_t>>& readers) {
   // Verify that all blocks in the readers occur in our block store
   int count = 0;
   for (const auto& reader : readers) {

@@ -119,9 +119,9 @@ struct supertensor_reader_t : public Object {
   const Array<const supertensor_blob_t,4> index;
 
 private:
-  supertensor_reader_t(const string& path);
-  supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset);
-  void initialize(const string& path, const uint64_t header_offset);
+  supertensor_reader_t(const string& path, const thread_type_t io=IO);
+  supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset, const thread_type_t io=IO);
+  void initialize(const string& path, const uint64_t header_offset, const thread_type_t io);
 public:
   ~supertensor_reader_t();
 
@@ -177,6 +177,6 @@ private:
 };
 
 // Open one or more supertensors from a single file
-vector<Ref<supertensor_reader_t>> open_supertensors(const string& path);
+vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, const thread_type_t io=IO);
 
 }

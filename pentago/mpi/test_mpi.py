@@ -15,10 +15,11 @@ def run(cmd):
   if not nop:
     subprocess.check_call(cmd.split())
 
-def check(dir):
+def check(dir,restart=0):
   check = os.path.join(os.path.dirname(__file__),'../end/check')
   check = os.path.normpath(check)
-  run('%s %s'%(check,dir))
+  cmd = [check,'--restart=%d'%int(restart),dir]
+  run(' '.join(cmd))
 
 @cache
 def mpirun():
@@ -46,7 +47,7 @@ def test_write(dir=None):
     # Write out meaningless data from MPI
     wdir = '%s/write-%d'%(dir,slice)
     run('%s -n 2 endgame-mpi --threads 3 --dir %s --test write-%d'%(mpirun(),wdir,slice))
-    check(wdir)
+    check(wdir,restart=1)
 
 def meaningless_test(key,dir=None):
   if dir is None:

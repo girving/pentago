@@ -5,10 +5,10 @@
 namespace pentago {
 namespace end {
 
-class block_store_t;
+class readable_block_store_t;
 
 // Generate a block cache from a block store
-Ref<const block_cache_t> store_block_cache(const block_store_t& blocks, const uint64_t memory_limit);
+Ref<const block_cache_t> store_block_cache(const readable_block_store_t& blocks, const uint64_t memory_limit);
 
 }
 }

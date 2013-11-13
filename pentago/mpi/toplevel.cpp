@@ -33,7 +33,6 @@
 #include <geode/utility/process.h>
 #include <boost/detail/endian.hpp>
 #include <sys/resource.h>
-#include <sys/stat.h>
 #include <getopt.h>
 #include <errno.h>
 #include <stdio.h>
@@ -337,11 +336,19 @@ int toplevel(int argc, char** argv) {
       const auto sections = new_<sections_t>(slice,all_boards_sections(slice,8));
       const auto partition = partition_factory(ranks,sections);
       const auto store = new_<compacting_store_t>(estimate_block_heap_size(partition,rank));
-      const auto blocks = meaningless_block_store(partition,rank,samples,store);
-      Log::Scope scope("write");
-      write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
-      write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks);
-      write_sections(comm,format("%s/slice-%d.pentago",dir,slice),blocks,level);
+      const auto sections_file = format("%s/slice-%d.pentago",dir,slice);
+      {
+        const auto blocks = meaningless_block_store(partition,rank,samples,store);
+        Log::Scope scope("write");
+        write_counts(comm,format("%s/counts-%d.npy",dir,slice),blocks);
+        write_sparse_samples(comm,format("%s/sparse-%d.npy",dir,slice),blocks);
+        write_sections(comm,sections_file,blocks,level);
+      } {
+        Log::Scope scope("restart");
+        const auto restart = read_sections(comm,sections_file,store);
+        Log::Scope write_scope("write");
+        write_sections(comm,format("%s/slice-%d-restart.pentago",dir,slice),restart,level);
+      }
     } else
       error("unknown unit test '%s'",test);
     return 0;
@@ -381,7 +388,7 @@ int toplevel(int argc, char** argv) {
          << "\ntag ub = "<<tag_ub<<" ("<<required_tag_ub<<" required)"
          << endl;
     if (PENTAGO_MPI_DEBUG)
-      cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl; 
+      cout << "WARNING: EXPENSIVE DEBUGGING CODE ENABLED!" << endl;
   }
 
   if (PENTAGO_MPI_DEBUG)
@@ -429,8 +436,8 @@ int toplevel(int argc, char** argv) {
   uint64_t total_local_outputs = 0,
            total_local_inputs = 0;
   {
-    Ptr<partition_t> prev_partition;
-    Ptr<block_store_t> prev_blocks;
+    Ptr<block_partition_t> prev_partition;
+    Ptr<readable_block_store_t> prev_blocks;
     const int first_slice = meaningless?meaningless-1:(int)slices.size()-1;
     for (int slice=first_slice;slice>=stop_after;slice--) {
       if (!slices[slice]->sections.size())
@@ -452,7 +459,7 @@ int toplevel(int argc, char** argv) {
       // Allocate memory for all the blocks we own
       auto lines = partition->rank_lines(rank);
       auto local_blocks = partition->rank_blocks(rank);
-      const auto blocks = new_<block_store_t>(partition,rank,local_blocks,samples,store);
+      const auto blocks = new_<accumulating_block_store_t>(partition,rank,local_blocks,samples,store);
       {
         Log::Scope scope("load balance");
         const auto load = load_balance(reduction<int64_t,max_op>(comm),lines,local_blocks);

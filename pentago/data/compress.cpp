@@ -10,10 +10,10 @@ namespace pentago {
 
 static const char* zlib_error(int z) {
   return z==Z_MEM_ERROR?"out of memory"
-        :z==Z_BUF_ERROR?"insufficient output buffer space"
-        :z==Z_DATA_ERROR?"incomplete or corrupted data"
-        :z==Z_STREAM_ERROR?"invalid level"
-        :"unknown error";
+       : z==Z_BUF_ERROR?"insufficient output buffer space"
+       : z==Z_DATA_ERROR?"incomplete or corrupted data"
+       : z==Z_STREAM_ERROR?"invalid level"
+       : "unknown error";
 }
 
 static const char* lzma_error(lzma_ret r) {
@@ -68,7 +68,7 @@ size_t compress_memusage(int level) {
     return lzma_easy_encoder_memusage(level-20);
 }
 
-Array<uint8_t> decompress(Array<const uint8_t> compressed, const size_t uncompressed_size, event_t event) {
+Array<uint8_t> decompress(RawArray<const uint8_t> compressed, const size_t uncompressed_size, event_t event) {
   GEODE_ASSERT(uncompressed_size<(uint64_t)1<<31);
   thread_time_t time(decompress_kind,event);
   size_t dest_size = uncompressed_size;
