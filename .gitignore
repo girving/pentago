@@ -1,8 +1,5 @@
-SConstruct
 config.py
-setup.cfg
 .sconsign.dblite
-site_scons
 build
 *.pyc
 .DS_Store
