@@ -67,7 +67,7 @@ for dir in dirs():
       hashes = [(re.compile('.*/%s$'%k),v) for k,v in hashes.items()]
       def check_hash(file):
         for p,h in hashes:
-          if p.match(file):
+          if p.match(file.replace('-restarted','')):
             h2 = hashlib.sha1(open(file).read()).hexdigest()
             Log.write('sha1sum %s = %s'%(os.path.basename(file),h2))
             h = h.split()[pad_io()]

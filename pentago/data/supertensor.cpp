@@ -425,6 +425,41 @@ static vector<Ref<const supertensor_reader_t>> open_supertensors_py(const string
   return open_supertensors(path);
 }
 
+int supertensor_slice(const string& path) {
+  const auto fd = new_<fildes_t>(check_extension(path),O_RDONLY);
+  if (fd->fd < 0)
+    THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
+
+  // Read magic string to determine file type (single or multiple supertensors)
+  char buffer[20];
+  ssize_t r = pread(fd->fd,buffer,20,0);
+  if (r < 20)
+    THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,r<0?strerror(errno):"unexpected eof");
+
+  // Branch on type
+  uint64_t header_offset;
+  vector<Ref<const supertensor_reader_t>> readers;
+  if (!memcmp(buffer,single_supertensor_magic,20))
+    header_offset = 0;
+  else if (!memcmp(buffer,multiple_supertensor_magic,20))
+    header_offset = 20+3*sizeof(uint32_t);
+  else
+    THROW(IOError,"invalid supertensor file \"%s\": bad magic string",path);
+
+  // Extract slice from the first header
+  {
+    const int header_size = supertensor_header_t::header_size;
+    uint8_t buffer[header_size];
+    ssize_t r = pread(fd->fd,buffer,header_size,header_offset);
+    if (r < 0)
+      THROW(IOError,"invalid supertensor file \"%s\": error reading header, %s",path,strerror(errno));
+    if (r < header_size)
+      THROW(IOError,"invalid supertensor file \"%s\": unexpected end of file during header",path);
+    const auto header = supertensor_header_t::unpack(RawArray<const uint8_t>(header_size,buffer));
+    return header.stones;
+  }
+}
+
 }
 using namespace pentago;
 

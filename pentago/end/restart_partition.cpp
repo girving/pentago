@@ -15,7 +15,7 @@ typedef restart_partition_t::Block Block;
 
 static Ref<const sections_t> make_sections(RawArray<const Ref<const supertensor_reader_t>> tensors) {
   GEODE_ASSERT(tensors.size());
-  const int slice = tensors[0]->header.section.sum();
+  const int slice = tensors[0]->header.stones;
   Array<section_t> sections;
   for (const auto& tensor : tensors)
     sections.append(tensor->header.section);

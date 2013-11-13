@@ -49,21 +49,26 @@ def test_write(dir=None):
     run('%s -n 2 endgame-mpi --threads 3 --dir %s --test write-%d'%(mpirun(),wdir,slice))
     check(wdir,restart=1)
 
-def meaningless_test(key,dir=None):
+def meaningless_test(key,dir=None,restart=False):
   if dir is None:
     tmpdir = TmpDir('test_meaningless')
     dir = tmpdir.name
   for slice in 4,5:
     # Compute small count slices based on meaningless data
     wdir = '%s/meaningless-s%d-r%d'%(dir,slice,key)
-    run('%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d --randomize %d 00000000 --dir %s'%(mpirun(),slice,key,wdir))
+    base = '%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d --randomize %d 00000000'%(mpirun(),slice,key)
+    run('%s --dir %s'%(base,wdir))
     check(wdir)
+    if restart:
+      rdir = wdir+'-restarted'
+      run('%s --restart %s/slice-%d.pentago --dir %s'%(base,wdir,slice-1,rdir))
+      check(rdir)
 
 def test_meaningless_simple(dir=None):
   meaningless_test(0,dir)
 
 def test_meaningless_random(dir=None):
-  meaningless_test(17,dir)
+  meaningless_test(17,dir,restart=1)
 
 if __name__=='__main__':
   Log.configure('test',False,False,100)

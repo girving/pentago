@@ -2,22 +2,22 @@
 
 #include <pentago/mpi/toplevel.h>
 #include <pentago/mpi/flow.h>
+#include <pentago/mpi/io.h>
 #include <pentago/mpi/reduction.h>
+#include <pentago/mpi/trace.h>
+#include <pentago/mpi/utility.h>
+#include <pentago/base/all_boards.h>
+#include <pentago/data/block_cache.h>
+#include <pentago/data/compress.h>
+#include <pentago/data/supertensor.h>
+#include <pentago/end/check.h>
 #include <pentago/end/config.h>
+#include <pentago/end/load_balance.h>
 #include <pentago/end/partition.h>
 #include <pentago/end/predict.h>
 #include <pentago/end/random_partition.h>
 #include <pentago/end/simple_partition.h>
-#include <pentago/end/load_balance.h>
-#include <pentago/mpi/io.h>
-#include <pentago/mpi/utility.h>
-#include <pentago/end/check.h>
-#include <pentago/mpi/trace.h>
-#include <pentago/base/all_boards.h>
-#include <pentago/data/block_cache.h>
 #include <pentago/end/store_block_cache.h>
-#include <pentago/utility/thread.h>
-#include <pentago/data/compress.h>
 #include <pentago/search/superengine.h>
 #include <pentago/search/supertable.h>
 #include <pentago/utility/aligned.h>
@@ -25,6 +25,7 @@
 #include <pentago/utility/index.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
+#include <pentago/utility/thread.h>
 #include <pentago/utility/wall_time.h>
 #include <geode/array/Array2d.h>
 #include <geode/random/Random.h>
@@ -106,6 +107,14 @@ static void report_mpi_times(const MPI_Comm comm, RawArray<wall_time_t> times, c
   }
 }
 
+static int broadcast_supertensor_slice(const MPI_Comm comm, const string& path) {
+  int slice;
+  if (!comm_rank(comm))
+    slice = supertensor_slice(path);
+  CHECK(MPI_Bcast(&slice,1,MPI_INT,0,comm));
+  return slice;
+}
+
 static Ref<partition_t> make_simple_partition(const int ranks, const sections_t& sections) {
   return new_<simple_partition_t>(ranks,sections);
 }
@@ -159,6 +168,7 @@ int toplevel(int argc, char** argv) {
   int samples = 256;
   int specified_ranks = -1;
   string dir;
+  string restart;
   string test;
   int meaningless = 0;
   int stop_after = 0;
@@ -170,6 +180,7 @@ int toplevel(int argc, char** argv) {
     {"block-size",required_argument,0,'b'},
     {"save",required_argument,0,'s'},
     {"dir",required_argument,0,'d'},
+    {"restart",required_argument,0,'T'},
     {"level",required_argument,0,'l'},
     {"memory",required_argument,0,'m'},
     {"gather-limit",required_argument,0,'g'},
@@ -199,6 +210,7 @@ int toplevel(int argc, char** argv) {
                   "  -b, --block-size <size>    4D block size for each section (default "<<block_size<<")\n"
                   "  -s, --save <n>             Save all slices with n stones for fewer (required)\n"
                   "  -d, --dir <dir>            Save and log to given new directory (required)\n"
+                  "      --restart <file>       Restart from the given slice file\n"
                   "      --level <n>            Compression level: 1-9 is zlib, 20-29 is xz (default "<<level<<")\n"
                   "  -m, --memory <n>           Approximate memory usage limit per *rank* (required)\n"
                   "      --gather-limit <n>     Maximum number of simultaneous active line gathers (default "<<gather_limit<<")\n"
@@ -243,6 +255,9 @@ int toplevel(int argc, char** argv) {
         break; }
       case 'd':
         dir = optarg;
+        break;
+      case 'T':
+        restart = optarg;
         break;
       case 'u':
         test = optarg;
@@ -408,13 +423,20 @@ int toplevel(int argc, char** argv) {
   flow_comms_t comms(comm);
   report(comm,"base");
 
+  // Determine which slice we're going to start from
+  const int restart_slice = restart.size() ? broadcast_supertensor_slice(comm,restart) : -1;
+  if (restart.size())
+    cout << "restart: slice "<<restart_slice<<", file "<<restart<<endl;
+
   // Allocate the space needed for block storage
   uint64_t heap_size = 0;
   {
     Log::Scope scope("estimate");
     uint64_t prev_size = 0;
     // Note that we compute first_slice differently from below in the meaningless case.
-    const int first_slice = meaningless?meaningless:(int)slices.size()-1;
+    const int first_slice = restart.size() ? restart_slice
+                          : meaningless    ? meaningless
+                                           : int(slices.size())-1;
     for (int slice=first_slice;slice>=stop_after;slice--) {
       if (!slices[slice]->sections.size())
         break;
@@ -436,22 +458,43 @@ int toplevel(int argc, char** argv) {
   uint64_t total_local_outputs = 0,
            total_local_inputs = 0;
   {
-    Ptr<block_partition_t> prev_partition;
-    Ptr<readable_block_store_t> prev_blocks;
-    const int first_slice = meaningless?meaningless-1:(int)slices.size()-1;
+    Ptr<const block_partition_t> prev_partition;
+    Ptr<const readable_block_store_t> prev_blocks;
+
+    // Load existing restart data if available
+    if (restart.size()) {
+      prev_blocks = read_sections(comm,restart,store);
+      prev_partition = prev_blocks->partition;
+      // Verify that we match the expected set of sections
+      if (prev_partition->sections->slice!=restart_slice)
+        die("internal error: inconsistent restart slices: %d vs %d",restart_slice,prev_partition->sections->slice);
+      const auto expected = slices[restart_slice];
+      for (const auto s : expected->sections)
+        prev_partition->sections->section_id.get(s);
+      for (const auto s : prev_partition->sections->sections)
+        expected->section_id.get(s);
+    }
+
+    // Allocate meaningless data if desired
+    if (meaningless) {
+      if (restart.size()) {
+        GEODE_ASSERT(prev_partition->sections->slice <= meaningless);
+        GEODE_ASSERT(!PENTAGO_MPI_DEBUG);
+      } else {
+        prev_partition = partition_factory(ranks,slices[meaningless]);
+        prev_blocks = meaningless_block_store(*prev_partition,rank,samples,store);
+        if (PENTAGO_MPI_DEBUG)
+          set_block_cache(store_block_cache(ref(prev_blocks),uint64_t(1)<<28));
+      }
+    }
+
+    // Compute!
+    const int first_slice = prev_partition ? prev_partition->sections->slice-1 : int(slices.size())-1;
     for (int slice=first_slice;slice>=stop_after;slice--) {
       if (!slices[slice]->sections.size())
         break;
       Log::Scope scope(format("slice %d",slice));
       const auto start = wall_time();
-
-      // Allocate meaningless data if necessary
-      if (slice+1==meaningless) {
-        prev_partition = partition_factory(ranks,slices[slice+1]);
-        prev_blocks = meaningless_block_store(*prev_partition,rank,samples,store);
-        if (PENTAGO_MPI_DEBUG)
-          set_block_cache(store_block_cache(ref(prev_blocks),uint64_t(1)<<28));
-      }
 
       // Partition work among processors
       const auto partition = partition_factory(ranks,slices[slice]);
