@@ -33,7 +33,6 @@ GEODE_PYTHON_MODULE(pentago_core) {
   GEODE_WRAP(partition)
   GEODE_WRAP(simple_partition)
   GEODE_WRAP(random_partition)
-  GEODE_WRAP(restart_partition)
   GEODE_WRAP(block_store)
   GEODE_WRAP(predict)
   GEODE_WRAP(check)

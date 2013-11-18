@@ -3,7 +3,6 @@
 #include <pentago/mpi/io.h>
 #include <pentago/mpi/utility.h>
 #include <pentago/end/blocks.h>
-#include <pentago/end/restart_partition.h>
 #include <pentago/data/filter.h>
 #include <pentago/data/compress.h>
 #include <pentago/data/supertensor.h>
@@ -347,33 +346,15 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
   CHECK(MPI_File_close(&file));
 }
 
-static Ref<const restart_partition_t> read_partition(const MPI_Comm comm, RawArray<const Ref<const supertensor_reader_t>> tensors) {
-  Log::Scope scope("partition");
-  const int ranks = comm_size(comm),
-            rank = comm_rank(comm);
-
-  // On master, read supertensor header information and compute partition
-  const auto partition = !rank ? new_<restart_partition_t>(ranks,tensors) : Ptr<restart_partition_t>();
-
-
-  // Broadcast partition information to everyone
-  auto counts = !rank ? Vector<uint64_t,4>(partition->sections->slice,
-                                           partition->sections->sections.size(),
-                                           partition->partition.offsets.size(),
-                                           partition->partition.flat.size())
-                       : Vector<uint64_t,4>();
-  CHECK(MPI_Bcast(&counts,counts.m,datatype<uint64_t>(),0,comm));
-  const auto sections = !rank ? partition->sections->sections.const_cast_() : Array<section_t>(counts[1],false);
-  const auto offsets  = !rank ? partition->partition.offsets .const_cast_() : Array<int>(counts[2],false);
-  const auto flat     = !rank ? partition->partition.flat    .const_cast_() : Array<Tuple<int,Vector<uint8_t,4>>>(counts[3],false);
-  CHECK(MPI_Bcast(sections.data(),memory_usage(sections),MPI_BYTE,0,comm));
-  CHECK(MPI_Bcast(offsets.data() ,memory_usage(offsets) ,MPI_BYTE,0,comm));
-  CHECK(MPI_Bcast(flat.data()    ,memory_usage(flat)    ,MPI_BYTE,0,comm));
-
-  // Assemble result
-  return !rank ? ref(partition)
-               : new_<restart_partition_t>(ranks,new_<sections_t>(counts[0],sections),
-                                           Nested<Tuple<int,Vector<uint8_t,4>>>(offsets,flat));
+static Ref<const sections_t> read_section_list(const MPI_Comm comm, const vector<Ref<const supertensor_reader_t>>& tensors) {
+  const int rank = comm_rank(comm);
+  const auto sections = !rank ? sections_from_supertensors(tensors) : Ptr<const sections_t>();
+  int count = !rank ? sections->sections.size() : 0;
+  CHECK(MPI_Bcast(&count,1,datatype<int>(),0,comm));
+  GEODE_ASSERT(count);
+  const auto list = !rank ? sections->sections.const_cast_() : Array<section_t>(count,false);
+  CHECK(MPI_Bcast(list.data(),memory_usage(list),MPI_BYTE,0,comm));
+  return !rank ? ref(sections) : new_<const sections_t>(list[0].sum(),list);
 }
 
 static uint64_t file_size(const MPI_Comm comm, const string& filename) {
@@ -389,14 +370,17 @@ static uint64_t file_size(const MPI_Comm comm, const string& filename) {
   return size;
 }
 
-Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store) {
+Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store,
+                                                const partition_factory_t& partition_factory) {
   Log::Scope scope("read sections");
 
   // Read header infromation and compute partitions
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   const auto tensors = !rank ? open_supertensors(filename,CPU) : vector<Ref<const supertensor_reader_t>>();
-  const auto partition = read_partition(comm,tensors);
+  const auto sections = read_section_list(comm,tensors);
+  const auto partition = partition_factory(ranks,sections);
+  GEODE_ASSERT(sections->total_blocks<=uint64_t(numeric_limits<int>::max()));
 
   // Slurp in the entire file
   const auto total_size = file_size(comm,filename);
@@ -415,13 +399,16 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
   }
 
   // Tell all processors where their data comes from
-  Array<supertensor_blob_t> blobs(partition->partition[rank].size(),false);
+  const auto local_blocks = partition->rank_blocks(rank);
+  Array<supertensor_blob_t> blobs(local_blocks.size(),false);
   if (!rank) {
     Nested<supertensor_blob_t,false> all_blobs;
+    all_blobs.offsets.preallocate(ranks+1);
+    all_blobs.flat.preallocate(sections->total_blocks);
     for (const int r : range(ranks)) {
       all_blobs.append_empty();
-      for (const auto& b : partition->partition[r])
-        all_blobs.append_to_back(tensors[b.x]->index[Vector<int,4>(b.y)]);
+      for (const auto& b : partition->rank_blocks(r))
+        all_blobs.append_to_back(tensors[sections->section_id.get(b.section)]->index[Vector<int,4>(b.block)]);
     }
     const auto sendcounts = all_blobs.sizes();
     sendcounts *= 3;
@@ -482,7 +469,7 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
           s = uninterleave_super(from_little_endian(s));
           unfiltered[i] = !turn ? vec(s.x,~s.y) : vec(s.y,~s.x);
         }
-        blocks->set(local_id_t(b),unfiltered);
+        blocks->set(local_blocks[b].local_id,unfiltered);
         spin_t spin(progress_lock);
         progress.progress();
       });

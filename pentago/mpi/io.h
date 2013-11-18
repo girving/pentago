@@ -3,6 +3,7 @@
 
 #include <pentago/end/block_store.h>
 #include <pentago/end/config.h>
+#include <pentago/end/partition.h>
 #include <mpi.h>
 namespace pentago {
 namespace mpi {
@@ -13,7 +14,8 @@ using namespace pentago::end;
 void write_sections(const MPI_Comm comm, const string& filename, const readable_block_store_t& blocks, const int level);
 
 // Read all data from a set of supertensor files
-Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store);
+Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store,
+                                                const partition_factory_t& partition_factory);
 
 // Write an empty section file to the directory to check that basic I/O works
 void check_directory(const MPI_Comm comm, const string& dir);

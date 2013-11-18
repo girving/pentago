@@ -338,7 +338,6 @@ int toplevel(int argc, char** argv) {
   }
 
   // Make partition factory
-  typedef function<Ref<partition_t>(int,const sections_t&)> partition_factory_t;
   const auto partition_factory = randomize ? partition_factory_t(curry(make_random_partition,randomize))
                                            :                           make_simple_partition;
 
@@ -360,7 +359,7 @@ int toplevel(int argc, char** argv) {
         write_sections(comm,sections_file,blocks,level);
       } {
         Log::Scope scope("restart");
-        const auto restart = read_sections(comm,sections_file,store);
+        const auto restart = read_sections(comm,sections_file,store,partition_factory);
         Log::Scope write_scope("write");
         write_sections(comm,format("%s/slice-%d-restart.pentago",dir,slice),restart,level);
       }
@@ -463,7 +462,7 @@ int toplevel(int argc, char** argv) {
 
     // Load existing restart data if available
     if (restart.size()) {
-      prev_blocks = read_sections(comm,restart,store);
+      prev_blocks = read_sections(comm,restart,store,partition_factory);
       prev_partition = prev_blocks->partition;
       // Verify that we match the expected set of sections
       if (prev_partition->sections->slice!=restart_slice)

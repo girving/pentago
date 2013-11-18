@@ -4,6 +4,7 @@
 #include <pentago/base/section.h>
 #include <geode/structure/Hashtable.h>
 namespace pentago {
+struct supertensor_reader_t;
 namespace end {
 
 // An ordered list of sections at the same slice
@@ -26,6 +27,8 @@ public:
 // Compute all sections that root depends, organized by slice.
 // Only 35 slices are returned, since computing slice 36 is unnecessary.
 GEODE_EXPORT vector<Ref<const sections_t>> descendent_sections(const section_t root, const int max_slice);
+
+GEODE_EXPORT Ref<const sections_t> sections_from_supertensors(const vector<Ref<const supertensor_reader_t>> tensors);
 
 }
 }

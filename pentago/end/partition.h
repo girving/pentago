@@ -62,5 +62,7 @@ void partition_test(const partition_t& partition);
 // Create a dummy full partition_t around a block_partition_t, with no lines
 Ref<const partition_t> null_line_partition(const block_partition_t& partition);
 
+typedef function<Ref<partition_t>(int,const sections_t&)> partition_factory_t;
+
 }
 }

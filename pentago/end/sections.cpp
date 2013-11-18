@@ -2,6 +2,7 @@
 
 #include <pentago/end/sections.h>
 #include <pentago/end/blocks.h>
+#include <pentago/data/supertensor.h>
 #include <pentago/utility/memory.h>
 #include <geode/array/sort.h>
 #include <geode/python/Class.h>
@@ -68,12 +69,22 @@ uint64_t sections_t::memory_usage() const {
        + pentago::memory_usage(section_id);
 }
 
+Ref<const sections_t> sections_from_supertensors(const vector<Ref<const supertensor_reader_t>> tensors) {
+  GEODE_ASSERT(tensors.size());
+  const int slice = tensors[0]->header.stones;
+  Array<section_t> sections;
+  for (const auto& tensor : tensors)
+    sections.append(tensor->header.section);
+  return new_<sections_t>(slice,sections);
+}
+
 }
 }
 using namespace pentago::end;
 
 void wrap_sections() {
   GEODE_FUNCTION(descendent_sections)
+  GEODE_FUNCTION(sections_from_supertensors)
 
   typedef sections_t Self;
   Class<Self>("sections_t")
