@@ -109,7 +109,10 @@ GEODE_EXPORT Array<wall_time_t> total_thread_times();
 // Print a timing report
 GEODE_EXPORT void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
 
+} namespace geode {
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
+GEODE_DECLARE_ENUM(thread_type_t,GEODE_EXPORT)
+} namespace pentago {
 GEODE_EXPORT thread_type_t thread_type();
 
 // Initialize thread pools

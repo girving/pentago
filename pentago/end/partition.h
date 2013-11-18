@@ -59,5 +59,8 @@ GEODE_EXPORT Ref<const partition_t> empty_partition(const int ranks, const int s
 // Test self consistency of a partition
 void partition_test(const partition_t& partition);
 
+// Create a dummy full partition_t around a block_partition_t, with no lines
+Ref<const partition_t> null_line_partition(const block_partition_t& partition);
+
 }
 }

@@ -9,3 +9,6 @@ def large(n):
 
 def report_thread_times(times,name=''):
   return pentago_core.report_thread_times(times,name)
+
+def open_supertensors(path,io=IO):
+  return open_supertensors_py(path,io)

@@ -78,6 +78,52 @@ void partition_test(const partition_t& partition) {
     GEODE_ASSERT(block_info.contains(tuple(block.section,block.block)));
 }
 
+namespace {
+struct null_line_partition_t : public partition_t {
+  GEODE_NEW_FRIEND
+
+  const Ref<const block_partition_t> p;
+
+protected:
+  null_line_partition_t(const block_partition_t& p)
+    : partition_t(p.ranks,p.sections)
+    , p(ref(p)) {}
+public:
+
+  uint64_t memory_usage() const {
+    return p->memory_usage();
+  }
+
+  Array<const local_block_t> rank_blocks(const int rank) const {
+    return p->rank_blocks(rank);
+  }
+
+  Vector<uint64_t,2> rank_counts(const int rank) const {
+    return p->rank_counts(rank);
+  }
+
+  Tuple<int,local_id_t> find_block(const section_t section, const Vector<uint8_t,4> block) const {
+    return p->find_block(section,block);
+  }
+
+  Tuple<section_t,Vector<uint8_t,4>> rank_block(const int rank, const local_id_t local_id) const {
+    return p->rank_block(rank,local_id);
+  }
+
+  uint64_t rank_count_lines(const int rank) const {
+    return 0;
+  }
+
+  Array<const line_t> rank_lines(const int rank) const {
+    return Array<const line_t>();
+  }
+};
+}
+
+Ref<const partition_t> null_line_partition(const block_partition_t& partition) {
+  return new_<null_line_partition_t>(partition);
+}
+
 }
 }
 using namespace pentago::end;
@@ -95,4 +141,5 @@ void wrap_partition() {
       ;
   }
   GEODE_FUNCTION(partition_test)
+  GEODE_FUNCTION(null_line_partition)
 }

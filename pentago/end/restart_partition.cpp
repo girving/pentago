@@ -6,12 +6,15 @@
 #include <pentago/utility/index.h>
 #include <pentago/utility/memory.h>
 #include <geode/python/Class.h>
+#include <geode/python/stl.h>
 #include <geode/utility/Log.h>
 namespace pentago {
 namespace end {
 
 GEODE_DEFINE_TYPE(restart_partition_t)
 typedef restart_partition_t::Block Block;
+using Log::cout;
+using std::endl;
 
 static Ref<const sections_t> make_sections(RawArray<const Ref<const supertensor_reader_t>> tensors) {
   GEODE_ASSERT(tensors.size());
@@ -65,15 +68,20 @@ partition_blocks(const int ranks, Tensors tensors, const uint64_t memory_limit) 
 }
 
 uint64_t restart_partition_t::minimum_memory_limit(const int ranks, Tensors tensors) {
-  uint64_t count = 0, total = 0;
+  uint64_t count = 0, total = 0, max_size = 0;
   for (const auto& tensor : tensors) {
     count += tensor->index.flat.size();
-    for (const auto& blob : tensor->index.flat)
+    for (const auto& blob : tensor->index.flat) {
       total += blob.uncompressed_size;
+      max_size = max(max_size,blob.uncompressed_size);
+    }
   }
+  cout << "block count = "<<count<<endl;
+  cout << "total size = "<<total<<endl;
   GEODE_ASSERT(total);
   GEODE_ASSERT(count<numeric_limits<int>::max());
-  uint64_t lo = ceil_div(total,ranks), hi = total;
+  uint64_t lo = ceil_div(total,ranks),
+           hi = lo+max_size;
   while (lo < hi) {
     const auto mid = (lo+hi)/2;
     if (partition_blocks(ranks,tensors,mid).size())
@@ -81,7 +89,7 @@ uint64_t restart_partition_t::minimum_memory_limit(const int ranks, Tensors tens
     else
       lo = mid+1;
   }
-  GEODE_ASSERT(lo<numeric_limits<int>::max());
+  cout << "memory limit = "<<lo<<endl;
   return lo;
 }
 
@@ -123,4 +131,12 @@ Tuple<section_t,Vector<uint8_t,4>> restart_partition_t::rank_block(const int ran
 }
 
 }
+}
+using namespace pentago::end;
+
+void wrap_restart_partition() {
+  typedef restart_partition_t Self;
+  Class<Self>("restart_partition_t")
+    .GEODE_INIT(int,const vector<Ref<const supertensor_reader_t>>&)
+    ;
 }

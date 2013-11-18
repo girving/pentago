@@ -5,6 +5,7 @@
 #include <pentago/utility/spinlock.h>
 #include <pentago/utility/wall_time.h>
 #include <geode/python/Class.h>
+#include <geode/python/enum.h>
 #include <geode/python/stl.h>
 #include <geode/random/counter.h>
 #include <geode/structure/Tuple.h>
@@ -16,7 +17,11 @@
 #include <stdio.h>
 #include <deque>
 #include <set>
+namespace geode {
+GEODE_DEFINE_ENUM(thread_type_t,GEODE_EXPORT)
+}
 namespace pentago {
+
 
 /****************** Configuration *****************/
 
@@ -744,4 +749,9 @@ void wrap_thread() {
   GEODE_FUNCTION(report_thread_times)
   GEODE_FUNCTION(thread_history)
   GEODE_FUNCTION(time_kind_names)
+
+  GEODE_ENUM(thread_type_t)
+  GEODE_ENUM_VALUE(MASTER)
+  GEODE_ENUM_VALUE(CPU)
+  GEODE_ENUM_VALUE(IO)
 }

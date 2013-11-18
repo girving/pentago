@@ -421,10 +421,6 @@ vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, co
   return readers;
 }
 
-static vector<Ref<const supertensor_reader_t>> open_supertensors_py(const string& path) {
-  return open_supertensors(path);
-}
-
 int supertensor_slice(const string& path) {
   const auto fd = new_<fildes_t>(check_extension(path),O_RDONLY);
   if (fd->fd < 0)
@@ -498,5 +494,5 @@ void wrap_supertensor() {
     ;}
 
   GEODE_FUNCTION_2(compress,pentago::compress)
-  GEODE_FUNCTION_2(open_supertensors,open_supertensors_py)
+  GEODE_FUNCTION_2(open_supertensors_py,open_supertensors)
 }
