@@ -370,33 +370,17 @@ static uint64_t file_size(const MPI_Comm comm, const string& filename) {
   return size;
 }
 
-Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store,
-                                                const partition_factory_t& partition_factory) {
-  Log::Scope scope("read sections");
+typedef Tuple<Ref<const block_partition_t>,Array<const local_block_t>,Array<const supertensor_blob_t>> ReadSectionsStart;
+static ReadSectionsStart read_sections_start(const MPI_Comm comm, const string& filename,
+                                             const partition_factory_t& partition_factory) {
 
-  // Read header infromation and compute partitions
+  // Read header information and compute partitions
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
   const auto tensors = !rank ? open_supertensors(filename,CPU) : vector<Ref<const supertensor_reader_t>>();
   const auto sections = read_section_list(comm,tensors);
   const auto partition = partition_factory(ranks,sections);
   GEODE_ASSERT(sections->total_blocks<=uint64_t(numeric_limits<int>::max()));
-
-  // Slurp in the entire file
-  const auto total_size = file_size(comm,filename);
-  Array<char> raw;
-  {
-    Log::Scope scope("read data");
-    const auto our_size = partition_loop(total_size,ranks,rank).size();
-    GEODE_ASSERT(our_size<uint64_t(numeric_limits<int>::max()));
-    raw.resize(our_size,false);
-    MPI_File file;
-    const int r = MPI_File_open(comm,(char*)filename.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
-    if (r != MPI_SUCCESS)
-      die("failed to open '%s' for reading: %s",filename,error_string(r));
-    CHECK(MPI_File_read_ordered(file,raw.data(),raw.size(),MPI_BYTE,MPI_STATUS_IGNORE));
-    CHECK(MPI_File_close(&file));
-  }
 
   // Tell all processors where their data comes from
   const auto local_blocks = partition->rank_blocks(rank);
@@ -419,6 +403,22 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
     CHECK(MPI_Scatterv(0,0,0,datatype<uint64_t>(),
                        blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
 
+  // On to the next phase
+  return ReadSectionsStart(partition,local_blocks,blobs);
+}
+
+Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store,
+                                                const partition_factory_t& partition_factory) {
+  Log::Scope scope("read sections");
+  const int ranks = comm_size(comm),
+            rank = comm_rank(comm);
+
+  // Read header and blob information
+  const auto start = read_sections_start(comm,filename,partition_factory);
+  const auto partition = start.x;
+  const auto local_blocks = start.y;
+  const auto blobs = start.z;
+
   // Allocate ordered compressed memory
   uint64_t compressed_total = 0;
   Array<int> compressed_sizes(blobs.size());
@@ -428,6 +428,25 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
   }
   GEODE_ASSERT(compressed_total<uint64_t(numeric_limits<int>::max()));
   Nested<uint8_t> compressed(compressed_sizes);
+  compressed_sizes.clean_memory();
+
+  // Slurp in the entire file
+  const auto total_size = file_size(comm,filename);
+  if (!rank)
+    cout << "total size = "<<total_size<<endl;
+  Array<char> raw;
+  {
+    Log::Scope scope("read data");
+    const auto our_size = partition_loop(total_size,ranks,rank).size();
+    GEODE_ASSERT(our_size<uint64_t(numeric_limits<int>::max()));
+    raw.resize(our_size,false);
+    MPI_File file;
+    const int r = MPI_File_open(comm,(char*)filename.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
+    if (r != MPI_SUCCESS)
+      die("failed to open '%s' for reading: %s",filename,error_string(r));
+    CHECK(MPI_File_read_ordered(file,raw.data(),raw.size(),MPI_BYTE,MPI_STATUS_IGNORE));
+    CHECK(MPI_File_close(&file));
+  }
 
   // Just for fun, we rearrange the data using one-sided communication
   {
@@ -476,6 +495,52 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
     threads_wait_all_help();
     blocks->store.freeze();
     return blocks;
+  }
+}
+
+void read_sections_test(const MPI_Comm comm, const string& filename, const partition_factory_t& partition_factory) {
+  Log::Scope scope("read sections test");
+  const int ranks = comm_size(comm),
+            rank = comm_rank(comm);
+
+  // Read header and blob information
+  const auto start = read_sections_start(comm,filename,partition_factory);
+  const auto partition = start.x;
+  const auto local_blocks = start.y;
+  const auto blobs = start.z;
+
+  // Determine how much ordered compressed memory to allocate, but don't allocate it
+  uint64_t compressed_total = 0;
+  Array<int> compressed_sizes(blobs.size());
+  for (const int b : range(blobs.size())) {
+    compressed_total += blobs[b].compressed_size;
+    compressed_sizes[b] = blobs[b].compressed_size;
+  }
+  GEODE_ASSERT(compressed_total<uint64_t(numeric_limits<int>::max()));
+
+  // Don't slurp in the entire file
+  const auto total_size = file_size(comm,filename);
+  if (!rank)
+    cout << "total size = "<<total_size<<endl;
+
+  // Just for fun, we rearrange the data using one-sided communication.  Rather, we pretend to.
+  {
+    Log::Scope scope("shuffle");
+    for (const int b : range(blobs.size())) {
+      uint64_t offset = 0;
+      const auto blob = blobs[b];
+      const auto blob_range = blob.offset+range(blob.compressed_size);
+      for (const int r : range(partition_loop_inverse(total_size,ranks,blob_range.lo),
+                               partition_loop_inverse(total_size,ranks,blob_range.hi-1)+1)) {
+        const auto r_range = partition_loop(total_size,ranks,r);
+        GEODE_ASSERT(r_range.lo<blob_range.hi && blob_range.lo<r_range.hi);
+        const auto common = range(max(blob_range.lo,r_range.lo),min(blob_range.hi,r_range.hi));
+        GEODE_ASSERT(common.lo-blob_range.lo==offset);
+        // Here's where we would read common.size() bytes into compressed(b,offset:?)
+        offset += common.size();
+      }
+      GEODE_ASSERT(offset==uint64_t(compressed_sizes[b]));
+    }
   }
 }
 

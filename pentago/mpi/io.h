@@ -17,6 +17,9 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
 Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const string& filename, compacting_store_t& store,
                                                 const partition_factory_t& partition_factory);
 
+// Consistency check for some of the read sections code
+void read_sections_test(const MPI_Comm comm, const string& filename, const partition_factory_t& partition_factory);
+
 // Write an empty section file to the directory to check that basic I/O works
 void check_directory(const MPI_Comm comm, const string& dir);
 

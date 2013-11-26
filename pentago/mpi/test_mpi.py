@@ -60,6 +60,8 @@ def meaningless_test(key,dir=None,restart=False):
     run('%s --dir %s'%(base,wdir))
     check(wdir)
     if restart:
+      tdir = wdir+'-restart-test'
+      run('%s --restart %s/slice-%d.pentago --dir %s --test restart'%(base,wdir,slice-1,tdir))
       rdir = wdir+'-restarted'
       run('%s --restart %s/slice-%d.pentago --dir %s'%(base,wdir,slice-1,rdir))
       check(rdir)

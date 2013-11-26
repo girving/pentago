@@ -363,6 +363,8 @@ int toplevel(int argc, char** argv) {
         Log::Scope write_scope("write");
         write_sections(comm,format("%s/slice-%d-restart.pentago",dir,slice),restart,level);
       }
+    } else if (test=="restart") {
+      read_sections_test(comm,restart,partition_factory);
     } else
       error("unknown unit test '%s'",test);
     return 0;
