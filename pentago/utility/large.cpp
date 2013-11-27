@@ -8,8 +8,8 @@ using std::abs;
 using namespace geode;
 
 string large(uint64_t x) {
-  string s = format("%llu",x);
-  int n = s.size();
+  const string s = format("%llu",x);
+  const int n = int(s.size());
   string r;
   for (int i=0;i<n;i++) {
     if (i && (n-i)%3==0)
@@ -20,7 +20,7 @@ string large(uint64_t x) {
 }
 
 string large(int64_t x) {
-  auto s = large(uint64_t(abs(x)));
+  const auto s = large(uint64_t(abs(x)));
   return x<0?"-"+s:s;
 }
 

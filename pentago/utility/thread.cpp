@@ -459,7 +459,7 @@ void init_threads(int cpu_threads, int io_threads) {
   master = pthread_self();
   time_info.init_thread(MASTER);
   if (cpu_threads<0)
-    cpu_threads = sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_threads = int(sysconf(_SC_NPROCESSORS_ONLN));
   if (io_threads<0)
     io_threads = 2;
   cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);

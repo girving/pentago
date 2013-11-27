@@ -267,8 +267,7 @@ Array<board_t> all_boards_list(int n) {
   uint64_t large_count = 0;
   for (section_t s : sections)
     large_count += s.size();
-  const int small_count = large_count;
-  GEODE_ASSERT(small_count>0 && (uint64_t)small_count==large_count);
+  const int small_count = CHECK_CAST_INT(large_count);
 
   // Collect boards
   Array<board_t> list;
@@ -307,7 +306,7 @@ void all_boards_sample_test(int n, int steps) {
     const section_t s = count(board);
     section_t ss;uint8_t g;s.standardize<8>().get(ss,g);
     // Does this section exist?
-    int si = std::lower_bound(sections.begin(),sections.end(),ss)-sections.begin();
+    const int si = int(std::lower_bound(sections.begin(),sections.end(),ss)-sections.begin());
     if (!(sections.valid(si) && sections[si]==ss)) {
       cout << "missing section "<<s.counts<<", standard "<<ss.counts<<", n "<<n<<endl;
       GEODE_ASSERT(ss.standardize<8>().x==ss);

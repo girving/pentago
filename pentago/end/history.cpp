@@ -85,7 +85,7 @@ Vector<int,2> search_thread(const vector<Array<const history_t>>& thread, double
 }
 
 static section_t parse_section(const event_t event) {
-  const uint32_t microsig(event>>29);
+  const uint32_t microsig = uint32_t(event>>29);
   uint8_t counts[8];
   for (int i=0;i<8;i++)
     counts[i] = microsig>>4*i&0xf;
@@ -292,7 +292,7 @@ void check_dependencies(const vector<vector<Array<const history_t>>>& event_sort
 Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>& event_sorted_history, const int threads, const double dt_seconds) {
   Log::Scope scope("estimate bandwidth");
   GEODE_ASSERT(threads>1);
-  const int ranks = event_sorted_history.size()/threads;
+  const int ranks = CHECK_CAST_INT(event_sorted_history.size())/threads;
   GEODE_ASSERT((int)event_sorted_history.size()==ranks*threads);
   const double dt = 1e6*dt_seconds;
   // Count how many epochs we need

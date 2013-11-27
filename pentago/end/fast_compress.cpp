@@ -15,7 +15,7 @@
 namespace pentago {
 namespace end {
 
-const int raw_max_fast_compressed_size = 1+snappy::MaxCompressedLength(sizeof(Vector<super_t,2>)*sqr(sqr(block_size)));
+const int raw_max_fast_compressed_size = int(1+snappy::MaxCompressedLength(sizeof(Vector<super_t,2>)*sqr(sqr(block_size))));
 
 int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<uint8_t> compressed, const event_t event) {
   thread_time_t time(snappy_kind,event);
@@ -33,7 +33,7 @@ int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<uint8_t> co
     output_size = input_size;
     memcpy(compressed.data()+1,uncompressed.data(),input_size);
   }
-  return output_size+1;
+  return int(output_size+1);
 }
 
 // Same as fast_uncompress, but doesn't require an exact size match in the uncompressed buffer and returns the correct size.
@@ -51,7 +51,7 @@ static inline int fast_uncompress_helper(RawArray<const uint8_t> compressed, Raw
     if (uncompressed_size & (n-1))
       die("fast_uncompress: expected size a multiple of %zu, got %zu, event 0x%llx",n,uncompressed_size,event);
     GEODE_ASSERT(snappy::RawUncompress((const char*)compressed.data()+1,compressed.size()-1,(char*)uncompressed.data()));
-    count = uncompressed_size/n;
+    count = int(uncompressed_size/n);
   } else {
     GEODE_ASSERT((size_t)compressed.size()<=1+memory_usage(uncompressed) && !((compressed.size()-1)&(n-1)));
     memcpy(uncompressed.data(),compressed.data()+1,compressed.size()-1);
@@ -87,7 +87,7 @@ __attribute__((constructor)) static void create_buffer_key() {
 
 // Thread local temporary buffer for local compression and decompression.
 static inline RawArray<Vector<super_t,2>> local_buffer() {
-  const int count = ceil_div(raw_max_fast_compressed_size,sizeof(Vector<super_t,2>));
+  const int count = ceil_div(raw_max_fast_compressed_size,int(sizeof(Vector<super_t,2>)));
 #if USE_PTHREADS
   auto buffer = (Vector<super_t,2>*)pthread_getspecific(buffer_key);
 #else

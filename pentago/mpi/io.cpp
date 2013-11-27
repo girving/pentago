@@ -165,7 +165,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
   // Concatenate local data into a single buffer
   {
     thread_time_t time(write_sections_kind,event);
-    Array<uint8_t> buffer(local_size,false);
+    Array<uint8_t> buffer(int(local_size),false);
     int next = 0;
     for (auto& c : compressed) {
       memcpy(buffer.data()+next,c.data(),c.size());
@@ -295,7 +295,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
     index_blobs = Array<supertensor_blob_t>();
 
   // Concatenate compressed block indexes into one buffer
-  Array<uint8_t> all_block_indexes(local_block_indexes_size,false);
+  Array<uint8_t> all_block_indexes(int(local_block_indexes_size),false);
   {
     int next_block_index = 0;
     for (const int sid : section_range) {
@@ -315,7 +315,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
 
   // On rank 0, write all section headers
   if (!rank) {
-    Array<uint8_t> headers(header_size,false);
+    Array<uint8_t> headers(CHECK_CAST_INT(header_size),false);
     size_t offset = 0;
     #define HEADER(pointer,size) \
       memcpy(headers.data()+offset,pointer,size); \
@@ -353,7 +353,7 @@ static Ref<const sections_t> read_section_list(const MPI_Comm comm, const vector
   CHECK(MPI_Bcast(&count,1,datatype<int>(),0,comm));
   GEODE_ASSERT(count);
   const auto list = !rank ? sections->sections.const_cast_() : Array<section_t>(count,false);
-  CHECK(MPI_Bcast(list.data(),memory_usage(list),MPI_BYTE,0,comm));
+  CHECK(MPI_Bcast(list.data(),CHECK_CAST_INT(memory_usage(list)),MPI_BYTE,0,comm));
   return !rank ? ref(sections) : new_<const sections_t>(list[0].sum(),list);
 }
 
@@ -392,7 +392,7 @@ static ReadSectionsStart read_sections_start(const MPI_Comm comm, const string& 
     if (!rank) {
       Nested<supertensor_blob_t,false> all_blobs;
       all_blobs.offsets.preallocate(ranks+1);
-      all_blobs.flat.preallocate(sections->total_blocks);
+      all_blobs.flat.preallocate(CHECK_CAST_INT(sections->total_blocks));
       for (const int r : range(ranks)) {
         all_blobs.append_empty();
         for (const auto& b : partition->rank_blocks(r))
@@ -429,7 +429,7 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
   Array<int> compressed_sizes(blobs.size());
   for (const int b : range(blobs.size())) {
     compressed_total += blobs[b].compressed_size;
-    compressed_sizes[b] = blobs[b].compressed_size;
+    compressed_sizes[b] = CHECK_CAST_INT(blobs[b].compressed_size);
   }
   GEODE_ASSERT(compressed_total<uint64_t(numeric_limits<int>::max()));
   Nested<uint8_t> compressed(compressed_sizes);
@@ -442,8 +442,7 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
   Array<char> raw;
   {
     Log::Scope scope("read data");
-    const auto our_size = partition_loop(total_size,ranks,rank).size();
-    GEODE_ASSERT(our_size<uint64_t(numeric_limits<int>::max()));
+    const auto our_size = CHECK_CAST_INT(partition_loop(total_size,ranks,rank).size());
     raw.resize(our_size,false);
     MPI_File file;
     const int r = MPI_File_open(comm,(char*)filename.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
@@ -467,8 +466,9 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
         const auto r_range = partition_loop(total_size,ranks,r);
         GEODE_ASSERT(r_range.lo<blob_range.hi && blob_range.lo<r_range.hi);
         const auto common = range(max(blob_range.lo,r_range.lo),min(blob_range.hi,r_range.hi));
-        CHECK(MPI_Get(&compressed(b,common.lo-blob_range.lo),common.size(),MPI_BYTE,
-                                  r,common.lo-   r_range.lo ,common.size(),MPI_BYTE,win));
+        const int size = CHECK_CAST_INT(common.size());
+        CHECK(MPI_Get(&compressed(b,CHECK_CAST_INT(common.lo-blob_range.lo)),size,MPI_BYTE,
+                                  r,CHECK_CAST_INT(common.lo-   r_range.lo) ,size,MPI_BYTE,win));
       }
     }
     CHECK(MPI_Win_fence(MPI_MODE_NOSUCCEED,win));
@@ -521,7 +521,7 @@ void read_sections_test(const MPI_Comm comm, const string& filename, const parti
   Array<int> compressed_sizes(blobs.size());
   for (const int b : range(blobs.size())) {
     compressed_total += blobs[b].compressed_size;
-    compressed_sizes[b] = blobs[b].compressed_size;
+    compressed_sizes[b] = CHECK_CAST_INT(blobs[b].compressed_size);
   }
   if (!rank && !(compressed_total<uint64_t(numeric_limits<int>::max())))
     cout << "WARNING: compressed_total = "<<compressed_total<<", real restart job would fail"<<endl;
@@ -599,11 +599,11 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
   }
 
   // Pack numpy buffer.  Endianness is handled in the numpy header.
-  Array<uint8_t> buffer(256+memory_usage(data),false);
+  Array<uint8_t> buffer(CHECK_CAST_INT(256+memory_usage(data)),false);
   size_t data_size = fill_numpy_header(buffer,data);
   GEODE_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size());
   int header_size = buffer.size();
-  buffer.resize(header_size+data_size,false,true);
+  buffer.resize(CHECK_CAST_INT(header_size+data_size),false,true);
   memcpy(buffer.data()+header_size,data.data(),data_size);
 
   // Write file

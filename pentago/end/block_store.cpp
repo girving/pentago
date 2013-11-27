@@ -59,11 +59,8 @@ readable_block_store_t::readable_block_store_t(const block_partition_t& partitio
     const_cast_(block_to_local_id).set(tuple(info.section,info.block),block.local_id);
   }
   GEODE_ASSERT(next_flat_id==blocks.size());
-  GEODE_ASSERT(total_count<(1u<<31));
-  const_cast_(required_contributions) = total_count;
-  // Make sure 32-bit array indices suffice
-  GEODE_ASSERT(total_nodes<(1u<<31));
-  const_cast_(this->total_nodes) = total_nodes;
+  const_cast_(required_contributions) = CHECK_CAST_INT(total_count);
+  const_cast_(this->total_nodes) = CHECK_CAST_INT(total_nodes);
 
 #if !PENTAGO_MPI_COMPRESS
   // Allocate space for all blocks as one huge array, and zero it to indicate losses.

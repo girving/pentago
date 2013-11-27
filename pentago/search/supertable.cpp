@@ -49,7 +49,7 @@ void init_supertable(int bits) {
     THROW(ValueError,"bits = %d is too small, the high order hash bits won't fit",bits);
   table_bits = bits;
   cout << "initializing supertable: bits = "<<bits<<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
-  table = Array<superentry_t>((uint64_t)1<<bits,false);
+  table = Array<superentry_t>(1<<bits,false);
   clear_supertable();
 }
 

@@ -28,6 +28,7 @@
 #include <pentago/utility/thread.h>
 #include <pentago/utility/wall_time.h>
 #include <geode/array/Array2d.h>
+#include <geode/math/uint128.h>
 #include <geode/random/Random.h>
 #include <geode/utility/curry.h>
 #include <geode/utility/Log.h>
@@ -229,9 +230,12 @@ int toplevel(int argc, char** argv) {
         break;
       #define INT_ARG(short_opt,long_opt,var) \
         case short_opt: { \
-          var = strtol(optarg,&end,0); \
+          const auto n = strtol(optarg,&end,0); \
           if (!*optarg || *end) \
             error("--" #long_opt " expected int, got '%s'",optarg); \
+          if (__int128_t(n) != __int128_t(decltype(var)(n))) \
+            error("--" #long_opt " got %lld which doesn't fit in %s",n,typeid(n).name()); \
+          var = decltype(var)(n); \
           break; }
       INT_ARG('t',threads,threads)
       INT_ARG('b',block-size,specified_block_size)

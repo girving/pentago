@@ -255,7 +255,7 @@ void flow_t::schedule_lines() {
           const RawArray<Vector<super_t,2>> block_data = line->input_block_data(b);
           MPI_Request response_request;
           if (PENTAGO_MPI_COMPRESS)
-            CHECK(MPI_Irecv(block_data.data(),memory_usage(block_data),MPI_BYTE,owner,response_tag,comms.response_comm,&response_request));
+            CHECK(MPI_Irecv(block_data.data(),CHECK_CAST_INT(memory_usage(block_data)),MPI_BYTE,owner,response_tag,comms.response_comm,&response_request));
           else
             CHECK(MPI_Irecv((uint64_t*)block_data.data(),8*block_data.size(),datatype<uint64_t>(),owner,response_tag,comms.response_comm,&response_request));
           // Send request
@@ -465,7 +465,7 @@ void flow_t::finish_output_send(line_details_t* const line, MPI_Status* status) 
 }
 
 static void absorb_response(block_request_t* request, const int recv_size) {
-  const int lines = request->dependent_lines.size();
+  const int lines = CHECK_CAST_INT(request->dependent_lines.size());
   GEODE_ASSERT(lines);
   const auto first_line = request->dependent_lines[0];
   const auto first_block_data = first_line->input_block_data(request->block);

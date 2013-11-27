@@ -143,7 +143,7 @@ simple_partition_t::simple_partition_t(const int ranks, const sections_t& sectio
   // Partition lines between processes, attempting to equalize (1) owned work and (2) total work.
   Array<uint64_t> work_nodes(ranks), work_penalties(ranks);
 
-  const_cast_(owner_starts) = partition_lines(work_nodes,work_penalties,owner_lines,owner_line_count);
+  const_cast_(owner_starts) = partition_lines(work_nodes,work_penalties,owner_lines,CHECK_CAST_INT(owner_line_count));
   if (verbose() && sections.sections.size()) {
     const auto sum = work_nodes.sum(), max = work_nodes.max();
     const_cast_(owner_excess) = (double)max/sum*ranks;
@@ -154,7 +154,7 @@ simple_partition_t::simple_partition_t(const int ranks, const sections_t& sectio
   if (save_work)
     const_cast_(owner_work) = work_nodes.copy();
 
-  const_cast_(other_starts) = partition_lines(work_nodes,work_penalties,other_lines,other_line_count);
+  const_cast_(other_starts) = partition_lines(work_nodes,work_penalties,other_lines,CHECK_CAST_INT(other_line_count));
   if (verbose() && sections.sections.size()) {
     auto sum = work_nodes.sum(), max = work_nodes.max();
     const_cast_(total_excess) = (double)max/sum*ranks;
@@ -175,8 +175,7 @@ simple_partition_t::simple_partition_t(const int ranks, const sections_t& sectio
     max_nodes = max(max_nodes,end.y-start.y);
     start = end;
   }
-  GEODE_ASSERT(max_blocks<(1<<30));
-  const_cast_(this->max_rank_blocks) = max_blocks;
+  const_cast_(this->max_rank_blocks) = CHECK_CAST_INT(max_blocks);
   const_cast_(this->max_rank_nodes) = max_nodes;
 }
 
@@ -326,7 +325,7 @@ Array<const local_block_t> simple_partition_t::rank_blocks(int rank) const {
 
 Tuple<int,local_id_t> simple_partition_t::find_block(const section_t section, const Vector<uint8_t,4> block) const {
   const int rank = block_to_rank(section,block);
-  const local_id_t id(block_to_id(section,block)-rank_offsets(rank).x);
+  const local_id_t id(CHECK_CAST_INT(block_to_id(section,block)-rank_offsets(rank).x));
   return tuple(rank,id);
 }
 
@@ -344,7 +343,7 @@ Tuple<section_t,Vector<uint8_t,4>> simple_partition_t::rank_block(const int rank
   }
   const chunk_t& chunk = owner_lines[lo];
   // Compute block
-  const int i = block_id-chunk.block_id;
+  const int i = CHECK_CAST_INT(block_id-chunk.block_id);
   const auto shape = Vector<int,4>(Vector<int,3>(chunk.blocks.sizes()),chunk.length);
   GEODE_ASSERT((unsigned)i<=(unsigned)shape.product());
   const auto I = decompose(shape,i);

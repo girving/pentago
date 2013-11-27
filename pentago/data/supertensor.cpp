@@ -65,7 +65,7 @@ void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Ar
   Array<uint8_t> compressed;
   {
     thread_time_t time(read_kind,unevent);
-    compressed.resize(blob.compressed_size,false,false);
+    compressed.resize(int(blob.compressed_size),false,false);
     ssize_t r = pread(fd,compressed.data(),blob.compressed_size,blob.offset);
     if (r<0 || r!=(ssize_t)blob.compressed_size)
       THROW(IOError,"read_and_uncompress pread failed: %s",r<0?strerror(errno):"incomplete read");

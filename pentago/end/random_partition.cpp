@@ -44,7 +44,7 @@ random_partition_t::random_partition_t(const uint128_t key, const int ranks, con
   // Assign contiguous indices to all lines
   {
     Array<sheaf_t> sheafs;
-    int64_t line_offset = 0;
+    uint64_t line_offset = 0;
     for (const auto& section : sections.sections) {
       const auto shape = section_blocks(section);
       for (const uint8_t dimension : range(4))
@@ -55,13 +55,12 @@ random_partition_t::random_partition_t(const uint128_t key, const int ranks, con
           sheaf.length = shape[dimension];
           sheaf.shape = Vector<uint8_t,3>(shape.remove_index(dimension));
           sheaf.lines = Vector<int,3>(sheaf.shape).product();
-          sheaf.line_offset = line_offset;
+          sheaf.line_offset = CHECK_CAST_INT(line_offset);
           const_cast_(sheaf_id).set(tuple(section,dimension),sheafs.append(sheaf));
           line_offset += sheaf.lines;
         }
     }
-    const_cast_(total_lines) = line_offset;
-    GEODE_ASSERT(total_lines==line_offset);
+    const_cast_(total_lines) = CHECK_CAST_INT(line_offset);
     const_cast_(this->sheafs) = sheafs; 
   }
 }
@@ -121,7 +120,7 @@ Tuple<int,local_id_t> random_partition_t::find_block(const section_t section, co
   if (!sheaf_n)
     die("random_partition_t::find_block: section %s, block %d,%d,%d,%d not part of partition with slice %d",str(section),block[0],block[1],block[2],block[3],sections->slice);
   const auto& sheaf = sheafs[*sheaf_n];
-  const int line_n = random_unpermute(total_lines,key,sheaf.line_offset+index(Vector<int,3>(sheaf.shape),Vector<int,3>(block.remove_index(dimension))));
+  const int line_n = CHECK_CAST_INT(random_unpermute(total_lines,key,sheaf.line_offset+index(Vector<int,3>(sheaf.shape),Vector<int,3>(block.remove_index(dimension)))));
   // Compute rank and local block id
   const int rank = partition_loop_inverse(total_lines,ranks,line_n),
             local_line_n = line_n - partition_loop(total_lines,ranks,rank).lo;
@@ -142,7 +141,7 @@ Tuple<section_t,Vector<uint8_t,4>> random_partition_t::rank_block(const int rank
 
 line_t random_partition_t::nth_line(const int n) const {
   // Map n through our random permutation
-  const int pn = random_permute(total_lines,key,n);
+  const int pn = CHECK_CAST_INT(random_permute(total_lines,key,n));
   // Do a binary search to find correct sheaf
   int lo = 0, hi = sheafs.size()-1;
   while (lo<hi) {

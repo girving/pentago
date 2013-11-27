@@ -6,6 +6,7 @@
 #include <pentago/end/load_balance.h>
 #include <pentago/end/block_store.h>
 #include <pentago/end/compute.h>
+#include <pentago/utility/debug.h>
 #include <pentago/utility/memory.h>
 #include <geode/python/wrap.h>
 #include <geode/python/Ptr.h>
@@ -37,7 +38,7 @@ static uint64_t max_rank_memory_usage(Ptr<const partition_t> prev_partition_, Pt
   const auto prev_load = prev_load_?ref(prev_load_):serial_load_balance(prev_partition);
   GEODE_ASSERT(prev_partition->ranks==partition.ranks);
   const auto partition_memory = memory_usage(prev_partition)+memory_usage(partition);
-  const auto lines  = load.lines.max;
+  const auto lines  = int(load.lines.max);
   const auto blocks = load.blocks.max+prev_load->blocks.max;
   const auto nodes  = load.block_nodes.max+prev_load->block_nodes.max;
   const auto heap   = estimate_block_heap_size(blocks,nodes);

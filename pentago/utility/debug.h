@@ -3,6 +3,9 @@
 
 #include <geode/utility/debug.h>
 #include <geode/utility/format.h>
+#include <boost/type_traits/remove_const.hpp>
+#include <boost/type_traits/is_unsigned.hpp>
+#include <limits>
 namespace pentago {
 
 using namespace geode;
@@ -27,7 +30,22 @@ GEODE_EXPORT void GEODE_NORETURN(die_helper(const string& msg)) GEODE_COLD;
 template<class... Args> static inline void GEODE_NORETURN(die(const char* msg, const Args&... args)) GEODE_COLD;
 template<class... Args> static inline void                die(const char* msg, const Args&... args) {
   die_helper(format(msg,args...));
-} 
+}
+
+namespace {
+template<class T> struct assert_is_almost_uint64 {
+  typedef typename boost::remove_const<T>::type I;
+  static_assert(boost::is_integral<I>::value,"");
+  static_assert(sizeof(I)==8,"");
+  static_assert(boost::is_unsigned<I>::value,"");
+};}
+
+// Check and cast an integer to int
+#define CHECK_CAST_INT(n) ({ \
+  const auto _n = (n); \
+  assert_is_almost_uint64<decltype(_n)>(); \
+  GEODE_ASSERT(_n<=uint64_t(std::numeric_limits<int>::max())); \
+  (int(_n)); })
 
 // Everything beyond here is internals
 

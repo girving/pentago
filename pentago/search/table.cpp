@@ -49,16 +49,16 @@ void set_table_type(table_type_t type) {
     THROW(RuntimeError,"transposition table already set to type %s, must reinitialize before changing to type %s",str(table_type),str(type));
 
   // Allocate table if we haven't already
-  GEODE_ASSERT(!table.size() || (uint64_t)table.size()==(uint64_t)1<<table_bits);
+  GEODE_ASSERT(!table.size() || table.size()==(1<<table_bits));
   if (!table.size())
-    table = Array<uint64_t>((uint64_t)1<<table_bits);
+    table = Array<uint64_t>(1<<table_bits);
 }
 
 score_t lookup(board_t board) {
   assert(table_type!=blank_table);
   STAT(total_lookups++);
   uint64_t h = hash_board(board);
-  uint64_t entry = table[h&(((uint64_t)1<<table_bits)-1)];
+  uint64_t entry = table[h&((1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits) {
     STAT(successful_lookups++);
     return entry&score_mask;
@@ -69,18 +69,18 @@ score_t lookup(board_t board) {
 void store(board_t board, score_t score) {
   assert(table_type!=blank_table);
   uint64_t h = hash_board(board);
-  uint64_t& entry = table[h&(((uint64_t)1<<table_bits)-1)];
+  uint64_t& entry = table[h&((1<<table_bits)-1)];
   if (entry>>score_bits==h>>table_bits || uint16_t(entry&score_mask)>>2 <= score>>2)
     entry = h>>table_bits<<score_bits|score;
 }
 
-Tuple<Array<board_t>,Array<score_t> > read_table(int max_count, int min_depth) {
+Tuple<Array<board_t>,Array<score_t>> read_table(int max_count, int min_depth) {
   GEODE_ASSERT(table_bits>=10 && table_type!=blank_table);
-  const uint64_t size = ((uint64_t)1<<table_bits)-1;
-  GEODE_ASSERT((uint64_t)table.size()==size);
+  const int size = (1<<table_bits)-1;
+  GEODE_ASSERT(table.size()==size);
   Array<board_t> boards;
   Array<score_t> scores;
-  for (uint64_t h=0;h<size;h++) {
+  for (int h=0;h<size;h++) {
     uint64_t entry = table[h];
     if (!entry)
       continue;

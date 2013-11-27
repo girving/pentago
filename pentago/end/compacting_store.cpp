@@ -118,7 +118,7 @@ RawArray<const uint8_t> compacting_store_t::lock_t::get() {
 }
 
 void compacting_store_t::lock_t::set(RawArray<const uint8_t> new_data) {
-  const int asize = align_size(new_data.size());
+  const int asize = int(align_size(new_data.size()));
   // Can we resize in place?
   if (asize > array->size) {
     // No: allocate a new block
@@ -283,8 +283,8 @@ struct thrasher_t {
       }
       // If there's space, set the new array, otherwise clear the existing one
       compacting_store_t::lock_t alock(group,array);
-      const int old_asize = align_size(alock.get().size());
-      const int diff = align_size(data.size())-old_asize;
+      const int old_asize = int(align_size(alock.get().size()));
+      const int diff = int(align_size(data.size())-old_asize);
       used_lock.lock();
       if (used+diff<=limit) {
         used += diff;
