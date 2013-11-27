@@ -427,8 +427,8 @@ template<bool turn,bool final> struct compute_helper_t {
     , dest(dest), src2(src2), src3(src3)
     , section(writer.header.section)
     , move(Vector<uint8_t,2>::axis_vector(turn))
-    , rmin(safe_rmin_slice(section.counts[order[0]],writer.header.block_size*i+range(dest.shape[0])),
-           safe_rmin_slice(section.counts[order[1]],writer.header.block_size*j+range(dest.shape[1])),
+    , rmin(safe_rmin_slice(section.counts[order[0]],int(writer.header.block_size*i)+range(dest.shape[0])),
+           safe_rmin_slice(section.counts[order[1]],int(writer.header.block_size*j)+range(dest.shape[1])),
            rotation_minimal_quadrants(section.counts[order[2]]).x,
            rotation_minimal_quadrants(section.counts[order[3]]).x)
     , count(count)

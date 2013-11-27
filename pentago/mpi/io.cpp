@@ -334,7 +334,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
       supertensor_header_t sh(sections[s],block_size,filter);
       sh.valid = true;
       sh.index = index_blobs[s];
-      sh.pack(headers.slice(offset+range(sh.header_size)));
+      sh.pack(headers.slice(int(offset)+range(sh.header_size)));
       offset += sh.header_size;
     }
     GEODE_ASSERT(offset==header_size);
@@ -377,7 +377,9 @@ static ReadSectionsStart read_sections_start(const MPI_Comm comm, const string& 
   // Read header information and compute partitions
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
-  const auto tensors = !rank ? open_supertensors(filename,CPU) : vector<Ref<const supertensor_reader_t>>();
+  const auto tensors = ({
+    Log::Scope scope("read headers");
+    !rank ? open_supertensors(filename,CPU) : vector<Ref<const supertensor_reader_t>>(); });
   const auto sections = read_section_list(comm,tensors);
   const auto partition = partition_factory(ranks,sections);
   GEODE_ASSERT(sections->total_blocks<=uint64_t(numeric_limits<int>::max()));
@@ -385,23 +387,26 @@ static ReadSectionsStart read_sections_start(const MPI_Comm comm, const string& 
   // Tell all processors where their data comes from
   const auto local_blocks = partition->rank_blocks(rank);
   Array<supertensor_blob_t> blobs(local_blocks.size(),false);
-  if (!rank) {
-    Nested<supertensor_blob_t,false> all_blobs;
-    all_blobs.offsets.preallocate(ranks+1);
-    all_blobs.flat.preallocate(sections->total_blocks);
-    for (const int r : range(ranks)) {
-      all_blobs.append_empty();
-      for (const auto& b : partition->rank_blocks(r))
-        all_blobs.append_to_back(tensors[sections->section_id.get(b.section)]->index[Vector<int,4>(b.block)]);
-    }
-    const auto sendcounts = all_blobs.sizes();
-    sendcounts *= 3;
-    const auto displs = (3*all_blobs.offsets).copy();
-    CHECK(MPI_Scatterv(all_blobs.flat.data(),sendcounts.data(),displs.data(),datatype<uint64_t>(),
-                       blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
-  } else
-    CHECK(MPI_Scatterv(0,0,0,datatype<uint64_t>(),
-                       blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
+  {
+    Log::Scope scope("blob scatter");
+    if (!rank) {
+      Nested<supertensor_blob_t,false> all_blobs;
+      all_blobs.offsets.preallocate(ranks+1);
+      all_blobs.flat.preallocate(sections->total_blocks);
+      for (const int r : range(ranks)) {
+        all_blobs.append_empty();
+        for (const auto& b : partition->rank_blocks(r))
+          all_blobs.append_to_back(tensors[sections->section_id.get(b.section)]->index[Vector<int,4>(b.block)]);
+      }
+      const auto sendcounts = all_blobs.sizes();
+      sendcounts *= 3;
+      const auto displs = (3*all_blobs.offsets).copy();
+      CHECK(MPI_Scatterv(all_blobs.flat.data(),sendcounts.data(),displs.data(),datatype<uint64_t>(),
+                         blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
+    } else
+      CHECK(MPI_Scatterv(0,0,0,datatype<uint64_t>(),
+                         blobs.data(),3*blobs.size(),datatype<uint64_t>(),0,comm));
+  }
 
   // On to the next phase
   return ReadSectionsStart(partition,local_blocks,blobs);
@@ -502,6 +507,8 @@ void read_sections_test(const MPI_Comm comm, const string& filename, const parti
   Log::Scope scope("read sections test");
   const int ranks = comm_size(comm),
             rank = comm_rank(comm);
+  if (!rank)
+    cout << "ranks = "<<ranks<<endl;
 
   // Read header and blob information
   const auto start = read_sections_start(comm,filename,partition_factory);
@@ -516,7 +523,8 @@ void read_sections_test(const MPI_Comm comm, const string& filename, const parti
     compressed_total += blobs[b].compressed_size;
     compressed_sizes[b] = blobs[b].compressed_size;
   }
-  GEODE_ASSERT(compressed_total<uint64_t(numeric_limits<int>::max()));
+  if (!rank && !(compressed_total<uint64_t(numeric_limits<int>::max())))
+    cout << "WARNING: compressed_total = "<<compressed_total<<", real restart job would fail"<<endl;
 
   // Don't slurp in the entire file
   const auto total_size = file_size(comm,filename);
@@ -530,6 +538,13 @@ void read_sections_test(const MPI_Comm comm, const string& filename, const parti
       uint64_t offset = 0;
       const auto blob = blobs[b];
       const auto blob_range = blob.offset+range(blob.compressed_size);
+      STATIC_ASSERT_SAME(decltype(blob_range),const Range<uint64_t>);
+      typedef uint64_t UI;
+      if (!(   blob_range.size()
+            && UI(blob_range.lo)  <UI(total_size)
+            && UI(blob_range.hi-1)<UI(total_size)))
+        GEODE_ASSERT(false,format("b %d, offset %lld, cs %lld, br %lld %lld",
+          b,blob.offset,blob.compressed_size,blob_range.lo,blob_range.hi));
       for (const int r : range(partition_loop_inverse(total_size,ranks,blob_range.lo),
                                partition_loop_inverse(total_size,ranks,blob_range.hi-1)+1)) {
         const auto r_range = partition_loop(total_size,ranks,r);
