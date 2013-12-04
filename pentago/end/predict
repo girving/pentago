@@ -72,7 +72,7 @@ def line_parallelism(base_memory):
 speed_estimate = 455092
 
 # Limit the number of per rank blocks and lines for tag purposes
-local_id_limit = 2**(23-2)
+local_id_limit = 2**(14+6)-1
 block_limit = 2**17
 
 # Simulate execution
@@ -99,19 +99,20 @@ for slice in reversed(xrange(min(len(slices),restart+1))):
     load = serial_load_balance(partition)
     with Log.scope('load balance'):
       Log.write(str(load))
+    max_rank_lines = max(load.lines)
+    max_rank_blocks = max(load.blocks)
+    max_rank_nodes = max(load.block_nodes)
+    Log.write('block local ids = %d (limit %d)'%(max(load.block_local_ids),local_id_limit))
+    if max(load.block_local_ids) > local_id_limit:
+      raise RuntimeError('max local ids = %d > %d'%(max(load.block_local_ids),local_id_limit))
+    if max_rank_blocks > block_limit:
+      raise RuntimeError('max rank blocks = %d > %d'%(max_rank_blocks,block_limit))
     if slice<restart:
-      max_rank_lines = max(load.lines)
-      max_rank_blocks = max(load.blocks)
-      max_rank_nodes = max(load.block_nodes)
       total_outputs += partition.sections.total_nodes
       total_inputs += prev_partition.sections.total_nodes if prev_partition else 0
       max_lines = max(max_lines,max_rank_lines)
       max_blocks = max(max_blocks,max_rank_blocks)
       max_local_ids = max(max_local_ids,max(load.block_local_ids))
-      if max(load.block_local_ids) > local_id_limit:
-        raise RuntimeError('max local ids = %d > %d'%(max(load.block_local_ids),local_id_limit))
-      if max_rank_blocks > block_limit:
-        raise RuntimeError('max rank blocks = %d > %d'%(max_rank_blocks,block_limit))
       base_memory = max_rank_memory_usage(prev_partition,prev_load,partition,load)
       max_base_memory = max(max_base_memory,base_memory)
       Log.write('base memory = %s'%large(base_memory))
