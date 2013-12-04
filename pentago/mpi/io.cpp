@@ -442,13 +442,13 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
   Array<char> raw;
   {
     Log::Scope scope("read data");
-    const auto our_size = CHECK_CAST_INT(partition_loop(total_size,ranks,rank).size());
-    raw.resize(our_size,false);
+    const auto chunk = partition_loop(total_size,ranks,rank);
+    raw.resize(CHECK_CAST_INT(chunk.size()),false);
     MPI_File file;
     const int r = MPI_File_open(comm,(char*)filename.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
     if (r != MPI_SUCCESS)
       die("failed to open '%s' for reading: %s",filename,error_string(r));
-    CHECK(MPI_File_read_ordered(file,raw.data(),raw.size(),MPI_BYTE,MPI_STATUS_IGNORE));
+    CHECK(MPI_File_read_at_all(file,chunk.lo,raw.data(),raw.size(),MPI_BYTE,MPI_STATUS_IGNORE));
     CHECK(MPI_File_close(&file));
   }
 
