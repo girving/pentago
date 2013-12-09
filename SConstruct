@@ -18,7 +18,7 @@ sys.path.insert(0,Dir('#').abspath)
 try:
   import config
   has_config = True
-except:
+except ImportError:
   has_config = False
 
 del sys.path[0]
@@ -46,9 +46,6 @@ windows = env['PLATFORM']=='win32'
 if not windows:
   env.Replace(ENV=os.environ)
 verbose = True
-
-# Locate geode in case we're in a different directory
-env['geode'] = os.path.normpath(os.path.dirname(os.path.realpath(File('#SConstruct').abspath)))
 
 # Default base directory
 if darwin:
@@ -103,6 +100,9 @@ options(env,
   ('mpicc','MPI wrapper compiler (used only to extract flags)','<detect>'),
   ('qtdir','Top level Qt dir (autodetect by default)',''))
 assert env['real'] in ('float','double')
+
+# Make a pristine environment for latex use
+latex_env = env.Clone()
 
 # Extra flag options
 env.Append(CXXFLAGS=env['cxxflags_extra'])
@@ -348,6 +348,10 @@ def external(env,name,default=0,dir=0,flags='',cxxflags='',linkflags='',cpppath=
   # Check whether the external is usable
   if configure is not None:
     has = configure if isinstance(configure,bool) else configure(env,lib)
+    if not has:
+      env['use_'+name] = 0
+      del externals[name]
+      fail()
   else:
     assert headers is not None
 
@@ -582,20 +586,21 @@ def resource(env,dir):
 def configure_latex():
   def check(context):
     context.Message('checking for latex: ')
-    r = context.TryBuild(env.PDF,text=r'\documentclass{book}\begin{document}\end{document}',extension='.tex')
+    r = context.TryBuild(latex_env.PDF,text=r'\documentclass{book}\begin{document}\end{document}',extension='.tex')
     context.Result(r)
     return r
-  conf = env.Configure(custom_tests={'Check':check})
+  conf = latex_env.Configure(custom_tests={'Check':check})
   if not conf.Check():
-    env['use_latex'] = 0
+    latex_env['use_latex'] = 0
   conf.Finish()
-if env['use_latex']:
+if latex_env['use_latex']:
   configure_latex()
 
 # Turn a latex document into a pdf
-def latex(env,name):
-  if env['use_latex'] and env['type']=='release':
-    env.Install(Dir('.').srcnode(),env.PDF(name+'.pdf',name+'.tex'))
+def latex(name):
+  if latex_env['use_latex']:
+    pdf = os.path.join('#'+Dir('.').srcnode().path,name+'.pdf')
+    latex_env.PDF(pdf,name+'.tex')
 
 # Automatic python configuration
 def configure_python(env,python):
@@ -718,7 +723,7 @@ def child(env,dir):
   env.SConscript('#'+os.path.join(path,'SConscript'),exports='env')
 
 # Descend into all child SConscripts in order of priority
-def children(env):
+def children(env,skip=()):
   # Directories that define externals used by other directories must come first.
   # Therefore, we sort children with .priority files first in increase order of priority.
   def priority(dir):
@@ -729,7 +734,7 @@ def children(env):
   base = Dir('.').srcnode().abspath+'/'
   dirs = [s[len(base):-11] for s in glob.glob(base+'*/SConscript')]
   for dir in sorted(dirs,key=priority):
-    if os.path.exists(File(os.path.join(dir,'SConscript')).srcnode().abspath):
+    if dir not in skip and os.path.exists(File(os.path.join(dir,'SConscript')).srcnode().abspath):
       child(env,dir)
 
 # Build everything
