@@ -592,9 +592,9 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
   Array<Vector<uint64_t,4>> data(counts.size(),false);
   const bool turn = sections.slice&1;
   for (int i=0;i<data.size();i++) {
-    auto wins = counts[i].x, losses = counts[i].z-counts[i].y;
+    auto wins = counts[i].x, losses = counts[i].z-counts[i].y; // At this point, wins are for the player to move
     if (turn)
-      swap(wins,losses);
+      swap(wins,losses); // Now wins are for black (first player), losses are for white (second player)
     data[i].set(sections.sections[i].sig(),wins,losses,counts[i].z);
   }
 

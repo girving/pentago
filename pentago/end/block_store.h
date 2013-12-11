@@ -111,7 +111,7 @@ public:
   GEODE_DECLARE_TYPE(GEODE_EXPORT)
   typedef readable_block_store_t Base;
 
-  const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section 
+  const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section (player to move first)
   spinlock_t section_counts_lock;
 
   // Space for sparse samples (filled in as blocks complete).  These are stored in native
