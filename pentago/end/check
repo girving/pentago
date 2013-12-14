@@ -18,6 +18,8 @@ dirs = props.add('dir',None).set_required(1).set_hidden(1)
 dirs.set([])
 pad_io = props.add('pad_io',pentago_end_pad_io).set_help('whether or not to expect padding when checking sha1 hashes')
 restart = props.add('restart',False)
+reader_test = props.add('reader_test',-1) \
+  .set_help('check consistency of given slice with smaller slices, using a reader_block_cache')
 parser.parse(props,'Compare MPI results with out-of-core results',positional=[dirs])
 old_dir = old_dir()
 
@@ -34,14 +36,21 @@ for dir in dirs():
       assert not meaningless
       meaningless = int(f.split('-')[-1])
 
-    # Generate meaningless data
-    if meaningless:
-      sections = sections_t(meaningless,all_boards_sections(meaningless,8))
-      partition = simple_partition_t(1,sections,False)
-      with Log.scope('meaningless'):
-        store = compacting_store_t(estimate_block_heap_size(partition,0))
-        cache = store_block_cache(meaningless_block_store(partition,0,0,store),1<<30)
+    if reader_test()>=0:
+      # Load given slice and treat as ground truth
+      cache_file = '%s/slice-%d.pentago'%(dir,reader_test())
+      Log.write('loading reader test data from %s'%cache_file)
+      cache = reader_block_cache(open_supertensors(cache_file),1<<30)
       set_block_cache(cache)
+    else:
+      # Generate meaningless data
+      if meaningless:
+        sections = sections_t(meaningless,all_boards_sections(meaningless,8))
+        partition = simple_partition_t(1,sections,False)
+        with Log.scope('meaningless'):
+          store = compacting_store_t(estimate_block_heap_size(partition,0))
+          cache = store_block_cache(meaningless_block_store(partition,0,0,store),1<<30)
+        set_block_cache(cache)
 
     # Memorize the hashes of .pentago files from unit tests
     if meaningless:
@@ -137,13 +146,14 @@ for dir in dirs():
             unchecked.remove(slice_file)
 
             # Check each section and block
-            with Log.scope('consistency'):
-              for reader,section,counts in zip(readers,sections,counts):
-                assert all(reader.header.section==section)
-                old_reader = None if meaningless or not old_dir else supertensor_reader_t('%s/section-%s.pentago'%(old_dir,show_section(section)))
-                counts2,samples_found = compare_readers_and_samples(reader,old_reader,sample_boards,sample_wins)
-                assert all(counts==counts2)
-                assert samples_found==256
+            if reader_test()<0 or slice<reader_test():
+              with Log.scope('consistency'):
+                for reader,section,counts in zip(readers,sections,counts):
+                  assert all(reader.header.section==section)
+                  old_reader = None if meaningless or not old_dir else supertensor_reader_t('%s/section-%s.pentago'%(old_dir,show_section(section)))
+                  counts2,samples_found = compare_readers_and_samples(reader,old_reader,sample_boards,sample_wins)
+                  assert all(counts==counts2)
+                  assert samples_found==256
 
             # Check restart consistency
             assert restart()==os.path.exists(restart_file)

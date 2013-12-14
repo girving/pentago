@@ -100,8 +100,8 @@ public:
   }
 
   super_t extract(const bool turn, const bool aggressive, const Vector<super_t,2>& data) const {
-    return turn?aggressive?data.x:~data.y  // Black to move
-               :aggressive?data.y:~data.x; // White to move
+    return !turn?aggressive?data.x:~data.y  // Black to move
+                :aggressive?data.y:~data.x; // White to move
   }
 
   RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const {

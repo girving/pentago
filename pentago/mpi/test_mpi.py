@@ -15,10 +15,12 @@ def run(cmd):
   if not nop:
     subprocess.check_call(cmd.split())
 
-def check(dir,restart=0):
+def check(dir,restart=0,reader_test=None):
   check = os.path.join(os.path.dirname(__file__),'../end/check')
   check = os.path.normpath(check)
   cmd = [check,'--restart=%d'%int(restart),dir]
+  if reader_test is not None:
+    cmd.extend(['--reader-test',str(reader_test)])
   run(' '.join(cmd))
 
 @cache
@@ -49,7 +51,7 @@ def test_write(dir=None):
     run('%s -n 2 endgame-mpi --threads 3 --dir %s --test write-%d'%(mpirun(),wdir,slice))
     check(wdir,restart=1)
 
-def meaningless_test(key,dir=None,restart=False):
+def meaningless_test(key,dir=None,restart=False,reader_test=False):
   if dir is None:
     tmpdir = TmpDir('test_meaningless')
     dir = tmpdir.name
@@ -59,6 +61,8 @@ def meaningless_test(key,dir=None,restart=False):
     base = '%s -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless %d --randomize %d 00000000'%(mpirun(),slice,key)
     run('%s --dir %s'%(base,wdir))
     check(wdir)
+    if reader_test:
+      check(wdir,reader_test=slice-1)
     if restart:
       tdir = wdir+'-restart-test'
       run('%s --restart %s/slice-%d.pentago --dir %s --test restart'%(base,wdir,slice-1,tdir))
@@ -70,7 +74,7 @@ def test_meaningless_simple(dir=None):
   meaningless_test(0,dir)
 
 def test_meaningless_random(dir=None):
-  meaningless_test(17,dir,restart=1)
+  meaningless_test(17,dir,restart=1,reader_test=1)
 
 if __name__=='__main__':
   Log.configure('test',False,False,100)
