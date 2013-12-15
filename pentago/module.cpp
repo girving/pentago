@@ -44,4 +44,7 @@ GEODE_PYTHON_MODULE(pentago_core) {
 
   // Configuration
   GEODE_OBJECT_2(pentago_end_pad_io,pentago::end::pad_io)
+
+  // High
+  GEODE_WRAP(high_board)
 }

@@ -19,7 +19,7 @@ protected:
 public:
   GEODE_EXPORT ~block_cache_t();
 
-  // Warning: Very slow, use only inside low depth searches
+  // Warning: Very slow, use only inside low depth searches.  board has player 0 to move.
   GEODE_EXPORT bool lookup(const bool aggressive, const board_t board, super_t& wins) const;
   GEODE_EXPORT bool lookup(const bool aggressive, const side_t side0, const side_t side1, super_t& wins) const;
 

@@ -2,6 +2,7 @@
 
 #include <pentago/base/board.h>
 #include <pentago/utility/debug.h>
+#include <geode/array/Array2d.h>
 #include <geode/array/NdArray.h>
 #include <geode/math/popcount.h>
 #include <geode/python/wrap.h>
@@ -55,7 +56,20 @@ static NdArray<side_t> unpack_py(NdArray<const board_t> boards) {
   return sides;
 }
 
-static NdArray<int> to_table(NdArray<const board_t> boards) {
+Array<int,2> to_table(const board_t board) {
+  check_board(board);
+  Array<int,2> table(6,6,false);
+  for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
+    const quadrant_t q = quadrant(board,2*qx+qy);
+    const side_t s0 = unpack(q,0),
+                 s1 = unpack(q,1);
+    for (int x=0;x<3;x++) for (int y=0;y<3;y++)
+      table(3*qx+x,3*qy+y) = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1);
+  }
+  return table;
+}
+
+NdArray<int> to_tables(NdArray<const board_t> boards) {
   for (int b=0;b<boards.flat.size();b++)
     check_board(boards.flat[b]);
   Array<int> shape = boards.shape.copy();
@@ -64,11 +78,11 @@ static NdArray<int> to_table(NdArray<const board_t> boards) {
   NdArray<int> tables(shape,false);
   for (int b=0;b<boards.flat.size();b++) {
     for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
-      quadrant_t q = quadrant(boards.flat[b],2*qx+qy); \
-      side_t s0 = unpack(q,0), \
-             s1 = unpack(q,1); \
-      for (int x=0;x<3;x++) for (int y=0;y<3;y++) \
-        tables.flat[36*b+6*(3*qx+x)+3*qy+y] = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1); \
+      const quadrant_t q = quadrant(boards.flat[b],2*qx+qy);
+      const side_t s0 = unpack(q,0),
+                   s1 = unpack(q,1);
+      for (int x=0;x<3;x++) for (int y=0;y<3;y++)
+        tables.flat[36*b+6*(3*qx+x)+3*qy+y] = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1);
     }
   }
   return tables;
@@ -183,9 +197,7 @@ board_t random_board(Random& random, int n) {
 string str_board(board_t board) {
   string s;
   s += format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));
-  NdArray<board_t> boards((Array<int>()));
-  boards.flat[0] = board;
-  NdArray<int> table = to_table(boards);
+  const Array<const int,2> table = to_table(board);
   for (int i=0;i<6;i++) {
     int y = 5-i;
     s += "abcdef"[i];
@@ -205,7 +217,7 @@ void wrap_board() {
   function("unpack",unpack_py);
   function("pack",pack_py);
   function("standardize",standardize_py);
-  GEODE_FUNCTION(to_table)
+  GEODE_FUNCTION_2(to_table,to_tables)
   GEODE_FUNCTION(from_table)
   GEODE_FUNCTION(check_board)
   GEODE_FUNCTION(black_to_move)

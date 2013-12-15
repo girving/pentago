@@ -20,6 +20,7 @@ pad_io = props.add('pad_io',pentago_end_pad_io).set_help('whether or not to expe
 restart = props.add('restart',False)
 reader_test = props.add('reader_test',-1) \
   .set_help('check consistency of given slice with smaller slices, using a reader_block_cache')
+high_test = props.add('high_test',-1).set_help('check consistency of high level interface up to the given slice')
 parser.parse(props,'Compare MPI results with out-of-core results',positional=[dirs])
 old_dir = old_dir()
 
@@ -92,6 +93,10 @@ for dir in dirs():
     def to_native(x):
       return x.astype(x.dtype.newbyteorder('='))
 
+    # Prepare to read data for high level test if necessary
+    if high_test()>=0:
+      high_data = reader_block_cache([s for f in glob.glob(dir+'/slice-*.pentago') for s in open_supertensors(f)],1<<30)
+
     # Process each slice that exists, keeping track of which files we've checked
     skip_pattern = re.compile('^(?:log(?:-\d+)?|empty.pentago|history.*|output-.*|.*\.pbs|meaningless-\d|\d+\.(cobaltlog|error|output))$')
     unchecked = set(os.path.join(dir,f) for f in os.listdir(dir) if not skip_pattern.match(f))
@@ -128,6 +133,11 @@ for dir in dirs():
           # Compare against superengine
           with Log.scope('validity'):
             endgame_sparse_verify(sample_boards,sample_wins,random,len(sample_boards))
+
+          # Run high level test if desired
+          if slice<=high_test():
+            with Log.scope('high level test'):
+              high_board_t.sample_check(high_data,sample_boards,sample_wins)
 
           # Check empty.pentago hash
           check_hash(empty_file)
