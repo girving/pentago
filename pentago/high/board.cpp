@@ -3,12 +3,16 @@
 #include <pentago/high/board.h>
 #include <pentago/base/score.h>
 #include <pentago/base/symmetry.h>
+#include <pentago/search/superengine.h>
 #include <geode/python/Class.h>
 #include <geode/python/stl.h>
 #include <geode/random/Random.h>
+#include <geode/utility/Log.h>
 namespace pentago {
 
 GEODE_DEFINE_TYPE(high_board_t)
+using Log::cout;
+using std::endl;
 
 high_board_t::high_board_t(const board_t board, const int turn, const bool middle)
   : board(board)
@@ -79,6 +83,18 @@ Ref<high_board_t> high_board_t::rotate(const int qx, const int qy, const int d) 
     !turn,false);
 }
 
+// If aggressive is true, true is win, otherwise true is win or tie.
+static bool exact_lookup(const bool aggressive, const board_t board, const block_cache_t& cache) {
+  {
+    super_t wins;
+    if (cache.lookup(aggressive,board,wins))
+      return wins(0);
+  }
+  // Fall back to tree search
+  const score_t score = super_evaluate(aggressive,100,board,Vector<int,4>());
+  return (score&3)>=aggressive+1;
+}
+
 int high_board_t::value(const block_cache_t& cache) const {
   {
     // Check immediate wins
@@ -92,14 +108,14 @@ int high_board_t::value(const block_cache_t& cache) const {
   if (!middle) {
     // If we're not at a half move, look up the result
     const auto flip = flip_board(board,turn);
-    super_t we_win, we_win_or_tie;
-    GEODE_ASSERT(cache.lookup(true,flip,we_win));
-    GEODE_ASSERT(cache.lookup(false,flip,we_win_or_tie));
-    return we_win(0)+we_win_or_tie(0)-1;
+    return exact_lookup(true,flip,cache)+exact_lookup(false,flip,cache)-1;
   } else {
     int best = -1;
-    for (const auto move : moves())
+    for (const auto move : moves()) {
       best = max(best,-move->value(cache));
+      if (best==1)
+        break;
+    }
     return best;
   }
 }
@@ -118,20 +134,27 @@ int high_board_t::value_check(const block_cache_t& cache) const {
     int value = -1;
     for (const auto& move : moves())
       value = max(value,move->value(cache));
-    GEODE_ASSERT(value==this->value(cache));
+    const int lookup = this->value(cache);
+    if (value != lookup)
+      throw AssertionError(format("high_board_t.value_check: board %lld, turn %d, middle %d, computed %d != lookup %d\n%s",
+        board,turn,middle,value,lookup,str_board(board)));
     return value;
   }
 }
 
-void high_board_t::sample_check(const block_cache_t& cache, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins) {
+Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins) {
   GEODE_ASSERT(boards.size()==wins.size());
   const auto random = new_<Random>(152311341);
+  Vector<int,3> counts;
   for (const int i : range(boards.size())) {
     const int r = random->bits<uint8_t>();
     const int n = count_stones(boards[i]);
     const auto board = new_<high_board_t>(transform_board(symmetry_t(local_symmetry_t(r)),boards[i]),n&1,false);
-    GEODE_ASSERT(board->value_check(cache)==wins[i][n&1](r)-wins[i][!(n&1)](r));
+    const int value = board->value_check(cache);
+    GEODE_ASSERT(value==wins[i][n&1](r)-wins[i][!(n&1)](r));
+    counts[value+1]++;
   }
+  return counts;
 }
 
 }

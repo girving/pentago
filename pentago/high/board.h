@@ -42,7 +42,9 @@ public:
 
   // Same as value, but verify consistency with minimum depth tree search.
   int value_check(const block_cache_t& cache) const;
-  static void sample_check(const block_cache_t& cache, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins);
+
+  // Compare against a bunch of samples and return loss,tie,win counts
+  static Vector<int,3> sample_check(const block_cache_t& cache, RawArray<const board_t> boards, RawArray<const Vector<super_t,2>> wins);
 
   friend Hash hash_reduce(const high_board_t& self) {
     return Hash(self.board,self.middle);

@@ -79,9 +79,8 @@ struct reader_block_cache_t : public block_cache_t {
 protected:
   reader_block_cache_t(const vector<Ref<const supertensor_reader_t>> reader_list, const uint64_t memory_limit)
     : memory_limit(memory_limit)
-    , block_size_(0) // filled in below
+    , block_size_(0) // filled in below if reader_list is nonempty, never used if reader_list is empty
     , free_memory(memory_limit) {
-    GEODE_ASSERT(reader_list.size());
     for (const auto& reader : reader_list) {
       if (!block_size_)
         const_cast_(block_size_) = reader->header.block_size;
