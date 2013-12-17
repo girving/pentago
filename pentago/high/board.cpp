@@ -14,9 +14,9 @@ GEODE_DEFINE_TYPE(high_board_t)
 using Log::cout;
 using std::endl;
 
-high_board_t::high_board_t(const board_t board, const int turn, const bool middle)
+high_board_t::high_board_t(const board_t board, const bool middle)
   : board(board)
-  , turn(turn)
+  , turn(0) // Filled in below
   , middle(middle)
   , grid(to_table(board)) {
   // Check correctness
@@ -26,7 +26,7 @@ high_board_t::high_board_t(const board_t board, const int turn, const bool middl
   const int count0 = popcount(side0),
             count1 = popcount(side1);
   GEODE_ASSERT(count0+count1==count_stones(board));
-  GEODE_ASSERT(turn==0 || turn==1);
+  const_cast_(turn) = count0-1==count1-middle;
   if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1))
     throw ValueError(format("high_board_t: inconsistent board %lld, turn %d, middle %d, side counts %d %d",
       board,turn,middle,count0,count1));
@@ -69,7 +69,7 @@ Ref<high_board_t> high_board_t::place(const int x, const int y) const {
   GEODE_ASSERT(!grid(x,y));
   return new_<high_board_t>(
     board+flip_board(pack(side_t(1<<(3*(x%3)+y%3))<<16*(2*(x/3)+(y/3)),side_t(0)),turn),
-    turn,true);
+    true);
 }
 
 Ref<high_board_t> high_board_t::rotate(const int qx, const int qy, const int d) const {
@@ -80,7 +80,7 @@ Ref<high_board_t> high_board_t::rotate(const int qx, const int qy, const int d) 
   GEODE_ASSERT(abs(d)==1);
   return new_<high_board_t>(
     transform_board(symmetry_t(local_symmetry_t((d>0?1:3)<<2*(2*qx+qy))),board),
-    !turn,false);
+    false);
 }
 
 // If aggressive is true, true is win, otherwise true is win or tie.
@@ -149,7 +149,7 @@ Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<co
   for (const int i : range(boards.size())) {
     const int r = random->bits<uint8_t>();
     const int n = count_stones(boards[i]);
-    const auto board = new_<high_board_t>(transform_board(symmetry_t(local_symmetry_t(r)),boards[i]),n&1,false);
+    const auto board = new_<high_board_t>(transform_board(symmetry_t(local_symmetry_t(r)),boards[i]),false);
     const int value = board->value_check(cache);
     GEODE_ASSERT(value==wins[i][n&1](r)-wins[i][!(n&1)](r));
     counts[value+1]++;
@@ -163,7 +163,7 @@ using namespace pentago;
 void wrap_high_board() {
   typedef high_board_t Self;
   Class<Self>("high_board_t")
-    .GEODE_INIT(board_t,int,bool)
+    .GEODE_INIT(board_t,bool)
     .GEODE_FIELD(board)
     .GEODE_FIELD(turn)
     .GEODE_FIELD(middle)

@@ -17,7 +17,7 @@ struct high_board_t : public Object {
   const Array<const int,2> grid; // x-y major order, 0-0 is lower left, values are 0-empty, 1-black, 2-white
 
 protected:
-  high_board_t(const board_t board, const int turn, const bool middle);
+  high_board_t(const board_t board, const bool middle);
 public:
   ~high_board_t();
 

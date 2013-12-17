@@ -91,7 +91,7 @@ def plot_board(board):
 
 def main():
   # No stones, black to move, not in the middle
-  board = high_board_t(0,0,False)
+  board = high_board_t(0,False)
   plot_board(board)
 
 if __name__=='__main__':
