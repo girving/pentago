@@ -172,6 +172,7 @@ private:
 
 // Open one or more supertensors from a single file
 vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, const thread_type_t io=IO);
+vector<Ref<const supertensor_reader_t>> open_supertensors(const read_file_t& fd, const thread_type_t io=IO);
 
 // Determine the slice of a supertensor file.  Does not verify consistency.
 int supertensor_slice(const string& path);

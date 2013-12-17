@@ -19,6 +19,7 @@ GEODE_PYTHON_MODULE(pentago_core) {
   GEODE_WRAP(all_boards)
   GEODE_WRAP(count)
   GEODE_WRAP(trace)
+  GEODE_WRAP(file)
   GEODE_WRAP(supertensor)
   GEODE_WRAP(endgame)
   GEODE_WRAP(filter)

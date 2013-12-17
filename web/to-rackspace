@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+'''Upload solution files to rackspace, segmented along block boundaries for .pentago files.'''
+
+from __future__ import division,print_function,unicode_literals,absolute_import
+from pentago import *
+from geode import *
+from geode.value import parser
+import pyrax
+import sys
+import re
+import os
+
+# Properties
+props = PropManager()
+props.add('nop',False).set_abbrev('n').set_help('upload nothing, but say what we would upload')
+props.add('paths',None).set([]).set_required(1)
+props.add('check',False).set_help('check hashes even if file already exists')
+props.add('hashes','').set_help('precomputed hash file')
+parser.parse(props,'Upload pentago data files to rackspace',positional=['paths'])
+
+# Authenticate
+Log.configure('rackspace upload',0,0,100)
+with Log.scope('authenticate'):
+  pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
+
+# Standard pyrax aliases from https://github.com/rackspace/pyrax/blob/master/docs/getting_started.md
+cs = pyrax.cloudservers
+cf = pyrax.cloudfiles
+cbs = pyrax.cloud_blockstorage
+cdb = pyrax.cloud_databases
+clb = pyrax.cloud_loadbalancers
+dns = pyrax.cloud_dns
+cnw = pyrax.cloud_networks
+
+def die(msg):
+  print(msg,file=sys.stderr)
+  sys.exit(1)
+
+def load_hashes():
+  assert props.hashes().endswith('md5s')
+  hashes = {}
+  for line in open(props.hashes()):
+    hash,name = line.split()
+    hashes[name] = hash
+  return hashes
+if props.hashes():
+  hashes = load_hashes()
+
+def quick_hash(path):
+  if props.hashes():
+    return hashes[os.path.basename(path)]
+  return pyrax.utils.get_checksum(path)
+
+def upload(container,name,path):
+  with Log.scope('chunk %s to %s'%(name,container.name)):
+    with Log.scope('checksum'):
+      etag = quick_hash(path)
+      Log.write('etag = %s'%etag)
+    if not props.nop():
+      with Log.scope('upload'):
+        obj = container.upload_file(name,path,etag=etag)
+        if etag != obj.etag:
+          die('etag mismatch: local %s, upload %s'%(etag,obj.etag))
+
+def upload_all(paths):
+  # Verify that all files make sense
+  file_pattern = re.compile('^(slice-\d+.pentago|sparse-\d+.npy|counts-\d+.npy)$')
+  for path in paths:
+    if not file_pattern.match(os.path.basename(path)):
+      die('weird file: %s'%path)
+    if not os.path.exists(path):
+      die('nonexistent file: %s'%path)
+
+  # Grab containers
+  container = cf.get_container('pentago-edison-all')
+  files = dict((f.name,f) for f in container.get_objects())
+
+  # Upload each file
+  with Log.scope('upload'):
+    for path in paths:
+      name = os.path.basename(path) 
+      if name in files:
+        if props.check():
+          with Log.scope('check %s'%name):
+            assert files[name].etag==quick_hash(path)
+        else:
+          Log.write('skipping %s: already uploaded'%path)
+      else:
+        upload(container,name,path)
+
+if __name__=='__main__':
+  upload_all(props.paths())

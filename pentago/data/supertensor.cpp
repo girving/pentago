@@ -9,6 +9,7 @@
 #include <pentago/utility/debug.h>
 #include <pentago/utility/endian.h>
 #include <geode/array/IndirectArray.h>
+#include <geode/python/cast.h>
 #include <geode/python/Class.h>
 #include <geode/python/to_python.h>
 #include <geode/python/stl.h>
@@ -359,12 +360,25 @@ uint64_t supertensor_writer_t::uncompressed_size(Vector<uint8_t,4> block) const 
   return index[Vector<int,4>(block)].uncompressed_size;
 }
 
+static vector<Ref<const supertensor_reader_t>> open_supertensors_py(PyObject* path_or_file, const thread_type_t io) {
+  if (const auto file = python_cast<const read_file_t*>(path_or_file))
+    return open_supertensors(*file,io);
+  if (PyString_Check(path_or_file) || PyUnicode_Check(path_or_file))
+    return open_supertensors(from_python<string>(path_or_file),io);
+  throw TypeError(format("open_supertensors: expected string path or read_file_t, got %s",
+    path_or_file->ob_type->tp_name));
+}
+
 vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, const thread_type_t io) {
-  const auto fd = read_local_file(check_extension(path));
+  return open_supertensors(read_local_file(check_extension(path)),io);
+}
+
+vector<Ref<const supertensor_reader_t>> open_supertensors(const read_file_t& fd, const thread_type_t io) {
+  const string path = fd.name();
 
   // Read magic string to determine file type (single or multiple supertensors)
   uint8_t buffer[20];
-  if (const char* error = fd->pread(asarray(buffer),0))
+  if (const char* error = fd.pread(asarray(buffer),0))
     THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,error);
 
   // Branch on type
@@ -373,7 +387,7 @@ vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, co
     readers.push_back(new_<supertensor_reader_t>(path,fd,0,io));
   else if (!memcmp(buffer,multiple_supertensor_magic,20)) {
     uint32_t header[3];
-    if (const char* error = fd->pread(char_view(asarray(header)),20))
+    if (const char* error = fd.pread(char_view(asarray(header)),20))
       THROW(IOError,"invalid multiple supertensor file \"%s\": error reading global header, %s",path,error);
     for (auto& h: header)
       h = to_little_endian(h);
@@ -469,5 +483,5 @@ void wrap_supertensor() {
     ;}
 
   GEODE_FUNCTION_2(compress,pentago::compress)
-  GEODE_FUNCTION_2(open_supertensors_py,open_supertensors)
+  GEODE_FUNCTION(open_supertensors_py)
 }
