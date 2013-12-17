@@ -18,9 +18,6 @@
 #include <geode/utility/curry.h>
 #include <geode/utility/Log.h>
 #include <geode/utility/str.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 namespace pentago {
 
 using std::cout;
@@ -56,7 +53,7 @@ Vector<int,4> supertensor_header_t::block_shape(Vector<uint8_t,4> block) const {
   return bs;
 }
 
-void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Array<uint8_t>)>& cont) {
+void read_and_uncompress(const read_file_t* fd, supertensor_blob_t blob, const function<void(Array<uint8_t>)>& cont) {
   // Check consistency
   GEODE_ASSERT(blob.compressed_size<(uint64_t)1<<31);
   GEODE_ASSERT(!blob.uncompressed_size || blob.offset);
@@ -66,9 +63,8 @@ void read_and_uncompress(int fd, supertensor_blob_t blob, const function<void(Ar
   {
     thread_time_t time(read_kind,unevent);
     compressed.resize(int(blob.compressed_size),false,false);
-    ssize_t r = pread(fd,compressed.data(),blob.compressed_size,blob.offset);
-    if (r<0 || r!=(ssize_t)blob.compressed_size)
-      THROW(IOError,"read_and_uncompress pread failed: %s",r<0?strerror(errno):"incomplete read");
+    if (const char* error = fd->pread(compressed,blob.offset))
+      THROW(IOError,"read_and_uncompress pread failed: %s",error);
   }
 
   // Schedule decompression
@@ -87,9 +83,8 @@ void supertensor_writer_t::pwrite(supertensor_blob_t* blob, Array<const uint8_t>
 
   // Write using pwrite for thread safety
   thread_time_t time(write_kind,unevent);
-  ssize_t w = ::pwrite(fd->fd,data.data(),data.size(),blob->offset);
-  if (w < 0 || w < (ssize_t)data.size())
-    THROW(IOError,"failed to write compressed block to supertensor file: %s",w<0?strerror(errno):"incomplete write");
+  if (const char* error = fd->pwrite(data,blob->offset))
+    THROW(IOError,"failed to write compressed block to supertensor file: %s",error);
 }
 
 void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray<const uint8_t> data) {
@@ -103,20 +98,6 @@ void supertensor_writer_t::compress_and_write(supertensor_blob_t* blob, RawArray
 
   // Schedule write
   threads_schedule(IO,curry(&Self::pwrite,this,blob,compressed));
-}
-
-fildes_t::fildes_t(const string& path, int flags, mode_t mode)
-  : fd(open(path.c_str(),flags,mode)) {}
-
-fildes_t::~fildes_t() {
-  close();
-}
-
-void fildes_t::close() {
-  if (fd >= 0) {
-    ::close(fd);
-    fd = -1;
-  }
 }
 
 static const string& check_extension(const string& path) {
@@ -172,27 +153,21 @@ static void save_index(Vector<int,4> blocks, Array<const supertensor_blob_t,4>* 
 }
 
 supertensor_reader_t::supertensor_reader_t(const string& path, const thread_type_t io)
-  : fd(new_<fildes_t>(check_extension(path),O_RDONLY)) {
+  : fd(read_local_file(check_extension(path))) {
   initialize(path,0,io);
 }
 
-supertensor_reader_t::supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset, const thread_type_t io)
+supertensor_reader_t::supertensor_reader_t(const string& path, const read_file_t& fd, const uint64_t header_offset, const thread_type_t io)
   : fd(ref(fd)) {
   initialize(path,header_offset,io);
 }
 
 void supertensor_reader_t::initialize(const string& path, const uint64_t header_offset, const thread_type_t io) {
-  if (fd->fd < 0)
-    THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
-
   // Read header
   const int header_size = supertensor_header_t::header_size;
   uint8_t buffer[header_size];
-  ssize_t r = pread(fd->fd,buffer,header_size,header_offset);
-  if (r < 0)
-    THROW(IOError,"invalid supertensor file \"%s\": error reading header, %s",path,strerror(errno));
-  if (r < header_size)
-    THROW(IOError,"invalid supertensor file \"%s\": unexpected end of file during header",path);
+  if (const char* error = fd->pread(asarray(buffer),header_offset))
+    THROW(IOError,"invalid supertensor file \"%s\": error reading header, %s",path,error);
   const auto h = supertensor_header_t::unpack(RawArray<const uint8_t>(header_size,buffer));
   const_cast_(header) = h;
 
@@ -215,7 +190,7 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
 
   // Read block index
   Array<const supertensor_blob_t,4> index;
-  threads_schedule(io,curry(read_and_uncompress,fd->fd,h.index,function<void(Array<uint8_t>)>(curry(save_index,Vector<int,4>(h.blocks),&index))));
+  threads_schedule(io,curry(read_and_uncompress,&*fd,h.index,function<void(Array<uint8_t>)>(curry(save_index,Vector<int,4>(h.blocks),&index))));
   threads_wait_all();
   GEODE_ASSERT((index.shape==Vector<int,4>(h.blocks)));
   to_little_endian_inplace(index.flat.const_cast_());
@@ -257,7 +232,7 @@ void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<uint8_t,4>
   for (auto block : blocks) {
     const Vector<int,4> block_(block);
     GEODE_ASSERT(index.valid(block_));
-    threads_schedule(IO,curry(read_and_uncompress,fd->fd,index[block_],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
+    threads_schedule(IO,curry(read_and_uncompress,&*fd,index[block_],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
   }
 }
 
@@ -269,13 +244,12 @@ uint64_t supertensor_reader_t::total_size() const {
 }
 
 // Write header at offset 0, and return the header size
-static uint64_t write_header(int fd, const supertensor_header_t& h) {
+static uint64_t write_header(write_file_t& fd, const supertensor_header_t& h) {
   const int header_size = supertensor_header_t::header_size;
   uint8_t buffer[header_size];
   h.pack(RawArray<uint8_t>(header_size,buffer));
-  ssize_t w = pwrite(fd,buffer,header_size,0);
-  if (w < 0 || w < header_size)
-    THROW(IOError,"failed to write header to supertensor file: %s",w<0?strerror(errno):"incomplete write");
+  if (const char* error = fd.pwrite(asarray(buffer),0))
+    THROW(IOError,"failed to write header to supertensor file: %s",error);
   return header_size;
 }
 
@@ -297,16 +271,14 @@ supertensor_header_t::supertensor_header_t(section_t section, int block_size, in
 
 supertensor_writer_t::supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level)
   : path(check_extension(path))
-  , fd(new_<fildes_t>(path,O_WRONLY|O_CREAT|O_TRUNC,0644))
+  , fd(write_local_file(path))
   , header(section,block_size,filter) // Initialize everything except for valid and index, which finalize will fill in later
   , level(level) {
-  if (fd->fd < 0)
-    THROW(IOError,"can't open supertensor file \"%s\" for writing: %s",path,strerror(errno));
   if (block_size&1)
     THROW(ValueError,"supertensor block size must be even (not %d) to support block-wise reflection",block_size);
 
   // Write preliminary header
-  next_offset = write_header(fd->fd,header);
+  next_offset = write_header(*fd,header);
 
   // Initialize block index to all undefined
   const_cast_(index) = Array<supertensor_blob_t,4>(Vector<int,4>(header.blocks));
@@ -345,7 +317,7 @@ void supertensor_writer_t::schedule_write_block(Vector<uint8_t,4> block, Array<V
 }
 
 void supertensor_writer_t::finalize() {
-  if (fd->fd < 0 || header.valid)
+  if (!fd || header.valid)
     return;
 
   // Check if all blocks have been written
@@ -362,9 +334,9 @@ void supertensor_writer_t::finalize() {
 
   // Finalize header
   h.valid = true;
-  write_header(fd->fd,h);
+  write_header(*fd,h);
   header = h;
-  fd->close();
+  fd.clear();
 }
 
 uint64_t supertensor_reader_t::compressed_size(Vector<uint8_t,4> block) const {
@@ -388,15 +360,12 @@ uint64_t supertensor_writer_t::uncompressed_size(Vector<uint8_t,4> block) const 
 }
 
 vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, const thread_type_t io) {
-  const auto fd = new_<fildes_t>(check_extension(path),O_RDONLY);
-  if (fd->fd < 0)
-    THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
+  const auto fd = read_local_file(check_extension(path));
 
   // Read magic string to determine file type (single or multiple supertensors)
-  char buffer[20];
-  ssize_t r = pread(fd->fd,buffer,20,0);
-  if (r < 20)
-    THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,r<0?strerror(errno):"unexpected eof");
+  uint8_t buffer[20];
+  if (const char* error = fd->pread(asarray(buffer),0))
+    THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,error);
 
   // Branch on type
   vector<Ref<const supertensor_reader_t>> readers;
@@ -404,9 +373,8 @@ vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, co
     readers.push_back(new_<supertensor_reader_t>(path,fd,0,io));
   else if (!memcmp(buffer,multiple_supertensor_magic,20)) {
     uint32_t header[3];
-    ssize_t r = pread(fd->fd,header,sizeof(header),20);
-    if (r < (int)sizeof(header))
-      THROW(IOError,"invalid multiple supertensor file \"%s\": error reading global header, %s",path,r<0?strerror(errno):"unexpected eof");
+    if (const char* error = fd->pread(char_view(asarray(header)),20))
+      THROW(IOError,"invalid multiple supertensor file \"%s\": error reading global header, %s",path,error);
     for (auto& h: header)
       h = to_little_endian(h);
     if (header[0] != 3)
@@ -422,15 +390,12 @@ vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, co
 }
 
 int supertensor_slice(const string& path) {
-  const auto fd = new_<fildes_t>(check_extension(path),O_RDONLY);
-  if (fd->fd < 0)
-    THROW(IOError,"can't open supertensor file \"%s\" for reading: %s",path,strerror(errno));
+  const auto fd = read_local_file(check_extension(path));
 
   // Read magic string to determine file type (single or multiple supertensors)
-  char buffer[20];
-  ssize_t r = pread(fd->fd,buffer,20,0);
-  if (r < 20)
-    THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,r<0?strerror(errno):"unexpected eof");
+  uint8_t buffer[20];
+  if (const char* error = fd->pread(asarray(buffer),0))
+    THROW(IOError,"invalid supertensor file \"%s\": error reading magic string, %s",path,error);
 
   // Branch on type
   uint64_t header_offset;
@@ -446,11 +411,8 @@ int supertensor_slice(const string& path) {
   {
     const int header_size = supertensor_header_t::header_size;
     uint8_t buffer[header_size];
-    ssize_t r = pread(fd->fd,buffer,header_size,header_offset);
-    if (r < 0)
-      THROW(IOError,"invalid supertensor file \"%s\": error reading header, %s",path,strerror(errno));
-    if (r < header_size)
-      THROW(IOError,"invalid supertensor file \"%s\": unexpected end of file during header",path);
+    if (const char* error = fd->pread(asarray(buffer),header_offset))
+      THROW(IOError,"invalid supertensor file \"%s\": error reading header, %s",path,error);
     const auto header = supertensor_header_t::unpack(RawArray<const uint8_t>(header_size,buffer));
     return header.stones;
   }

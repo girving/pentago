@@ -50,6 +50,7 @@
  * 3 - Allow multiple sections in one file
  */
 
+#include <pentago/data/file.h>
 #include <pentago/base/superscore.h>
 #include <pentago/base/section.h>
 #include <pentago/utility/thread.h>
@@ -98,29 +99,16 @@ struct supertensor_header_t {
   GEODE_EXPORT static supertensor_header_t unpack(RawArray<const uint8_t> buffer);
 };
 
-// RAII holder for a file descriptor
-struct fildes_t : public Object {
-  GEODE_NEW_FRIEND
-  int fd;
-
-protected:
-  fildes_t(const string& path, int flags, mode_t mode=0);
-public:
-  ~fildes_t();
-
-  void close();
-};
-
 struct supertensor_reader_t : public Object {
   GEODE_DECLARE_TYPE(GEODE_EXPORT)
 
-  const Ref<const fildes_t> fd;
+  const Ref<const read_file_t> fd;
   const supertensor_header_t header;
   const Array<const supertensor_blob_t,4> index;
 
 private:
   supertensor_reader_t(const string& path, const thread_type_t io=IO);
-  supertensor_reader_t(const string& path, const fildes_t& fd, const uint64_t header_offset, const thread_type_t io=IO);
+  supertensor_reader_t(const string& path, const read_file_t& fd, const uint64_t header_offset, const thread_type_t io=IO);
   void initialize(const string& path, const uint64_t header_offset, const thread_type_t io);
 public:
   ~supertensor_reader_t();
@@ -152,7 +140,7 @@ struct supertensor_writer_t : public Object {
   typedef supertensor_writer_t Self;
 
   const string path;
-  const Ref<fildes_t> fd;
+  Ptr<write_file_t> fd;
   supertensor_header_t header; // incomplete until finalize is called
   const int level; // zlib compression level
 private:
