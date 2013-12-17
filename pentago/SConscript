@@ -4,7 +4,8 @@ external(env,'geode',default=1,required=1,libs=['geode'],headers=['geode/utility
 external(env,'lzma',libs=['lzma'],headers=['lzma.h'],required=1)
 external(env,'snappy',libs=['snappy'],headers=['snappy.h'],required=1)
 
-child(env,'mpi')
+if env['use_mpi']:
+  child(env,'mpi')
 
 generated = ['gen/%s'%f for f in 'tables.h tables.cpp'.split()]
 env.Command(generated,'base/precompute.py','$SOURCE --prefix ${TARGET.dir}')
