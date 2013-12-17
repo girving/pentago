@@ -2,25 +2,41 @@
 '''Upload solution files to rackspace, segmented along block boundaries for .pentago files.'''
 
 from __future__ import division,print_function,unicode_literals,absolute_import
-from pentago import *
-from geode import *
-from geode.value import parser
+from contextlib import contextmanager
+import optparse
 import pyrax
+import time
 import sys
 import re
 import os
 
-# Properties
-props = PropManager()
-props.add('nop',False).set_abbrev('n').set_help('upload nothing, but say what we would upload')
-props.add('paths',None).set([]).set_required(1)
-props.add('check',False).set_help('check hashes even if file already exists')
-props.add('hashes','').set_help('precomputed hash file')
-parser.parse(props,'Upload pentago data files to rackspace',positional=['paths'])
+# Options
+usage = 'usage: %prog [options] [files...]\nUpload pentago data files to rackspace'
+parser = optparse.OptionParser(usage)
+parser.add_option('-n','--nop',action='store_true',help='upload nothing, but say what we would upload')
+parser.add_option('-c','--check',action='store_true',help='check hashes even if file already exists')
+parser.add_option('--hashes',type=str,help='precomputed hash file')
+options,paths = parser.parse_args()
+
+# Logging
+indent = [0]
+
+@contextmanager
+def scope(name):
+  start = time.time()
+  print('  '*indent[0]+name)
+  indent[0] += 1
+  try:
+    yield
+  finally:
+    indent[0] -= 1
+    print('%*sEND %-*s%8.4f s'%(2*indent[0],'',60-2*indent[0]-4,name,time.time()-start))
+
+def info(s):
+  print('  '*indent[0]+s)
 
 # Authenticate
-Log.configure('rackspace upload',0,0,100)
-with Log.scope('authenticate'):
+with scope('authenticate'):
   pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
 
 # Standard pyrax aliases from https://github.com/rackspace/pyrax/blob/master/docs/getting_started.md
@@ -37,29 +53,29 @@ def die(msg):
   sys.exit(1)
 
 def load_hashes():
-  assert props.hashes().endswith('md5s')
+  assert options.hashes.endswith('md5s')
   hashes = {}
-  for line in open(props.hashes()):
+  for line in open(options.hashes):
     hash,name = line.split()
     hashes[name] = hash
   return hashes
-if props.hashes():
+if options.hashes:
   hashes = load_hashes()
 
 def quick_hash(path):
-  if props.hashes():
+  if options.hashes:
     return hashes[os.path.basename(path)]
-  with Log.scope('checksum'):
+  with scope('checksum'):
     return pyrax.utils.get_checksum(path)
 
 def upload(container,name,path):
-  with Log.scope('chunk %s to %s'%(name,container.name)):
-    with Log.scope('checksum'):
+  with scope('chunk %s to %s'%(name,container.name)):
+    with scope('checksum'):
       etag = quick_hash(path)
-      Log.write('etag = %s'%etag)
-    if not props.nop():
-      with Log.scope('upload'):
-        obj = container.upload_file(name,path,etag=etag)
+      info('etag = %s'%etag)
+    if not options.nop:
+      with scope('upload'):
+        obj = container.upload_file(path,name,etag=etag)
         if etag != obj.etag:
           die('etag mismatch: local %s, upload %s'%(etag,obj.etag))
 
@@ -77,17 +93,18 @@ def upload_all(paths):
   files = dict((f.name,f) for f in container.get_objects())
 
   # Upload each file
-  with Log.scope('upload'):
+  with scope('upload'):
     for path in paths:
       name = os.path.basename(path) 
       if name in files:
-        if props.check():
-          with Log.scope('check %s'%name):
+        if options.check:
+          with scope('check %s'%name):
             assert files[name].etag==quick_hash(path)
         else:
-          Log.write('skipping %s: already uploaded'%path)
+          info('skipping %s: already uploaded'%path)
       else:
         upload(container,name,path)
 
 if __name__=='__main__':
-  upload_all(props.paths())
+  with scope('to rackspace'):
+    upload_all(paths)
