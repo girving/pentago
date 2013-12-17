@@ -4,7 +4,6 @@
 #include <geode/utility/debug.h>
 #include <geode/utility/format.h>
 #include <boost/type_traits/remove_const.hpp>
-#include <boost/type_traits/is_unsigned.hpp>
 #include <limits>
 namespace pentago {
 
@@ -32,18 +31,18 @@ template<class... Args> static inline void                die(const char* msg, c
   die_helper(format(msg,args...));
 }
 
-namespace {
-template<class T> struct assert_is_almost_uint64 {
-  typedef typename boost::remove_const<T>::type I;
-  static_assert(boost::is_integral<I>::value,"");
-  static_assert(sizeof(I)==8,"");
-  static_assert(boost::is_unsigned<I>::value,"");
-};}
+// We'd use a template, but that fails for obscure reasons on clang 3.0 on Rackspace
+template<class T> static inline void assert_is_almost_uint64(const T n) {
+  static_assert(sizeof(T)==8,"");
+  typedef typename boost::remove_const<T>::type S;
+  static_assert(   boost::is_same<S,unsigned long>::value
+                || boost::is_same<S,unsigned long long>::value,"");
+}
 
 // Check and cast an integer to int
 #define CHECK_CAST_INT(n) ({ \
   const auto _n = (n); \
-  assert_is_almost_uint64<decltype(_n)>(); \
+  assert_is_almost_uint64(_n); \
   GEODE_ASSERT(_n<=uint64_t(std::numeric_limits<int>::max())); \
   (int(_n)); })
 
