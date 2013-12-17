@@ -139,6 +139,12 @@ public:
 
   // For debugging purposes
   uint64_t total_size() const;
+
+  // File offset of the compressed index
+  uint64_t index_offset() const;
+
+  // File offsets of each block
+  Array<const uint64_t,4> block_offsets() const;
 };
 
 struct supertensor_writer_t : public Object {

@@ -456,6 +456,17 @@ int supertensor_slice(const string& path) {
   }
 }
 
+uint64_t supertensor_reader_t::index_offset() const {
+  return header.index.offset;
+}
+
+Array<const uint64_t,4> supertensor_reader_t::block_offsets() const {
+  Array<uint64_t,4> offsets(index.shape,false);
+  for (const int i : range(offsets.flat.size()))
+    offsets.flat[i] = index.flat[i].offset;
+  return offsets;
+}
+
 }
 using namespace pentago;
 
@@ -481,6 +492,8 @@ void wrap_supertensor() {
     .GEODE_METHOD(compressed_size)
     .GEODE_METHOD(uncompressed_size)
     .GEODE_METHOD(total_size)
+    .GEODE_METHOD(index_offset)
+    .GEODE_METHOD(block_offsets)
     ;}
 
   {typedef supertensor_writer_t Self;
