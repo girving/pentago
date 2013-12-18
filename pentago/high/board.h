@@ -53,6 +53,8 @@ public:
   bool operator==(const high_board_t& other) const {
     return board==other.board && middle==other.middle;
   }
+
+  friend ostream& operator<<(ostream& output, const high_board_t& board);
 };
 
 }

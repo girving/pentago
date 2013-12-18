@@ -157,6 +157,13 @@ Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<co
   return counts;
 }
 
+ostream& operator<<(ostream& output, const high_board_t& board) {
+  output << board.board;
+  if (board.middle)
+    output << 'm';
+  return output;
+}
+
 }
 using namespace pentago;
 
@@ -177,5 +184,6 @@ void wrap_high_board() {
     .GEODE_METHOD(value_check)
     .GEODE_METHOD(sample_check)
     .compare()
+    .str()
     ;
 }
