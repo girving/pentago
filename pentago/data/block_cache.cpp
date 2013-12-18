@@ -72,7 +72,7 @@ struct reader_block_cache_t : public block_cache_t {
 
   const uint64_t memory_limit;
   const int block_size_;
-  unordered_map<section_t,Ref<const supertensor_reader_t>,Hasher> readers;
+  const unordered_map<section_t,Ref<const supertensor_reader_t>,Hasher> readers;
   mutable unordered_map<Tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
   mutable uint64_t free_memory;
 
@@ -85,7 +85,7 @@ protected:
       if (!block_size_)
         const_cast_(block_size_) = reader->header.block_size;
       GEODE_ASSERT((int)reader->header.block_size==block_size_);
-      readers.insert(make_pair(reader->header.section,reader));
+      const_cast_(readers).insert(make_pair(reader->header.section,reader));
     }
   }
 public:
