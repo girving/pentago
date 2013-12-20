@@ -45,7 +45,6 @@ bool high_board_t::done() const {
 }
 
 vector<Ref<high_board_t>> high_board_t::moves() const {
-  GEODE_ASSERT(!done());
   vector<Ref<high_board_t>> moves;
   if (!middle) { // Place a stone
     for (const int x : range(6))
@@ -62,7 +61,6 @@ vector<Ref<high_board_t>> high_board_t::moves() const {
 }
 
 Ref<high_board_t> high_board_t::place(const int x, const int y) const {
-  GEODE_ASSERT(!done());
   GEODE_ASSERT(!middle);
   GEODE_ASSERT(0<=x && x<6);
   GEODE_ASSERT(0<=y && y<6);
@@ -73,7 +71,6 @@ Ref<high_board_t> high_board_t::place(const int x, const int y) const {
 }
 
 Ref<high_board_t> high_board_t::rotate(const int qx, const int qy, const int d) const {
-  GEODE_ASSERT(!done());
   GEODE_ASSERT(middle);
   GEODE_ASSERT(qx==0 || qx==1);
   GEODE_ASSERT(qy==0 || qy==1);
