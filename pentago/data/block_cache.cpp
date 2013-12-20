@@ -1,8 +1,9 @@
 // Cache of precomputed blocks from supertensor files
 
 #include <pentago/data/block_cache.h>
-#include <pentago/base/section.h>
+#include <pentago/data/lru.h>
 #include <pentago/data/supertensor.h>
+#include <pentago/base/section.h>
 #include <pentago/base/symmetry.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/memory.h>
@@ -73,8 +74,8 @@ struct reader_block_cache_t : public block_cache_t {
   const uint64_t memory_limit;
   const int block_size_;
   const unordered_map<section_t,Ref<const supertensor_reader_t>,Hasher> readers;
-  mutable unordered_map<Tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>,Hasher> block_cache;
-  mutable uint64_t free_memory;
+  mutable lru_t<Tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>> lru;
+  mutable int64_t free_memory; // signed so it can go temporarily below zero
 
 protected:
   reader_block_cache_t(const vector<Ref<const supertensor_reader_t>> reader_list, const uint64_t memory_limit)
@@ -106,15 +107,13 @@ public:
   RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const {
     const auto& reader = *readers.find(section)->second;
     const auto key = tuple(reader.header.section,block);
-    const auto it = block_cache.find(key);
-    if (it != block_cache.end())
-      return it->second;
+    if (const auto p = lru.get(key))
+      return *p;
     const auto data = reader.read_block(block);
-    const auto memory = memory_usage(data);
-    if (free_memory < memory)
-      THROW(RuntimeError,"reader_block_cache_t: memory limit of %s exceeded (%zu blocks loaded)",large(memory_limit),block_cache.size());
-    free_memory -= memory;
-    block_cache.insert(make_pair(key,data));
+    free_memory -= memory_usage(data);
+    while (free_memory < 0)
+      free_memory += memory_usage(lru.drop().y);
+    lru.add(key,data);
     return data;
   }
 };
