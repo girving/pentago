@@ -15,9 +15,10 @@ import os
 usage = 'usage: %prog [options] [files...]\nUpload pentago data files to rackspace'
 parser = optparse.OptionParser(usage)
 parser.add_option('-n','--nop',action='store_true',help='upload nothing, but say what we would upload')
-parser.add_option('-c','--check',action='store_true',help='check hashes even if file already exists')
 parser.add_option('--hashes',type=str,help='precomputed hash file')
 options,paths = parser.parse_args()
+if not options.hashes:
+  parser.error('--hashes is required')
 
 # Logging
 indent = [0]
@@ -63,25 +64,38 @@ def load_hashes():
     hash,name = line.split()
     hashes[name] = hash
   return hashes
-if options.hashes:
-  hashes = load_hashes()
+hashes = load_hashes()
 
-def quick_hash(path):
-  if options.hashes:
-    return hashes[os.path.basename(path)]
-  with scope('checksum'):
-    return pyrax.utils.get_checksum(path)
+def quick_hash(name):
+  return hashes[name]
 
-def upload(container,name,path):
+def upload(container,name,file):
   with scope('chunk %s to %s'%(name,container.name)):
     with scope('checksum'):
-      etag = quick_hash(path)
+      etag = quick_hash(name)
       info('etag = %s'%etag)
     if not options.nop:
       with scope('upload'):
-        obj = container.upload_file(path,name,etag=etag)
+        obj = container.upload_file(file,name,etag=etag)
         if etag != obj.etag:
           die('etag mismatch: local %s, upload %s'%(etag,obj.etag))
+
+class slice_file(object):
+  def __init__(self,path,lo,hi):
+    self.f = open(path,'rb')
+    self.seek(0)
+
+  def seek(self,offset,whence=0):
+    n = offset+{0:lo,2:hi}[whence]
+    assert lo<=n<=hi
+    self.f.seek(n)
+
+  def tell(self):
+    return self.f.tell()-lo
+
+  def read(n):
+    n = min(n,hi-self.f.tell())
+    return self.f.read(n)
 
 def upload_all(paths):
   # Verify that all files make sense
@@ -100,27 +114,35 @@ def upload_all(paths):
   with scope('upload'):
     for path in paths:
       name = os.path.basename(path) 
+      size = os.stat(path).st_size
+      chunks = (size+chunk_size-1)//chunk_size
+      digits = int(log10(chunks))+1
+
+      def cname(c):
+        return '%s.%0*d'%(name,digits,c+1)
+      def check_chunk(c):
+        assert files[cname(c)].total_bytes==min(size,chunk_size*(c+1))-chunk_size*c
+        with scope('check %s'%cname(c)):
+          expected = quick_hash(cname(c))
+          got = files[cname(c)].etag
+          assert expected==got, 'expected %s, got %s'%(expected,got)
+
       if name in files:
-        if options.check:
-          size = os.stat(path).st_size
-          if size <= chunk_size:
-            with scope('check %s'%name):
-              assert files[name].etag==quick_hash(path)
-          else:
-            assert options.hashes
-            chunks = (size+chunk_size-1)//chunk_size
-            digits = int(log10(chunks))+1
-            for c in xrange(chunks):
-              cname = '%s.%0*d'%(name,digits,c+1)
-              assert files[cname].total_bytes==min(size,chunk_size*(c+1))-chunk_size*c
-              with scope('check %s'%cname):
-                expected = quick_hash(cname)
-                got = files[cname].etag
-                assert expected==got, 'expected %s, got %s'%(expected,got)
+        if size <= chunk_size:
+          with scope('check %s'%name):
+            assert files[name].etag==quick_hash(name)
         else:
-          info('skipping %s: already uploaded'%path)
+          for c in xrange(chunks):
+            check_chunk(c)
       else:
-        upload(container,name,path)
+        if size <= chunk_size:
+          upload(container,name,open(path,'rb'))
+        else:
+          for c in xrange(chunks):
+            if cname(c) in files:
+              check_chunk(c)
+            else:
+              upload(container,name,slice_file(path,chunk_size*c,min(size,chunk_size*(c+1))))
 
 if __name__=='__main__':
   with scope('to rackspace'):
