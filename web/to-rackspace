@@ -82,19 +82,21 @@ def upload(container,name,file):
 
 class slice_file(object):
   def __init__(self,path,lo,hi):
+    self.lo = lo
+    self.hi = hi
     self.f = open(path,'rb')
     self.seek(0)
 
   def seek(self,offset,whence=0):
-    n = offset+{0:lo,2:hi}[whence]
-    assert lo<=n<=hi
+    n = offset+{0:self.lo,2:self.hi}[whence]
+    assert self.lo<=n<=self.hi
     self.f.seek(n)
 
   def tell(self):
-    return self.f.tell()-lo
+    return self.f.tell()-self.lo
 
-  def read(n):
-    n = min(n,hi-self.f.tell())
+  def read(self,n):
+    n = min(n,self.hi-self.f.tell())
     return self.f.read(n)
 
 def upload_all(paths):
@@ -142,7 +144,7 @@ def upload_all(paths):
             if cname(c) in files:
               check_chunk(c)
             else:
-              upload(container,name,slice_file(path,chunk_size*c,min(size,chunk_size*(c+1))))
+              upload(container,cname(c),slice_file(path,chunk_size*c,min(size,chunk_size*(c+1))))
 
 if __name__=='__main__':
   with scope('to rackspace'):
