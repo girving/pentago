@@ -1,0 +1,43 @@
+<!DOCTYPE.html>
+<html>
+<head>
+  <meta charset="utf8"/>
+  <title>Perfect pentago explorer</title>
+</head>
+<style>
+  .black,.white,.empty,.emptyblack,.emptywhite {
+    stroke: black;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+  .empty,.emptyblack,.emptywhite { fill: tan }
+  .emptyblack:hover { fill: black }
+  .emptywhite:hover { fill: white }
+  .black { fill: black }
+  .white { fill: white }
+
+  .board { fill: tan }
+  .separators { fill: darkgray }
+
+  .rotateselect { opacity: 0 }
+  .rotateselect:hover + .rotateblack { fill: black }
+  .rotateselect:hover + .rotatewhite { fill: white }
+  .norotate { visibility: hidden }
+  .rotateblack,.rotatewhite {
+    fill: tan;
+    stroke: black;
+    stroke-width: 1;
+    vector-effect: non-scaling-stroke;
+  }
+  .rotateblack:hover { fill: black }
+  .rotatewhite:hover { fill: white }
+</style>
+<body>
+
+<script type="text/javascript" src="bundle.js"></script>
+
+<div id="error"></div>
+<svg width="1" height="1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+
+</body>
+</html>
