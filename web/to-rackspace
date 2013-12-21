@@ -3,6 +3,7 @@
 
 from __future__ import division,print_function,unicode_literals,absolute_import
 from contextlib import contextmanager
+from math import *
 import optparse
 import pyrax
 import time
@@ -48,12 +49,15 @@ clb = pyrax.cloud_loadbalancers
 dns = pyrax.cloud_dns
 cnw = pyrax.cloud_networks
 
+# Chunks must be no larger than 5 GB - 1
+chunk_size = 5*2**30-1
+
 def die(msg):
   print(msg,file=sys.stderr)
   sys.exit(1)
 
 def load_hashes():
-  assert options.hashes.endswith('md5s')
+  assert 'md5s' in options.hashes
   hashes = {}
   for line in open(options.hashes):
     hash,name = line.split()
@@ -98,8 +102,21 @@ def upload_all(paths):
       name = os.path.basename(path) 
       if name in files:
         if options.check:
-          with scope('check %s'%name):
-            assert files[name].etag==quick_hash(path)
+          size = os.stat(path).st_size
+          if size <= chunk_size:
+            with scope('check %s'%name):
+              assert files[name].etag==quick_hash(path)
+          else:
+            assert options.hashes
+            chunks = (size+chunk_size-1)//chunk_size
+            digits = int(log10(chunks))+1
+            for c in xrange(chunks):
+              cname = '%s.%0*d'%(name,digits,c+1)
+              assert files[cname].total_bytes==min(size,chunk_size*(c+1))-chunk_size*c
+              with scope('check %s'%cname):
+                expected = quick_hash(cname)
+                got = files[cname].etag
+                assert expected==got, 'expected %s, got %s'%(expected,got)
         else:
           info('skipping %s: already uploaded'%path)
       else:

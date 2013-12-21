@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+'''Compute md5 hashes of chunks of files'''
+
+from __future__ import division,print_function,unicode_literals,absolute_import
+from math import *
+import multiprocessing
+import hashlib
+import sys
+import os
+
+# Parameters
+processes = 6
+chunk_size = 5*2**30-1 # 5 GB - 1
+block_size = 16*2**20  # 16 MB
+
+# Divide file into chunks
+assert len(sys.argv)==2
+name = sys.argv[1]
+total_size = os.stat(name).st_size
+chunks = (total_size+chunk_size-1)//chunk_size
+digits = int(log10(chunks))+1
+print('size = %d'%total_size)
+print('chunks = %d'%chunks)
+print('digits = %d'%digits)
+
+# Hash each chunk
+def hash_chunk(c):
+  f = open(name,'rb')
+  f.seek(chunk_size*c)
+  m = hashlib.md5() 
+  left = min(total_size,chunk_size*(c+1))-chunk_size*c
+  while left:
+    n = min(left,block_size)
+    data = f.read(n)
+    assert len(data)==n
+    m.update(data)
+    left -= n
+  print('%s  %s.%0*d'%(m.hexdigest(),name,digits,c+1))
+  sys.stdout.flush()
+pool = multiprocessing.Pool(processes)
+pool.map(hash_chunk,range(chunks))
