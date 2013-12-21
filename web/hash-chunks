@@ -14,7 +14,7 @@ chunk_size = 5*2**30-1 # 5 GB - 1
 block_size = 16*2**20  # 16 MB
 
 # Divide file into chunks
-assert len(sys.argv)==2
+assert len(sys.argv)>=2
 name = sys.argv[1]
 total_size = os.stat(name).st_size
 chunks = (total_size+chunk_size-1)//chunk_size
@@ -38,4 +38,8 @@ def hash_chunk(c):
   print('%s  %s.%0*d'%(m.hexdigest(),name,digits,c+1))
   sys.stdout.flush()
 pool = multiprocessing.Pool(processes)
-pool.map(hash_chunk,range(chunks))
+if len(sys.argv)==2:
+  cs = range(chunks) 
+else:
+  cs = [int(c)-1 for c in sys.argv[2:]]
+pool.map(hash_chunk,cs)
