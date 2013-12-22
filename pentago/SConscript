@@ -1,4 +1,5 @@
-Import('env child external library')
+Import('env child external library install_or_link')
+import os
 
 external(env,'geode',default=1,required=1,libs=['geode'],headers=['geode/utility/config.h'])
 external(env,'lzma',libs=['lzma'],headers=['lzma.h'],required=1)
@@ -8,7 +9,8 @@ if env['use_mpi']:
   child(env,'mpi')
 
 generated = ['gen/%s'%f for f in 'tables.h tables.cpp'.split()]
-env.Command(generated,'base/precompute.py','$SOURCE --prefix ${TARGET.dir}')
+generated = env.Command(generated,'base/precompute.py','$SOURCE --prefix ${TARGET.dir}')
+install_or_link(env,os.path.join(env['prefix_include'],os.path.dirname(generated[0].srcnode().path)),generated[0])
 
 env = env.Clone(need_zlib=1,need_lzma=1,need_snappy=1)
 env.Append(CPPPATH=['.'],CXXFLAGS='-Wno-invalid-offsetof')

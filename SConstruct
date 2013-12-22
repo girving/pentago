@@ -59,13 +59,16 @@ if darwin:
 else:
   env.Replace(base='/usr')
 
+# install or develop only if explicitly asked for on the command line
+env['install'] = 'install' in COMMAND_LINE_TARGETS
+env['develop'] = 'develop' in COMMAND_LINE_TARGETS
+
 # Base options
 options(env,
   ('cxx','C++ compiler','<detect>'),
   ('arch','Architecture (e.g. opteron, nocona, powerpc, native)','native'),
   ('type','Type of build (e.g. release, debug, profile)','release'),
   ('default_arch','Architecture that doesn\'t need a suffix',''),
-  ('install','Allow install (set to false to developer mode trees)',1),
   ('cache','Cache directory to use',''),
   ('shared','Build shared libraries',1),
   ('shared_objects','Build shareable objects when without shared libraries',1),
@@ -274,6 +277,13 @@ def external(env,name,default=0,dir=0,flags='',cxxflags='',linkflags='',cpppath=
       print>>sys.stderr, 'FATAL: %s is required'%name
       Exit(1)
 
+  # Do we want to use this external?
+  Help('\n')
+  options(env,('use_'+name,'Use '+name+' if available',1))
+  if not env['use_'+name]:
+    fail()
+    return
+
   for r in requires:
     if not env['use_'+r]:
       if verbose:
@@ -285,6 +295,7 @@ def external(env,name,default=0,dir=0,flags='',cxxflags='',linkflags='',cpppath=
          'rpath':rpath,'libs':libs,'copy':copy,'frameworkpath':frameworkpath,'frameworks':frameworks,'requires':requires,
          'hide':hide,'callback':callback,'name':name}
   env['need_'+name] = default
+  externals[name] = lib
 
   # Make sure empty lists are copied and do not refer to the same object
   for n in lib:
@@ -293,7 +304,6 @@ def external(env,name,default=0,dir=0,flags='',cxxflags='',linkflags='',cpppath=
 
   Help('\n')
   options(env,
-    ('use_'+name,'Use '+name+' if available',1),
     (name+'_dir','Base directory for '+name,dir),
     (name+'_include','Include directory for '+name,0),
     (name+'_libpath','Library directory for '+name,0),
@@ -307,13 +317,6 @@ def external(env,name,default=0,dir=0,flags='',cxxflags='',linkflags='',cpppath=
     (name+'_requires','Required libraries for '+name,0),
     (name+'_pkgconfig','pkg-config names for '+name,0),
     (name+'_callback','Arbitrary environment modification callback for '+name,0))
-
-  # Do we want to use this external?
-  if env['use_'+name]:
-    externals[name] = lib
-  else:
-    fail()
-    return
 
   # Absorb settings
   if env[name+'_pkgconfig']!=0: lib['pkg-config']=env[name+'_pkgconfig']
@@ -409,7 +412,7 @@ def link_flags(env):
   workaround = env.get('need_qt',0)
 
   for name,lib in externals.items():
-    if env['need_'+name]:
+    if env_link['need_'+name]:
       all_uses.append('need_'+name)
       env_link.Append(LINKFLAGS=lib['linkflags'],LIBS=lib['libs'],FRAMEWORKPATH=lib['frameworkpath'],FRAMEWORKS=lib['frameworks'])
       env_link.AppendUnique(LIBPATH=lib['libpath'])
@@ -486,6 +489,21 @@ if windows:
   python_libs = []
   projects = []
 
+# Target must be a directory!
+def install_or_link(env,target,src):
+  # Get the real location of src
+  srcpath = File(src).abspath
+  if not os.path.exists(srcpath):
+    srcpath = File(src).srcnode().abspath
+    if not os.path.exists(srcpath):
+      raise RuntimeError("can't find %s in either source or build directories"%src)
+  if env['install']:
+    env.Alias('install',env.Install(target,srcpath))
+  elif env['develop']:
+    cmd = env.Command([],srcpath,"mkdir -p '%s' && ln -sf '%s' '%s'"%(target,srcpath,target))
+    env.Alias('develop',cmd)
+    env.AlwaysBuild(cmd) # For some reason, generated headers fail to install without this
+
 def library(env,name,libs=(),skip=(),extra=(),skip_all=False,no_exports=False,pyname=None):
   if name in env['skip_libs']:
     return
@@ -507,10 +525,8 @@ def library(env,name,libs=(),skip=(),extra=(),skip_all=False,no_exports=False,py
     env.Append(CPPDEFINES=qt['flags'],CXXFLAGS=qt['cxxflags'])
 
   # Install headers
-  if env['install']:
-    header_dir = os.path.join(env['prefix_include'],Dir('.').srcnode().path)
-    for h in headers:
-      env.Alias('install',env.Install(os.path.join(header_dir,os.path.dirname(h)),h))
+  for h in headers:
+    install_or_link(env, os.path.join(env['prefix_include'], Dir('.').srcnode().path, os.path.dirname(h)), h)
 
   # Tell the compiler which library we're building
   env.Append(CPPDEFINES=['BUILDING_'+name])
@@ -544,13 +560,14 @@ def library(env,name,libs=(),skip=(),extra=(),skip_all=False,no_exports=False,py
     if 'module.cpp' in cpps:
       python_libs.append(lib)
   else:
-    if env['install']:
-      env.Alias('install',env.Install(env['prefix_lib'],lib))
+    for l in lib:
+      install_or_link(env, env['prefix_lib'], l)
     if env['use_python']:
       if pyname is None:
         pyname = name
       module = os.path.join('#'+Dir('.').srcnode().path,pyname)
-      python_env.LoadableModule(module,source=[],LIBS=name,LIBPATH=[libpath])
+      module = python_env.LoadableModule(module,source=[],LIBS=name,LIBPATH=[libpath])
+      python_env.Depends(module,lib) # scons doesn't always notice this (obvious) dependency
 
 # Build a program
 def program(env,name,cpp=None):
@@ -563,24 +580,23 @@ def program(env,name,cpp=None):
   files = objects(env,cpp)
   bin = env.Program('#'+os.path.join(env['variant_build'],'bin',name),files)
   env.Depends('.',bin)
-  if env['install']:
-    env.Alias('install',env.Install(env['prefix_bin'],bin))
+  for b in bin:
+    install_or_link(env, env['prefix_bin'], b)
 
 # Install a (possibly directory) resource
 def resource(env,dir):
-  if not env['install']:
-    return
-  # if dir is a directory, add a dependency for each file found in its subtree
-  if os.path.isdir(str(Dir(dir).srcnode())):
+  # if we are installing, and we're adding a directory, add a dependency for each file found in its subtree
+  if env['install'] and os.path.isdir(str(Dir(dir).srcnode())):
     def visitor(basedir, dirname, names):
       reldir = os.path.relpath(dirname, basedir)
       for name in names:
         fullname = os.path.join(dirname, name)
-        env.Alias('install', env.Install(os.path.join(env['prefix_share'], reldir), fullname))
+        install_or_link(env, os.path.join(env['prefix_share'], reldir), fullname)
     basedir = str(Dir('.').srcnode())
     os.path.walk(str(Dir(dir).srcnode()), visitor, basedir)
   else:
-    env.Alias('install', env.Install(env['prefix_share'], Dir(dir).srcnode()))
+    # if we're just making links, a single link is enough even if it's a directory
+    install_or_link(env, env['prefix_share'], Dir(dir).srcnode())
 
 # Configure latex
 def configure_latex():
@@ -738,7 +754,8 @@ def children(env,skip=()):
       child(env,dir)
 
 # Build everything
-Export('child children options external externals library objects program latex clang posix darwin windows resource')
+Export('''child children options external externals library objects program latex
+          clang posix darwin windows resource install_or_link''')
 if os.path.exists(File('#SConscript').abspath):
   child(env,'.')
 else:
