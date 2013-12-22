@@ -3,22 +3,34 @@
 
 from __future__ import division,print_function,unicode_literals,absolute_import
 from contextlib import contextmanager
+import ConfigParser
 from math import *
+import subprocess
 import optparse
+import tempfile
+import hashlib
 import pyrax
 import time
+import glob
 import sys
 import re
 import os
+
+# Make sure we're unbuffered
+sys.stdout = os.fdopen(sys.stdout.fileno(),'w',0)
 
 # Options
 usage = 'usage: %prog [options] [files...]\nUpload pentago data files to rackspace'
 parser = optparse.OptionParser(usage)
 parser.add_option('-n','--nop',action='store_true',help='upload nothing, but say what we would upload')
 parser.add_option('--hashes',type=str,help='precomputed hash file')
+parser.add_option('--chunk-size',type=int,default=5*2**30-1,help='set chunk (for debugging purposes only)')
+parser.add_option('--container',type=str,default='pentago-edison-all',help='container to upload files to')
+parser.add_option('-v','--verbose',action='store_true',help='extra verbosity')
 options,paths = parser.parse_args()
 if not options.hashes:
   parser.error('--hashes is required')
+chunk_size = options.chunk_size
 
 # Logging
 indent = [0]
@@ -50,19 +62,18 @@ clb = pyrax.cloud_loadbalancers
 dns = pyrax.cloud_dns
 cnw = pyrax.cloud_networks
 
-# Chunks must be no larger than 5 GB - 1
-chunk_size = 5*2**30-1
-
 def die(msg):
   print(msg,file=sys.stderr)
   sys.exit(1)
 
 def load_hashes():
-  assert 'md5s' in options.hashes
   hashes = {}
-  for line in open(options.hashes):
-    hash,name = line.split()
-    hashes[name] = hash
+  info('loading hashes from %s'%options.hashes)
+  for filename in glob.glob(options.hashes):
+    for line in open(filename):
+      if re.match(r'^[0-9a-f]{32}  \S+$',line):
+        hash,name = line.split()
+        hashes[name] = hash
   return hashes
 hashes = load_hashes()
 
@@ -71,9 +82,8 @@ def quick_hash(name):
 
 def upload(container,name,file):
   with scope('chunk %s to %s'%(name,container.name)):
-    with scope('checksum'):
-      etag = quick_hash(name)
-      info('etag = %s'%etag)
+    etag = quick_hash(name)
+    info('etag = %s'%etag)
     if not options.nop:
       with scope('upload'):
         obj = container.upload_file(file,name,etag=etag)
@@ -99,6 +109,48 @@ class slice_file(object):
     n = min(n,self.hi-self.f.tell())
     return self.f.read(n)
 
+def manifest_hash(names):
+  return hashlib.md5(''.join(map(quick_hash,names))).hexdigest()
+
+def manual_authenticate():
+  # Grab username and api key
+  config = ConfigParser.ConfigParser()
+  config.readfp(open(os.environ['HOME']+'/.pyrax.cfg'))
+  user = config.get('rackspace_cloud','username')
+  key = config.get('rackspace_cloud','api_key')
+
+  # Get authentication token
+  auth_url = 'https://auth.api.rackspacecloud.com/v1.0'
+  data = subprocess.check_output(('curl -sS -i %s -Hx-auth-user:%s -Hx-auth-key:%s'%(auth_url,user,key)).split())
+  token = re.search(r'^X-Auth-Token:\s+([0-9a-f]+)\s*$',data,flags=re.MULTILINE).group(1)
+  storage_url = re.search(r'^X-Storage-Url:\s+(\S+)\s*$',data,flags=re.MULTILINE).group(1)
+  return token,storage_url
+
+def upload_manifest_json(container,name,json):
+  token,storage_url = manual_authenticate()
+  cmd = ('curl -sS -i -XPUT -Hx-auth-token:%s %s/%s/%s?multipart-manifest=put -T -'
+          %(token,storage_url,container.name,name)).split()
+  subprocess.Popen(cmd,stdin=subprocess.PIPE).stdin.write(json)
+
+def remote_manifest_hash(container,name):
+  token,storage_url = manual_authenticate()
+  data = subprocess.check_output(('curl -sS -I -Hx-auth-token:%s %s/%s/%s'%(token,storage_url,container.name,name)).split())
+  etag = re.search(r'^Etag:\s+"([0-9a-f]+)"\s+$',data,flags=re.MULTILINE).group(1)
+  return etag
+
+'''
+$ curl -i -XPUT -Hx-auth-token:$CF_TOKEN \
+  $CF_URL/container/manifest?multipart-manifest=put -T - <<EOF
+[{"path": "/container/one",
+  "etag": "99ad4e1604174a175190c8ae88ad5363",
+  "size_bytes": 1048576},
+ {"path": "/container/two",
+  "etag": "2a8920794e70c911c7d2822d934c4ec0",
+  "size_bytes": 1024}]
+EOF
+HTTP/1.1 201 Created
+'''
+
 def upload_all(paths):
   # Verify that all files make sense
   file_pattern = re.compile('^(slice-\d+.pentago|sparse-\d+.npy|counts-\d+.npy)$')
@@ -109,7 +161,7 @@ def upload_all(paths):
       die('nonexistent file: %s'%path)
 
   # Grab containers
-  container = cf.get_container('pentago-edison-all')
+  container = cf.get_container(options.container)
   files = dict((f.name,f) for f in container.get_objects())
 
   # Upload each file
@@ -122,29 +174,42 @@ def upload_all(paths):
 
       def cname(c):
         return '%s.%0*d'%(name,digits,c+1)
+      def csize(c):
+        return min(size,chunk_size*(c+1))-chunk_size*c
       def check_chunk(c):
-        assert files[cname(c)].total_bytes==min(size,chunk_size*(c+1))-chunk_size*c
-        with scope('check %s'%cname(c)):
-          expected = quick_hash(cname(c))
-          got = files[cname(c)].etag
-          assert expected==got, 'expected %s, got %s'%(expected,got)
+        s0 = files[cname(c)].total_bytes
+        s1 = csize(c)
+        assert s0==s1,'size mismatch for %s: expected %d, got %d'%(cname(c),s1,s0)
+        expected = quick_hash(cname(c))
+        got = files[cname(c)].etag
+        assert expected==got, '%s: expected %s, got %s'%(cname(c),expected,got)
+      cnames = [cname(c) for c in xrange(chunks)]
 
       if name in files:
-        if size <= chunk_size:
-          with scope('check %s'%name):
+        with scope('check %s'%name):
+          if size <= chunk_size:
             assert files[name].etag==quick_hash(name)
-        else:
-          for c in xrange(chunks):
-            check_chunk(c)
+          else:
+            for c in xrange(chunks):
+              check_chunk(c)
+            got = remote_manifest_hash(container,name)
+            expected = manifest_hash(cnames)
+            assert got==expected, 'manifest %s: expected etag %s, got %s'%(name,expected,got)
       else:
         if size <= chunk_size:
           upload(container,name,open(path,'rb'))
         else:
-          for c in xrange(chunks):
-            if cname(c) in files:
-              check_chunk(c)
-            else:
-              upload(container,cname(c),slice_file(path,chunk_size*c,min(size,chunk_size*(c+1))))
+          with scope('large upload %s'%name):
+            info('chunks = %d'%chunks)
+            for c in xrange(chunks):
+              if cname(c) in files:
+                check_chunk(c)
+              else:
+                upload(container,cname(c),slice_file(path,chunk_size*c,min(size,chunk_size*(c+1))))
+            with scope('upload manifest %s'%name):
+              json = '['+'\n,'.join('{"path":"/%s/%s","etag":"%s","size_bytes":%d}'%(
+                       container.name,cname(c),quick_hash(cname(c)),csize(c)) for c in xrange(chunks))+']'
+              upload_manifest_json(container,name,json)
 
 if __name__=='__main__':
   with scope('to rackspace'):
