@@ -224,8 +224,7 @@ Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<uint8_t,4> bl
   return data;
 }
 
-static Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_data) {
-  GEODE_ASSERT(thread_type()==CPU);
+Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_data) {
   GEODE_ASSERT(raw_data.size()==(int)sizeof(Vector<super_t,2>)*block_shape.product());
   Array<Vector<super_t,2>,4> data(block_shape,(Vector<super_t,2>*)raw_data.data(),raw_data.borrow_owner());
   to_little_endian_inplace(data.flat);

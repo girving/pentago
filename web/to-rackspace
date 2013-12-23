@@ -153,7 +153,7 @@ HTTP/1.1 201 Created
 
 def upload_all(paths):
   # Verify that all files make sense
-  file_pattern = re.compile('^(slice-\d+.pentago|sparse-\d+.npy|counts-\d+.npy)$')
+  file_pattern = re.compile('^(slice-\d+\.pentago(\.index)|sparse-\d+\.npy|counts-\d+\.npy)$')
   for path in paths:
     if not file_pattern.match(os.path.basename(path)):
       die('weird file: %s'%path)

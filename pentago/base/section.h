@@ -50,6 +50,10 @@ struct section_t {
     return counts==s.counts;
   }
 
+  bool operator!=(const section_t& s) const {
+    return counts!=s.counts;
+  }
+
   bool operator<(const section_t& s) const {
     return sig()<s.sig();
   }

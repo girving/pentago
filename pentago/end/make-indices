@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+'''Make .index.pentago files from .pentago files'''
+
+from __future__ import division,absolute_import,unicode_literals,print_function
+from pentago import *
+from geode import *
+import re
+
+def pread(name,range):
+  m = re.match(r'^bytes=(\d+)-(\d+)$',range)
+  assert m
+  lo = int(m.group(1))
+  hi = int(m.group(2))+1
+  f = open(name,'rb')
+  f.seek(lo)
+  return f.read(hi-lo)
+
+random.seed(183111)
+init_threads(-1,-1)
+for slice in xrange(19):
+  name = '../all/slice-%d.pentago'%slice
+  index_name = 'slice-%d.pentago.index'%slice
+  readers = open_supertensors(name)
+  if not os.path.exists(index_name):
+    write_supertensor_index(index_name,readers)
+  # Test
+  index = supertensor_index_t(descendent_sections(zeros((4,2),dtype=uint8),slice)[slice])
+  for _ in xrange(20):
+    r = readers[random.randint(len(readers))]
+    section = r.header.section
+    offsets = r.block_offsets()
+    block = [random.randint(n) for n in offsets.shape]
+    # Read data the old way
+    data = r.read_block(block)
+    # Read using the index
+    blob = pread(index_name,index.blob_range_header(section,block))
+    data2 = pread(name,index.block_range_header(blob))
+    data2 = index.unpack_block(section,block,fromstring(data2,dtype=uint8))
+    assert data.dtype==data2.dtype
+    assert all(data==data2)

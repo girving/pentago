@@ -181,4 +181,7 @@ vector<Ref<const supertensor_reader_t>> open_supertensors(const read_file_t& fd,
 // Determine the slice of a supertensor file.  Does not verify consistency.
 int supertensor_slice(const string& path);
 
+// Unfilter a filtered uncompressed block.  raw_data is destroyed.
+Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_data);
+
 }

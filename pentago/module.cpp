@@ -43,6 +43,7 @@ GEODE_PYTHON_MODULE(pentago_core) {
   GEODE_WRAP(load_balance)
   GEODE_WRAP(store_block_cache)
   GEODE_WRAP(compacting_store)
+  GEODE_WRAP(index)
 
   // Configuration
   GEODE_OBJECT_2(pentago_end_pad_io,pentago::end::pad_io)
