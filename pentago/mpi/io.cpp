@@ -396,7 +396,7 @@ static ReadSectionsStart read_sections_start(const MPI_Comm comm, const string& 
       for (const int r : range(ranks)) {
         all_blobs.append_empty();
         for (const auto& b : partition->rank_blocks(r))
-          all_blobs.append_to_back(tensors[sections->section_id.get(b.section)]->index[Vector<int,4>(b.block)]);
+          all_blobs.append_to_back(tensors[sections->section_id.get(b.section)]->blob(b.block));
       }
       const auto sendcounts = all_blobs.sizes();
       sendcounts *= 3;

@@ -8,6 +8,7 @@
 #include <pentago/utility/char_view.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/endian.h>
+#include <pentago/utility/index.h>
 #include <geode/array/IndirectArray.h>
 #include <geode/python/cast.h>
 #include <geode/python/Class.h>
@@ -195,7 +196,18 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
   threads_wait_all();
   GEODE_ASSERT((index.shape==Vector<int,4>(h.blocks)));
   to_little_endian_inplace(index.flat.const_cast_());
-  const_cast_(this->index) = index;
+
+  // Compact block index
+  const Array<uint64_t,4> offset(index.shape,false);
+  const Array<uint32_t,4> compressed_size(index.shape,false);
+  for (const int i : range(index.flat.size())) {
+    offset.flat[i] = index.flat[i].offset;
+    compressed_size.flat[i] = CHECK_CAST_INT(index.flat[i].compressed_size);
+    const auto block = Vector<uint8_t,4>(decompose(index.shape,i));
+    GEODE_ASSERT(sizeof(Vector<super_t,2>)*header.block_shape(block).product()==index.flat[i].uncompressed_size);
+  }
+  const_cast_(this->offset) = offset;
+  const_cast_(this->compressed_size_) = compressed_size;
 }
 
 supertensor_reader_t::~supertensor_reader_t() {}
@@ -230,17 +242,14 @@ void supertensor_reader_t::schedule_read_block(Vector<uint8_t,4> block, const fu
 }
 
 void supertensor_reader_t::schedule_read_blocks(RawArray<const Vector<uint8_t,4>> blocks, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const {
-  for (auto block : blocks) {
-    const Vector<int,4> block_(block);
-    GEODE_ASSERT(index.valid(block_));
-    threads_schedule(IO,curry(read_and_uncompress,&*fd,index[block_],compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
-  }
+  for (auto block : blocks)
+    threads_schedule(IO,curry(read_and_uncompress,&*fd,blob(block),compose(curry(cont,block),curry(unfilter,header.filter,header.block_shape(block)))));
 }
 
 uint64_t supertensor_reader_t::total_size() const {
   uint64_t total = supertensor_header_t::header_size + header.index.compressed_size;
-  for (const auto& blob : index.flat)
-    total += blob.compressed_size;
+  for (const auto cs : compressed_size_.flat)
+    total += cs;
   return total;
 }
 
@@ -342,12 +351,20 @@ void supertensor_writer_t::finalize() {
 
 uint64_t supertensor_reader_t::compressed_size(Vector<uint8_t,4> block) const {
   header.block_shape(block); // check validity
-  return index[Vector<int,4>(block)].compressed_size;
+  return compressed_size_[Vector<int,4>(block)];
 }
 
 uint64_t supertensor_reader_t::uncompressed_size(Vector<uint8_t,4> block) const {
-  header.block_shape(block); // check validity
-  return index[Vector<int,4>(block)].uncompressed_size;
+  const auto shape = header.block_shape(block); // checks validity
+  return sizeof(Vector<super_t,2>)*shape.product();
+}
+
+supertensor_blob_t supertensor_reader_t::blob(Vector<uint8_t,4> block) const {
+  supertensor_blob_t blob;
+  blob.uncompressed_size = uncompressed_size(block); // checks validity
+  blob.compressed_size = compressed_size_[Vector<int,4>(block)];
+  blob.offset = offset[Vector<int,4>(block)];
+  return blob;
 }
 
 uint64_t supertensor_writer_t::compressed_size(Vector<uint8_t,4> block) const {
@@ -437,10 +454,7 @@ uint64_t supertensor_reader_t::index_offset() const {
 }
 
 Array<const uint64_t,4> supertensor_reader_t::block_offsets() const {
-  Array<uint64_t,4> offsets(index.shape,false);
-  for (const int i : range(offsets.flat.size()))
-    offsets.flat[i] = index.flat[i].offset;
-  return offsets;
+  return offset;
 }
 
 }

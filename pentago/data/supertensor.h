@@ -19,11 +19,11 @@
  *   supertensor_header_t header; // packed
  *
  *   // At header.index.offset
- *   char compressed_index_data[]; // zlib compressed data, representing
+ *   char compressed_index_data[]; // zlib/lzma compressed data, representing
  *     supertensor_blob_t blocks[][][][]; // 4D array of information about each block
  *
  *   // Elsewhere
- *   char compressed_block_data[]; // zlib compressed block data, representing
+ *   char compressed_block_data[]; // zlib/lzma compressed block data, representing
  *     super_t filtered_block_data[][][][][2]; // filtered superscores, representing
  *       super_t block_data[][][][][2]; // sequence of (black win, white win) pairs
  *
@@ -64,8 +64,8 @@ using boost::function;
 
 struct supertensor_blob_t {
   uint64_t uncompressed_size; // size of the uncompressed data block
-  uint64_t compressed_size; // size of the zlib compressed data block
-  uint64_t offset; // offset of the start of the zlib data, or zero for undefined
+  uint64_t compressed_size; // size of the zlib/lzma compressed data block
+  uint64_t offset; // offset of the start of the zlib/lzma data, or zero for undefined
 
   supertensor_blob_t()
     : uncompressed_size(-1)
@@ -88,7 +88,7 @@ struct supertensor_header_t {
   Vector<uint16_t,4> shape; // 4D shape of the entire array
   uint32_t block_size; // dimensions of each block (except for blocks at the ends, which may be smaller)
   Vector<uint16_t,4> blocks; // shape of the block array: ceil(shape/block_size)
-  uint32_t filter; // algorithm used to preprocess superscore data before zlib compression (0 for none)
+  uint32_t filter; // algorithm used to preprocess superscore data before compression (0 for none)
   supertensor_blob_t index; // size and location of the compressed block index
 
   GEODE_EXPORT supertensor_header_t();
@@ -104,7 +104,10 @@ struct supertensor_reader_t : public Object {
 
   const Ref<const read_file_t> fd;
   const supertensor_header_t header;
-  const Array<const supertensor_blob_t,4> index;
+
+  // To save memory, we drop the uncompressed_size since it is computable, and store compressed_size as a uint32_t
+  const Array<const uint64_t,4> offset; // absolute offset of each block in the file
+  const Array<const uint32_t,4> compressed_size_; // compressed size of each block
 
 private:
   supertensor_reader_t(const string& path, const thread_type_t io=IO);
@@ -124,6 +127,7 @@ public:
 
   uint64_t compressed_size(Vector<uint8_t,4> block) const;
   uint64_t uncompressed_size(Vector<uint8_t,4> block) const;
+  supertensor_blob_t blob(Vector<uint8_t,4> block) const;
 
   // For debugging purposes
   uint64_t total_size() const;
