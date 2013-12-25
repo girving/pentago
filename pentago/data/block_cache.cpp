@@ -67,6 +67,31 @@ bool block_cache_t::lookup(const bool aggressive, const board_t board, super_t& 
 }
 
 namespace {
+struct empty_block_cache_t : public block_cache_t {
+  GEODE_DECLARE_TYPE(GEODE_NO_EXPORT)
+  typedef block_cache_t Base;
+
+protected:
+  empty_block_cache_t() {}
+public:
+
+  int block_size() const {
+    return 8;
+  }
+
+  bool has_section(const section_t section) const {
+    return false;
+  }
+
+  super_t extract(const bool turn, const bool aggressive, const Vector<super_t,2>& data) const {
+    GEODE_FATAL_ERROR();
+  }
+
+  RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const {
+    GEODE_FATAL_ERROR();
+  }
+};
+
 struct reader_block_cache_t : public block_cache_t {
   GEODE_DECLARE_TYPE(GEODE_NO_EXPORT)
   typedef block_cache_t Base;
@@ -117,7 +142,12 @@ public:
     return data;
   }
 };
+GEODE_DEFINE_TYPE(empty_block_cache_t)
 GEODE_DEFINE_TYPE(reader_block_cache_t)
+}
+
+Ref<const block_cache_t> empty_block_cache() {
+  return new_<empty_block_cache_t>();
 }
 
 Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_reader_t>> readers, const uint64_t memory_limit) {

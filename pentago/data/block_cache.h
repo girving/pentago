@@ -30,6 +30,9 @@ private:
   virtual RawArray<const Vector<super_t,2>,4> load_block(const section_t section, const Vector<uint8_t,4> block) const = 0;
 };
 
+// An empty block cache
+GEODE_EXPORT Ref<const block_cache_t> empty_block_cache();
+
 // Generate a block cache from one or more supertensor files
 GEODE_EXPORT Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_reader_t>> readers, const uint64_t memory_limit);
 
