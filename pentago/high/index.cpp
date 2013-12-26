@@ -86,7 +86,7 @@ void write_supertensor_index(const string& name, const vector<Ref<const superten
   GEODE_ASSERT(sections->slice==int(slice));
   Hashtable<section_t,Ref<const supertensor_reader_t>> section_reader;
   for (const auto reader : readers) {
-    GEODE_ASSERT(reader->header.filter==filter);
+    GEODE_ASSERT(int(reader->header.filter)==filter);
     section_reader.set(reader->header.section,reader);
   }
   for (const auto section : sections->sections)
