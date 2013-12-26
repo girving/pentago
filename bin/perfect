@@ -8,19 +8,32 @@ from geode.value import parser
 import pylab
 import glob
 import sys
+import os
+
+# Make sure we're unbuffered
+sys.stdout = os.fdopen(sys.stdout.fileno(),'w',0)
 
 # Properties
 props = PropManager()
+board = props.add('board','0').set_help('starting board')
 bits = props.add('bits',21).set_abbrev('b').set_help('size of transposition table in bits')
 dir = props.add('dir',os.path.normpath(os.path.dirname(sys.argv[0]))+'/../data/edison/project/all') \
   .set_help('data directory')
+generate = props.add('generate','') \
+  .set_help('generate a random path, and print out lots of details, trying for value generate[i] at quarter move i')
+max_slice = props.add('max_slice',18)
+seed = props.add('seed',7).set_help('random seed for path')
 parser.parse(props,'Perfect pentago explorer')
 
 # Load data lazily
 init_threads(-1,-1)
-slices = [f for f in glob.glob(dir()+'/slice-*.pentago') if os.path.exists(f)]
+slices = [dir()+'/slice-%d.pentago'%n for n in xrange(max_slice()+1)]
+slices = [f for f in slices if os.path.exists(f)]
 print('loading data from\n  %s'%('\n  '.join(slices)))
 data = reader_block_cache([s for f in slices for s in open_supertensors(f)],1<<30)
+
+# Prepare for tree searches
+init_supertable(bits())
 
 def plot_board(board):
   current_board = [board]
@@ -91,8 +104,37 @@ def plot_board(board):
 
 def main():
   # No stones, black to move, not in the middle
-  board = high_board_t(0,False)
+  board = high_board_t.parse(props.board())
   plot_board(board)
 
+def generate_path():
+  gen = list(map(int,generate().split(',')))+list(ones(100,dtype=int))
+  random.seed(seed())
+  board = high_board_t(0,False)
+  path = []
+  values = {}
+  while not board.done():
+    path.append(str(board))
+    v = board.value(data)
+    values[str(board)] = v
+    print('board %d %s = %d'%(board.count,str(board),v))
+    choices = [[],[],[]]
+    for m in board.moves():
+      v = m.value(data)
+      values[str(m)] = v
+      print('  move %s = %d'%(str(m),v))
+      choices[abs(gen[0]-(v if board.turn==m.turn else -v))].append(m)
+    del gen[0]
+    for ms in choices:
+      if ms:
+        board = ms[random.randint(len(ms))]
+        break
+  print()
+  print('path = [%s]'%','.join("'%s'"%str(b) for b in path))
+  print('values = {%s}'%','.join("'%s':%d"%(b,v) for b,v in sorted(values.items())))
+
 if __name__=='__main__':
-  main()
+  if generate():
+    generate_path()
+  else:
+    main()

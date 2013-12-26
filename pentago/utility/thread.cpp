@@ -1,6 +1,7 @@
 // Thread utilities
 
 #include <pentago/utility/thread.h>
+#include <pentago/utility/convert.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/spinlock.h>
 #include <pentago/utility/wall_time.h>
@@ -451,10 +452,9 @@ Ptr<thread_pool_t> io_pool;
 
 }
 
-void init_threads(int cpu_threads, int io_threads) {
-  GEODE_ASSERT(cpu_threads);
+unit init_threads(int cpu_threads, int io_threads) {
   if (cpu_threads==-1 && io_threads==-1 && cpu_pool)
-    return;
+    return unit();
   GEODE_ASSERT(!cpu_pool && !io_pool);
   master = pthread_self();
   time_info.init_thread(MASTER);
@@ -462,10 +462,12 @@ void init_threads(int cpu_threads, int io_threads) {
     cpu_threads = int(sysconf(_SC_NPROCESSORS_ONLN));
   if (io_threads<0)
     io_threads = 2;
-  cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);
+  if (cpu_threads)
+    cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);
   if (io_threads)
     io_pool = new_<thread_pool_t>(IO,io_threads,1000);
   time_info.total_start = time_info.local_start = wall_time();
+  return unit();
 }
 
 Vector<int,2> thread_counts() {

@@ -4,6 +4,7 @@
 #include <pentago/search/stat.h>
 #include <pentago/base/symmetry.h>
 #include <pentago/search/trace.h>
+#include <pentago/utility/convert.h>
 #include <pentago/utility/debug.h>
 #include <geode/array/Array.h>
 #include <geode/python/wrap.h>
@@ -42,7 +43,7 @@ static_assert(sizeof(superentry_t)==72,"");
 static int table_bits = 0;
 static Array<superentry_t> table;
 
-void init_supertable(int bits) {
+unit init_supertable(int bits) {
   if (bits<1 || bits>30)
     THROW(ValueError,"expected 1<=bits<=30, got bits = %d",bits);
   if (64-bits>hash_bits)
@@ -51,6 +52,7 @@ void init_supertable(int bits) {
   cout << "initializing supertable: bits = "<<bits<<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
   table = Array<superentry_t>(1<<bits,false);
   clear_supertable();
+  return unit();
 }
 
 void clear_supertable() {

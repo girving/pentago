@@ -7,6 +7,7 @@
 #include <geode/python/Ptr.h>
 #include <geode/python/Object.h>
 #include <geode/python/ExceptionValue.h>
+#include <geode/structure/forward.h>
 #include <boost/noncopyable.hpp>
 #include <boost/function.hpp>
 #include <pthread.h>
@@ -111,12 +112,11 @@ GEODE_EXPORT void report_thread_times(RawArray<const wall_time_t> times, const s
 
 } namespace geode {
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
-GEODE_DECLARE_ENUM(thread_type_t,GEODE_EXPORT)
 } namespace pentago {
 GEODE_EXPORT thread_type_t thread_type();
 
 // Initialize thread pools
-GEODE_EXPORT void init_threads(int cpu_threads, int io_threads);
+GEODE_EXPORT unit init_threads(int cpu_threads, int io_threads);
 
 // Grab thread counts: cpu count, io count
 GEODE_EXPORT Vector<int,2> thread_counts();

@@ -1,6 +1,6 @@
 // Organized index for supertensor files
 
-#include <pentago/end/index.h>
+#include <pentago/high/index.h>
 #include <pentago/end/blocks.h>
 #include <pentago/data/compress.h>
 #include <pentago/data/supertensor.h>
@@ -10,10 +10,10 @@
 #include <geode/python/stl.h>
 #ifdef BOOST_LITTLE_ENDIAN
 namespace pentago {
-namespace end {
 
 GEODE_DEFINE_TYPE(supertensor_index_t)
 const int filter = 1; // interleave filtering
+using namespace pentago::end;
 
 Array<const uint64_t> make_offsets(const sections_t& sections) {
   Array<uint64_t> offsets(sections.sections.size()+1,false);
@@ -40,27 +40,35 @@ string supertensor_index_t::header() const {
   return header;
 }
 
-uint64_t supertensor_index_t::blob_offset(const section_t section, const Vector<uint8_t,4> block) const {
-  const uint64_t offset = section_offset[sections->section_id.get(section)]; 
-  const int i = index(section_blocks(section),Vector<int,4>(block));
+uint64_t supertensor_index_t::blob_offset(const block_t block) const {
+  const uint64_t offset = section_offset[sections->section_id.get(block.x)];
+  const int i = index(section_blocks(block.x),Vector<int,4>(block.y));
   return offset+sizeof(compact_blob_t)*i;
 }
 
-string supertensor_index_t::blob_range_header(const section_t section, const Vector<uint8_t,4> block) const {
-  const auto offset = blob_offset(section,block);
+string supertensor_index_t::blob_range_header(const block_t block) const {
+  const auto offset = blob_offset(block);
   return format("bytes=%lld-%lld",offset,offset+sizeof(compact_blob_t)-1);
 }
 
-string supertensor_index_t::block_range_header(const string& s) {
-  compact_blob_t blob;
-  GEODE_ASSERT(s.size()==sizeof(blob));
-  memcpy(&blob,s.c_str(),sizeof(blob));
-  return format("bytes=%lld-%lld",blob.offset,blob.offset+blob.compressed_size-1);
+static compact_blob_t parse_blob(RawArray<const uint8_t> blob) {
+  compact_blob_t b;
+  GEODE_ASSERT(blob.size()==sizeof(b),format("expected size %d, got size %d, data %s",sizeof(b),blob.size(),str(blob)));
+  memcpy(&b,blob.data(),sizeof(b));
+  return b;
 }
 
-Array<Vector<super_t,2>,4> supertensor_index_t::unpack_block(const section_t section, const Vector<uint8_t,4> block,
-                                                             RawArray<const uint8_t> compressed) {
-  const auto shape = block_shape(section.shape(),block);
+int supertensor_index_t::block_compressed_size(RawArray<const uint8_t> blob) {
+  return parse_blob(blob).compressed_size;
+}
+
+string supertensor_index_t::block_range_header(RawArray<const uint8_t> blob) {
+  const auto b = parse_blob(blob);
+  return format("bytes=%lld-%lld",b.offset,b.offset+b.compressed_size-1);
+}
+
+Array<Vector<super_t,2>,4> supertensor_index_t::unpack_block(const block_t block, RawArray<const uint8_t> compressed) {
+  const auto shape = block_shape(block.x.shape(),block.y);
   const auto data = decompress(compressed,sizeof(Vector<super_t,2>)*shape.product(),unevent);
   return unfilter(filter,shape,data);
 }
@@ -101,9 +109,8 @@ void write_supertensor_index(const string& name, const vector<Ref<const superten
 }
 
 }
-}
 #endif
-using namespace pentago::end;
+using namespace pentago;
 
 void wrap_index() {
 #ifdef BOOST_LITTLE_ENDIAN

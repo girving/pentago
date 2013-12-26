@@ -37,6 +37,9 @@ public:
   // Rotate the given quadrant in the given direction (-1 or 1)
   Ref<high_board_t> rotate(const int qx, const int qy, const int d) const;
 
+  // value() assuming done()
+  int immediate_value() const;
+
   // 1 if the player to move wins, 0 for tie, -1 if the player to move loses
   int value(const block_cache_t& cache) const;
 
@@ -54,6 +57,7 @@ public:
     return board==other.board && middle==other.middle;
   }
 
+  string name() const;
   friend ostream& operator<<(ostream& output, const high_board_t& board);
   static Ref<high_board_t> parse(const string& name);
 };

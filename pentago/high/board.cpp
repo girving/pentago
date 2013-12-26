@@ -92,17 +92,19 @@ static bool exact_lookup(const bool aggressive, const board_t board, const block
   return (score&3)>=aggressive+1;
 }
 
+int high_board_t::immediate_value() const {
+  GEODE_ASSERT(done());
+  const bool bw = won(unpack(board,0)),
+             ww = won(unpack(board,1));
+  if (bw || ww)
+    return bw && ww ? 0 : bw==!turn ? 1 : -1;
+  return 0;
+}
+
 int high_board_t::value(const block_cache_t& cache) const {
-  {
-    // Check immediate wins
-    const bool bw = won(unpack(board,0)),
-               ww = won(unpack(board,1));
-    if (bw || ww)
-      return bw && ww ? 0 : bw==!turn ? 1 : -1;
-    if (!middle && count_stones(board)==36)
-      return 0;
-  }
-  if (!middle) {
+  if (done())
+    return immediate_value();
+  else if (!middle) {
     // If we're not at a half move, look up the result
     const auto flip = flip_board(board,turn);
     return exact_lookup(true,flip,cache)+exact_lookup(false,flip,cache)-1;
@@ -119,15 +121,9 @@ int high_board_t::value(const block_cache_t& cache) const {
 
 int high_board_t::value_check(const block_cache_t& cache) const {
   GEODE_ASSERT(!middle);
+  if (done())
+    return immediate_value();
   {
-    // Check immediate wins
-    const bool bw = won(unpack(board,0)),
-               ww = won(unpack(board,1));
-    if (bw || ww)
-      return bw && ww ? 0 : bw==!turn ? 1 : -1;
-    if (!middle && count_stones(board)==36)
-      return 0;
-  } {
     int value = -1;
     for (const auto& move : moves())
       value = max(value,move->value(cache));
@@ -152,6 +148,10 @@ Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<co
     counts[value+1]++;
   }
   return counts;
+}
+
+string high_board_t::name() const {
+  return format("%lld%s",board,middle?"m":"");
 }
 
 ostream& operator<<(ostream& output, const high_board_t& board) {
@@ -192,6 +192,7 @@ void wrap_high_board() {
     .GEODE_METHOD(value)
     .GEODE_METHOD(value_check)
     .GEODE_METHOD(sample_check)
+    .GEODE_METHOD(parse)
     .compare()
     .str()
     ;

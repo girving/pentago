@@ -18,7 +18,6 @@
 #include <boost/detail/endian.hpp>
 #ifdef BOOST_LITTLE_ENDIAN
 namespace pentago {
-namespace end {
 
 struct __attribute__ ((packed)) compact_blob_t {
   uint64_t offset;
@@ -28,29 +27,31 @@ static_assert(sizeof(compact_blob_t)==12,"struct packing failed");
 
 struct supertensor_index_t : public Object {
   GEODE_DECLARE_TYPE(GEODE_EXPORT)
+  typedef Tuple<section_t,Vector<uint8_t,4>> block_t;
 
-  const Ref<const sections_t> sections;
+  const Ref<const end::sections_t> sections;
   const Array<const uint64_t> section_offset;
 
 protected:
-  supertensor_index_t(const sections_t& sections);
+  supertensor_index_t(const end::sections_t& sections);
 public:
   ~supertensor_index_t();
 
   string header() const;
-  uint64_t blob_offset(const section_t section, const Vector<uint8_t,4> block) const;
-  string blob_range_header(const section_t section, const Vector<uint8_t,4> block) const;
+  uint64_t blob_offset(const block_t block) const;
+  string blob_range_header(const block_t block) const;
+
+  // Convert blob data to compressed size
+  static int block_compressed_size(RawArray<const uint8_t> blob);
 
   // Convert blob data to block range header
-  static string block_range_header(const string& blob);
+  static string block_range_header(RawArray<const uint8_t> blob);
 
   // Decompress a compressed block
-  static Array<Vector<super_t,2>,4> unpack_block(const section_t section, const Vector<uint8_t,4> block,
-                                                 RawArray<const uint8_t> compressed);
+  static Array<Vector<super_t,2>,4> unpack_block(const block_t block, RawArray<const uint8_t> compressed);
 };
 
 void write_supertensor_index(const string& name, const vector<Ref<const supertensor_reader_t>>& readers);
 
-}
 }
 #endif

@@ -15,7 +15,6 @@ namespace end {
 GEODE_DEFINE_TYPE(sections_t)
 
 vector<Ref<const sections_t>> descendent_sections(const section_t root, const int max_slice) {
-  Log::Scope scope("dependents");
   GEODE_ASSERT(0<=max_slice && max_slice<=35);
   GEODE_ASSERT(root.sum()<=max_slice);
 
