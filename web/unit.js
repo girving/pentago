@@ -73,7 +73,7 @@ function test_values(cont) {
   }
 
   var log = new Log('debug')
-  var compute = Values.values({},log)
+  var compute = Values.values({httpTimeout:20},log)
   var gn = games.length
   function test(path,values) {
     var seen = {}

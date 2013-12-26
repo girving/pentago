@@ -6,6 +6,7 @@
 #include <node.h>
 #include <node_buffer.h>
 #include <pentago/base/section.h>
+#include <pentago/high/index.h>
 #include <geode/python/Ptr.h>
 #include <geode/utility/Enumerate.h>
 #include <geode/utility/format.h>
@@ -59,7 +60,14 @@ template<class T> static inline typename boost::enable_if<boost::is_same<T,bool>
 }
 
 template<class T> static inline typename boost::enable_if<is_numeric<T>,Handle<Number>>::type to_js(T x) {
+  const double d(x);
+  if (!boost::is_floating_point<T>::value && T(d)!=x)
+    throw ValueError(format("can't safely convert %s to javascript, would degrade to %s",str(x),str(d)));
   return Number::New(x);
+}
+
+static inline Handle<String> to_js(const char* x) {
+  return String::New(x);
 }
 
 static inline Handle<String> to_js(const string& x) {
@@ -81,6 +89,13 @@ template<class T,int d> static inline Handle<v8::Array> to_js(const Vector<T,d>&
 
 static inline Handle<v8::Array> to_js(const section_t x) {
   return to_js(x.counts);
+}
+
+static inline Handle<v8::Object> to_js(const compact_blob_t x) {
+  auto o = v8::Object::New();
+  o->Set(to_js("offset"),to_js(x.offset));
+  o->Set(to_js("size"),to_js(x.size));
+  return o;
 }
 
 template<class T> static inline Handle<v8::Array> to_js(const vector<T>& xs) {

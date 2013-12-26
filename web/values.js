@@ -23,6 +23,7 @@ exports.add_options = function (options) {
          .option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
+         .option('--http-timeout <s>','http request timeout in seconds',parseFloat,0)
 }
 
 // Create an evaluation routine with calling convention
@@ -59,26 +60,46 @@ exports.values = function (options,log) {
   process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
 
+  // Allow a lot of simultaneous http connections
+  http.globalAgent.maxSockets = 64
+
   // Useful counters
   var active_gets = 0
 
   // http.get, but bail on all errors, and call cont(data) once the full data is available
-  function lazy_get(req,cont) {
-    req['encoding'] = null // Set binary mode
-    req['agent'] = false // Don't leave connection alive
-    log.debug('range request %s, %s, active %d',req.path,req.headers.range,active_gets++)
-    http.get(req,function (res) {
+  function lazy_get(path,blob,cont) {
+    var opts = {host: slice_host,
+               path: path,
+               encoding: null, // Binary mode
+               headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
+    var name = path+', '+blob.offset+"+"+blob.size
+    log.debug('range request %s, active %d',name,active_gets++)
+    function hcont (res) {
       var body = []
       res.on('data',function (chunk) { body.push(chunk) })
       res.on('end',function () {
         body = Buffer.concat(body)
-        log.debug('range response %s, %s, length %d, active %d',req.path,req.headers.range,body.length,--active_gets)
+        if (body.length != blob.size)
+          throw 'http size mismatch: '+name+', got size '+body.length
+        log.debug('range response %s, active %d',name,--active_gets)
         cont(body)
       })
-    }).on('error',function (e) {
-      log.error('http get failed: request %j, error %s',req,e)
-      process.exit(1)
-    })
+    }
+    function launch () {
+      var req = http.get(opts,hcont)
+        .on('error',function (e) {
+          log.error('http get failed, relaunching: %s, error %s',name,e)
+          launch()
+        })
+      if (options.httpTimeout)
+        req.setTimeout(1000*options.httpTimeout,function () {
+          log.error('http get timed out, relaunching: %s, time limit %s s',name,options.httpTimeout)
+          req.abort()
+          launch()
+        })
+    }
+    // Launch first request, then retry on failure
+    launch()
   }
 
   // Lookup or compute the value or board and its children, then call cont(results) with a board -> value map.
@@ -128,21 +149,11 @@ exports.values = function (options,log) {
       else {
         // Add one pending callback
         cache_pending[block] = [rest]
-        // Grab blob via an http range request.  This tells us where to look for the block.
+        // Grab block location
         var slice = board.count()
-        var range = indices[slice].blob_range_header(block)
-        var blob_req = {host: slice_host,
-                        path: '/slice-'+slice+'.pentago.index',
-                        headers: {range:range}}
-        lazy_get(blob_req,function (blob) {
-          // Grab block via an http range request
-          var data_req = {host: slice_host,
-                          path: '/slice-'+slice+'.pentago',
-                          headers: {range: indices[slice].block_range_header(blob)}}
-          lazy_get(data_req,function (data) {
-            var csize = indices[slice].block_compressed_length(blob)
-            if (data.length != csize)
-              throw 'block '+block+': expected compressed size '+csize+', got '+data.length
+        lazy_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
+          // Grab block data
+          lazy_get('/slice-'+slice+'.pentago',indices[slice].block_location(blob),function (data) {
             cache.set(block,data)
             var pending = cache_pending[block]
             delete cache_pending[block]
@@ -165,14 +176,16 @@ exports.values = function (options,log) {
         for (var i=0;i<requests.length;i++)
           remote_request(requests[i].board,requests[i].cont)
       else { // Dispatch all requests to a single worker process to exploit coherence
-        log.debug('compute launch %s',board.name())
+        log.debug('computing board %s, slice %d',board.name(),board.count())
         var boards = requests.map(function (r) { return r.board.name() })
         pool.enqueue(boards, function (res) {
-          log.debug('compute success %s',board.name())
+          var total = 0
+          for (var name in res)
+            total += res[name].time
+          log.info('computed board %s, slice %d, time %s s',board.name(),board.count(),total)
           for (var i=0;i<requests.length;i++) {
             var name = requests[i].board.name()
             var v = res[name].v
-            log.info('computed %s = %d, elapsed %s s',name,v,res[name].time)
             results[name] = v
             requests[i].cont(v)
           }

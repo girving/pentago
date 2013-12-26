@@ -57,9 +57,8 @@ static void init(Handle<v8::Object> exports) {
     PN_METHOD(set)
   } {
     PN_CLASS(supertensor_index_t,make_index)
-    PN_METHOD(blob_range_header)
-    PN_METHOD(block_compressed_size)
-    PN_METHOD(block_range_header)
+    PN_METHOD(blob_location)
+    PN_METHOD(block_location)
   }
   PN_FUNCTION(descendent_sections)
   PN_FUNCTION(init_supertable)

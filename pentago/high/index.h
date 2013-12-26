@@ -21,7 +21,7 @@ namespace pentago {
 
 struct __attribute__ ((packed)) compact_blob_t {
   uint64_t offset;
-  uint32_t compressed_size;
+  uint32_t size; // compressed for blocks, uncompressed for blob information
 };
 static_assert(sizeof(compact_blob_t)==12,"struct packing failed");
 
@@ -38,14 +38,10 @@ public:
   ~supertensor_index_t();
 
   string header() const;
-  uint64_t blob_offset(const block_t block) const;
-  string blob_range_header(const block_t block) const;
+  compact_blob_t blob_location(const block_t block) const;
 
-  // Convert blob data to compressed size
-  static int block_compressed_size(RawArray<const uint8_t> blob);
-
-  // Convert blob data to block range header
-  static string block_range_header(RawArray<const uint8_t> blob);
+  // Convert blob data to block location
+  static compact_blob_t block_location(RawArray<const uint8_t> blob);
 
   // Decompress a compressed block
   static Array<Vector<super_t,2>,4> unpack_block(const block_t block, RawArray<const uint8_t> compressed);

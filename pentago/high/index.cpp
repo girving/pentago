@@ -40,37 +40,42 @@ string supertensor_index_t::header() const {
   return header;
 }
 
-uint64_t supertensor_index_t::blob_offset(const block_t block) const {
-  const uint64_t offset = section_offset[sections->section_id.get(block.x)];
+compact_blob_t supertensor_index_t::blob_location(const block_t block) const {
+  const uint64_t base = section_offset[sections->section_id.get(block.x)];
   const int i = index(section_blocks(block.x),Vector<int,4>(block.y));
-  return offset+sizeof(compact_blob_t)*i;
+  compact_blob_t b;
+  b.offset = base+sizeof(compact_blob_t)*i;
+  b.size = 12;
+  return b;
 }
 
-string supertensor_index_t::blob_range_header(const block_t block) const {
-  const auto offset = blob_offset(block);
-  return format("bytes=%lld-%lld",offset,offset+sizeof(compact_blob_t)-1);
-}
-
-static compact_blob_t parse_blob(RawArray<const uint8_t> blob) {
+compact_blob_t supertensor_index_t::block_location(RawArray<const uint8_t> blob) {
   compact_blob_t b;
   GEODE_ASSERT(blob.size()==sizeof(b),format("expected size %d, got size %d, data %s",sizeof(b),blob.size(),str(blob)));
   memcpy(&b,blob.data(),sizeof(b));
   return b;
 }
 
-int supertensor_index_t::block_compressed_size(RawArray<const uint8_t> blob) {
-  return parse_blob(blob).compressed_size;
-}
-
-string supertensor_index_t::block_range_header(RawArray<const uint8_t> blob) {
-  const auto b = parse_blob(blob);
-  return format("bytes=%lld-%lld",b.offset,b.offset+b.compressed_size-1);
-}
-
 Array<Vector<super_t,2>,4> supertensor_index_t::unpack_block(const block_t block, RawArray<const uint8_t> compressed) {
   const auto shape = block_shape(block.x.shape(),block.y);
   const auto data = decompress(compressed,sizeof(Vector<super_t,2>)*shape.product(),unevent);
   return unfilter(filter,shape,data);
+}
+
+namespace {
+struct compact_blob_py : public Object {
+  GEODE_DECLARE_TYPE(GEODE_NO_EXPORT)
+  const uint64_t offset;
+  const uint32_t size;
+protected:
+  compact_blob_py(const compact_blob_t b)
+    : offset(b.offset), size(b.size) {}
+};
+GEODE_DEFINE_TYPE(compact_blob_py)
+}
+
+static inline PyObject* to_python(const compact_blob_t b) {
+  return to_python(new_<compact_blob_py>(b));
 }
 
 void write_supertensor_index(const string& name, const vector<Ref<const supertensor_reader_t>>& readers) {
@@ -99,7 +104,7 @@ void write_supertensor_index(const string& name, const vector<Ref<const superten
     Array<compact_blob_t> blobs(reader->offset.flat.size(),false);
     for (const int i : range(blobs.size())) {
       blobs[i].offset = reader->offset.flat[i];
-      blobs[i].compressed_size = reader->compressed_size_.flat[i];
+      blobs[i].size = reader->compressed_size_.flat[i];
     }
     fwrite(blobs.data(),sizeof(compact_blob_t),blobs.size(),file);
   }
@@ -114,15 +119,22 @@ using namespace pentago;
 
 void wrap_index() {
 #ifdef BOOST_LITTLE_ENDIAN
-  typedef supertensor_index_t Self;
-  Class<Self>("supertensor_index_t")
-    .GEODE_INIT(const sections_t&)
-    .GEODE_METHOD(header)
-    .GEODE_METHOD(blob_offset)
-    .GEODE_METHOD(blob_range_header)
-    .GEODE_METHOD(block_range_header)
-    .GEODE_METHOD(unpack_block)
-    ;
+  {
+    typedef compact_blob_py Self;
+    Class<Self>("compact_blob_t")
+      .GEODE_FIELD(offset)
+      .GEODE_FIELD(size)
+      ;
+  } {
+    typedef supertensor_index_t Self;
+    Class<Self>("supertensor_index_t")
+      .GEODE_INIT(const sections_t&)
+      .GEODE_METHOD(header)
+      .GEODE_METHOD(blob_location)
+      .GEODE_METHOD(block_location)
+      .GEODE_METHOD(unpack_block)
+      ;
+  }
 
   GEODE_FUNCTION(write_supertensor_index)
 #endif

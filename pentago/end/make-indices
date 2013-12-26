@@ -6,14 +6,10 @@ from pentago import *
 from geode import *
 import re
 
-def pread(name,range):
-  m = re.match(r'^bytes=(\d+)-(\d+)$',range)
-  assert m
-  lo = int(m.group(1))
-  hi = int(m.group(2))+1
+def pread(name,blob):
   f = open(name,'rb')
-  f.seek(lo)
-  return f.read(hi-lo)
+  f.seek(blob.offset)
+  return f.read(blob.size)
 
 random.seed(183111)
 init_threads(-1,-1)
@@ -33,8 +29,8 @@ for slice in xrange(19):
     # Read data the old way
     data = r.read_block(block)
     # Read using the index
-    blob = pread(index_name,index.blob_range_header(section,block))
-    data2 = pread(name,index.block_range_header(blob))
+    blob = pread(index_name,index.blob_location(section,block))
+    data2 = pread(name,index.block_location(blob))
     data2 = index.unpack_block(section,block,fromstring(data2,dtype=uint8))
     assert data.dtype==data2.dtype
     assert all(data==data2)
