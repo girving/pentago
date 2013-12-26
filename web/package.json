@@ -1,0 +1,25 @@
+{
+  "name": "pentago-web",
+  "version": "0.0.1",
+  "description": "Perfect pentago move explorer",
+  "author": "Geoffrey Irving <irving@naml.us>",
+  "homepage": "https://github.com/girving/pentago",
+  "license": "BSD",
+  "main": "server.js",
+  "dependencies": {
+    "time": "0.10.0",
+    "mule": "0.1.0",
+    "log": "1.4.0"
+  },
+  "keywords": [
+    "pentago",
+    "solved"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:girving/pentago.git"
+  },
+  "bugs": {
+    "url": "https://github.com/girving/pentago/issues"
+  }
+}
