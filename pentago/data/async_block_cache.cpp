@@ -8,7 +8,8 @@ namespace pentago {
 typedef async_block_cache_t::block_t block_t;
 
 async_block_cache_t::async_block_cache_t(const uint64_t memory_limit)
-  : memory_limit(memory_limit) {}
+  : memory_limit(memory_limit)
+  , free_memory(memory_limit) {}
 
 async_block_cache_t::~async_block_cache_t() {}
 
