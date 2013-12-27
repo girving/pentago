@@ -30,6 +30,13 @@ exports.add_options = function (options) {
          .option('--max-sockets <n>','Maximum number of simultaneous http connections',parseInt,d.maxSockets)
 }
 
+// Useful counters
+var stats = {
+  active_gets: 0,
+  crossed_chunks: 0
+}
+exports.stats = stats
+
 // Create an evaluation routine with calling convention
 //   values(board,cont)
 // The options are
@@ -69,13 +76,10 @@ exports.values = function (options,log) {
   process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
 
-  // Useful counters
-  var active_gets = 0
-
   // Get a section of a file, bailing on all errors
   function simple_get(path,blob,cont) {
     var name = path+', '+blob.offset+"+"+blob.size
-    log.debug('range request %s, active %d',name,active_gets++)
+    log.debug('range request %s, active %d',name,stats.active_gets++)
     var details = {url: container+path,
                    encoding: null, // Binary mode
                    headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
@@ -84,7 +88,7 @@ exports.values = function (options,log) {
         log.error("http get failed: %s, status %d, length %d, error '%s'",name,res.statusCode,body.length,error)
         process.exit(1)
       }
-      log.debug('range response %s, active %d',name,--active_gets)
+      log.debug('range response %s, active %d',name,--stats.active_gets)
       cont(body)
     })
   }
@@ -109,6 +113,7 @@ exports.values = function (options,log) {
         chunk_get(c0,cont)
       else { // Block split between two chunks
         log.info('blob crosses chunk boundary: %s, %j',path,blob)
+        stats.crossed_chunks++
         var parts = ['','']
         var next = function () {
           if (parts[0].length && parts[1].length)
