@@ -27,7 +27,7 @@ high_board_t::high_board_t(const board_t board, const bool middle)
             count1 = popcount(side1);
   GEODE_ASSERT(count0+count1==count_stones(board));
   const_cast_(turn) = count0-1==count1-middle;
-  if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1))
+  if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1) || (middle && !board))
     throw ValueError(format("high_board_t: inconsistent board %lld, turn %d, middle %d, side counts %d %d",
       board,turn,middle,count0,count1));
 }
