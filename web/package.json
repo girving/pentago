@@ -7,10 +7,11 @@
   "license": "BSD",
   "main": "server.js",
   "dependencies": {
-    "time": "0.10.0",
-    "mule": "0.1.0",
-    "log": "1.4.0",
-    "d3": "3.3.13"
+    "d3": "3.3.x",
+    "log": "1.4.x",
+    "mule": "0.1.x",
+    "request": "2.30.x",
+    "time": "0.10.x"
   },
   "keywords": [
     "pentago",

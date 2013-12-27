@@ -4,17 +4,21 @@
 var os = require('os')
 var http = require('http')
 var time = require('time')
+var request = require('request')
 var WorkQueue = require('mule').WorkQueue
 var pentago = require('./pentago/build/Release/pentago')
 
 // Pull in math
+var min = Math.min
 var max = Math.max
+var floor = Math.floor
 
 exports.defaults = {
   bits: 22,
   pool: os.cpus().length,
   cache: '250M',
-  maxSlice: 18
+  maxSlice: 18,
+  maxSockets: 64
 }
 
 exports.add_options = function (options) {
@@ -23,7 +27,7 @@ exports.add_options = function (options) {
          .option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
-         .option('--http-timeout <s>','http request timeout in seconds',parseFloat,0)
+         .option('--max-sockets <n>','Maximum number of simultaneous http connections',parseInt,d.maxSockets)
 }
 
 // Create an evaluation routine with calling convention
@@ -40,66 +44,80 @@ exports.values = function (options,log) {
     opts[k] = options[k] || exports.defaults[k]
 
   // Prepare for opening book lookups
-  var m = opts.cache.match(/^(\d+)(M|MB|G|GB)$/)
+  var m = opts.cache.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
   if (!m) {
     log.error("invalid --cache size '%s', expect something like 256M or 1G",opts.cache)
     process.exit(1)
   }
+  var memory_limit = parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
+  log.info('memory limit = %d',memory_limit)
+  var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
+  var cache = pentago.async_block_cache_t(memory_limit)
+  var cache_pending = {} // Map from block to callbacks to call once block is available
+  var container = 'http://582aa28f4f000f497ad5-81c103f827ca6373fd889208ea864720.r52.cf5.rackcdn.com'
+
+  // Allow more simultaneous connections
+  log.info('max sockets = %d',opts.maxSockets)
+  if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
+    throw 'invalid --max-sockets value '+opts.maxSockets
+  http.globalAgent.maxSockets = opts.maxSockets
 
   // Initialize timing system
   pentago.init_threads(0,0)
-
-  pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice)
-
-  var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
-  var cache = pentago.async_block_cache_t(parseInt(m[0])<<{'M':20,'G':30}[m[1][0]])
-  var cache_pending = {} // Map from block to callbacks to call once block is available
-  var slice_host = '582aa28f4f000f497ad5-81c103f827ca6373fd889208ea864720.r52.cf5.rackcdn.com'
 
   // Prepare for computations
   process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
 
-  // Allow a lot of simultaneous http connections
-  http.globalAgent.maxSockets = 64
-
   // Useful counters
   var active_gets = 0
 
-  // http.get, but bail on all errors, and call cont(data) once the full data is available
-  function lazy_get(path,blob,cont) {
-    var opts = {host: slice_host,
-               path: path,
-               encoding: null, // Binary mode
-               headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
+  // Get a section of a file, bailing on all errors
+  function simple_get(path,blob,cont) {
     var name = path+', '+blob.offset+"+"+blob.size
     log.debug('range request %s, active %d',name,active_gets++)
-    function hcont (res) {
-      var body = []
-      res.on('data',function (chunk) { body.push(chunk) })
-      res.on('end',function () {
-        body = Buffer.concat(body)
-        if (body.length != blob.size)
-          throw 'http size mismatch: '+name+', got size '+body.length
-        log.debug('range response %s, active %d',name,--active_gets)
-        cont(body)
-      })
+    var details = {url: container+path,
+                   encoding: null, // Binary mode
+                   headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
+    request(details,function (error,res,body) {
+      if (error || res.statusCode != 206 || body.length != blob.size) {
+        log.error("http get failed: %s, status %d, length %d, error '%s'",name,res.statusCode,body.length,error)
+        process.exit(1)
+      }
+      log.debug('range response %s, active %d',name,--active_gets)
+      cont(body)
+    })
+  }
+
+  // Get a section of a slice file, possibly split into chunks due to size
+  function block_get(slice,blob,cont) {
+    var path = '/slice-'+slice+'.pentago'
+    if (slice <= 11) // Unchunked file, single request works
+      simple_get(path,blob,cont)
+    else {
+      var zeros = 1+(slice>13)+(slice>16)
+      var chunk_size = 5368709119
+      var chunk_get = function (c,cont) {
+        simple_get(path+'.'+('000'+(c+1)).slice(-zeros),{
+          'offset': max(0,blob.offset-chunk_size*c),
+          'size': min(blob.size,chunk_size*(c+1)-blob.offset)},
+          cont)
+      }
+      var c0 = floor(blob.offset/chunk_size)
+      var c1 = floor((blob.offset+blob.size-1)/chunk_size)
+      if (c0==c1) // Block contained in a single chunk
+        chunk_get(c0,cont)
+      else { // Block split between two chunks
+        log.info('blob crosses chunk boundary: %s, %j',path,blob)
+        var parts = ['','']
+        var next = function () {
+          if (parts[0].length && parts[1].length)
+            cont(Buffer.concat(parts))
+        }
+        chunk_get(c0,function (part) { parts[0] = part; next() })
+        chunk_get(c1,function (part) { parts[1] = part; next() })
+      }
     }
-    function launch () {
-      var req = http.get(opts,hcont)
-        .on('error',function (e) {
-          log.error('http get failed, relaunching: %s, error %s',name,e)
-          launch()
-        })
-      if (options.httpTimeout)
-        req.setTimeout(1000*options.httpTimeout,function () {
-          log.error('http get timed out, relaunching: %s, time limit %s s',name,options.httpTimeout)
-          req.abort()
-          launch()
-        })
-    }
-    // Launch first request, then retry on failure
-    launch()
   }
 
   // Lookup or compute the value or board and its children, then call cont(results) with a board -> value map.
@@ -108,7 +126,7 @@ exports.values = function (options,log) {
     var results = {}
     var requests = []
     function traverse(board,children,cont) {
-      if (board.done()) { // Done, so 
+      if (board.done()) { // Done, so no lookup required
         var v = board.immediate_value()
         results[board.name()] = v
         cont(v)
@@ -136,7 +154,7 @@ exports.values = function (options,log) {
 
     // Lookup a value in the database
     function remote_request(board,cont) {
-      var block = cache.board_block(board) 
+      var block = cache.board_block(board)
       var rest = function () {
         var v = board.value(cache)
         results[board.name()] = v
@@ -151,9 +169,9 @@ exports.values = function (options,log) {
         cache_pending[block] = [rest]
         // Grab block location
         var slice = board.count()
-        lazy_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
+        simple_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
           // Grab block data
-          lazy_get('/slice-'+slice+'.pentago',indices[slice].block_location(blob),function (data) {
+          block_get(slice,indices[slice].block_location(blob),function (data) {
             cache.set(block,data)
             var pending = cache_pending[block]
             delete cache_pending[block]
