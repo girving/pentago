@@ -9,7 +9,8 @@
   "dependencies": {
     "time": "0.10.0",
     "mule": "0.1.0",
-    "log": "1.4.0"
+    "log": "1.4.0",
+    "d3": "3.3.13"
   },
   "keywords": [
     "pentago",
