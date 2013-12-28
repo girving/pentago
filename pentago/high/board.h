@@ -58,6 +58,7 @@ public:
   }
 
   string name() const;
+  string repr() const;
   friend ostream& operator<<(ostream& output, const high_board_t& board);
   static Ref<high_board_t> parse(const string& name);
 };

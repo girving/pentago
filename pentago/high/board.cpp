@@ -154,6 +154,10 @@ string high_board_t::name() const {
   return format("%lld%s",board,middle?"m":"");
 }
 
+string high_board_t::repr() const {
+  return format("high_board_t.parse('%s')",name());
+}
+
 ostream& operator<<(ostream& output, const high_board_t& board) {
   output << board.board;
   if (board.middle)
@@ -186,6 +190,7 @@ void wrap_high_board() {
     .GEODE_FIELD(grid)
     .GEODE_GET(count)
     .GEODE_METHOD(done)
+    .GEODE_METHOD(name)
     .GEODE_METHOD(moves)
     .GEODE_METHOD(place)
     .GEODE_METHOD(rotate)
@@ -194,6 +199,7 @@ void wrap_high_board() {
     .GEODE_METHOD(sample_check)
     .GEODE_METHOD(parse)
     .compare()
+    .repr()
     .str()
     ;
 }
