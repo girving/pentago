@@ -1,6 +1,6 @@
 # Mostly obsolete command line pentago player
 
-from __future__ import division
+from __future__ import division,absolute_import
 import os
 import re
 import sys
