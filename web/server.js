@@ -23,6 +23,9 @@ log.info('port = %d',options.port)
 // Prepare for evaluation
 var values = Values.values(options,log)
 
+// Usage information
+var usage = fs.readFileSync(__dirname+'/usage.txt')
+
 // Create server
 var server = http.createServer(function (req,res) {
   // Parse board
@@ -33,7 +36,7 @@ var server = http.createServer(function (req,res) {
   } catch (e) {
     log.error('bad request %s',req.url)
     res.writeHead(404)
-    res.end('bad url '+req.url+': expected (\d+)m? representing valid board')
+    res.end('bad url '+req.url+': expected (\d+)m? representing valid board as described below\n\n'+usage)
     return
   }
 

@@ -1,0 +1,43 @@
+Usage: http://backend.perfect-pentago.com/<board>
+
+If <board> describes a valid pentago position, compute or lookup the values
+of all children of <board> (valid moves starting at <board>) and return the
+results as a json dictionary mapping <child> to <value>.  The value of a
+position is 1 if the player to move wins, 0 for tie, and -1 for a loss.  The
+json dictionary also includes the value of the asked for position, and possibly
+some other positions that we computed in the process.
+
+Pentago boards are named by a 64-bit int followed by an optional 'm'; examples
+include 0, 1m, 205481007622539795m, etc.  Each quadrant of the pentago boards
+gets a 16-bit quarter of the bits, and the stones in a quadrant are packed into
+a 9-digit ternary number.  The quadrant order is x-major: the first 16 bits are
+lower left, the next 16 bits are upper left, then lower right and upper right.
+The 9-digit ternary representation is also x-major order, and each digit is 0
+for empty, 1 for black, or 2 for white (by convention, black is the player to
+play first).  If there is no 'm', the current player will place a stone next.
+If there is an 'm', the current player will rotate a quadrant next.
+
+For example, 205481007622539795m is white (second player) to rotate and win.
+Representing black as 1 and white as 2 as in the ternary, this board looks like
+
+  1 2 2 _ _ _
+  _ _ 1 _ _ _
+  _ _ 2 1 _ 1 
+  1 _ 2 2 1 _
+  _ _ 2 1 _ _
+  _ _ 2 2 _ 1
+
+Internally, values of positions with 18 stones or fewer are looked up in a 4 TB
+database.  If there are more stones, the value is computed from scratch using
+optimized tree search.  This is computationally expensive, so expect a delay.
+
+All code and data for this website is BSD-licensed open source.  For details see
+
+  http://perfect-pentago.net
+  https://github.com/girving/pentago
+
+Feel free to use this backend server directly if you like, but please let me
+know if you plan to hit it with a bunch of requests.  Since the code is open
+source you can also run a copy of the server yourself.
+
+Geoffrey Irving <irving@naml.us>
