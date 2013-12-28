@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
 'use strict'
-var os = require('os')
 var fs = require('fs')
 var Log = require('log')
 var http = require('http')
 var time = require('time')
-var mule = require('mule')
 var options = require('commander')
 var pentago = require('./pentago/build/Release/pentago')
 var Values = require('./values.js')
@@ -18,7 +16,9 @@ Values.add_options(options)
 options.parse(process.argv)
 
 // Initialize logging
-var log = options.log ? new Log('debug',fs.createWriteStream(options.log)) : new Log('debug')
+var log = options.log ? new Log('debug',fs.createWriteStream(options.log,{flags:'a'})) : new Log('debug')
+log.info('command = %s',process.argv.join(' '))
+log.info('port = %d',options.port)
 
 // Prepare for evaluation
 var values = Values.values(options,log)
@@ -33,17 +33,19 @@ var server = http.createServer(function (req,res) {
   } catch (e) {
     log.error('bad request %s',req.url)
     res.writeHead(404)
-    res.end('bad url '+req.url+': expected (\d+)m?')
+    res.end('bad url '+req.url+': expected (\d+)m? representing valid board')
+    return
   }
 
   values(board,function (results) {
-    end = time.time()
-    log.info('response %s, elapsed %g',board.name(),end-start) 
+    var end = time.time()
+    log.info('response %s, elapsed %s',board.name(),end-start)
     // Send reply, following cache advice at https://developers.google.com/speed/docs/best-practices/caching
     res.writeHead(200,{
-      'content-type': 'application/json',
+      'content-type': 'application/json; charset=utf-8',
       'cache-control': 'public',
-      'expires', time.Date(Date.now()+31536000000)}) // One year later
+      'access-control-allow-origin': '*', // All access from javascript is safe
+      'expires': time.Date(Date.now()+31536000000)}) // One year later
     res.write(JSON.stringify(results))
     res.end()
   })

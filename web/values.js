@@ -57,7 +57,8 @@ exports.values = function (options,log) {
     process.exit(1)
   }
   var memory_limit = parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
-  log.info('memory limit = %d',memory_limit)
+  log.info('cache memory limit = %d (%s)',memory_limit,opts.cache)
+  log.info('max slice = %d',opts.maxSlice)
   var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
   var cache = pentago.async_block_cache_t(memory_limit)
   var cache_pending = {} // Map from block to callbacks to call once block is available
@@ -73,6 +74,8 @@ exports.values = function (options,log) {
   pentago.init_threads(0,0)
 
   // Prepare for computations
+  log.info('compute pool = %d',opts.pool)
+  log.info('supertable bits = %d',opts.bits)
   process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
 
