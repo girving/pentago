@@ -31,9 +31,14 @@
   .rotateblack:hover { fill: black }
   .rotatewhite:hover { fill: white }
 
-  .cvalue,.rvalue {
+  .cvalue,.rvalue,.tvalue {
     stroke-width: 0;
     pointer-events: none;
+    opacity: 0;
+  }
+
+  .turnlabel,.valuelabel {
+    text-anchor: middle;
   }
 </style>
 <body>
@@ -41,7 +46,7 @@
 <script type="text/javascript" src="bundle.js"></script>
 
 <div id="error"></div>
-<svg width="1" height="1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>
 
 </body>
 </html>

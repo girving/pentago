@@ -16,31 +16,67 @@ var sqrt = Math.sqrt
 
 // Backend, with a bit of caching to avoid flicker on the back button
 var backend_url = 'http://backend.perfect-pentago.net/'
-var values_cache = lru({max:256})
+var cache = lru({max:2048})
 
-// Keep track of the current board for asynchronous callback purposes
-var current_board = ''
-
-// Drawing parameters
-var shrink = 1/2 // Shrink for debugging
-var svg_size = 640*shrink
-var center = svg_size/2
-var scale = 420/6*shrink
-var bar_size = .1
-var spot_radius = .4
-var value_radius = .15
-var rotator_radius = 2.5
-var rotator_thickness = .2
-var rotator_arrow = .4
-var select_radius = 4
+// Colors for each board value
+var value_colors = {'1':'green','0':'blue','-1':'red','undefined':null}
 
 function draw_base() {
+  // Drawing parameters
+  var shrink = 1/2 // Shrink for debugging
+  var scale = 420/6*shrink
+  var header_size = 2.5
+  var footer_size = 3
+  var margin_size = 2
+  var bar_size = .1
+  var spot_radius = .4
+  var value_radius = .15
+  var rotator_radius = 2.5
+  var rotator_thickness = .2
+  var rotator_arrow = .4
+  var select_radius = 4
+  var font_size = .4
+
   // Grab and resize svg
   var svg = d3.select('svg')
-    .attr('width',svg_size)
-    .attr('height',svg_size)
+    .attr('width',scale*(6+2*margin_size))
+    .attr('height',scale*(6+header_size+footer_size))
     .append('g')
-    .attr('transform','translate('+center+','+center+') scale('+scale+','+-scale+') ')
+    .attr('transform','translate('+scale*(3+margin_size)+','+scale*(3+header_size)+') scale('+scale+','+-scale+') ')
+
+  // Draw header
+  var header_y = 4.5
+  svg.selectAll('circle').data([1,0]).enter().append('circle')
+    .attr('class',function (d) { return d ? 'empty' : 'tvalue' })
+    .attr('id',function (d) { return d ? 'turn' : null })
+    .attr('cx',0)
+    .attr('cy',header_y)
+    .attr('r',function (d) { return d ? spot_radius : value_radius })
+  svg.selectAll('text').data(['']).enter().append('text')
+    .attr('class','turnlabel')
+    .attr('transform','scale(1,-1)')
+    .attr('x',0)
+    .attr('y',-(header_y-spot_radius-font_size))
+    .style('font-size',font_size)
+
+  // Draw footer
+  var footer_sep = 1.5
+  var footer_cy = -5
+  var footer_radius = .25
+  var footer = svg.selectAll('.footer').data([1,0,-1]).enter().append('g')
+    .attr('class','footer')
+  footer.append('circle')
+    .attr('cx',function (d) { return -footer_sep*d })
+    .attr('cy',footer_cy)
+    .attr('r',footer_radius)
+    .attr('fill',function (d) { return value_colors[d] })
+  footer.append('text')
+    .attr('class','valuelabel')
+    .attr('transform','scale(1,-1)')
+    .attr('x',function (d) { return -footer_sep*d })
+    .attr('y',-(footer_cy-footer_radius-font_size))
+    .text(function (d) { return {'1':'win','0':'tie','-1':'loss'}[d] })
+    .style('font-size',font_size)
 
   // Draw separators
   svg.selectAll('rect').data([0,1]).enter().append('rect')
@@ -57,7 +93,8 @@ function draw_base() {
       qdata.push({'qx':qx,'qy':qy,
                   'cx':(bar_size+3)*(qx-1/2),
                   'cy':(bar_size+3)*(qy-1/2)})
-  var quads = svg.selectAll('g').data(qdata).enter().append('g')
+  var quads = svg.selectAll('g.quadrant').data(qdata).enter().append('g')
+    .attr('class','quadrant')
     .attr('id',function (d) { return 'quadrant'+d.qx+d.qy })
     .attr('transform',function (d) { return 'translate('+d.cx+','+d.cy+') ' })
   quads.append('rect')
@@ -160,6 +197,10 @@ function draw_base() {
 }
 
 function draw_board(svg,board) {
+  // Update turn
+  svg.select('circle')
+    .attr('class',board.turn ? 'white' : 'black')
+
   // Update circles
   var classes = {0:board.middle?'empty':board.turn?'emptywhite':'emptyblack',1:'black',2:'white'}
   var links = svg.selectAll('a#spot')
@@ -181,33 +222,50 @@ function draw_board(svg,board) {
 }
 
 function draw_values(svg,board) {
+  // Note if we're missing anything
+  var missing = false
+  var get = function (board) {
+    var v = cache.get(board.name)
+    if (v === undefined)
+      missing = true
+    return v
+  }
+  var has = function (board) {
+    return !(get(board)===undefined)
+  }
+
   // Draw values if we have them
   console.log('drawing values')
-  var values = values_cache.get(board.name)
-  var colors = {'1':'green','0':'blue','-1':'red'}
-  var cvalue = !board.middle && !board.done() && values
-  var rvalue =  board.middle && !board.done() && values
   svg.selectAll('.cvalue')
-    .style('opacity',!cvalue ? 0 : function (d) {
-      return board.grid[6*d.x+d.y] ? 0 : 1 })
-    .style('fill',!cvalue ? null : function (d) {
-      return board.grid[6*d.x+d.y] ? null : colors[values[board.place(d.x,d.y).name]] })
+    .style('opacity',board.middle || board.done() ? 0 : function (d) {
+      return board.grid[6*d.x+d.y] || !has(board.place(d.x,d.y)) ? 0 : 1 })
+    .style('fill',board.middle || board.done() ? null : function (d) {
+      return board.grid[6*d.x+d.y] ? null : value_colors[get(board.place(d.x,d.y))] })
   svg.selectAll('.rvalue')
-    .style('opacity',!rvalue ? 0 : 1)
-    .style('fill',!rvalue ? null : function (d) {
-      return colors[-values[board.rotate(d.qx,d.qy,d.d).name]] })
+    .style('opacity',!board.middle || board.done() ? 0 : function (d) {
+      return has(board.rotate(d.qx,d.qy,d.d)) ? 1 : 0 })
+    .style('fill',!board.middle || board.done() ? null : function (d) {
+      var v = get(board.rotate(d.qx,d.qy,d.d))
+      return v===undefined ? null : value_colors[-v] })
+  svg.selectAll('.tvalue')
+    .style('opacity',board.done() || has(board) ? 1 : 0)
+    .style('fill',value_colors[board.done() ? board.immediate_value() : get(board)])
+  svg.selectAll('.turnlabel')
+    .text(  board.done() ? {'1':'wins','0':'ties','-1':'loses'}[board.immediate_value()]
+          : has(board)   ? {'1':'to win','0':'to tie','-1':'to lose'}[get(board)]
+                         : 'to play')
 
   // If we don't have them, look them up
-  if (!values) {
+  if (missing) {
     var xh = new XMLHttpRequest()
     xh.onreadystatechange = function () {
       if (xh.readyState==4) {
         if (xh.status==200) {
           var values = JSON.parse(xh.responseText)
           console.log('recieved '+board.name+' from '+backend_url,values)
-          values_cache.set(board.name,values)
-          if (current_board == board.name)
-            draw_values(svg,board)
+          for (var name in values)
+            cache.set(name,values[name])
+          draw_values(svg,board)
         } else
           console.error('backend error '+xh.status+' for board '+board.name)
       }
@@ -232,7 +290,6 @@ function update(svg) {
   } else
     var board = new board_t([0,0,0,0],false)
   console.log('update',board.name)
-  current_board = board.name
   draw_board(svg,board)
 }
 
