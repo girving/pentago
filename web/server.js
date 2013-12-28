@@ -52,4 +52,5 @@ var server = http.createServer(function (req,res) {
 })
 
 // Listen forever
+log.info('listening on port %d',options.port)
 server.listen(options.port)
