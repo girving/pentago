@@ -45,6 +45,7 @@ def plot_board(board):
     fig.clf()
     board = current_board[0]
     arrow_info[0] = []
+    clear_stats()
     pylab.title('board %d, %s to %s, %s%s'%(
       board.board,
       ('black','white')[board.turn],
