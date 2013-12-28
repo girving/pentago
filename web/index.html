@@ -11,11 +11,10 @@
     vector-effect: non-scaling-stroke;
   }
   .empty,.emptyblack,.emptywhite { fill: tan }
-  .emptyblack:hover { fill: black }
-  .emptywhite:hover { fill: white }
+  .emptyblack:hover, .emptyblack:hover + .emptyblack { fill: black }
+  .emptywhite:hover, .emptywhite:hover + .emptywhite { fill: white }
   .black { fill: black }
   .white { fill: white }
-
   .board { fill: tan }
   .separators { fill: darkgray }
 
@@ -31,6 +30,11 @@
   }
   .rotateblack:hover { fill: black }
   .rotatewhite:hover { fill: white }
+
+  .cvalue,.rvalue {
+    stroke-width: 0;
+    pointer-events: none;
+  }
 </style>
 <body>
 

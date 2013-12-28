@@ -10,6 +10,7 @@
     "d3": "3.3.x",
     "commander": "2.1.x",
     "log": "1.4.x",
+    "lru-cache": "2.5.x",
     "mule": "0.1.x",
     "request": "2.30.x",
     "time": "0.10.x"

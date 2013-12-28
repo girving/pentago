@@ -2,6 +2,7 @@
 
 'use strict'
 var d3 = require('d3')
+var lru = require('lru-cache')
 var board_t = require('./board.js').board_t
 var server = 'http://localhost:8000'
 console.log('server',server)
@@ -13,6 +14,13 @@ var sin = Math.sin
 var max = Math.max
 var sqrt = Math.sqrt
 
+// Backend, with a bit of caching to avoid flicker on the back button
+var backend_url = 'http://backend.perfect-pentago.net/'
+var values_cache = lru({max:256})
+
+// Keep track of the current board for asynchronous callback purposes
+var current_board = ''
+
 // Drawing parameters
 var shrink = 1/2 // Shrink for debugging
 var svg_size = 640*shrink
@@ -20,6 +28,7 @@ var center = svg_size/2
 var scale = 420/6*shrink
 var bar_size = .1
 var spot_radius = .4
+var value_radius = .15
 var rotator_radius = 2.5
 var rotator_thickness = .2
 var rotator_arrow = .4
@@ -66,11 +75,17 @@ function draw_base() {
         for (var y=0;y<3;y++)
           grid.push({'qx':qx,'qy':qy,'x':3*qx+x,'y':3*qy+y})
       qdata[2*qx+qy]['grid'] = grid
-      svg.select('#quadrant'+qx+qy).selectAll('a#spot').data(grid).enter().append('a')
-        .attr('id','spot').append('circle')
-        .attr('cx',function (d) { return d.x%3-1 })
-        .attr('cy',function (d) { return d.y%3-1 })
-        .attr('r',spot_radius)
+      var links = svg.select('#quadrant'+qx+qy).selectAll('a#spot')
+        .data(grid).enter().append('a').attr('id','spot')
+      var make_circles = function (id,radius) {
+        return links.append('circle').attr('id',id)
+          .attr('cx',function (d) { return d.x%3-1 })
+          .attr('cy',function (d) { return d.y%3-1 })
+          .attr('r',radius)
+      }
+      make_circles('spot',spot_radius)
+      make_circles('value',value_radius)
+        .attr('class','cvalue')
     }
 
   // Initialize rotators
@@ -107,7 +122,14 @@ function draw_base() {
                    +' L'+point(r+h,t1)
                    +' A'+[r+h,r+h]+' 0 0 '+(d>0?0:1)+' '+point(r+h,t0)
                    +' z'
-        rotators.push({'path':path,'select':select,'qx':qx,'qy':qy,'d':d})
+        var v0 = t0+.2*(t1-t0),
+            v1 = t0+.8*(t1-t0)
+        var value =   'm'+point(r-h,v0)
+                    +' A'+[r-h,r-h]+' 0 0 '+(d>0?1:0)+' '+point(r-h,v1)
+                    +' L'+point(r+h,v1)
+                    +' A'+[r+h,r+h]+' 0 0 '+(d>0?0:1)+' '+point(r+h,v0)
+                    +' z'
+        rotators.push({'path':path,'select':select,'value':value,'qx':qx,'qy':qy,'d':d})
       }
   function spin(d) {
     // Animate our quadrant left or right by pi/2
@@ -130,6 +152,9 @@ function draw_base() {
   links.append('path')
     .attr('class','norotate')
     .attr('d',function (d) { return d.path })
+  links.append('path')
+    .attr('class','rvalue')
+    .attr('d',function (d) { return d.value })
 
   return {'svg':svg,'grid':grid}
 }
@@ -137,17 +162,60 @@ function draw_base() {
 function draw_board(svg,board) {
   // Update circles
   var classes = {0:board.middle?'empty':board.turn?'emptywhite':'emptyblack',1:'black',2:'white'}
-  svg.selectAll('a#spot')
+  var links = svg.selectAll('a#spot')
     .attr('xlink:href',board.middle ? null : function (d) {
       return board.grid[6*d.x+d.y] ? null : '#'+board.place(d.x,d.y).name })
-    .select('circle')
+  links.selectAll('circle#spot')
     .attr('class',function (d) { return classes[board.grid[6*d.x+d.y]] })
 
   // Update rotators
   svg.selectAll('a#rotate')
     .attr('xlink:href',board.middle ? function (d) { return '#'+board.rotate(d.qx,d.qy,d.d).name } : null)
+  svg.selectAll('.rotateselect') // Hide rotate selectors from the mouse when they aren't active
+    .style('pointer-events',board.middle ? null : 'none')
   svg.selectAll('.norotate,.rotateblack,.rotatewhite')
     .attr('class',board.middle ? board.turn ? 'rotatewhite' : 'rotateblack' : 'norotate')
+
+  // Draw win/loss/tie values
+  draw_values(svg,board)
+}
+
+function draw_values(svg,board) {
+  // Draw values if we have them
+  console.log('drawing values')
+  var values = values_cache.get(board.name)
+  var colors = {'1':'green','0':'blue','-1':'red'}
+  var cvalue = !board.middle && !board.done() && values
+  var rvalue =  board.middle && !board.done() && values
+  svg.selectAll('.cvalue')
+    .style('opacity',!cvalue ? 0 : function (d) {
+      return board.grid[6*d.x+d.y] ? 0 : 1 })
+    .style('fill',!cvalue ? null : function (d) {
+      return board.grid[6*d.x+d.y] ? null : colors[values[board.place(d.x,d.y).name]] })
+  svg.selectAll('.rvalue')
+    .style('opacity',!rvalue ? 0 : 1)
+    .style('fill',!rvalue ? null : function (d) {
+      return colors[-values[board.rotate(d.qx,d.qy,d.d).name]] })
+
+  // If we don't have them, look them up
+  if (!values) {
+    var xh = new XMLHttpRequest()
+    xh.onreadystatechange = function () {
+      if (xh.readyState==4) {
+        if (xh.status==200) {
+          var values = JSON.parse(xh.responseText)
+          console.log('recieved '+board.name+' from '+backend_url,values)
+          values_cache.set(board.name,values)
+          if (current_board == board.name)
+            draw_values(svg,board)
+        } else
+          console.error('backend error '+xh.status+' for board '+board.name)
+      }
+    }
+    console.log('requesting '+board.name+' from '+backend_url)
+    xh.open('GET',backend_url+board.name,true)
+    xh.send()
+  }
 }
 
 function update(svg) {
@@ -164,6 +232,7 @@ function update(svg) {
   } else
     var board = new board_t([0,0,0,0],false)
   console.log('update',board.name)
+  current_board = board.name
   draw_board(svg,board)
 }
 
