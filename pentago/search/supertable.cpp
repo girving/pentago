@@ -66,6 +66,7 @@ int supertable_bits() {
 
 template<bool aggressive> superlookup_t super_lookup(int depth, side_t side0, side_t side1) {
   STAT(total_lookups++);
+  STAT_DETAIL(lookup_detail[depth]++);
   // Standardize the board
   superlookup_t data;
   board_t standard;
@@ -86,6 +87,7 @@ template<bool aggressive> superlookup_t super_lookup(int depth, side_t side0, si
       info.wins = aggressive?info.known:super_t(0);
     } else {
       STAT(successful_lookups++);
+      STAT_DETAIL(successful_lookup_detail[depth]++);
       info.known = transform_super(si,info.known);
       info.wins  = transform_super(si,info.wins);
     }

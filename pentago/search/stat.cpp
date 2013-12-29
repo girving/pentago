@@ -2,6 +2,7 @@
 
 #include <pentago/search/stat.h>
 #include <pentago/utility/convert.h>
+#include <geode/array/Array.h>
 #include <geode/python/to_python.h>
 #include <geode/python/stl.h>
 #include <geode/python/wrap.h>
@@ -18,14 +19,19 @@ uint64_t total_expanded_nodes;
 uint64_t expanded_nodes[37];
 uint64_t total_lookups;
 uint64_t successful_lookups;
+STAT_DETAIL(uint64_t lookup_detail[37], successful_lookup_detail[37];)
 uint64_t distance_prunes;
 double start_time;
 
 unit clear_stats() {
   total_expanded_nodes = 0;
-  memset(expanded_nodes,0,sizeof(expanded_nodes));
+  asarray(expanded_nodes).fill(0);
   total_lookups = 0;
   successful_lookups = 0;
+  STAT_DETAIL(
+    asarray(lookup_detail).fill(0);
+    asarray(successful_lookup_detail).fill(0);
+  )
   distance_prunes = 0;
   start_time = get_time();
   return unit();
@@ -34,15 +40,33 @@ unit clear_stats() {
 unit print_stats() {
   double elapsed = get_time()-start_time;
   cout << "expanded nodes = "<<total_expanded_nodes<<" (";
-  bool found = false;
+  int found = 0;
   for (int d=36;d>0;d--)
-    if (expanded_nodes[d]) {
-      cout << (found?" ":"")<<expanded_nodes[d];
-      found = true;
-    }
+    if (expanded_nodes[d])
+      cout << (found++?" ":"")<<expanded_nodes[d];
   cout << ")";
-  if (total_lookups) cout << ", total lookups = "<<total_lookups;
-  if (successful_lookups) cout << ", successful lookups = "<<successful_lookups;
+  if (total_lookups) {
+    cout << ", total lookups = "<<total_lookups;
+    STAT_DETAIL(
+      cout << " (";
+      int found = 0;
+      for (int d=36;d>0;d--)
+        if (lookup_detail[d])
+          cout << (found++?" ":"")<<d<<":"<<lookup_detail[d];
+      cout << ")";
+    )
+  }
+  if (successful_lookups) {
+    cout << ", successful lookups = "<<successful_lookups;
+    STAT_DETAIL(
+      cout << " (";
+      int found = 0;
+      for (int d=36;d>0;d--)
+        if (successful_lookup_detail[d])
+          cout << (found++?" ":"")<<d<<":"<<successful_lookup_detail[d];
+      cout << ")";
+    )
+  }
   if (distance_prunes) cout << ", distance prunes = "<<distance_prunes;
   cout << ", elapsed time = "<<elapsed<<" s";
   cout << ", speed = "<<uint64_t(total_expanded_nodes/elapsed)<<" nodes/s"<<endl;
