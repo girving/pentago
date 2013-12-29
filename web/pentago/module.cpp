@@ -5,6 +5,7 @@
 #include <pentago/end/sections.h>
 #include <pentago/high/board.h>
 #include <pentago/high/index.h>
+#include <pentago/search/stat.h>
 #include <pentago/search/supertable.h>
 namespace pentago {
 namespace node {
@@ -64,6 +65,8 @@ static void init(Handle<v8::Object> exports) {
   PN_FUNCTION(init_supertable)
   PN_FUNCTION(empty_block_cache)
   PN_FUNCTION(init_threads)
+  PN_FUNCTION(clear_stats)
+  PN_FUNCTION(print_stats)
 }
 
 }

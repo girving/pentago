@@ -22,8 +22,13 @@ process.on('message',function (boards) {
   var results = {}
   for (var i=0;i<boards.length;i++) {
     var start = Date.now()
+    console.log('\nevaluating '+boards[i])
+    pentago.clear_stats()
     var v = pentago.high_board_t(boards[i]).value(cache)
-    results[boards[i]] = {v:v,time:(Date.now()-start)/1000}
+    var t = (Date.now()-start)/1000
+    results[boards[i]] = {v:v,time:t}
+    console.log('done evaluating '+boards[i]+': value '+v+', time '+t)
+    pentago.print_stats()
   }
   process.send(results)
 })
