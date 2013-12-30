@@ -6,6 +6,7 @@ var http = require('http')
 var time = require('time')
 var request = require('request')
 var WorkQueue = require('mule').WorkQueue
+var Pending = require('./pending')
 var pentago = require('./pentago/build/Release/pentago')
 
 // Pull in math
@@ -78,6 +79,8 @@ exports.values = function (options,log) {
   log.info('supertable bits = %d',opts.bits)
   process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
+  // Don't simultaneously duplicate work
+  var pending_pool = Pending(function (board,cont) { pool.enqueue(board,cont) })
 
   // Get a section of a file, bailing on all errors
   function simple_get(path,blob,cont) {
@@ -204,7 +207,7 @@ exports.values = function (options,log) {
       else { // Dispatch all requests to a single worker process to exploit coherence
         log.debug('computing board %s, slice %d',board.name(),board.count())
         var boards = requests.map(function (r) { return r.board.name() })
-        pool.enqueue(boards, function (res) {
+        pending_pool(boards, function (res) {
           var total = 0
           for (var name in res)
             total += res[name].time

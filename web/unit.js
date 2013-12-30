@@ -6,6 +6,7 @@ var pentago = require('./pentago/build/Release/pentago')
 var board_t = require('./board.js').board_t
 var high_board_t = pentago.high_board_t
 var Values = require('./values.js')
+var Pending = require('./pending.js')
 var Log = require('log')
 
 function test_moves(cont) {
@@ -43,6 +44,28 @@ function test_done(cont) {
       throw 'done check failed: board '+name+', board_t '+board.done()+', high_board_t '+high.done()
   }
   cont()
+}
+
+function test_pending(cont) {
+  var left = 5
+  var inputs = {0:0,1:0,2:0}
+  var outputs = {7:0,8:0,9:0}
+  var slow = function (x,cont) { setTimeout(function () { inputs[x]++; cont(7+x) }, 10) }
+  slow = Pending(slow)
+  var s = JSON.stringify
+  var finish = function () {
+    if (s(inputs) != s({0:1,1:1,2:1})) throw 'bad inputs '+s(inputs)
+    if (s(outputs) != s({7:2,8:2,9:1})) throw 'bad outputs '+s(outputs)
+    cont()
+  }
+  var expect = function (e) { return function (y) {
+    outputs[y]++
+    if (y!=e) throw 'bad'
+    if (!--left)
+      finish()
+  }}
+  for (var i=0;i<3;i++) slow(i,expect(7+i))
+  for (var i=0;i<2;i++) slow(i,expect(7+i))
 }
 
 function test_values(cont) {
@@ -117,15 +140,18 @@ function test_slow (cont) {
                  "274450184880264472":-1,"274450185044366616":-1,"274458500082701592":0,"274464684835607832":0,"684277751116731672":0,"1855213654233060632":0,"274450185026016536m":1,"274468971212966088":1,"274468971212975264":0,"274468971067217176":1,"274468971231319320":0,"274461515149743384":0,"274463679813260568":1,"684296537303684376":0,"1855232440420013336":1,"274468971212969240m":0,"890026565998741704":0,"890026565998750880":0,"890026565852992792":0,"890026566017094936":0,"890044158184789272":0,"890049415224759576":0,"691868182394443032":0,"1923602680480273688":0,"890026565998744856m":0,"2121198114131151048":0,"2121198114131160224":0,"2121198113985402136":0,"2121198114149504280":0,"2121215706317198616":0,"2121220963357168920":0,"889463616045323544":0,"1857737535929980184":0,"2121198114131154200m":0,"274440791932540184":1}
   var log = new Log('debug')
   var compute = Values.values({pool:1,bits:24},log)
-  compute(board,function (results) {
-    for (var name in correct)
-      if (correct[name] != results[name])
-        throw 'incorrect result for board '+name+': correct '+correct[name]+', got '+results[name]
-    for (var name in results)
-      if (!(name in correct))
-        throw 'unexpected result for board '+name+': value '+results[name]+' does not occur in correct'
-    cont()
-  })
+  var left = 16 // Ask for the same board many times to check that we don't recompute it
+  for (var i=0;i<16;i++)
+    compute(board,function (results) {
+      for (var name in correct)
+        if (correct[name] != results[name])
+          throw 'incorrect result for board '+name+': correct '+correct[name]+', got '+results[name]
+      for (var name in results)
+        if (!(name in correct))
+          throw 'unexpected result for board '+name+': value '+results[name]+' does not occur in correct'
+      if (!--left)
+        cont()
+    })
 
   /* Benchmarks:
    *   cayley 28dec2013 - 1873 s
@@ -138,7 +164,7 @@ var green = '\x1b[1;32m'
 var clear = '\x1b[00m'
 
 // Register tests
-var tests = [test_moves,test_done]
+var tests = [test_moves,test_done,test_pending]
 if (process.argv.length > 2) {
   if (process.argv.length > 3)
     throw 'expected 0 or 1 arguments'
