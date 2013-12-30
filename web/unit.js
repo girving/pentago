@@ -154,9 +154,10 @@ function test_slow (cont) {
     })
 
   /* Benchmarks:
-   *   cayley 28dec2013 - 1873 s
-   *     ''       ''    -  735 s (--bits 23)
-   *     ''       ''    -  288 s (--bits 24)
+   *   cayley    28dec2013 - 1873 s
+   *     ''          ''    -  735 s (--bits 23)
+   *     ''          ''    -  288 s (--bits 24)
+   *   rackspace 29dec2013 -  465 s (--bits 24)
    */
 }
 
