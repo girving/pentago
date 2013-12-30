@@ -5,6 +5,7 @@ var os = require('os')
 var http = require('http')
 var time = require('time')
 var request = require('request')
+var LRU = require('lru-cache')
 var WorkQueue = require('mule').WorkQueue
 var Pending = require('./pending')
 var pentago = require('./pentago/build/Release/pentago')
@@ -18,6 +19,7 @@ exports.defaults = {
   bits: 22,
   pool: os.cpus().length,
   cache: '250M',
+  ccache: '250M',
   maxSlice: 18,
   maxSockets: 64
 }
@@ -27,6 +29,7 @@ exports.add_options = function (options) {
   options.option('-b,--bits <n>','Size of transposition table in bits (actual size is 80<<bits)',parseInt,d.bits)
          .option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
+         .option('--ccache <size>','Size of compute cache (suffixes M/MB and G/GB are understood)',d.ccache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
          .option('--max-sockets <n>','Maximum number of simultaneous http connections',parseInt,d.maxSockets)
 }
@@ -37,6 +40,15 @@ var stats = {
   crossed_chunks: 0
 }
 exports.stats = stats
+
+function parseSize (s,name) {
+  var m = s.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
+  if (!m) {
+    log.error("invalid %ssize '%s', expect something like 256M or 1G",name?name+' ':'',opts.cache)
+    throw 'invalid '+(name?name+' ':'')+'size '+s
+  }
+  return parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
+}
 
 // Create an evaluation routine with calling convention
 //   values(board,cont)
@@ -50,23 +62,24 @@ exports.values = function (options,log) {
   var opts = {}
   for (var k in exports.defaults)
     opts[k] = options[k] || exports.defaults[k]
+  var cache_limit = parseSize(opts.cache,'--cache')
+  var ccache_limit = parseSize(opts.ccache,'--ccache')
+
+  // Print information
+  log.info('cache memory limit = %d (%s)',cache_limit,opts.cache)
+  log.info('compute cache memory limit = %d (%s)',ccache_limit,opts.ccache)
+  log.info('max slice = %d',opts.maxSlice)
+  log.info('max sockets = %d',opts.maxSockets)
+  log.info('compute pool = %d',opts.pool)
+  log.info('supertable bits = %d',opts.bits)
 
   // Prepare for opening book lookups
-  var m = opts.cache.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
-  if (!m) {
-    log.error("invalid --cache size '%s', expect something like 256M or 1G",opts.cache)
-    process.exit(1)
-  }
-  var memory_limit = parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
-  log.info('cache memory limit = %d (%s)',memory_limit,opts.cache)
-  log.info('max slice = %d',opts.maxSlice)
   var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
-  var cache = pentago.async_block_cache_t(memory_limit)
+  var cache = pentago.async_block_cache_t(cache_limit)
   var cache_pending = {} // Map from block to callbacks to call once block is available
   var container = 'http://582aa28f4f000f497ad5-81c103f827ca6373fd889208ea864720.r52.cf5.rackcdn.com'
 
   // Allow more simultaneous connections
-  log.info('max sockets = %d',opts.maxSockets)
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
     throw 'invalid --max-sockets value '+opts.maxSockets
   http.globalAgent.maxSockets = opts.maxSockets
@@ -75,12 +88,24 @@ exports.values = function (options,log) {
   pentago.init_threads(0,0)
 
   // Prepare for computations
-  log.info('compute pool = %d',opts.pool)
-  log.info('supertable bits = %d',opts.bits)
   process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
-  // Don't simultaneously duplicate work
-  var pending_pool = Pending(function (board,cont) { pool.enqueue(board,cont) })
+  var compute_cache = LRU({
+    max: floor(ccache_limit/1.2),
+    length: function (s) { return s.length }
+  })
+  // Cache and don't simultaneously duplicate work
+  var pending_compute = Pending(function (b,cont) {
+    var board = b[0]
+    var results = compute_cache.get(board)
+    if (results)
+      return JSON.parse(results)
+    else
+      pool.enqueue(b[1],function (results) {
+        compute_cache.set(board,JSON.stringify(results))
+        cont(results)
+      })
+  })
 
   // Get a section of a file, bailing on all errors
   function simple_get(path,blob,cont) {
@@ -207,7 +232,7 @@ exports.values = function (options,log) {
       else { // Dispatch all requests to a single worker process to exploit coherence
         log.debug('computing board %s, slice %d',board.name(),board.count())
         var boards = requests.map(function (r) { return r.board.name() })
-        pending_pool(boards, function (res) {
+        pending_compute([board,boards], function (res) {
           var total = 0
           for (var name in res)
             total += res[name].time
