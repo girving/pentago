@@ -99,7 +99,7 @@ function test_values(cont) {
   }
 
   var log = new Log('debug')
-  var compute = Values.values({cache:"4M"},log) // Use a small cache to test replacement
+  var compute = Values.values({cache:'4M',bits:22},log) // Use a small cache to test replacement
   var gn = games.length
   function test(path,values) {
     var seen = {}
