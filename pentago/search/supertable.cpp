@@ -22,22 +22,25 @@ static const int hash_bits = 54;
 static const int depth_bits = 10;
 static_assert(hash_bits+depth_bits<=64,"");
 
+// Unfortunately, the alignment of __m128 is 16, so superentry_t would 8 bytes
+// of unused padding if it included a superinfo_t.  memcpy to the rescue!
+struct compact_superinfo_t {
+  uint64_t x[sizeof(superinfo_t)/sizeof(uint64_t)];
+};
+
 struct superentry_t {
   uint64_t hash : hash_bits;
   uint64_t depth : depth_bits;
-  superinfo_t info;
+  compact_superinfo_t info;
 };
-
-#if PENTAGO_SSE
-// Unfortunately, the alignment of __m128 is 16, so super_entry_t has 8 bytes
-// of unused padding.  Maybe we can use it to store a lock in future?
-#if !defined(__COVERITY__)
-static_assert(sizeof(superentry_t)==80,"");
-#endif
-#else
-// No padding here!
 static_assert(sizeof(superentry_t)==72,"");
-#endif
+
+template<class D,class S> static inline D mcast(const S& src) {
+  static_assert(sizeof(S)==sizeof(D),"");
+  D dst;
+  memcpy(&dst,&src,sizeof(S));
+  return dst;
+}
 
 // The current transposition table
 static int table_bits = 0;
@@ -49,7 +52,8 @@ unit init_supertable(int bits) {
   if (64-bits>hash_bits)
     THROW(ValueError,"bits = %d is too small, the high order hash bits won't fit",bits);
   table_bits = bits;
-  cout << "initializing supertable: bits = "<<bits<<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
+  cout << "initializing supertable: bits = "<<bits
+    <<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
   table = Array<superentry_t>(1<<bits,false);
   clear_supertable();
   return unit();
@@ -76,7 +80,7 @@ template<bool aggressive> superlookup_t super_lookup(int depth, side_t side0, si
   const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
   if (entry.hash==data.hash>>table_bits) {
     superinfo_t& info = data.info;
-    info = entry.info;
+    info = mcast<superinfo_t>(entry.info);
     // Prepare to transform: wins(b) = wins(s'(s(b))) = s'(wins(s(b)))
     const symmetry_t si = data.symmetry.inverse();
     // If we don't have enough depth, we can only use wins for black or losses for white
@@ -106,7 +110,7 @@ GEODE_NEVER_INLINE static void store_error(int depth, const superlookup_t& data,
   const board_t board = board_flag&~aggressive_mask;
   const bool aggressive = board_flag>>aggressive_bit;
   const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
-  const superinfo_t& existing = entry.info;
+  const auto existing = mcast<superinfo_t>(entry.info);
   const super_t errors = (info.wins^existing.wins)&info.known&existing.known;
   const uint8_t r = first(errors);
   cout << format("inconsistency detected in super_store:\n  standard %lld, rotation %d, transformed %lld, aggressive %d\n  existing depth %d, existing value %d\n  new depth %d, new value %d",
@@ -119,7 +123,7 @@ template<bool aggressive> void super_store(int depth, const superlookup_t& data)
   superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
   if (entry.hash==data.hash>>table_bits || depth>=entry.depth) {
     superinfo_t info = data.info;
-    superinfo_t& existing = entry.info;
+    superinfo_t existing = mcast<superinfo_t>(entry.info);
     // Transform: wins(s(b)) = s(wins(b))
     info.known = transform_super(data.symmetry,info.known);
     info.wins  = transform_super(data.symmetry,info.wins);
@@ -156,6 +160,7 @@ template<bool aggressive> void super_store(int depth, const superlookup_t& data)
       entry.depth = depth;
       existing = info;
     }
+    entry.info = mcast<compact_superinfo_t>(existing);
   }
 }
 
