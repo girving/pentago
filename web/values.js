@@ -237,6 +237,7 @@ exports.values = function (options,log) {
           for (var name in res)
             total += res[name].time
           log.info('computed board %s, slice %d, time %s s',board.name(),board.count(),total)
+          results['search-time'] = total
           for (var i=0;i<requests.length;i++) {
             var name = requests[i].board.name()
             var v = res[name].v
