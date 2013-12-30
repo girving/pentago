@@ -15,7 +15,7 @@ static const uint64_t aggressive_mask = (uint64_t)1<<aggressive_bit;
 extern unit init_supertable(int bits);
 
 // Clear all supertable entries
-void clear_supertable();
+unit clear_supertable();
 
 // lg(entries) or 0 for uninitialized
 extern int supertable_bits() GEODE_PURE;

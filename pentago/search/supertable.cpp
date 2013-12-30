@@ -59,9 +59,10 @@ unit init_supertable(int bits) {
   return unit();
 }
 
-void clear_supertable() {
+unit clear_supertable() {
   memset(table.data(),0,sizeof(superentry_t)*table.size());
   TRACE(trace_restart());
+  return unit();
 }
 
 int supertable_bits() {

@@ -63,6 +63,7 @@ static void init(Handle<v8::Object> exports) {
   }
   PN_FUNCTION(descendent_sections)
   PN_FUNCTION(init_supertable)
+  PN_FUNCTION(clear_supertable)
   PN_FUNCTION(empty_block_cache)
   PN_FUNCTION(init_threads)
   PN_FUNCTION(clear_stats)

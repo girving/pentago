@@ -23,6 +23,7 @@ process.on('message',function (boards) {
   for (var i=0;i<boards.length;i++) {
     var start = Date.now()
     console.log('\nevaluating '+boards[i]+' ('+i+'/'+boards.length+') ')
+    pentago.clear_supertable() // Don't let high depth entries block new low depth entries
     pentago.clear_stats()
     var v = pentago.high_board_t(boards[i]).value(cache)
     var t = (Date.now()-start)/1000
