@@ -5,6 +5,24 @@
   <title>Perfect pentago explorer</title>
 </head>
 <style>
+  /*** Page layout ***/
+
+  h1,h2 {
+    text-align: center;
+  }
+
+  svg,.section {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .section {
+    width: 52em;
+  }
+
+  /*** Board visuals ***/
+
   .black,.white,.empty,.emptyblack,.emptywhite {
     stroke: black;
     stroke-width: 1;
@@ -45,8 +63,34 @@
 
 <script type="text/javascript" src="bundle.js"></script>
 
-<div id="error"></div>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+<div id="error"></div>
+
+<h1>Pentago is a first player win</h1>
+<h2>A semi-interactive explorer for perfect pentago play</h2>
+<div class="section">
+  <p>
+  <a href="https://en.wikipedia.org/wiki/Pentago">Pentago</a> is a game designed by Tomas Flodén and
+  developed and sold by <a href="http://mindtwisterusa.com">Mindtwister</a>.
+  <a href="http://www.pentago.se/ENRules.pdf">Here are the rules</a>.
+  </p><p>
+  With the help of several hours on 98304 threads of Edison, a Cray supercomputer at NERSC,
+  Pentago is now strongly solved.  This means that perfect play can be computed from any position
+  in a reasonable amount of time (see below).  The above visualization lets you explore the results:
+  click on a empty spot to place a stone, or on an arrow to rotate the board.  After a wait, the
+  results of all moves will show up.
+  </p><p>
+  How long you have to wait depends on the number of stones on the board.  For moves with 18 or fewer
+  stones, the result is simply read out of a 4 terabyte database (generously hosted by Rackspace!).
+  Since the number of positions with increases exponentially with the number of stones (up to 24
+  stones), it was impractical to remember the values of positions with more stones: the supercomputer
+  generated these values in RAM but discarded them as soon as possible.  Therefore, when given a board
+  whose children have 19 or more stones, the values are computed from scratch using tree search.  This
+  takes a fraction of a second close to the end of the game, around 30 seconds for for the children of
+  an "average" 18 stone board, and possibly an hour or more for "delicate" 18 stone boards even if
+  the backend server is otherwise idle.  Thus semi-interactive.
+  </p>
+</div>
 
 </body>
 </html>

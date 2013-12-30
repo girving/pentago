@@ -2,7 +2,7 @@
 
 'use strict'
 var d3 = require('d3')
-var lru = require('lru-cache')
+var LRU = require('lru-cache')
 var board_t = require('./board.js').board_t
 var server = 'http://localhost:8000'
 console.log('server',server)
@@ -16,7 +16,7 @@ var sqrt = Math.sqrt
 
 // Backend, with a bit of caching to avoid flicker on the back button
 var backend_url = 'http://backend.perfect-pentago.net/'
-var cache = lru({max:2048})
+var cache = LRU({max:2048})
 
 // Colors for each board value
 var value_colors = {'1':'green','0':'blue','-1':'red','undefined':null}
@@ -26,7 +26,7 @@ function draw_base() {
   var shrink = 1/2 // Shrink for debugging
   var scale = 420/6*shrink
   var header_size = 2.5
-  var footer_size = 3
+  var footer_size = 4
   var margin_size = 2
   var bar_size = .1
   var spot_radius = .4
@@ -266,8 +266,9 @@ function draw_values(svg,board) {
           for (var name in values)
             cache.set(name,values[name])
           draw_values(svg,board)
-        } else
-          console.error('backend error '+xh.status+' for board '+board.name)
+        } else {
+          set_error('Backend error '+xh.status+' for board '+board.name+', try reloading page')
+        }
       }
     }
     console.log('requesting '+board.name+' from '+backend_url)
@@ -276,15 +277,18 @@ function draw_values(svg,board) {
   }
 }
 
+function set_error(error) {
+  console.error(error)
+  d3.select('#error').text(error)
+}
+
 function update(svg) {
   if (window.location.hash) {
     try {
       var hash = window.location.hash.substr(1)
       var board = new board_t(hash)
     } catch (e) {
-      var error = 'Invalid board '+hash+', error = '+e
-      console.error(error)
-      d3.select('#error').text(error)
+      set_error('Invalid board '+hash+', error = '+e)
       return
     }
   } else
