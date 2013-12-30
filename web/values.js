@@ -16,7 +16,7 @@ var max = Math.max
 var floor = Math.floor
 
 exports.defaults = {
-  bits: 22,
+  bits: 24, // 1152 MB
   pool: os.cpus().length,
   cache: '250M',
   ccache: '250M',
