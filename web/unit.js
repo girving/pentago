@@ -159,6 +159,10 @@ function test_slow (cont) {
    *     ''          ''    -  288 s (--bits 24)
    *   rackspace 29dec2013 -  465 s (--bits 24)
    */
+
+  /* Alternate hard positions:
+   *   3232499362891447332 - tie, and doesn't seem to get computed by server.  I need logging for compute processes.
+   */
 }
 
 var green = '\x1b[1;32m'

@@ -258,28 +258,40 @@ function draw_values(svg,board) {
   // If we don't have them, look them up
   if (missing) {
     var xh = new XMLHttpRequest()
+    var start = Date.now()
     xh.onreadystatechange = function () {
       if (xh.readyState==4) {
         if (xh.status==200) {
           var values = JSON.parse(xh.responseText)
-          console.log('recieved '+board.name+' from '+backend_url,values)
+          var elapsed = (Date.now()-start)/1000
+          var s = 'Received board '+board.name+' from server, elapsed = '+elapsed
+          if ('search-time' in values)
+            s += ', tree search = '+values['search-time']+' s'
+          set_status(s)
           for (var name in values)
             cache.set(name,values[name])
           draw_values(svg,board)
         } else {
-          set_error('Backend error '+xh.status+' for board '+board.name+', try reloading page')
+          set_status('Server request failed, http status = '+xh.status)
         }
       }
     }
-    console.log('requesting '+board.name+' from '+backend_url)
+    xh.timeout = 1000*60*60 // One hour
+    xh.ontimeout = function () {
+      set_status('Server access timed out, time = '+(Date.now()-start)/1000+' s')
+    }
+    var s = 'Requesting board '+board.name+' ('+board.count+' stones) from server'
+    if (board.count==18)
+      s += '.  Warning: 18 stone boards may take several minutes to compute.'
+    set_status(s)
     xh.open('GET',backend_url+board.name,true)
     xh.send()
   }
 }
 
-function set_error(error) {
-  console.error(error)
-  d3.select('#error').text(error)
+function set_status(s) {
+  console.log('status',s)
+  d3.select('#status').text(s)
 }
 
 function update(svg) {
@@ -288,7 +300,7 @@ function update(svg) {
       var hash = window.location.hash.substr(1)
       var board = new board_t(hash)
     } catch (e) {
-      set_error('Invalid board '+hash+', error = '+e)
+      set_status('Invalid board '+hash+', error = '+e)
       return
     }
   } else
