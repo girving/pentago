@@ -4,7 +4,7 @@ from __future__ import division
 import re
 import fileinput
 from numpy import *
-from interface import *
+from pentago.old.interface import *
 
 game_pattern = re.compile(r'^(\d+) \(0, (-?[01]), \[([\d, ]+)\]\)$')
 

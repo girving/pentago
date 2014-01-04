@@ -3,7 +3,7 @@
 from __future__ import division
 from other.core import *
 from other.core.value import parser
-from interface import *
+from pentago.old.interface import *
 import time
 
 props = PropManager()

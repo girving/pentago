@@ -199,6 +199,7 @@ void wrap_high_board() {
     .GEODE_METHOD(sample_check)
     .GEODE_METHOD(parse)
     .compare()
+    .hash()
     .repr()
     .str()
     ;

@@ -6,7 +6,7 @@ from geode import *
 from geode.value import parser
 from geode.utility import tryfile
 from other.gui import *
-from pentago.bin.interface import *
+from pentago.old.interface import *
 from OpenGL import GL
 import glob
 

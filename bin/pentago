@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import optparse
-from pentago.misc.interface import *
+from pentago.old.interface import *
 from geode import *
 from geode.value import parser
 

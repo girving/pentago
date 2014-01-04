@@ -158,6 +158,7 @@ Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_r
 using namespace pentago;
 
 void wrap_block_cache() {
+  GEODE_FUNCTION(empty_block_cache)
   GEODE_FUNCTION(reader_block_cache)
   Class<block_cache_t>("block_cache_t");
   Class<reader_block_cache_t>("reader_block_cache_t");

@@ -50,4 +50,7 @@ GEODE_PYTHON_MODULE(pentago_core) {
   // High
   GEODE_WRAP(high_board)
   GEODE_WRAP(index)
+
+  // Mid
+  GEODE_WRAP(midengine)
 }

@@ -4,7 +4,7 @@ from __future__ import division
 from geode import *
 from geode.value import parser
 from geode.utility import tryfile
-from interface import *
+from pentago.old.interface import *
 from section import *
 import time
 import tempfile

@@ -3,7 +3,7 @@
 from __future__ import division
 from geode import *
 from pentago import *
-from pentago.misc.interface import *
+from pentago.old.interface import *
 
 randint = random.randint
 

@@ -82,7 +82,7 @@ struct super_t {
   uint64_t d,c,b,a; // Respect big endianness
 #endif
 
-  super_t() {}
+  super_t() = default;
 
 #if PENTAGO_SSE
 
@@ -353,4 +353,6 @@ static inline super_t rmax(const super_t f) {
 
 #endif
 
+} namespace geode {
+template<> struct IsScalar<pentago::super_t> : public mpl::true_ {};
 }

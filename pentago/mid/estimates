@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+from __future__ import print_function,absolute_import,unicode_literals,division
+from pentago import *
+from numpy import *
+
+'''
+The Plan:
+
+Instead of doing forward tree search for boards with 18 or more stones,
+we're going to go backwards again.  There are only 18 remaining free stones
+on the board, and using a rotation agnostic solve the position of these free
+spaces does not change.  The total number of downstream boards starting
+at any 18 stone board is only 86,574,831.
+
+If we compute slice by slice as in the full endgame solver, the maximum
+number of positions to be stored is
+  count(12)+count(11) = 31,855,824 * 64 bytes = 1.9 GB
+where for each position we store 64 bits (super_t's for win and not-lose).
+
+Can we decrease the memory requirement by taking advantage of the extreme
+structural regularity?  Consider two n stone positions, one with a black stone
+in a given position, and one with a white stone in the same position (note
+that we're ignoring all rotations).  The descendents of these two positions
+are entirely disjoint.  I'm not sure if we can take advantage of this, though.
+
+Consider spot 0, which has value black = 1, white = -1, or empty = 0.  Let
+P(n,v) be positions with n stones and value v in spot 0.  The dependencies are
+
+  P(n,0) <- P(n+1,{0,1,-1})
+  P(n,v) <- P(n+1,v) # |v| = 1
+
+The following order works
+
+  start with P(n+1,v)
+  compute P(n,0)
+  forget  P(n+1,0)
+  for v in -1,1:
+    compute P(n,v)
+    forget P(n+1,v)
+
+This would reduce the memory requirements a little, but not by a huge factor.
+What if we consider two positions with values a,b:
+
+  start with P(n+1,{0,+-1},{0,+-1})
+  compute P(n,0,0)
+  forget P(n+1,0,0)
+  for a in -1,1:
+    compute P(n,a,0)
+    forget P(n+1,a,0)
+    compute P(n,0,a)
+    forget P(n+1,0,a)
+  for a in -1,1:
+    for b in -1,1:
+      compute P(n,a,b)
+      forget P(n,a,b)
+
+Hmm.  I bet we can get close to a factor of 2, but it's probably hard to do
+better.  Complicated though, and there's a much easier way to save a factor
+of 2: use aggressive and passive modes.  Let's do it that way.
+'''
+
+def factorial(n):
+  assert n>=0
+  f = 1
+  for i in xrange(2,n+1):
+    f *= i
+  return f
+
+def choose(n,*k):
+  k = asarray(k)
+  sk = k.sum()
+  if k.min()<0 or sk>n: return 0
+  f = factorial(n)//factorial(n-sk)
+  for i in k:
+    f //= factorial(i)
+  return f
+
+def count(n,k):
+  return choose(n,k)*choose(k,k//2)
+def total(n):
+  return sum(count(n,k) for k in xrange(n+1))
+
+# Print everything
+for n in 18,17:
+  print('total %d = %s'%(n,large(total(n))))
+  for k in xrange(n+1):
+    print('  count %2d = %10s'%(k,large(count(n,k))))
+
+bottleneck = count(18,11)+count(18,12)
+for e in 32,64:
+  print('memory %d = %s entries / %g GB'%(e,large(bottleneck),e*bottleneck/2**30))
