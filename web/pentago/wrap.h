@@ -26,6 +26,7 @@ using std::string;
 using std::vector;
 template<class T> struct Wrapper;
 
+// Wrap a class
 #define PN_CLASS(name,make) \
   typedef name Self; \
   const auto sname = String::NewSymbol(#name); \
@@ -35,11 +36,17 @@ template<class T> struct Wrapper;
   Wrapper<Self>::template_->InstanceTemplate()->SetInternalFieldCount(1); \
   Wrapper<Self>::Finish finisher(exports,sname);
 
+// Wrap a class method
 #define PN_METHOD(name) \
+  PN_METHOD_2(name,name)
+
+// Wrap a class method with a different name
+#define PN_METHOD_2(name,method) \
   static_assert(boost::is_same<decltype(finisher),Wrapper<Self>::Finish>::value,""); \
   Wrapper<Self>::template_->PrototypeTemplate()->Set(String::NewSymbol(#name),FunctionTemplate::New( \
-    wrapped_method<Self,decltype(&Self::name),&Self::name>)->GetFunction());
+    wrapped_method<Self,decltype(&Self::method),&Self::method>)->GetFunction());
 
+// Wrap a free function
 #define PN_FUNCTION(name) \
   exports->Set(String::NewSymbol(#name),FunctionTemplate::New( \
     wrapped_function<decltype(&name),name>)->GetFunction());
@@ -120,10 +127,18 @@ template<class T,int d> static inline Handle<v8::Array> to_js(const Vector<T,d>&
   return v;
 }
 
+template<class K,class V> static inline Handle<v8::Object> to_js(const Hashtable<K,V>& x) {
+  auto o = v8::Object::New();
+  for (auto& y : x)
+    o->Set(to_js(y.key()),to_js(y.data()));
+  return o;
+}
+
 template<class T,class enable=void> struct FromJS;
 template<class T> struct FromJS<const T> : public FromJS<T> {};
 
-template<class T> static inline T from_js(const Local<Value>& x) {
+template<class T> static inline auto from_js(const Local<Value>& x)
+  -> decltype(FromJS<T>::convert(x)) {
   return FromJS<T>::convert(x);
 }
 
@@ -154,6 +169,27 @@ template<class T> struct FromJS<T&,typename boost::enable_if<boost::is_base_of<g
     throw TypeError(format("expected object, type %s",typeid(MT).name()));
   }
 };
+template<class T> struct FromJS<T&,typename boost::disable_if<boost::is_base_of<geode::Object,T>>::type>
+  : public FromJS<T> {};
+
+template<class T> struct FromJS<Ref<T>> {
+  static Ref<T> convert(const Local<Value>& x) {
+    return ref(from_js<T&>(x));
+  }
+};
+
+template<class T> struct FromJS<vector<T>> {
+  static vector<T> convert(const Local<Value>& x) {
+    if (!x->IsArray())
+      throw TypeError(format("expected array of %s",typeid(T).name()));
+    const auto a = Local<v8::Array>::Cast(x);
+    const int n = a->Length();
+    vector<T> r;
+    for (const int i : range(n))
+      r.push_back(from_js<T>(a->Get(i)));
+    return r;
+  }
+};
 
 template<class T0,class T1> struct FromJS<Tuple<T0,T1>> { static Tuple<T0,T1> convert(const Local<Value>& x) {
   if (x->IsArray()) {
@@ -165,11 +201,12 @@ template<class T0,class T1> struct FromJS<Tuple<T0,T1>> { static Tuple<T0,T1> co
   throw TypeError(format("expected length 2 tuple, types %s, %s",typeid(T0).name(),typeid(T1).name()));
 }};
 
-template<> struct FromJS<RawArray<const uint8_t>> { static RawArray<const uint8_t> convert(const Local<Value>& x) {
+template<> struct FromJS<RawArray<uint8_t>> { static RawArray<uint8_t> convert(const Local<Value>& x) {
   if (!::node::Buffer::HasInstance(x))
     throw TypeError("expected Buffer");
-  return RawArray<const uint8_t>(::node::Buffer::Length(x),(const uint8_t*)::node::Buffer::Data(x));
+  return RawArray<uint8_t>(::node::Buffer::Length(x),(uint8_t*)::node::Buffer::Data(x));
 }};
+template<> struct FromJS<RawArray<const uint8_t>> : public FromJS<RawArray<uint8_t>> {};
 
 template<class T,int d> struct FromJS<Vector<T,d>> { static Vector<T,d> convert(const Local<Value>& x) {
   if (!x->IsArray())

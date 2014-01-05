@@ -16,7 +16,6 @@ var max = Math.max
 var floor = Math.floor
 
 exports.defaults = {
-  bits: 24, // 1152 MB
   pool: os.cpus().length,
   cache: '250M',
   ccache: '250M',
@@ -26,8 +25,7 @@ exports.defaults = {
 
 exports.add_options = function (options) {
   var d = exports.defaults
-  options.option('-b,--bits <n>','Size of transposition table in bits (actual size is 80<<bits)',parseInt,d.bits)
-         .option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
+  options.option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--ccache <size>','Size of compute cache (suffixes M/MB and G/GB are understood)',d.ccache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
@@ -53,7 +51,6 @@ function parseSize (s,name) {
 // Create an evaluation routine with calling convention
 //   values(board,cont)
 // The options are
-//   bits: Size of transposition table in bits (actual size is 80<<bits)
 //   pool: Number of worker compute processes (defaults to cpu count)
 //   cache: Size of block cache (suffixes M/MB and G/GB are understood)
 //   maxSlice: Maximum slice available in database (for debugging use only)
@@ -71,7 +68,6 @@ exports.values = function (options,log) {
   log.info('max slice = %d',opts.maxSlice)
   log.info('max sockets = %d',opts.maxSockets)
   log.info('compute pool = %d',opts.pool)
-  log.info('supertable bits = %d',opts.bits)
 
   // Prepare for opening book lookups
   var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
@@ -88,20 +84,20 @@ exports.values = function (options,log) {
   pentago.init_threads(0,0)
 
   // Prepare for computations
-  process.env['PENTAGO_WORKER_BITS'] = opts.bits
   var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
   var compute_cache = LRU({
     max: floor(ccache_limit/1.2),
     length: function (s) { return s.length }
   })
-  // Cache and don't simultaneously duplicate work
+  // Cache and don't simultaneously duplicate work. b = (root,boards),
+  // where boards are to be evaluated and root is their nearest common ancestor.
   var pending_compute = Pending(function (b,cont) {
     var board = b[0]
     var results = compute_cache.get(board)
     if (results)
       return JSON.parse(results)
     else
-      pool.enqueue(b[1],function (results) {
+      pool.enqueue(b,function (results) {
         compute_cache.set(board,JSON.stringify(results))
         cont(results)
       })
@@ -232,15 +228,13 @@ exports.values = function (options,log) {
       else { // Dispatch all requests to a single worker process to exploit coherence
         log.debug('computing board %s, slice %d',board.name(),board.count())
         var boards = requests.map(function (r) { return r.board.name() })
-        pending_compute([board,boards], function (res) {
-          var total = 0
-          for (var name in res)
-            total += res[name].time
-          log.info('computed board %s, slice %d, time %s s',board.name(),board.count(),total)
-          results['search-time'] = total
+        pending_compute([board.name(),boards], function (res) {
+          var stime = res['time']
+          log.info('computed board %s, slice %d, time %s s',board.name(),board.count(),stime)
+          results['search-time'] = stime
           for (var i=0;i<requests.length;i++) {
             var name = requests[i].board.name()
-            var v = res[name].v
+            var v = res[name]
             results[name] = v
             requests[i].cont(v)
           }

@@ -104,6 +104,11 @@ Array<uint8_t> midsolve_workspace(const int min_slice) {
   return char_view_own(aligned_buffer<halfsupers_t>(bottleneck(36-min_slice)));
 }
 
+uint64_t midsolve_workspace_memory_usage(const int min_slice) {
+  // Add a bit so that we can fix alignment if it's wrong
+  return sizeof(halfsupers_t)*(bottleneck(36-min_slice)+2);
+}
+
 static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end, const int nx, const int ny) {
   RawArray<halfsupers_t> work(workspace.size()/sizeof(halfsupers_t),(halfsupers_t*)workspace.data());
   const auto flat = end ? work.slice(work.size()-nx*ny,work.size()) : work.slice(0,nx*ny);
@@ -329,11 +334,17 @@ Hashtable<board_t,superinfos_t> midsolve_internal(const board_t root, const bool
   const int slice = count_stones(root);
   GEODE_ASSERT(18<=slice && slice<=36);
   const int spots = 36-slice;
-  GEODE_ASSERT(workspace.size()>=bottleneck(spots));
+
+  // Make sure workspace will do
+  const int align = int(sizeof(halfsupers_t)),
+            fix = (align-(uint64_t(workspace.data())&(align-1)))&(align-1);
+  GEODE_ASSERT(workspace.size()>=fix);
+  const auto safe_workspace = workspace.slice(fix,workspace.size()-fix);
+  GEODE_ASSERT(safe_workspace.size()>=bottleneck(spots));
 
   // Compute all slices
   Hashtable<board_t,superinfos_t> results;
-  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root,parity,results,workspace);
+  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root,parity,results,safe_workspace);
   #define S(s_) \
     case s_: { \
       const int s = (s_); \
@@ -372,6 +383,20 @@ Hashtable<board_t,int> midsolve(const board_t root, const bool parity, const Raw
       root,parity,board,str_board(root),str_board(board)));
     found:;
   }
+  return results;
+}
+
+Hashtable<Ref<const high_board_t>,int>
+high_midsolve(const high_board_t& root, const vector<Ref<const high_board_t>>& boards, RawArray<uint8_t> workspace) {
+  Array<board_t> bs;
+  for (auto b : boards) {
+    GEODE_ASSERT(!b->middle);
+    bs.append(b->board);
+  }
+  const auto rs = midsolve(root.board,root.middle,bs,workspace);
+  Hashtable<Ref<const high_board_t>,int> results;
+  for (auto r : rs)
+    results.set(new_<high_board_t>(r.key(),false),r.data());
   return results;
 }
 

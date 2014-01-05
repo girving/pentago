@@ -3,34 +3,16 @@
 'use strict'
 var pentago = require('./pentago/build/Release/pentago')
 
-// Initialize supertable
-var bits = parseInt(process.env['PENTAGO_WORKER_BITS'])
-if (isNaN(bits))
-  throw 'supertable bits must be specified via PENTAGO_WORKER_BITS environment variable'
-pentago.init_supertable(bits)
-
-// Initialize timing system
-pentago.init_threads(0,0)
-
-// No block cache here
-var cache = pentago.empty_block_cache()
+// Allocate workspace
+var workspace = new Buffer(pentago.midsolve_workspace_memory_usage(18))
 
 // Process compute requests
-process.on('message',function (boards) {
-  var ordered = boards.slice(0)
-  ordered.sort()
-  var results = {}
-  pentago.clear_supertable() // Don't let high depth entries block new low depth entries
-  for (var i=0;i<boards.length;i++) {
-    var start = Date.now()
-    console.log('\nevaluating '+boards[i]+' ('+i+'/'+boards.length+') ')
-    pentago.clear_stats()
-    var v = pentago.high_board_t(boards[i]).value(cache)
-    var t = (Date.now()-start)/1000
-    results[boards[i]] = {v:v,time:t}
-    console.log('done evaluating '+boards[i]+': value '+v+', time '+t+' s ('+i+'/'+boards.length+') ')
-    pentago.print_stats()
-  }
+process.on('message',function (job) {
+  var root = pentago.high_board_t(job[0])
+  var boards = job[1].map(pentago.high_board_t)
+  var start = Date.now()
+  var results = pentago.high_midsolve(root,boards,workspace)
+  results['time'] = (Date.now()-start)/1000
   process.send(results)
 })
 

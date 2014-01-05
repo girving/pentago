@@ -46,6 +46,14 @@ function test_done(cont) {
   cont()
 }
 
+function test_str(cont) {
+  var s = '1846757322198614016m'
+  var b = high_board_t(s)
+  if (s != b.name() || s != b)
+    throw 'string mismatch'
+  cont()
+}
+
 function test_pending(cont) {
   var left = 5
   var inputs = {0:0,1:0,2:0}
@@ -147,7 +155,7 @@ function test_slow (cont) {
         if (correct[name] != results[name])
           throw 'incorrect result for board '+name+': correct '+correct[name]+', got '+results[name]
       for (var name in results)
-        if (!(name in correct))
+        if (!(name in correct || name=='search-time'))
           throw 'unexpected result for board '+name+': value '+results[name]+' does not occur in correct'
       if (!--left)
         cont()
@@ -158,6 +166,7 @@ function test_slow (cont) {
    *     ''          ''    -  735 s (--bits 23)
    *     ''          ''    -  288 s (--bits 24)
    *   rackspace 29dec2013 -  465 s (--bits 24)
+   *   cayley     5jan2014 -   19 s (midsolve!)
    */
 
   /* Alternate hard positions:
@@ -169,7 +178,7 @@ var green = '\x1b[1;32m'
 var clear = '\x1b[00m'
 
 // Register tests
-var tests = [test_moves,test_done,test_pending]
+var tests = [test_moves,test_done,test_pending,test_str]
 if (process.argv.length > 2) {
   if (process.argv.length > 3)
     throw 'expected 0 or 1 arguments'

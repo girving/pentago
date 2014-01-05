@@ -5,8 +5,7 @@
 #include <pentago/end/sections.h>
 #include <pentago/high/board.h>
 #include <pentago/high/index.h>
-#include <pentago/search/stat.h>
-#include <pentago/search/supertable.h>
+#include <pentago/mid/midengine.h>
 namespace pentago {
 namespace node {
 
@@ -47,6 +46,7 @@ static void init(Handle<v8::Object> exports) {
     PN_METHOD(moves)
     PN_METHOD(value)
     PN_METHOD(immediate_value)
+    PN_METHOD_2(toString,name)
   } {
     PN_CLASS(sections_t,make_sections)
   } {
@@ -62,12 +62,9 @@ static void init(Handle<v8::Object> exports) {
     PN_METHOD(block_location)
   }
   PN_FUNCTION(descendent_sections)
-  PN_FUNCTION(init_supertable)
-  PN_FUNCTION(clear_supertable)
-  PN_FUNCTION(empty_block_cache)
+  PN_FUNCTION(midsolve_workspace_memory_usage)
+  PN_FUNCTION(high_midsolve)
   PN_FUNCTION(init_threads)
-  PN_FUNCTION(clear_stats)
-  PN_FUNCTION(print_stats)
 }
 
 }
