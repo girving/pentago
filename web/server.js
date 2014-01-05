@@ -10,7 +10,7 @@ var pentago = require('./pentago/build/Release/pentago')
 var Values = require('./values.js')
 
 // Parse options
-options.option('-p,--port <p>','Port to listen on',parseInt,80)
+options.option('-p,--port <p>','Port to listen on',parseInt,2048)
        .option('--log <file>','Log file')
 Values.add_options(options)
 options.parse(process.argv)
