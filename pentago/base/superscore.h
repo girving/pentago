@@ -300,6 +300,7 @@ GEODE_EXPORT uint8_t first(super_t s);
 GEODE_EXPORT super_t random_super(Random& random);
 
 GEODE_EXPORT ostream& operator<<(ostream& output, super_t s);
+GEODE_EXPORT ostream& operator<<(ostream& output, superinfo_t s);
 
 GEODE_EXPORT int popcount(super_t s);
 

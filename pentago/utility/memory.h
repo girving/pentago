@@ -34,6 +34,10 @@ template<class T> static inline uint64_t memory_usage(const Array<T>& array) {
   return sizeof(T)*array.size();
 }
 
+template<class T,int d> static inline uint64_t memory_usage(const RawArray<T,d>& array) {
+  return sizeof(T)*array.flat.size();
+}
+
 template<class T,int d> static inline uint64_t memory_usage(const Array<T,d>& array) {
   return sizeof(T)*array.flat.size();
 }

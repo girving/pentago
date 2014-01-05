@@ -7,7 +7,9 @@
 #include <pentago/search/superengine.h>
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/ceil_div.h>
+#include <pentago/utility/char_view.h>
 #include <pentago/utility/debug.h>
+#include <pentago/utility/memory.h>
 #include <geode/array/view.h>
 #include <geode/python/wrap.h>
 #include <geode/utility/Log.h>
@@ -20,10 +22,11 @@ using std::endl;
 //#define MD(...) __VA_ARGS__
 #define MD(...)
 
-static supers_t transform_supers(const symmetry_t s, const supers_t a) {
-  supers_t sa;
-  sa.x = transform_super(s,a.x);
-  sa.y = transform_super(s,a.y);
+static superinfos_t transform_superinfos(const symmetry_t s, const superinfos_t a) {
+  superinfos_t sa;
+  sa.known   = transform_super(s,a.known);
+  sa.win     = transform_super(s,a.win);
+  sa.notlose = transform_super(s,a.notlose);
   return sa;
 }
 
@@ -96,13 +99,14 @@ static int bottleneck(const int spots) {
   return worst;
 }
 
-Array<supers_t> midsolve_workspace(const int min_slice) {
+Array<uint8_t> midsolve_workspace(const int min_slice) {
   // Allocate enough memory for 18 stones, which is the most we'll need
-  return aligned_buffer<supers_t>(bottleneck(36-min_slice));
+  return char_view_own(aligned_buffer<halfsupers_t>(bottleneck(36-min_slice)));
 }
 
-static RawArray<supers_t,2> grab(RawArray<supers_t> workspace, const bool end, const int nx, const int ny) {
-  const auto flat = end ? workspace.slice(workspace.size()-nx*ny,workspace.size()) : workspace.slice(0,nx*ny);
+static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end, const int nx, const int ny) {
+  RawArray<halfsupers_t> work(workspace.size()/sizeof(halfsupers_t),(halfsupers_t*)workspace.data());
+  const auto flat = end ? work.slice(work.size()-nx*ny,work.size()) : work.slice(0,nx*ny);
   return flat.reshape(nx,ny);
 }
 
@@ -115,7 +119,7 @@ static const uint16_t combinations[18+1][10+1] = {{1,0,0,0,0,0,0,0,0,0,0},{1,1,0
   combinations[n_][k_]; })
 
 template<int spots,int n> GEODE_NEVER_INLINE static void
-midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray<supers_t> workspace) {
+midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfos_t>& results, RawArray<uint8_t> workspace) {
   const int slice = 36-spots;
   const auto black_root = unpack(root,0),
              white_root = unpack(root,1);
@@ -127,11 +131,12 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
              sets1 = subsets(spots,k1),
              sets1p = subsets(spots-k0,k1);
   const int sets0p_size = choose(spots-k1,k0+1);
+  GEODE_ASSERT(!(uint64_t(workspace.data())&(sizeof(halfsupers_t)-1)));
   const auto input = grab(workspace,n&1,sets1.size(),sets0p_size).const_();
   const auto output = grab(workspace,!(n&1),sets0.size(),sets1p.size());
-  const int all_wins_start = n&1?output.flat.size():input.flat.size();
-  const auto all_wins1 = scalar_view(workspace.slice(all_wins_start,all_wins_start+ceil_div(sets1.size(),2)));
-  GEODE_ASSERT(input.flat.size()+output.flat.size()+all_wins1.size()/2 <= workspace.size());
+  const int all_wins_start = CHECK_CAST_INT(memory_usage(n&1?output.const_():input));
+  const RawArray<halfsuper_t> all_wins1(sets1.size(),(halfsuper_t*)(workspace.data()+all_wins_start));
+  GEODE_ASSERT(memory_usage(input)+memory_usage(output)+memory_usage(all_wins1) <= uint64_t(workspace.size()));
 
   // List empty spots as bit indices into side_t
   uint8_t empty[spots];
@@ -159,7 +164,7 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
 
   // Evaluate whether the other side wins for all possible sides
   for (int s1=0;s1<sets1.size();s1++)
-    all_wins1[s1] = super_wins(root1 | set_side(k1,sets1[s1]));
+    all_wins1[s1] = halfsuper_wins(root1 | set_side(k1,sets1[s1]))[(n+parity)&1];
 
   // Iterate over set of stones of player to move
   for (int s0=0;s0<output.m;s0++) {
@@ -173,7 +178,7 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
       filled0 |= 1<<(set0>>5*i&0x1f);
 
     // Evaluate whether we win for side0 and all child sides
-    const super_t wins0 = super_wins(side0);
+    const halfsuper_t wins0 = halfsuper_wins(side0)[(n+parity)&1];
 
     // List empty spots after we place s0's stones
     uint8_t empty1[spots-k0];
@@ -185,6 +190,11 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
           empty1[next++] = i;
       GEODE_ASSERT(next==spots-k0);
     }
+
+    // Precompute wins after we place s0's stones
+    halfsuper_t child_wins0[spots-k0];
+    for (int i=0;i<spots-k0;i++)
+      child_wins0[i] = halfsuper_wins(side0|side_t(1)<<empty[empty1[i]])[(n+parity)&1];
 
     // Iterate over set of stones of other player
     for (int s1p=0;s1p<sets1p.size();s1p++) {
@@ -222,17 +232,18 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
       }
 
       // Consider each move in turn
-      supers_t us;
+      halfsupers_t us;
       {
-        us.x = us.y = super_t(0);
+        us.x = us.y = halfsuper_t(0);
         const uint32_t moves = ~(filled0|filled1);
         int zeros = 0, ones = 0, base = shift;
         for (int i=0;i<spots;i++) {
           if (moves&1<<i) {
             const int s0p = base+choose(i-ones,zeros+1);
-            const supers_t child = input(s1,s0p);
-            us.x |= child.x; // win
-            us.y |= child.y; // not lose
+            const auto cwins = child_wins0[i-zeros];
+            const halfsupers_t child = input(s1,s0p);
+            us.x |= cwins | child.x; // win
+            us.y |= cwins | child.y; // not lose
             MD({
               const auto child_set0 = set0|i<<5*k0;
               const auto board = pack(root1|set_side(k1,sets1[s1]),root0|set_side(k0+1,child_set0));
@@ -253,8 +264,8 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
       }
 
       // Account for immediate results
-      const super_t wins1 = all_wins1[s1],
-                    inplay = ~(wins0 | wins1);
+      const halfsuper_t wins1 = all_wins1[s1],
+                        inplay = ~(wins0 | wins1);
       us.x = (inplay & us.x) | (wins0 & ~wins1); // win
       us.y = (inplay & us.y) | (slice+n==36 ? wins0 | ~wins1 : wins0); // not lose
 
@@ -265,27 +276,31 @@ midsolve_loop(const board_t root, Hashtable<board_t,supers_t>& results, RawArray
         GEODE_ASSERT(us.y==super_evaluate_all(false,100,board));
       })
 
-      // If we're far enough along, remember superstandardized results
+      // If we're far enough along, remember results
       if (n <= 1) {
+        superinfos_t info;
+        const auto all = ~halfsuper_t(0);
+        info.known   = (n+parity)&1 ? merge(0, all) : merge( all,0);
+        info.win     = (n+parity)&1 ? merge(0,us.x) : merge(us.x,0);
+        info.notlose = (n+parity)&1 ? merge(0,us.y) : merge(us.y,0);
         const uint32_t filled_black = slice+n&1 ? filled1 : filled0,
                        filled_white = slice+n&1 ? filled0 : filled1;
         board_t board = root;
         for (int i=0;i<spots;i++)
           board += ((filled_black>>i&1)+2*(filled_white>>i&1))*pack(side_t(1)<<empty[i],side_t(0));
-        const auto standard = superstandardize(board);
-        results.set(standard.x,transform_supers(standard.y,us));
+        results.set(board,info);
       }
 
       // Negate and apply rmax in preparation for the slice above
-      supers_t above;
-      above.x = wins1 | rmax(~us.y);
-      above.y = wins1 | rmax(~us.x);
+      halfsupers_t above;
+      above.x = rmax(~us.y);
+      above.y = rmax(~us.x);
       output(s0,s1p) = above;
     }
   }
 }
 
-Hashtable<board_t,supers_t> midsolve_internal(const board_t root, RawArray<supers_t> workspace) {
+Hashtable<board_t,superinfos_t> midsolve_internal(const board_t root, const bool parity, RawArray<uint8_t> workspace) {
   new_<high_board_t>(root,false); // Verify that we have a consistent board
   const int slice = count_stones(root);
   GEODE_ASSERT(18<=slice && slice<=36);
@@ -293,8 +308,8 @@ Hashtable<board_t,supers_t> midsolve_internal(const board_t root, RawArray<super
   GEODE_ASSERT(workspace.size()>=bottleneck(spots));
 
   // Compute all slices
-  Hashtable<board_t,supers_t> results;
-  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root,results,workspace);
+  Hashtable<board_t,superinfos_t> results;
+  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root,parity,results,workspace);
   #define S(s_) \
     case s_: { \
       const int s = (s_); \
@@ -309,36 +324,48 @@ Hashtable<board_t,supers_t> midsolve_internal(const board_t root, RawArray<super
   return results;
 }
 
-Hashtable<board_t,int> midsolve(const board_t root, const RawArray<const board_t> boards,
-                                RawArray<supers_t> workspace) {
+Hashtable<board_t,int> midsolve(const board_t root, const bool parity, const RawArray<const board_t> boards,
+                                RawArray<uint8_t> workspace) {
   // Compute
-  const auto supers = midsolve_internal(root,workspace);
+  const auto supers = midsolve_internal(root,parity,workspace);
 
   // Extract results
   Hashtable<board_t,int> results;
-  const Vector<int,4> zero;
   for (const auto board : boards) {
-    const auto st = superstandardize(board);
-    const supers_t r = transform_supers(st.y.inverse(),supers.get(st.x));
-    results.set(board,r.x(zero)+r.y(zero)-1);
+    // We can't superstandardize, since that can break parity.  Instead, we check all local rotations manually.
+    for (int i=0;i<256;i++) {
+      const local_symmetry_t s(i);
+      const auto p = supers.get_pointer(transform_board(s,board));
+      if (p) {
+        const superinfos_t r = transform_superinfos(s.inverse(),*p);
+        if (r.known(0)) {
+          results.set(board,r.win(0)+r.notlose(0)-1);
+          goto found;
+        }
+      }
+    }
+    throw RuntimeError(format("midsolve failure: root %lld, parity %d, board %lld\n%s\n%s",
+      root,parity,board,str_board(root),str_board(board)));
+    found:;
   }
   return results;
 }
 
-static void midsolve_internal_test(const board_t board) {
+static void midsolve_internal_test(const board_t board, const bool parity) {
   const int slice = count_stones(board);
   const auto workspace = midsolve_workspace(slice);
-  const auto results = midsolve_internal(board,workspace);
+  const auto results = midsolve_internal(board,parity,workspace);
   GEODE_ASSERT(results.size()==37-slice); // Only mostly true due to superstandardization, but still useful to assert
   for (const auto& r : results) {
     const auto rboard = r.key();
     const bool turn = count_stones(r.key())&1;
     const auto rs = r.data();
-    cout << format("slice %d, board %19lld: win %3d, tie %3d, loss %3d",
-                   slice,rboard,popcount(rs.x),popcount(~rs.x&rs.y),popcount(~(rs.x|rs.y)))<<endl;
+    GEODE_ASSERT(popcount(rs.known)==128);
+    cout << format("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
+                   slice,rboard,parity,popcount(rs.win),popcount(~rs.win&rs.notlose),popcount(~(rs.win|rs.notlose)))<<endl;
     for (int a=0;a<2;a++) {
       super_t correct = super_evaluate_all(a,100,flip_board(rboard,turn));
-      GEODE_ASSERT(correct==rs[1-a]);
+      GEODE_ASSERT(!((correct^(a?rs.win:rs.notlose))&rs.known));
     }
   }
 }

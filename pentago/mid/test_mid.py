@@ -19,7 +19,8 @@ def test_mid_internal():
   for slice in range(30,36+1)[::-1]:
     for _ in xrange(16):
       board = random_board(slice)
-      midsolve_internal_test(board)
+      for parity in 0,1:
+        midsolve_internal_test(board,parity)
 
 def test_mid():
   random.seed(2223)
@@ -32,11 +33,15 @@ def test_mid():
       for middle in 0,1:
         high = high_board_t(root,middle)
         moves = frozenset(high.moves() if middle else [b for a in high.moves() for b in a.moves()])
-        values = midsolve(root,[m.board for m in moves],workspace)
+        values = midsolve(root,middle,[m.board for m in moves],workspace)
         assert len(values)==len(moves)
         for m in moves:
           assert values[m.board]==m.value(empty)
 
+def test_half():
+  halfsuper_test(1024)
+
 if __name__=='__main__':
+  test_half()
   test_mid_internal()
   test_mid()

@@ -194,20 +194,27 @@ static void super_bool_test() {
   }
 }
 
-ostream& operator<<(ostream& output, super_t s) {
+ostream& operator<<(ostream& output, superinfo_t s) {
   for (int r3=0;r3<4;r3++) {
     for (int r1=0;r1<4;r1++) {
       output << (r1||r3?' ':'[');
       for (int r2=0;r2<4;r2++) {
         if (r2) output << ' ';
         for (int r0=0;r0<4;r0++)
-          output << s(r0,r1,r2,r3);
+          output << char(s.known(r0,r1,r2,r3) ? '0'+s.wins(r0,r1,r2,r3) : '_');
       }
       output << (r1==3&&r3==3?']':'\n');
       if (r1==3) output << '\n';
     }
   }
   return output;
+}
+
+ostream& operator<<(ostream& output, super_t s) {
+  superinfo_t i;
+  i.known = ~super_t(0);
+  i.wins = s;
+  return output<<i;
 }
 
 uint8_t first(super_t s) {

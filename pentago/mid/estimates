@@ -82,11 +82,11 @@ def total(n):
   return sum(count(n,k) for k in xrange(n+1))
 
 # Print everything
-for n in 18,17:
+for n in 18,:
   print('total %d = %s'%(n,large(total(n))))
   for k in xrange(n+1):
     print('  count %2d = %10s'%(k,large(count(n,k))))
 
 bottleneck = count(18,11)+count(18,12)
-for e in 32,64:
+for e in 32,:
   print('memory %d = %s entries / %g GB'%(e,large(bottleneck),e*bottleneck/2**30))

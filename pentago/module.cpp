@@ -52,5 +52,6 @@ GEODE_PYTHON_MODULE(pentago_core) {
   GEODE_WRAP(index)
 
   // Mid
+  GEODE_WRAP(halfsuper)
   GEODE_WRAP(midengine)
 }
