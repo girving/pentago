@@ -11,12 +11,14 @@ Results:
   3jan2014 - 17.4 s - initial working version
            - 16.2 s - hoist cwins downwards
            - 15.4 s - unroll and templatize slice loop
-           - 15.3 s - halfsuper_t (seems anomalous, I was expecting much faster)
-           - 15.8 s - unhoist cwins (a little slow, but reduces memory bandwidth)
+  4jan2014 - 15.3 s - halfsuper_t (seems anomalous, I was expecting much faster)
+           - 15.8 s - unhoist cwins (a little slower, but reduces memory bandwidth)
 
 Actually, the above times are a bit of a lie: they are the minimums of several runs.
 The typical value is typically several seconds slower.  I am not sure why the variance
-is so high.
+is so high.  I am going to switch to median of three runs now to reduce the variance:
+
+  4jan2014 - 19.7 s - median of three runs
 '''
 
 def slow():
