@@ -19,6 +19,7 @@ The typical value is typically several seconds slower.  I am not sure why the va
 is so high.  I am going to switch to median of three runs now to reduce the variance:
 
   4jan2014 - 19.7 s - median of three runs
+  5jan2014 - 10.3 s - transpose input and output arrays!
 '''
 
 def slow():

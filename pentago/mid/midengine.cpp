@@ -133,12 +133,14 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
   const int k0 = (slice+n)/2-(slice+(n&1))/2, // Player to move
             k1 = n-k0; // Other player
   const auto sets0 = subsets(spots,k0),
+             sets0p = subsets(spots-k1,k0),
              sets1 = subsets(spots,k1),
              sets1p = subsets(spots-k0,k1);
-  const int sets0p_size = fast_choose(spots-k1,k0+1);
+  const int csets0_size = fast_choose(spots,k0+1),
+            csets1p_size = spots-k0 ? fast_choose(spots-k0-1,k1) : 0;
   GEODE_ASSERT(!(uint64_t(workspace.data())&(sizeof(halfsupers_t)-1)));
-  const auto input = grab(workspace,n&1,sets1.size(),sets0p_size).const_();
-  const auto output = grab(workspace,!(n&1),sets0.size(),sets1p.size());
+  const auto input = grab(workspace,n&1,csets0_size,csets1p_size).const_();
+  const auto output = grab(workspace,!(n&1),sets1.size(),sets0p.size());
   const int all_wins_start = CHECK_CAST_INT(memory_usage(n&1?output.const_():input));
   const RawArray<halfsuper_t> all_wins1(sets1.size(),(halfsuper_t*)(workspace.data()+all_wins_start));
   GEODE_ASSERT(memory_usage(input)+memory_usage(output)+memory_usage(all_wins1) <= uint64_t(workspace.size()));
@@ -161,9 +163,11 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
       s_ |= side_t(1)<<empty[set_>>5*i&0x1f]; \
     s_; })
   MD(const auto str_set = [=](const int k0, const set_t set0, const int k1, const set_t set1, const bool flip) {
-    string s(spots,'_');
-    for (int i=0;i<k0;i++) s[set0>>5*i&0x1f] = flip ? '1' : '0';
-    for (int i=0;i<k1;i++) s[set1>>5*i&0x1f] = flip ? '0' : '1';
+    string s(spots,'\0');
+    for (int i=0;i<k0;i++) s[set0>>5*i&0x1f] += flip ? 2 : 1;
+    for (int i=0;i<k1;i++) s[set1>>5*i&0x1f] += flip ? 1 : 2;
+    for (int i=0;i<spots;i++)
+      s[i] = uint8_t(s[i])<3 ? "_01"[int(s[i])] : 'x';
     return s;
   };)
 
@@ -171,8 +175,25 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
   for (int s1=0;s1<sets1.size();s1++)
     all_wins1[s1] = halfsuper_wins(root1 | set_side(k1,sets1[s1]))[(n+parity)&1];
 
+  // Lookup table for converting s1p to cs1p (s1 relative to one more black stone:
+  //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
+  Array<Vector<uint16_t,spots-k0>> cs1ps(sets1p.size(),false);
+  for (int s1p=0;s1p<sets1p.size();s1p++) {
+    for (int j=0;j<spots-k0;j++) {
+      cs1ps[s1p][j] = s1p;
+      for (int a=0;a<k1;a++) {
+        const int s1p_a = sets1p[s1p]>>5*a&0x1f;
+        if (j<s1p_a)
+          cs1ps[s1p][j] += fast_choose(s1p_a-1,a+1)-fast_choose(s1p_a,a+1);
+      }
+    }
+  }
+
+  // Make sure each output entry is written only once
+  MD(Array<uint8_t,2> written(output.sizes()));
+ 
   // Iterate over set of stones of player to move
-  for (int s0=0;s0<output.m;s0++) {
+  for (int s0=0;s0<sets0.size();s0++) {
     // Construct side to move
     const set_t set0 = sets0[s0];
     const side_t side0 = root0 | set_side(k0,set0);
@@ -206,15 +227,18 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
      * at q with set0[j-1] < q < set0[j], the new index is
      *   cs0 = s0 + choose(q,j+1) + sum_{j<=i<k0} [ choose(set0[i],i+2)-choose(set0[i],i+1) ]
      *
-     * What if we instead add a first white stone at empty1[q0] with set0[j-1] < empty1[q0] < set0[j]>
+     * What if we instead add a first white stone at empty1[q0] with set0[j0-1] < empty1[q0] < set0[j0]>
      * The new index is s0p_1:
      *   s0p_0 = s0
-     *   s0p_1 = s0p_0 + sum_{j<=i<k0} choose(set0[i]-1,i+1)-choose(set0[i],i+1)
-     *         = s0p_0 + offset0[0][q]
-     * That is, all combinations from j on are shifted downwards by 1, and the total offset is precomputable.
+     *   s0p_1 = s0p_0 + sum_{j0<=i<k0} choose(set0[i]-1,i+1)-choose(set0[i],i+1)
+     *         = s0p_0 + offset0[0][q0]
+     * That is, all combinations from j0 on are shifted downwards by 1, and the total offset is precomputable.
      * If we add another stone at q1,j1, the shift is
      *   s0p_2 = s0p_1 + sum_{j1<=i<k0} choose(set0[i]-2,i+1)-choose(set0[i]-1,i+1)
-     * where we have used the fact that q0 < q1.
+     *         = s0p_1 + offset0[1][q1]
+     * where we have used the fact that q0 < q1.  In general, we have
+     *   s0p_a = s0p_{a-1} + sum_{ja<=i<k0} choose(set0[i]-a-1,i+1)-choose(set0[i]-a,i+1)
+     *         = s0p_{a-1} + offset0[a][qa]
      *
      * So far this offset0 array is two dimensional, but now we have to take into account the new black
      * stones.  We must also be able to know where they go.  The easy thing is to make one 2D offset0 array
@@ -223,19 +247,61 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
      * can change independently as we add white stones.
      *
      * Overall, this precomputation seems quite complicated for an uncertain benefit, so I'll put it aside for now.
+     *
+     * ----------------------
+     *
+     * What if we start with s1p and add one black stone at empty1[i] to reach cs1p?  We get
+     *
+     *    s1p = sum_j choose(set1p[j],j+1)
+     *   cs1p = sum_j choose(set1p[j]-(set1p[j]>i),j+1)
+     *   cs1p = s1p + sum_{j s.t. set1p[j]>i} choose(set1p[j]-1,j+1) - choose(set1p[j],j+1)
+     *
+     * Ooh: that's complicated, but it doesn't depend at all on s0, so we can hoist the entire
+     * thing.  See cs1ps above.
      */
+
+    // Precompute absolute indices after we place s0's stones
+    uint16_t child_s0s[spots-k0];
+    for (int i=0;i<spots-k0;i++) {
+      const int j = empty1[i]-i;
+      child_s0s[i] = choose(empty1[i],j+1);
+      for (int a=0;a<k0;a++)
+        child_s0s[i] += choose(set0>>5*a&0x1f,a+(a>=j)+1);
+    }
+
+    // Lookup table to convert s1p to s1
+    uint16_t offset1[k1][spots-k0];
+    for (int i=0;i<k1;i++)
+      for (int q=0;q<spots-k0;q++)
+        offset1[i][q] = fast_choose(empty1[q],i+1);
+
+    // Lookup table to convert s0 to s0p
+    uint16_t offset0[k1][spots-k0];
+    for (int a=0;a<k1;a++)
+      for (int q=0;q<spots-k0;q++) {
+        offset0[a][q] = 0;
+        for (int i=empty1[q]-q;i<k0;i++) {
+          const int v = set0>>5*i&0x1f;
+          if (v>a)
+            offset0[a][q] += fast_choose(v-a-1,i+1)-fast_choose(v-a,i+1);
+        }
+      }
 
     // Iterate over set of stones of other player
     for (int s1p=0;s1p<sets1p.size();s1p++) {
       const auto set1p = sets1p[s1p];
+
       // Convert indices
       uint32_t filled1 = 0;
-      int s1 = 0;
+      uint32_t filled1p = 0;
+      uint16_t s1 = 0;
+      uint16_t s0p = s0;
       for (int i=0;i<k1;i++) {
-        const int s1pi = set1p>>5*i&0x1f,
-                  s1i = empty1[s1pi];
-        filled1 |= 1<<s1i;
-        s1 += fast_choose(s1i,i+1);
+        const int q = set1p>>5*i&0x1f;
+        filled1 |= 1<<empty1[q];
+        filled1p |= 1<<q;
+        s1  += offset1[i][q];
+        s0p += offset0[i][q];
       }
 
       // Print board
@@ -244,52 +310,34 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
         cout << "\ncomputing slice "<<slice<<"+"<<n<<", k0 "<<k0<<", k1 "<<k1
           <<", fill "<<str_set(k0,set0,k1,sets1[s1],(slice+n)&1)
           <<", board "<<board
-          <<", s0 "<<s0<<", s1p "<<s1p<<", s1 "<<s1<<endl;
+          <<", s0 "<<s0<<", s0p "<<s0p<<", s1p "<<s1p<<", s1 "<<s1<<endl;
         if (0) cout << str_board(board)<<endl;
       })
-
-      // Sweep through once to precompute an uniform index shift
-      int shift = 0;
-      {
-        int zeros = 1, ones = 0;
-        for (int i=0;i<spots;i++) {
-          if (filled0&1<<i)
-            shift += fast_choose(i-ones,++zeros);
-          else if (filled1&1<<i)
-            ones++;
-        }
-      }
 
       // Consider each move in turn
       halfsupers_t us;
       {
         us.x = us.y = halfsuper_t(0);
-        const uint32_t moves = ~(filled0|filled1);
-        int zeros = 0, ones = 0, base = shift;
-        for (int i=0;i<spots;i++) {
-          if (moves&1<<i) {
-            const int s0p = base+fast_choose(i-ones,zeros+1);
-            const auto cwins = child_wins0[i-zeros];
-            const halfsupers_t child = input(s1,s0p);
+        for (int i=0;i<spots-k0;i++)
+          if (!(filled1p&1<<i)) {
+            const int cs0 = child_s0s[i];
+            const auto cwins = child_wins0[i];
+            const halfsupers_t child = input(cs0,cs1ps[s1p][i]);
             us.x |= cwins | child.x; // win
             us.y |= cwins | child.y; // not lose
             MD({
-              const auto child_set0 = set0|i<<5*k0;
+              const auto child_set0 = set0|side_t(empty1[i])<<5*k0;
               const auto board = pack(root1|set_side(k1,sets1[s1]),root0|set_side(k0+1,child_set0));
               const auto flip = flip_board(board,(slice+n+1)&1);
               cout << "child "<<str_set(k1,sets1[s1],k0+1,child_set0,(slice+n+1)&1)
-                <<", board "<<flip<<", set "<<child_set0<<", s1 "<<s1<<", s0p "<<s0p
-                <<" (shift "<<shift<<", base "<<base<<", i-ones "<<i-ones<<")"<<endl;
+                <<", board "<<flip<<", set "<<child_set0
+                <<", s0 "<<s0<<", s1 "<<s1<<", cs0 "<<cs0<<", cs1p "<<cs1ps[s1p][i]<<", input "<<input.sizes()<<endl;
               if (0) cout << str_board(flip)<<endl;
-              GEODE_ASSERT(child.x==rmax(~super_evaluate_all(false,100,board)));
-              GEODE_ASSERT(child.y==rmax(~super_evaluate_all(true ,100,board)));
+              const bool p = (n+parity)&1;
+              GEODE_ASSERT(child.x==split(rmax(~super_evaluate_all(false,100,board)))[p]);
+              GEODE_ASSERT(child.y==split(rmax(~super_evaluate_all(true ,100,board)))[p]);
             })
-          } else if (filled0&1<<i) {
-            base += fast_choose(i-ones,zeros+1)-fast_choose(i-ones,zeros+2);
-            zeros++;
-          } else
-            ones++;
-        }
+          }
       }
 
       // Account for immediate results
@@ -301,8 +349,9 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
       // Test if desired
       MD({
         const auto board = pack(side0,root1|set_side(k1,sets1[s1]));
-        GEODE_ASSERT(us.x==super_evaluate_all(true ,100,board));
-        GEODE_ASSERT(us.y==super_evaluate_all(false,100,board));
+        const bool p = (n+parity)&1;
+        GEODE_ASSERT(us.x==split(super_evaluate_all(true ,100,board))[p]);
+        GEODE_ASSERT(us.y==split(super_evaluate_all(false,100,board))[p]);
       })
 
       // If we're far enough along, remember results
@@ -324,7 +373,8 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
       halfsupers_t above;
       above.x = rmax(~us.y);
       above.y = rmax(~us.x);
-      output(s0,s1p) = above;
+      output(s1,s0p) = above;
+      MD(GEODE_ASSERT(!written(s1,s0p)++));
     }
   }
 }
