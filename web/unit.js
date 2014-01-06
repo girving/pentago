@@ -108,38 +108,43 @@ function test_values(cont) {
 
   var log = new Log('debug')
   var compute = Values.values({cache:'4M',bits:22},log) // Use a small cache to test replacement
-  var gn = games.length
-  function test(path,values) {
-    var seen = {}
-    var pn = path.length
-    function step(board) {
-      log.info('board %s launched',board)
-      compute(high_board_t(board),function (results) {
-        for (var b in results) {
-          seen[b] = 1
-          if (b in values && results[b] != values[b])
-            throw 'mismatch: board '+b+', correct '+values[b]+', got '+results[b] 
-        }
-        log.info('board %s checked',board)
-        if (!--pn) {
-          if (!truncate)
-            for (var b in values)
-              if (!seen[b])
-                throw 'missed board '+b
-          if (!--gn) {
-            log.info('crossed chunks = %d',Values.stats.crossed_chunks)
-            if (!Values.stats.crossed_chunks)
-              throw 'no chunks crossed, the relevant code could be buggy'
-            cont()
+  function epoch(which,cont) {
+    var gn = which
+    function test(path,values) {
+      var seen = {}
+      var pn = path.length
+      function step(board) {
+        log.info('board %s launched',board)
+        compute(high_board_t(board),function (results) {
+          for (var b in results) {
+            seen[b] = 1
+            if (b in values && results[b] != values[b])
+              throw 'mismatch: board '+b+', correct '+values[b]+', got '+results[b]
           }
-        }
-      })
+          log.info('board %s checked',board)
+          if (!--pn) {
+            if (!truncate)
+              for (var b in values)
+                if (!seen[b])
+                  throw 'missed board '+b
+            if (!--gn) {
+              log.info('crossed chunks = %d',Values.stats.crossed_chunks)
+              if (!Values.stats.crossed_chunks)
+                throw 'no chunks crossed, the relevant code could be buggy'
+              cont()
+            }
+          }
+        })
+      }
+      for (var i=0;i<path.length;i++)
+        step(path[i])
     }
-    for (var i=0;i<path.length;i++)
-      step(path[i])
+    for (var i=0;i<which;i++)
+      test(games[i].path,games[i].values)
   }
-  for (var i=0;i<games.length;i++)
-    test(games[i].path,games[i].values)
+  // Run the whole thing twice to make sure caching works
+  epoch (games.length,function () {
+    epoch(1,cont) })
 }
 
 function test_slow (cont) {
@@ -198,7 +203,7 @@ if (process.argv.length > 2) {
 var left_count = tests.length
 var left_names = {}
 for (var i=0;i<tests.length;i++)
-  left_names[tests[i].name] = 1 
+  left_names[tests[i].name] = 1
 function run (name,test) {
   console.log('  '+name+': start')
   test(function () {

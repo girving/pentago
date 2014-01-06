@@ -95,7 +95,7 @@ exports.values = function (options,log) {
     var board = b[0]
     var results = compute_cache.get(board)
     if (results)
-      return JSON.parse(results)
+      cont(JSON.parse(results))
     else
       pool.enqueue(b,function (results) {
         compute_cache.set(board,JSON.stringify(results))
