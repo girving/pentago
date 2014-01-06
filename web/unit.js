@@ -169,6 +169,7 @@ function test_slow (cont) {
    *   cayley     5jan2014 -   19 s - midsolve!
    *   rackspace     ''    -   25 s - cool, not too much slower
    *   cayley     5jan2014 -   12 s - transpose arrays in midsolve
+   *   rackspace     ''    -   16 s
    */
 
   /* Alternate hard positions:
