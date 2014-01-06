@@ -40,7 +40,7 @@ def done():
   counts = {-1:0,0:0,1:0,2:0}
   for stones in 0,1,4,5,22,23,35,36:
     for middle in (0,1) if stones else (0,):
-      for _ in xrange(10):
+      for _ in xrange(20):
         board = random_board(stones,middle) 
         d = board.done()
         v = board.value(empty) if d else 2

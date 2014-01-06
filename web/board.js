@@ -135,7 +135,7 @@ function board_t() {
 
   // Is the game over?
   this.done = function () {
-    return won(0) || won(1) || count==36
+    return won(0) || won(1) || (count==36 && !middle)
   }
 
   // Assuming the game is over, what is the current player's results?  1=win, 0=tie, -1=loss
