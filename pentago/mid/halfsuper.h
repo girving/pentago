@@ -59,8 +59,8 @@ struct halfsuper_t {
   explicit halfsuper_t(__m128i x)
     : x(x) {}
 
-  operator SafeBool() const {
-    return safe_bool(_mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0);
+  operator SafeBool<halfsuper_t>::type() const {
+    return safe_bool<halfsuper_t>(_mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0);
   }
 
   bool operator==(halfsuper_t h) const { return !(*this^h); }
@@ -95,6 +95,9 @@ struct halfsuper_t {
     return singleton((a&1)+2*(b&3)+8*(c&3)+32*(d&3));
   }
 };
+
+// Split a super_t into two halfsuper_t's
+GEODE_EXPORT Vector<halfsuper_t,2> split(const super_t s) GEODE_CONST;
 
 // Merge even and odd bits into a single super_t
 GEODE_EXPORT super_t merge(const halfsuper_t even, const halfsuper_t odd) GEODE_CONST;

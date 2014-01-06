@@ -56,7 +56,7 @@ static const super_t evens(evens0,~evens0,evens0,~evens0);
 // This is called outside the inner loop (about sqrt of the time in midsolve), so
 // it does not need to be optimally fast.  Like merge below, it should only be roughly
 // a factor of two slower.
-static Vector<halfsuper_t,2> split(const super_t s) {
+Vector<halfsuper_t,2> split(const super_t s) {
   Vector<super_t,2> v(s&evens,s&~evens);
   v = uninterleave_super(v);
   return vec(halfsuper_t(v.x.x|v.y.y),

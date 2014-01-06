@@ -18,8 +18,8 @@ public:
     return r;
   }
 
-  operator SafeBool() const {
-    return safe_bool(count!=0);
+  operator SafeBool<counter_t>::type() const {
+    return safe_bool<counter_t>(count!=0);
   }
 };
 

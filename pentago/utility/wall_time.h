@@ -18,8 +18,8 @@ struct wall_time_t {
     return 1e-6*us;
   }
 
-  operator SafeBool() const {
-    return safe_bool(us!=0);
+  operator SafeBool<wall_time_t>::type() const {
+    return safe_bool<wall_time_t>(us!=0);
   }
 
   wall_time_t& operator+=(wall_time_t t) {

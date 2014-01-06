@@ -64,8 +64,8 @@ struct symmetry_t {
     return symmetry_t(gi,commute_global_local_symmetries[gi][li]);
   }
 
-  operator SafeBool() const {
-    return safe_bool(global||local);
+  operator SafeBool<symmetry_t>::type() const {
+    return safe_bool<symmetry_t>(global||local);
   }
 
   bool operator==(symmetry_t s) const {

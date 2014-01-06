@@ -101,8 +101,8 @@ struct super_t {
     return super_t(_mm_set1_epi32(1),_mm_set1_epi32(0));
   }
 
-  operator SafeBool() const {
-    return safe_bool(_mm_movemask_epi8(~_mm_cmpeq_epi32(x|y,_mm_setzero_si128()))!=0);
+  operator SafeBool<super_t>::type() const {
+    return safe_bool<super_t>(_mm_movemask_epi8(~_mm_cmpeq_epi32(x|y,_mm_setzero_si128()))!=0);
   }
 
   super_t operator~() const {
