@@ -15,7 +15,7 @@ var max = Math.max
 var sqrt = Math.sqrt
 
 // Backend, with a bit of caching to avoid flicker on the back button
-var backend_url = 'http://backend.perfect-pentago.net/'
+var backend_url = 'http://backend.perfect-pentago.net:2048/'
 var cache = LRU({max:2048})
 
 // Colors for each board value
