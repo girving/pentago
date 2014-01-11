@@ -35,3 +35,12 @@
 .turnlabel,.valuelabel {
   text-anchor: middle;
 }
+
+.five {
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.mask {
+  fill: white;
+}

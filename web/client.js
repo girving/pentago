@@ -11,6 +11,7 @@ var cos = Math.cos
 var sin = Math.sin
 var max = Math.max
 var sqrt = Math.sqrt
+var floor = Math.floor
 
 // Backend, with a bit of caching to avoid flicker on the back button
 var backend_url = 'http://backend.perfect-pentago.net:2048/'
@@ -19,13 +20,19 @@ var cache = LRU({max:2048})
 // Colors for each board value
 var value_colors = {'1':'green','0':'blue','-1':'red','undefined':null}
 
+// Which quadrant is currently spinning?
+var spinning = null
+
+// Drawing parameters
+var bar_size = .1
+var spot_radius = .4
+var board_scale = null
+
 function draw_base() {
   // Drawing parameters
   var header_size = 2
   var footer_size = 3.5
   var margin_size = 2
-  var bar_size = .1
-  var spot_radius = .4
   var value_radius = .15
   var rotator_radius = 2.5
   var rotator_thickness = .2
@@ -37,6 +44,7 @@ function draw_base() {
   var root = d3.select('svg#board')
   var width = parseInt(root.style('width').match(/^(\d+)px$/)[1])
   var scale = width/(6+2*margin_size)
+  board_scale = scale
   var svg = root
     .attr('width',width)
     .attr('height',scale*(6+header_size+footer_size))
@@ -170,12 +178,15 @@ function draw_base() {
   function spin(d) {
     // Animate our quadrant left or right by pi/2
     var angle = d.d*pi/2
+    spinning = [d.qx,d.qy]
+    draw_fives(svg)
     svg.select('#quadrant'+d.qx+d.qy)
       .transition().duration(500)
       .attrTween('transform',function (d,i,a) { return function (t) {
         var a = angle*(t-1)
         var shift = 3*(sqrt(2)*max(cos(a+pi/4),cos(a-pi/4))-1)
         return 'translate('+(d.cx+shift*(d.qx-1/2))+','+(d.cy+shift*(d.qy-1/2))+') rotate('+180/pi*a+') ' }})
+      .each('end', function () { if (spinning) { spinning = null; draw_fives(svg) } })
     d3.timer.flush() // Avoid flicker by starting transition immediately
   }
   var links = svg.selectAll('a#rotate').data(rotators).enter()
@@ -222,6 +233,65 @@ function draw_board(svg,board) {
   // Draw win/loss/tie values
   current_board = board
   draw_values(svg)
+  draw_fives(svg)
+}
+
+function draw_fives(svg) {
+  // Always draw fives for the current board (set by draw_board above), even
+  // if draw_values is called from an asynchronous callback.
+  var board = current_board
+  var fives = board.fives()
+  var active = []
+  var masks = []
+  for (var i=0;i<fives.length;i++) {
+    var f = fives[i]
+    var good = true
+    if (spinning) {
+      for (var j=0;j<5;j++)
+        if (floor(f[j][0]/3)==spinning[0] && floor(f[j][1]/3==spinning[1])) {
+          good = false
+          break
+        }
+    }
+    if (good) {
+      active.push(f)
+      if (board.grid[6*f[0][0]+f[0][1]]==2)
+        for (var j=0;j<5;j++)
+          masks.push(f[j])
+    }
+  }
+  function tweak (c) {
+    return c-2.5+bar_size/2*(c>2?1:-1)
+  }
+  var f = svg.selectAll('.five').data(active)
+  f.enter().insert('path','.mask')
+  f.exit().remove()
+  f.attr('class', 'five')
+   .style('fill', function (d) { return board.grid[6*d[0][0]+d[0][1]]==1 ? 'black' : 'white' })
+   .attr('d', function (d) {
+      var x0 = tweak(d[0][0]),
+          y0 = tweak(d[0][1]),
+          x1 = tweak(d[4][0]),
+          y1 = tweak(d[4][1]),
+          dx = x1-x0,
+          dy = y1-y0,
+          s = .15/2/sqrt(dx*dx+dy*dy),
+          nx =  s*dy,
+          ny = -s*dx
+      function point(x,y) { return x+','+y }
+      return 'm'+point(x0+nx,y0+ny)
+           +' L'+point(x1+nx,y1+ny)
+           +' L'+point(x1-nx,y1-ny)
+           +' L'+point(x0-nx,y0-ny)
+           +' z'
+     })
+  var m = svg.selectAll('.mask').data(masks)
+  m.enter().append('circle')
+  m.exit().remove()
+  m.attr('class','mask')
+   .attr('cx', function (d) { return tweak(d[0]) })
+   .attr('cy', function (d) { return tweak(d[1]) })
+   .attr('r', spot_radius-.01)
 }
 
 function draw_values(svg) {

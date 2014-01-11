@@ -8,6 +8,12 @@ var digit_quadrants = [[1,0,0,0],[10,0,0,0],[100,0,0,0],[1000,0,0,0],[10000,0,0,
 var bit_sections = [[1,0,0,0],[2,0,0,0],[4,0,0,0],[8,0,0,0],[16,0,0,0],[32,0,0,0],[64,0,0,0],[128,0,0,0],[256,0,0,0],[512,0,0,0],[1024,0,0,0],[2048,0,0,0],[4096,0,0,0],[8192,0,0,0],[16384,0,0,0],[32768,0,0,0],[65536,0,0,0],[31072,1,0,0],[62144,2,0,0],[24288,5,0,0],[48576,10,0,0],[97152,20,0,0],[94304,41,0,0],[88608,83,0,0],[77216,167,0,0],[54432,335,0,0],[8864,671,0,0],[17728,1342,0,0],[35456,2684,0,0],[70912,5368,0,0],[41824,10737,0,0],[83648,21474,0,0],[67296,42949,0,0],[34592,85899,0,0],[69184,71798,1,0],[38368,43597,3,0],[76736,87194,6,0],[53472,74389,13,0],[6944,48779,27,0],[13888,97558,54,0],[27776,95116,109,0],[55552,90232,219,0],[11104,80465,439,0],[22208,60930,879,0],[44416,21860,1759,0],[88832,43720,3518,0],[77664,87441,7036,0],[55328,74883,14073,0],[10656,49767,28147,0],[21312,99534,56294,0],[42624,99068,12589,1],[85248,98136,25179,2],[70496,96273,50359,4],[40992,92547,719,9],[81984,85094,1439,18],[63968,70189,2879,36],[27936,40379,5759,72],[55872,80758,11518,144],[11744,61517,23037,288],[23488,23034,46075,576],[46976,46068,92150,1152],[93952,92136,84300,2305],[87904,84273,68601,4611],[75808,68547,37203,9223]]
 var win_rays = [[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],[0,1],[1,1],[6,1],[7,1],[12,1],[13,1],[18,1],[19,1],[24,1],[25,1],[30,1],[31,1],[4,5],[5,5],[10,5],[11,5],[0,7],[1,7],[6,7],[7,7]]
 
+// Pull in math
+var floor = Math.floor
+var min = Math.min
+var pow = Math.pow
+var abs = Math.abs
+
 function str_to_quadrants(s) {
   // We assume s consists entirely of digits
   if (!s.match(/^\d+$/) || s.length>19)
@@ -39,12 +45,12 @@ function quadrants_to_str(quads) {
   // Reduce down to base 10**5
   var s = ''
   for (var i=0;i<3;i++) {
-    sections[i+1] += Math.floor(sections[i]/100000)
+    sections[i+1] += floor(sections[i]/100000)
     var si = '00000'+sections[i]%100000
     s = si.substr(si.length-5)+s
   }
   s = sections[3]+s
-  return s.substr(Math.min(s.match(/^0*/)[0].length,s.length-1))
+  return s.substr(min(s.match(/^0*/)[0].length,s.length-1))
 }
 
 // Mirror of high_board_t in python
@@ -78,7 +84,7 @@ function board_t() {
       for (var x=0;x<3;x++)
         for (var y=0;y<3;y++) {
           grid[6*(3*qx+x)+3*qy+y] = quad%3
-          quad = Math.floor(quad/3)
+          quad = floor(quad/3)
         }
     }
   this.grid = grid
@@ -102,14 +108,14 @@ function board_t() {
     if (middle || grid[6*x+y])
       throw 'bad place: '+name+', xy '+x+' '+y
     var qm = quads.slice(0)
-    qm[2*Math.floor(x/3)+Math.floor(y/3)] += (1+turn)*Math.pow(3,3*(x%3)+y%3)
+    qm[2*floor(x/3)+floor(y/3)] += (1+turn)*pow(3,3*(x%3)+y%3)
     return new board_t(qm,true)
   }
   this.place = place
 
   // Rotate the given quadrant left (d=1) or right (d=-1)
   function rotate(qx,qy,d) {
-    if (!middle || !(qx==0 || qx==1) || !(qy==0 || qy==1) || Math.abs(d)!=1)
+    if (!middle || !(qx==0 || qx==1) || !(qy==0 || qy==1) || abs(d)!=1)
       throw 'bad rotate: '+name+', middle '+middle+', q '+qx+' '+qy+', d '+d
     var quad = 0
     for (var x=2;x>=0;x--)
@@ -131,6 +137,20 @@ function board_t() {
         return true
     }
     return false;
+  }
+
+  // Start and end for each five in a row
+  this.fives = function () {
+    function coord(i) { var x = floor(i/6); return [x,i-6*x] }
+    var fives = []
+    for (var i=0;i<win_rays.length;i++) {
+      var s = win_rays[i][0]
+      var d = win_rays[i][1]
+      var v = grid[s]
+      if (v && grid[s+d]==v && grid[s+2*d]==v && grid[s+3*d]==v && grid[s+4*d]==v)
+        fives.push([coord(s),coord(s+d),coord(s+2*d),coord(s+3*d),coord(s+4*d)])
+    }
+    return fives
   }
 
   // Is the game over?
