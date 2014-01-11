@@ -52,7 +52,7 @@
     compression to reduce down to 4 TB total.  The large scale computation took less than four hours, plus
     a few more hours on fewer nodes to finish up.
     </p><p>
-    If we see a position with 18 or more stones, its children are outside the database, we perform a much
+    If we see a position with 18 or more stones, its children are outside the database, so we perform a much
     smaller traversal over all downstream positions.  The solver code abstracts away rotations using bit
     twiddling, so the set of downstream positions consists of all ways to fill the remaining empty spaces
     with the appropriate numbers of black or white stones.  This has the same structure as the full solve,
