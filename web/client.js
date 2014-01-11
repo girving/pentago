@@ -230,6 +230,12 @@ function draw_board(svg,board) {
   svg.selectAll('.norotate,.rotateblack,.rotatewhite')
     .attr('class',board.middle ? board.turn ? 'rotatewhite' : 'rotateblack' : 'norotate')
 
+  // Set status if we're done
+  if (board.done()) {
+    var v = board.immediate_value()
+    set_status('Game complete<br>'+(v?v==board.turn?'White wins!':'Black wins!':'Tie!'))
+  }
+
   // Draw win/loss/tie values
   current_board = board
   draw_values(svg)
@@ -328,7 +334,7 @@ function draw_values(svg) {
     .style('opacity',board.done() || has(board) ? 1 : 0)
     .style('fill',value_colors[board.done() ? board.immediate_value() : get(board)])
   svg.selectAll('.turnlabel')
-    .text(  board.done() ? {'1':'wins','0':'ties','-1':'loses'}[board.immediate_value()]
+    .text(  board.done() ? {'1':'wins!','0':'ties!','-1':'loses!'}[board.immediate_value()]
           : has(board)   ? {'1':'to win','0':'to tie','-1':'to lose'}[get(board)]
                          : 'to play')
 
