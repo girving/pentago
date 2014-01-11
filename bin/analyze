@@ -117,7 +117,8 @@ def approx():
     raw_total += count_boards(n,2048)
   sections = sum(len(all_boards_sections(n,symmetries)) for n in xrange(37))
   print 'grand total = %s, grand ratio = %g, total sections = %d'%(large(total),total/raw_total,sections)
-  print 'super ratio = %g'%(256*total/sum(count_boards(n,8) for n in xrange(37)))
+  simple_total = sum(count_boards(n,8) for n in xrange(37))
+  print 'super ratio = %g, simple total = %s'%(256*total/simple_total,large(simple_total))
   for p in 17,18:
     print 'total up to %d stones = %s supers, %s bytes'%(p,large(partials[p]),large(64*long(partials[p])))
 

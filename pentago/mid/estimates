@@ -60,24 +60,8 @@ better.  Complicated though, and there's a much easier way to save a factor
 of 2: use aggressive and passive modes.  Let's do it that way.
 '''
 
-def factorial(n):
-  assert n>=0
-  f = 1
-  for i in xrange(2,n+1):
-    f *= i
-  return f
-
-def choose(n,*k):
-  k = asarray(k)
-  sk = k.sum()
-  if k.min()<0 or sk>n: return 0
-  f = factorial(n)//factorial(n-sk)
-  for i in k:
-    f //= factorial(i)
-  return f
-
 def count(n,k):
-  return choose(n,k)*choose(k,k//2)
+  return binom(n,k)*binom(k,k//2)
 def total(n):
   return sum(count(n,k) for k in xrange(n+1))
 

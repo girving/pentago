@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+
+from __future__ import division,print_function,unicode_literals
+from pentago import *
+from geode import *
+import matplotlib
+import pylab
+
+nn = arange(37)
+counts = [count_boards(n,8) for n in nn]
+mm = nn[18:]
+mid = [binom(18,k)*binom(k,k//2) for k in mm-18]
+pylab.semilogy(nn,counts,'-o')
+pylab.semilogy(mm,mid,'-ob')
+pylab.semilogy(mm,mid,'-og')
+pylab.xlim(0,36.2)
+pylab.xticks(nn)
+
+size = 20
+pylab.xlabel('stones on the board',fontsize=size)
+pylab.ylabel('positions',fontsize=size)
+pylab.text(24,counts[24]/10,'all boards',horizontalalignment='center',fontsize=size)
+pylab.text(30,mid[30-18]/200,'descendents of an\n18 stone board',horizontalalignment='center',fontsize=size)
+
+ax = pylab.axes()
+ax.spines['top'].set_visible(0)
+ax.spines['right'].set_visible(0)
+ax.get_xaxis().tick_bottom()
+ax.get_yaxis().tick_left()
+
+pylab.show()

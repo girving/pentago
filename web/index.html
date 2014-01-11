@@ -2,93 +2,105 @@
 <html>
 <head>
   <meta charset="utf8"/>
-  <title>Perfect pentago explorer</title>
+  <title>Pentago is a first player win</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="board.css">
 </head>
-<style>
-  /*** Page layout ***/
-
-  h1,h2,#status {
-    text-align: center;
-  }
-
-  svg,.section {
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-  }
-
-  .section {
-    width: 52em;
-  }
-
-  /*** Board visuals ***/
-
-  .black,.white,.empty,.emptyblack,.emptywhite {
-    stroke: black;
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-  .empty,.emptyblack,.emptywhite { fill: tan }
-  .emptyblack:hover, .emptyblack:hover + .emptyblack { fill: black }
-  .emptywhite:hover, .emptywhite:hover + .emptywhite { fill: white }
-  .black { fill: black }
-  .white { fill: white }
-  .board { fill: tan }
-  .separators { fill: darkgray }
-
-  .rotateselect { opacity: 0 }
-  .rotateselect:hover + .rotateblack { fill: black }
-  .rotateselect:hover + .rotatewhite { fill: white }
-  .norotate { visibility: hidden }
-  .rotateblack,.rotatewhite {
-    fill: tan;
-    stroke: black;
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-  .rotateblack:hover { fill: black }
-  .rotatewhite:hover { fill: white }
-
-  .cvalue,.rvalue,.tvalue {
-    stroke-width: 0;
-    pointer-events: none;
-    opacity: 0;
-  }
-
-  .turnlabel,.valuelabel {
-    text-anchor: middle;
-  }
-</style>
 <body>
 
 <script type="text/javascript" src="bundle.js"></script>
 
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>
-<div id="status"></div>
+<div class="main">
+  <svg id="board" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"/>
+  <div class="status"></div>
 
-<h1>Pentago is a first player win</h1>
-<h2>A semi-interactive explorer for perfect pentago play</h2>
-<div class="section">
+  <hr>
+
+  <h1>Pentago is a first player win</h1>
+
+  <h2>An interactive explorer for perfect pentago play</h2>
+  <div class="section">
+    <p>
+    <a href="https://en.wikipedia.org/wiki/Pentago">Pentago</a> is a board game designed by Tomas Flodén and
+    developed and sold by <a href="http://mindtwisterusa.com">Mindtwister</a>.
+    <a href="http://www.pentago.se/ENRules.pdf">Here are the rules</a>.
+    Pentago is now strongly solved.  This means that perfect play can be efficiently computed from any
+    position.  The above visualization lets you explore the results: click on a empty spot to place a stone,
+    or on an arrow to rotate the board.  After a wait, the results of all moves will show up: green moves
+    win, blue moves tie, and red moves lose.
+    </p><p>
+    For boards with 17 or fewer stones, the result is read out of a 4 terabyte database.  Since the number
+    of positions increases exponentially with the number of stones, the database stops after this, and the
+    result must be computed from scratch.  This takes about 15-20 seconds for an 18 stone board if the server
+    is below full load, much less for boards with 19 or more stones.
+    </p>
+  </div>
+
+  <h2>Solving the game via brute force</h2>
+  <div class="section">
+    <p>
+    With symmetries removed, pentago has 3,009,081,623,421,558 (3e15) possible positions.  To solve the
+    game, we traversed each of these (with about 15% redundancy for technical reasons), starting at 36 stone
+    positions and moving backwards through the game to the starting position with 0 stones computing the
+    result of each position under perfect play.  The number of positions with each number of stones looks like:
+    </p><img id="counts" src="counts.svg" height="256"><p>
+    Around the peak at 24 stones, the computation requires 80 TB of RAM even with (weak) compression, and was
+    therefore run on 98304 threads of
+    <a href="http://www.nersc.gov/users/computational-systems/edison">Edison</a>,
+    a Cray supercomputer at NERSC, the National Energy Research Supercomputing Center.  Positions with more
+    than 18 stones were discarded after use, and those with 18 or fewer were written to disk, using lzma
+    compression to reduce down to 4 TB total.  The large scale computation took less than four hours, plus
+    a few more hours on fewer nodes to finish up.
+    </p><p>
+    If we see a position with 18 or more stones, its children are outside the database, we perform a much
+    smaller traversal over all downstream positions.  The solver code abstracts away rotations using bit
+    twiddling, so the set of downstream positions consists of all ways to fill the remaining empty spaces
+    with the appropriate numbers of black or white stones.  This has the same structure as the full solve,
+    but is much smaller, so it can be done in 15-20 seconds with a single thread.
+    </p>
+  </div>
+
+  <h2>Open source and data</h2>
+  <div class="section">
+    <p>
+    All code for this project (including this site and its backend) is BSD licensed and hosted on Github at
+    </p><div class="indent">
+      <a href="https://github.com/girving/pentago">https://github.com/girving/pentago</a>
+    </div><p>
+    The data set is released into the public domain
+    (<a href="http://wiki.creativecommons.org/CC0_use_for_data">CC0</a>),
+    and can be downloaded directly from Rackspace; send me an email if you want links.
+    </p><p>
+    I will be writing up more details of the computation in paper form soon.
+    </p>
+  </div>
+
+  <h2>Acknowledgements</h2>
+  <div class="section">
+    <p>
+    I am extremely grateful to Jeff Hammond and <a href="http://nersc.gov">NERSC</a> for the Edison time required
+    for this project, as well as Jeff Hammond and <a href="http://www.anl.gov">Argonne National Lab</a> for small
+    amounts of time on Blue Gene to help understand performance problems.  Both Jeff Hammond and Jed Brown provided
+    valuable advice throughout the project.
+    </p><p>
+    Hosting for the 4 TB data set and compute servers for this site were generously donated by
+    <a href="http://rackspace.com">Rackspace</a>; thanks especially to Jesse Noller at Rackspace for offering
+    to host this open source project!  Cloud storage may seem less shiny than supercomputer time, but is just
+    as essential in order to make the results available to anyone curious.  Solving a game and forgetting the answer
+    is no good!
+    </p>
+    <div class="logos">
+      <a href="http://nersc.gov"><img src="nersc-logo-small.png" height="60"></a>
+      <a href="http://rackspace.com"><img src="rackspace-logo.svg" height="60"></a>
+    </div>
+  </div>
+
+  <h2>Contact</h2>
   <p>
-  <a href="https://en.wikipedia.org/wiki/Pentago">Pentago</a> is a game designed by Tomas Flodén and
-  developed and sold by <a href="http://mindtwisterusa.com">Mindtwister</a>.
-  <a href="http://www.pentago.se/ENRules.pdf">Here are the rules</a>.
+  For questions or comments, email <a href="mailto:irving@naml.us">Geoffrey Irving &lt;irving@naml.us&gt</a>.
   </p><p>
-  With the help of several hours on 98304 threads of Edison, a Cray supercomputer at NERSC,
-  Pentago is now strongly solved.  This means that perfect play can be computed from any position
-  in a reasonable amount of time (see below).  The above visualization lets you explore the results:
-  click on a empty spot to place a stone, or on an arrow to rotate the board.  After a wait, the
-  results of all moves will show up.
-  </p><p>
-  How long you have to wait depends on the number of stones on the board.  For moves with 18 or fewer
-  stones, the result is simply read out of a 4 terabyte database (generously hosted by Rackspace!).
-  Since the number of positions with increases exponentially with the number of stones (up to 24
-  stones), it was impractical to remember the values of positions with more stones: the supercomputer
-  generated these values in RAM but discarded them as soon as possible.  Therefore, when given a board
-  whose children have 19 or more stones, the values are computed from scratch using tree search.  This
-  takes a fraction of a second close to the end of the game, around 30 seconds for for the children of
-  an "average" 18 stone board, and possibly an hour or more for "delicate" 18 stone boards even if
-  the backend server is otherwise idle.  Thus semi-interactive.
+  For bug reports, you can also use
+  <a href="https://github.com/girving/pentago/issues">https://github.com/girving/pentago/issues</a>.
   </p>
 </div>
 

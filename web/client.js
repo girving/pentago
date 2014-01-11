@@ -4,8 +4,6 @@
 var d3 = require('d3')
 var LRU = require('lru-cache')
 var board_t = require('./board.js').board_t
-var server = 'http://localhost:8000'
-console.log('server',server)
 
 // Pull in math stuff
 var pi = Math.PI
@@ -23,10 +21,8 @@ var value_colors = {'1':'green','0':'blue','-1':'red','undefined':null}
 
 function draw_base() {
   // Drawing parameters
-  var shrink = 1/2 // Shrink for debugging
-  var scale = 420/6*shrink
-  var header_size = 2.5
-  var footer_size = 4
+  var header_size = 2
+  var footer_size = 3.5
   var margin_size = 2
   var bar_size = .1
   var spot_radius = .4
@@ -38,8 +34,11 @@ function draw_base() {
   var font_size = .4
 
   // Grab and resize svg
-  var svg = d3.select('svg')
-    .attr('width',scale*(6+2*margin_size))
+  var root = d3.select('svg#board')
+  var width = parseInt(root.style('width').match(/^(\d+)px$/)[1])
+  var scale = width/(6+2*margin_size)
+  var svg = root
+    .attr('width',width)
     .attr('height',scale*(6+header_size+footer_size))
     .append('g')
     .attr('transform','translate('+scale*(3+margin_size)+','+scale*(3+header_size)+') scale('+scale+','+-scale+') ')
@@ -196,6 +195,9 @@ function draw_base() {
   return {'svg':svg,'grid':grid}
 }
 
+// Keep track of currently shown board for asynchronous callback purposes
+var current_board = null
+
 function draw_board(svg,board) {
   // Update turn
   svg.select('circle')
@@ -218,10 +220,15 @@ function draw_board(svg,board) {
     .attr('class',board.middle ? board.turn ? 'rotatewhite' : 'rotateblack' : 'norotate')
 
   // Draw win/loss/tie values
-  draw_values(svg,board)
+  current_board = board
+  draw_values(svg)
 }
 
-function draw_values(svg,board) {
+function draw_values(svg) {
+  // Always draw values for the current board (set by draw_board above), even
+  // if draw_values is called from an asynchronous callback.
+  var board = current_board
+
   // Note if we're missing anything
   var missing = false
   var get = function (board) {
@@ -264,34 +271,39 @@ function draw_values(svg,board) {
         if (xh.status==200) {
           var values = JSON.parse(xh.responseText)
           var elapsed = (Date.now()-start)/1000
-          var s = 'Received board '+board.name+' from server, elapsed = '+elapsed
+          var s = 'Received '+board.count+' stone board<br>elapsed = '+elapsed+' s'
           if ('search-time' in values)
             s += ', tree search = '+values['search-time']+' s'
           set_status(s)
           for (var name in values)
             cache.set(name,values[name])
-          draw_values(svg,board)
-        } else {
-          set_status('Server request failed, http status = '+xh.status)
-        }
+          draw_values(svg)
+        } else
+          set_error('Server request failed, http status = '+xh.status)
       }
     }
-    xh.timeout = 1000*60*60 // One hour
-    xh.ontimeout = function () {
-      set_status('Server access timed out, time = '+(Date.now()-start)/1000+' s')
-    }
-    var s = 'Requesting board '+board.name+' ('+board.count+' stones) from server'
-    if (board.count==18)
-      s += '.  Warning: 18 stone boards may take several minutes to compute.'
-    set_status(s)
+    set_loading('Looking up '+board.count+' stone board...')
     xh.open('GET',backend_url+board.name,true)
     xh.send()
   }
 }
 
 function set_status(s) {
-  console.log('status',s)
-  d3.select('#status').text(s)
+  console.log(s)
+  d3.select('.status').html(s)
+}
+
+function set_error(s) {
+  console.error(s)
+  d3.select('.status').html('<div id="'+mode+'">'+s+'</div>')
+}
+
+function set_loading(s) {
+  console.log(s)
+  var h = ''
+  for (var i=0;i<s.length;i++)
+    h += '<div class="load" style="animation-delay:'+1.7*i/s.length+'s">'+s[i]+'</div>'
+  d3.select('.status').html(h)
 }
 
 function update(svg) {
@@ -300,7 +312,7 @@ function update(svg) {
       var hash = window.location.hash.substr(1)
       var board = new board_t(hash)
     } catch (e) {
-      set_status('Invalid board '+hash+', error = '+e)
+      set_error('Invalid board '+hash+', error = '+e)
       return
     }
   } else

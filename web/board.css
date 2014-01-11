@@ -1,0 +1,37 @@
+/*** Board style ***/
+
+.black,.white,.empty,.emptyblack,.emptywhite {
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.empty,.emptyblack,.emptywhite { fill: tan }
+.emptyblack:hover, .emptyblack:hover + .emptyblack { fill: black }
+.emptywhite:hover, .emptywhite:hover + .emptywhite { fill: white }
+.black { fill: black }
+.white { fill: white }
+.board { fill: tan }
+.separators { fill: darkgray }
+
+.rotateselect { opacity: 0 }
+.rotateselect:hover + .rotateblack { fill: black }
+.rotateselect:hover + .rotatewhite { fill: white }
+.norotate { visibility: hidden }
+.rotateblack,.rotatewhite {
+  fill: tan;
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.rotateblack:hover { fill: black }
+.rotatewhite:hover { fill: white }
+
+.cvalue,.rvalue,.tvalue {
+  stroke-width: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.turnlabel,.valuelabel {
+  text-anchor: middle;
+}
