@@ -1,15 +1,17 @@
 // Spin locks
 #pragma once
 
+#include <geode/utility/type_traits.h>
 #ifdef __APPLE__
 #include <libkern/OSAtomic.h>
 #else
 #include <pthread.h>
 #endif
-#include <boost/type_traits/is_same.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/mpl/assert.hpp>
 namespace pentago {
+
+using namespace geode;
 
 /* Important non-portability note:
  *
@@ -54,7 +56,7 @@ struct spinlock_t {
 //
 // I've checked that both are safe to do with glibc, so we restrict to that for now.
 #ifdef __GLIBC__
-BOOST_MPL_ASSERT((boost::is_same<volatile int,pthread_spinlock_t>));
+static_assert(is_same<volatile int,pthread_spinlock_t>::value,"");
 #else
 #error "I'm not sure if pthread_spin_destroy is a no-op on this system"
 #endif

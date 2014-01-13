@@ -11,9 +11,8 @@
 #include <geode/utility/Enumerate.h>
 #include <geode/utility/format.h>
 #include <geode/utility/range.h>
+#include <geode/utility/type_traits.h>
 #include <geode/vector/Vector.h>
-#include <boost/type_traits/is_integral.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/mpl/and.hpp>
 namespace pentago {
@@ -42,7 +41,7 @@ template<class T> struct Wrapper;
 
 // Wrap a class method with a different name
 #define PN_METHOD_2(name,method) \
-  static_assert(boost::is_same<decltype(finisher),Wrapper<Self>::Finish>::value,""); \
+  static_assert(is_same<decltype(finisher),Wrapper<Self>::Finish>::value,""); \
   Wrapper<Self>::template_->PrototypeTemplate()->Set(String::NewSymbol(#name),FunctionTemplate::New( \
     wrapped_method<Self,decltype(&Self::method),&Self::method>)->GetFunction());
 
@@ -54,21 +53,21 @@ template<class T> struct Wrapper;
 // Conversion
 
 template<class T> struct is_numeric : public
-  mpl::and_<mpl::not_<boost::is_same<T,bool>>,
-            mpl::or_<boost::is_integral<T>,
-                     boost::is_floating_point<T>>> {};
+  mpl::and_<mpl::not_<is_same<T,bool>>,
+            mpl::or_<is_integral<T>,
+                     is_floating_point<T>>> {};
 
 static inline Handle<Primitive> to_js(unit) {
   return Undefined();
 }
 
-template<class T> static inline typename boost::enable_if<boost::is_same<T,bool>,Handle<Boolean>>::type to_js(T x) {
+template<class T> static inline typename enable_if<is_same<T,bool>,Handle<Boolean>>::type to_js(T x) {
   return Boolean::New(x);
 }
 
-template<class T> static inline typename boost::enable_if<is_numeric<T>,Handle<Number>>::type to_js(T x) {
+template<class T> static inline typename enable_if<is_numeric<T>,Handle<Number>>::type to_js(T x) {
   const double d(x);
-  if (!boost::is_floating_point<T>::value && T(d)!=x)
+  if (!is_floating_point<T>::value && T(d)!=x)
     throw ValueError(format("can't safely convert %s to javascript, would degrade to %s",str(x),str(d)));
   return Number::New(x);
 }
@@ -82,7 +81,7 @@ static inline Handle<String> to_js(const string& x) {
 }
 
 template<class T> static inline Handle<v8::Object> to_js(const Ref<T>& x) {
-  typedef typename boost::remove_const<T>::type MT;
+  typedef typename remove_const<T>::type MT;
   GEODE_ASSERT(!Wrapper<MT>::constructor.IsEmpty(),format("type %s has not been wrapped",typeid(T).name()));
   Wrapper<MT>::constructor_hack = x.const_cast_();
   const auto js = Wrapper<MT>::constructor->NewInstance(0,0);
@@ -142,7 +141,7 @@ template<class T> static inline auto from_js(const Local<Value>& x)
   return FromJS<T>::convert(x);
 }
 
-template<class T> struct FromJS<T,typename boost::enable_if<is_numeric<T>>::type> {
+template<class T> struct FromJS<T,typename enable_if<is_numeric<T>>::type> {
   static T convert(const Local<Value>& x) {
     const auto n = Local<Number>::Cast(x);
     if (x.IsEmpty())
@@ -154,14 +153,14 @@ template<class T> struct FromJS<T,typename boost::enable_if<is_numeric<T>>::type
   }
 };
 
-template<class T> struct FromJS<T&,typename boost::enable_if<boost::is_base_of<geode::Object,T>>::type> {
+template<class T> struct FromJS<T&,typename enable_if<is_base_of<geode::Object,T>>::type> {
   static T& convert(const Local<Value>& x) {
-    typedef typename boost::remove_const<T>::type MT;
+    typedef typename remove_const<T>::type MT;
     if (x->IsObject()) {
       const auto o = x->ToObject();
       if (Wrapper<MT>::template_->HasInstance(o)) {
         const Wrapper<MT>& self = *::node::ObjectWrap::Unwrap<Wrapper<MT>>(x->ToObject());
-        if (!boost::is_const<T>::value && !self.mutable_)
+        if (!is_const<T>::value && !self.mutable_)
           throw format("expected mutable %s, got const",typeid(MT).name());
         return self.self;
       }
@@ -169,7 +168,7 @@ template<class T> struct FromJS<T&,typename boost::enable_if<boost::is_base_of<g
     throw TypeError(format("expected object, type %s",typeid(MT).name()));
   }
 };
-template<class T> struct FromJS<T&,typename boost::disable_if<boost::is_base_of<geode::Object,T>>::type>
+template<class T> struct FromJS<T&,typename disable_if<is_base_of<geode::Object,T>>::type>
   : public FromJS<T> {};
 
 template<class T> struct FromJS<Ref<T>> {
@@ -227,7 +226,7 @@ template<> struct FromJS<section_t> { static section_t convert(const Local<Value
 // Class wrapping
 
 template<class T> struct Wrapper : public ::node::ObjectWrap {
-  static_assert(!boost::is_const<T>::value,"");
+  static_assert(!is_const<T>::value,"");
   typedef T Self;
   const geode::Ref<T> self;
   const bool mutable_;
@@ -251,7 +250,7 @@ template<class T> struct Wrapper : public ::node::ObjectWrap {
     Finish(Handle<v8::Object>& exports, const Local<String>& sname) : exports(exports), sname(sname) {}
     ~Finish() {
       Wrapper::constructor = Persistent<Function>::New(Wrapper::template_->GetFunction());
-      if (!boost::is_same<typename T::Base,geode::Object>::value) {
+      if (!is_same<typename T::Base,geode::Object>::value) {
         GEODE_ASSERT(!Wrapper<typename T::Base>::template_.IsEmpty());
         Wrapper::template_->Inherit(Wrapper<typename T::Base>::template_);
       }
@@ -338,7 +337,7 @@ template<class T,class M,M method> static Handle<Value> wrapped_method(const Arg
     return scope.Close(Undefined());
   }
   try {
-    typedef typename boost::remove_const<T>::type MT;
+    typedef typename remove_const<T>::type MT;
     const auto self = ::node::ObjectWrap::Unwrap<Wrapper<MT>>(args.This());
     return scope.Close(to_js(invoke(*self->self,method,args,Args(),self->mutable_)));
   } catch (const exception& e) {

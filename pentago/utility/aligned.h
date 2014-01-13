@@ -13,8 +13,8 @@ GEODE_EXPORT Tuple<void*,PyObject*> aligned_buffer_helper(size_t alignment, size
 
 // Allocate an aligned, uninitialized array of the given type and size
 template<class T> Array<T> aligned_buffer(int size) {
-  BOOST_MPL_ASSERT((boost::has_trivial_destructor<T>));
-  BOOST_STATIC_ASSERT(!(sizeof(T)&(sizeof(T)-1))); // size must be a power of two
+  static_assert(has_trivial_destructor<T>::value,"");
+  static_assert(!(sizeof(T)&(sizeof(T)-1)),"size must be a power of two");
   auto aligned = aligned_buffer_helper(max(sizeof(T),sizeof(void*)),sizeof(T)*size);
   Array<T> array(size,(T*)aligned.x,aligned.y);
   GEODE_XDECREF(aligned.y);

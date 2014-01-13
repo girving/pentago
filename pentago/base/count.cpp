@@ -10,7 +10,6 @@
 #include <geode/random/Random.h>
 #include <geode/structure/Hashtable.h>
 #include <geode/utility/Hasher.h>
-#include <geode/utility/remove_const_reference.h>
 #include <geode/utility/tr1.h>
 #include <vector>
 namespace pentago {

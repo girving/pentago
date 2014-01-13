@@ -27,7 +27,7 @@ struct line_t {
   }
 };
 
-BOOST_STATIC_ASSERT(sizeof(line_t)==12);
+static_assert(sizeof(line_t)==12,"Line isn't packed enough");
 
 // Dedicated type to catch errors
 struct local_id_t {

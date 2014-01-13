@@ -13,7 +13,7 @@ GEODE_EXPORT Tuple<void*,PyObject*> mmap_buffer_helper(size_t size);
 
 // Allocate a large buffer using mmap.  The data will be zero initialized.
 template<class T> static inline Array<T> mmap_buffer(int size) {
-  BOOST_MPL_ASSERT((boost::has_trivial_destructor<T>));
+  static_assert(has_trivial_destructor<T>::value,"");
   auto buffer = mmap_buffer_helper(sizeof(T)*size);
   Array<T> array(size,(T*)buffer.x,buffer.y);
   GEODE_XDECREF(buffer.y);
