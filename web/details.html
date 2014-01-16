@@ -1,0 +1,144 @@
+<!DOCTYPE.html>
+<html>
+<head>
+  <meta charset="utf8"/>
+  <title>Pentago is a first player win</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="board.css">
+</head>
+<body>
+
+
+
+<div class="all">
+  <header>
+    <h2>Pentago is a first player win</h2>
+    <h3>An interactive explorer for perfect pentago play</h3>
+  </header>
+
+  <div class="main">
+    <nav>
+      <a href="/">Home</a>
+      <a href="details.html#intro">Introduction</a>
+      <a href="details.html#rules">Pentago rules</a>
+      <a href="details.html#algorithms">Algorithms</a>
+      <a href="details.html#open">Code and data</a>
+      <a href="details.html#thanks">Acknowledgements</a>
+      <a href="details.html#contact">Contact</a>
+    </nav>
+
+    <div class="content">
+      <section id="intro"><h2>Introduction</h2>
+        <p>
+        <a href="https://en.wikipedia.org/wiki/Pentago">Pentago</a> is a board game designed by Tomas Flodén and
+        developed and sold by <a href="http://mindtwisterusa.com">Mindtwister</a>.
+        The rules are <a href="#rules">given below</a>.
+        Like chess and go, pentago is a two player, deterministic, perfect knowledge, zero sum game:
+        there is no random or hidden state, and the goal of the two players is to make the other player lose (or
+        at least tie).  Note that pentago is not related to go; it is much closer to
+        <a href="http://en.wikipedia.org/wiki/gomoku">gomoku</a>.
+        </p><p>
+        Unlike chess and go, pentago is small enough for a computer to play perfectly: with symmetries removed,
+        there are a mere 3,009,081,623,421,558 (3e15) possible positions.  Thus, with the help of several hours
+        on 98304 threads of <a href="http://www.nersc.gov/users/computational-systems/edison">Edison</a>, a
+        Cray supercomputer at <a href="http://www.nersc.gov">NERSC</a>, pentago is now strongly solved.
+        "Strongly" means that perfect play is efficiently computable for any position.  For example,
+        <a href="/#0">the first player wins</a>.
+        </p><p>
+        For boards with 17 or fewer stones, the result is read out of a 4 terabyte database.  Since the number
+        of positions increases exponentially with the number of stones, the database stops after this, and the
+        result must be computed from scratch.  This takes about 15-20 seconds for an 18 stone board if the server
+        is below full load, much less for boards with 19 or more stones.
+        </p>
+      </section>
+
+      <section id="rules"><h2>Pentago rules</h2>
+        <p>
+        The rules of pentago can be found on the <a href="http://www.pentago.se/ENRules.pdf">Mindtwister website</a>,
+        or on <a href="https://en.wikipedia.org/wiki/Pentago">Wikipedia</a>.  For completeness, we reproduce them
+        here.
+        </p><p>
+        Pentago is played on a 6 by 6 board, divided into four 3 by 3 quadrants.  There are two players, black
+        and white, who alternate turns.  The goal of each player is to get five stones of their color in a row,
+        either horizontal, vertically, or diagonally.  Each turn, a player places a stone in an empty space in
+        some quadrant, then chooses a possibly different quadrant to rotate 90 degrees either left or right.
+        If both players get five in a row at the same time, or the last move is played with no five in a row,
+        the game is a tie.  If a player makes five a row by placing a stone, there is no need to rotate a
+        quadrant: the player wins immediately.
+        </p><p>
+        To use the visualization, click on an empty spot to place a stone, or on an arrow to the board.  After
+        a short wait, the results of all moves will show up: green moves win, blue moves tie, and red moves lose.
+        You can back up either by pressing the back button, or using your browser history.  If you find an
+        interesting position, you can save it by copying the browser url; this records both the current position
+        and the history of the game up to this point.
+      </section>
+
+      <section id="algorithms"><h2>Algorithms: solving the game by brute force</h2>
+        <p>
+        With symmetries removed, pentago has 3,009,081,623,421,558 (3e15) possible positions.  To solve the
+        game, we traversed each of these (with about 15% redundancy for technical reasons), starting at 36 stone
+        positions and moving backwards through the game to the starting position with 0 stones computing the
+        result of each position under perfect play.  The number of positions with each number of stones looks like:
+        </p><img id="counts" src="counts.svg" height="256"><p>
+        Around the peak at 24 stones, the computation requires 80 TB of RAM even with (weak) compression, and was
+        therefore run on 98304 threads of
+        <a href="http://www.nersc.gov/users/computational-systems/edison">Edison</a>,
+        a Cray supercomputer at NERSC, the National Energy Research Supercomputing Center.  Positions with more
+        than 18 stones were discarded after use, and those with 18 or fewer were written to disk, using lzma
+        compression to reduce down to 4 TB total.  The large scale computation took less than four hours, plus
+        a few more hours on fewer nodes to finish up.
+        </p><p>
+        If we see a position with 18 or more stones, its children are outside the database, so we perform a much
+        smaller traversal over all downstream positions.  The solver code abstracts away rotations using bit
+        twiddling, so the set of downstream positions consists of all ways to fill the remaining empty spaces
+        with the appropriate numbers of black or white stones.  This has the same structure as the full solve,
+        but is much smaller, so it can be done in 15-20 seconds with a single thread.
+        </p>
+      </section>
+
+      <section id="open"><h2>Code and data</h2>
+        <p>
+        All code for this project (including this site and its backend) is BSD licensed and hosted on Github at
+        </p><div class="indent">
+          <a href="https://github.com/girving/pentago">https://github.com/girving/pentago</a>
+        </div><p>
+        The data set is released into the public domain
+        (<a href="http://wiki.creativecommons.org/CC0_use_for_data">CC0</a>),
+        and can be downloaded directly from Rackspace; send me an email if you want links.
+        </p><p>
+        I will be writing up more details of the computation in paper form soon.
+        </p>
+      </section>
+
+      <section id="thanks"><h2>Acknowledgements</h2>
+        <p>
+        I am extremely grateful to Jeff Hammond and <a href="http://nersc.gov">NERSC</a> for the Edison time required
+        for this project, as well as Jeff Hammond and <a href="http://www.anl.gov">Argonne National Lab</a> for small
+        amounts of time on Blue Gene to help understand performance problems.  Both Jeff Hammond and Jed Brown provided
+        valuable advice throughout the project.
+        </p><p>
+        Hosting for the 4 TB data set and compute servers for this site were generously donated by
+        <a href="http://rackspace.com">Rackspace</a>; thanks especially to Jesse Noller at Rackspace for offering
+        to host this open source project!  Cloud storage may seem less shiny than supercomputer time, but is just
+        as essential in order to make the results available to anyone curious.  Solving a game and forgetting the answer
+        is no good!
+        </p>
+        <div class="logos">
+          <a href="http://nersc.gov"><img src="nersc-logo-small.png" height="60"></a>
+          <a href="http://rackspace.com"><img src="rackspace-logo.svg" height="60"></a>
+        </div>
+      </section>
+
+      <section id="contact"><h2>Contact</h2>
+        <p>
+        For questions or comments, email <a href="mailto:irving@naml.us">Geoffrey Irving &lt;irving@naml.us&gt</a>.
+        </p><p>
+        For bug reports, you can also use
+        <a href="https://github.com/girving/pentago/issues">https://github.com/girving/pentago/issues</a>.
+        </p>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>

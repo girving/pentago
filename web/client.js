@@ -30,7 +30,7 @@ var board_scale = null
 
 function draw_base() {
   // Drawing parameters
-  var header_size = 2
+  var header_size = 2.5
   var footer_size = 3.5
   var margin_size = 2
   var value_radius = .15

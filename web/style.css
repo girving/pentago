@@ -4,20 +4,60 @@ body {
   background: #d5d6d7;
 }
 
-.main {
-  width: 54em;
+.all {
+  width: 60em;
   margin: 0 auto;
-  padding: 2em 2em 1em 2em;
   background-color: white;
-  border: 1px solid #959596;
+  border: 1px solid;
   border-radius: 1em;
+  overflow: hidden;
 }
 
-svg {
+header {
+  text-align: center;
+  background-color: #c0c0c0;
+  display: inline-block;
+  width: 100%;
+  border-bottom: 1px solid;
+}
+
+.main {
+  background-color: white;
+  float: left;
+  width: 49em;
+  border-left: 11em solid #c0c0c0;
+}
+
+nav {
+  float: left;
+  width: 11em;
+  margin-left: -11em;
+  position: relative;
+}
+
+nav a {
+  display: block;
+  height: 3em;
+  line-height: 3em;
+  text-align: center;
+  text-decoration: none;
+  border-bottom: 1px solid black;
+  color: black;
+}
+nav a:hover   { background-color: white; }
+nav a:visited { color: black; }
+
+.content {
+  width: 49em;
+  float: left;
+  margin-right: -49em;
+  border-left: 1px solid black;
+}
+
+svg#board {
   width: 400px;
   display: block;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0 auto;
 }
 
 .status {
@@ -40,23 +80,10 @@ svg {
    40% { color: black;  text-shadow: none; }
 }
 
-hr { /* From http://css-tricks.com/examples/hrs */
-  border: 0;
-  height: 1px;
-  background: linear-gradient(to left, rgba(0,0,0,0), rgba(0,0,0,0.75), rgba(0,0,0,0));
-}
-
-h1 {
-  text-align: center;
-}
-h2 {
-}
-
-.section {
-  display: block;
+section {
+  width: 47em;
   margin-left: auto;
   margin-right: auto;
-  width: 100%;
   text-align: justify;
 }
 
