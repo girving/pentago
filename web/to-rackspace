@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-'''Upload solution files to rackspace, segmented along block boundaries for .pentago files.'''
+'''Upload solution files to rackspace'''
 
 from __future__ import division,print_function,unicode_literals,absolute_import
 from contextlib import contextmanager
@@ -137,19 +137,6 @@ def remote_manifest_hash(container,name):
   data = subprocess.check_output(('curl -sS -I -Hx-auth-token:%s %s/%s/%s'%(token,storage_url,container.name,name)).split())
   etag = re.search(r'^Etag:\s+"([0-9a-f]+)"\s+$',data,flags=re.MULTILINE).group(1)
   return etag
-
-'''
-$ curl -i -XPUT -Hx-auth-token:$CF_TOKEN \
-  $CF_URL/container/manifest?multipart-manifest=put -T - <<EOF
-[{"path": "/container/one",
-  "etag": "99ad4e1604174a175190c8ae88ad5363",
-  "size_bytes": 1048576},
- {"path": "/container/two",
-  "etag": "2a8920794e70c911c7d2822d934c4ec0",
-  "size_bytes": 1024}]
-EOF
-HTTP/1.1 201 Created
-'''
 
 def upload_all(paths):
   # Verify that all files make sense
