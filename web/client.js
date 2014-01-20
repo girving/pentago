@@ -42,6 +42,11 @@ function resize() {
     .attr('transform','translate('+scale*(3+margin_size)+','+scale*(3+header_size)+') scale('+scale+','+-scale+') ')
 }
 
+// Webkit has a strange bug which causes the turn label to disappear whenever
+// we change the text.  Work around this by creating all the text in advance
+// and making only the one we want visible.
+var set_turnlabel = null // Call to set turnlabel text
+
 function draw_base() {
   // Drawing parameters
   var value_radius = .15
@@ -67,12 +72,20 @@ function draw_base() {
     .attr('cx',0)
     .attr('cy',header_y)
     .attr('r',function (d) { return d ? spot_radius : value_radius })
-  svg.selectAll('text').data(['']).enter().append('text')
+
+  // Draw all turnlabels, but make them initially invisible
+  var labels = ['wins!','ties!','loses!','to win','to tie','to lose','to play']
+  var turnlabels = svg.selectAll('text').data(labels).enter().append('text')
     .attr('class','turnlabel')
     .attr('transform','scale(1,-1)')
     .attr('x',0)
     .attr('y',-(header_y-spot_radius-font_size))
     .style('font-size',font_size)
+    .style('visibility','hidden')
+    .text(function (d) { return d })
+  set_turnlabel = function (text) {
+    turnlabels.style('visibility',function (d) { return d==text ? 'visible' : 'hidden' })
+  }
 
   // Draw footer
   var footer_sep = 1.5
@@ -345,10 +358,9 @@ function draw_values(svg) {
   svg.selectAll('.tvalue')
     .style('opacity',board.done() || has(board) ? 1 : 0)
     .style('fill',value_colors[board.done() ? board.immediate_value() : get(board)])
-  svg.selectAll('.turnlabel')
-    .text(  board.done() ? {'1':'wins!','0':'ties!','-1':'loses!'}[board.immediate_value()]
-          : has(board)   ? {'1':'to win','0':'to tie','-1':'to lose'}[get(board)]
-                         : 'to play')
+  set_turnlabel(  board.done() ? {'1':'wins!','0':'ties!','-1':'loses!'}[board.immediate_value()]
+                : has(board)   ? {'1':'to win','0':'to tie','-1':'to lose'}[get(board)]
+                               : 'to play')
 
   // If we don't have them, look them up
   if (missing) {
