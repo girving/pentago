@@ -9,7 +9,6 @@ var board_t = require('./board.js').board_t
 var pi = Math.PI
 var cos = Math.cos
 var sin = Math.sin
-var min = Math.min
 var max = Math.max
 var sqrt = Math.sqrt
 var floor = Math.floor
@@ -55,9 +54,6 @@ function draw_base() {
   var rotator_arrow = .4
   var select_radius = 4
   var font_size = .4
-  var back_center = [1.5+2.5+.05+1,0]
-  var back_size = [1.4,.7]
-  var back_round = .1
 
   // Grab and resize svg
   var svg = d3.select('svg#board').append('g')
