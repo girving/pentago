@@ -9,6 +9,7 @@ var board_t = require('./board.js').board_t
 var pi = Math.PI
 var cos = Math.cos
 var sin = Math.sin
+var min = Math.min
 var max = Math.max
 var sqrt = Math.sqrt
 var floor = Math.floor
@@ -26,13 +27,23 @@ var spinning = null
 // Drawing parameters
 var bar_size = .1
 var spot_radius = .4
-var board_scale = null
+var header_size = 2.5
+var footer_size = 3.5
+var margin_size = 1.7
+
+function resize() {
+  var root = d3.select('svg#board')
+  var width = parseInt(root.style('width').match(/^(\d+)px$/)[1])
+  var scale = width/(6+2*margin_size)
+  var svg = root
+    .attr('width',width)
+    .attr('height',scale*(6+header_size+footer_size))
+    .select('g')
+    .attr('transform','translate('+scale*(3+margin_size)+','+scale*(3+header_size)+') scale('+scale+','+-scale+') ')
+}
 
 function draw_base() {
   // Drawing parameters
-  var header_size = 2.5
-  var footer_size = 3.5
-  var margin_size = 3
   var value_radius = .15
   var rotator_radius = 2.5
   var rotator_thickness = .2
@@ -44,15 +55,9 @@ function draw_base() {
   var back_round = .1
 
   // Grab and resize svg
-  var root = d3.select('svg#board')
-  var width = parseInt(root.style('width').match(/^(\d+)px$/)[1])
-  var scale = width/(6+2*margin_size)
-  board_scale = scale
-  var svg = root
-    .attr('width',width)
-    .attr('height',scale*(6+header_size+footer_size))
-    .append('g')
-    .attr('transform','translate('+scale*(3+margin_size)+','+scale*(3+header_size)+') scale('+scale+','+-scale+') ')
+  var svg = d3.select('svg#board').append('g')
+  window.onresize = resize
+  resize()
 
   // Draw header
   var header_y = 4.5
@@ -218,7 +223,7 @@ function draw_board(svg,board,history) {
     .attr('class',board.turn ? 'white' : 'black')
 
   // Update back button
-  d3.select('a.back')
+  d3.selectAll('a.back')
     .attr('href',history.length>1 ? '#'+history.slice(0,history.length-1).join(',') : null)
 
   // Update circles

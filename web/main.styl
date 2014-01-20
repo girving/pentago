@@ -36,6 +36,7 @@ sup { vertical-align: super; font-size: smaller; line-height: normal; }
   background-color: white;
   float: left;
   width: 49em;
+  width: calc(100% - 11em);
   border-left: 11em solid #c0c0c0;
 }
 
@@ -61,23 +62,26 @@ nav a {
   border-bottom: 1px solid black;
   color: black;
 }
-nav a          { border-bottom: 1px solid black; }
-nav.back a     { border-left: 1px solid black; }
-nav a:hover    { background-color: white; }
-nav a:visited  { color: black; }
+nav a           { border-bottom: 1px solid black; }
+nav.back a      { border-left: 1px solid black; }
+nav a:hover     { background-color: white; }
+nav a:visited   { color: black; }
+.contents .back { visibility: hidden; }
 
 .content {
-  width: 49em;
+  width: 100%;
   float: left;
-  margin-right: -49em;
+  margin-right: -100%;
   border-left: 1px solid black;
   position: relative;
 }
 
 svg#board {
-  width: 480px;
+  width: 400px;
+  max-width: 100%;
   display: block;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .status {
@@ -102,10 +106,15 @@ svg#board {
 
 section {
   width: 47em;
+  width: calc(100% - 2em);
   margin-left: auto;
   margin-right: auto;
   text-align: justify;
   line-height: 1.2em;
+}
+
+section h2 {
+  text-align: left;
 }
 
 .indent {
@@ -119,4 +128,38 @@ section {
   display: block;
   margin-left: auto;
   margin-right: auto;
+  max-width: 100%;
+}
+
+@media (max-width: 62em) {
+  .all {
+    width: 100%;
+  }
+}
+@media (max-width: 800px) {
+  .main {
+    width: 100%;
+    border-left: none;
+  }
+  .content {
+    margin-right: 0;
+  }
+  nav.contents {
+    float: none;
+    width: 100%;
+    margin-left: 0;
+    background-color: #c0c0c0;
+    text-align: center;
+    border-bottom: 1px solid black;
+  }
+  nav a {
+    display: inline-block;
+    height: 1.5em;
+    line-height: 1.5em;
+    padding: 0 .5em;
+    border: none;
+    text-decoration: underline;
+  }
+  nav.back { visibility: hidden; }
+  .contents .back { visibility: visible; }
 }
