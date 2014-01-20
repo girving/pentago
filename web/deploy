@@ -16,8 +16,12 @@ pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
 
 # Upload
 container = pyrax.cloudfiles.get_container('pentago-frontend')
+files = dict((f.name,f) for f in container.get_objects())
 for pattern in 'bundle.js *.html *.css *.png *.svg'.split():
   for name in glob.glob(pattern):
     if name not in ('nersc-logo.png',):
+      if name in files and files[name].etag==pyrax.utils.get_checksum(name):
+        continue
       print('upload %s'%name)
-      container.upload_file(name,name)
+      obj = container.upload_file(name,name)
+      obj.purge()
