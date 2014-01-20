@@ -82,6 +82,9 @@ svg#board {
   display: block;
   margin-left: auto;
   margin-right: auto;
+  // Improve animations on iOS, following
+  // http://chrissilich.com/blog/fix-css-animation-slow-or-choppy-in-mobile-browsers
+  -webkit-transform: translateZ(0);
 }
 
 .status {
