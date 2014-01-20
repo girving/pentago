@@ -1,7 +1,11 @@
-/*** Page layout ***/
+// Page layout
+
+@import 'nib'
+global-reset()
 
 body {
   background: #d5d6d7;
+  margin: 8px;
 }
 
 .all {
@@ -20,6 +24,13 @@ header {
   width: 100%;
   border-bottom: 1px solid;
 }
+
+// Taken from http://mxr.mozilla.org/mozilla-central/source/layout/style/html.css
+h1 { font-size: 2em;    font-weight: bold; margin: .67em 0; }
+h2 { font-size: 1.5em;  font-weight: bold; margin: .83em 0; }
+h3 { font-size: 1.17em; font-weight: bold; margin: 1em 0; }
+p { margin: 1em 0; }
+sup { vertical-align: super; font-size: smaller; line-height: normal; }
 
 .main {
   background-color: white;
@@ -94,6 +105,7 @@ section {
   margin-left: auto;
   margin-right: auto;
   text-align: justify;
+  line-height: 1.2em;
 }
 
 .indent {

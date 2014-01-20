@@ -12,7 +12,9 @@
     "log": "1.4.x",
     "lru-cache": "2.5.x",
     "mule": "0.1.x",
+    "nib": "1.0.x",
     "request": "2.30.x",
+    "stylus": "0.42.x",
     "time": "0.10.x"
   },
   "keywords": [
