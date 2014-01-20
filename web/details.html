@@ -84,9 +84,10 @@
         </p><img id="counts" src="counts.svg" width="600"><p>
         Unfortunately, since each full move involves both placing a stone and choosing a rotation, the
         branching factor is very high: there are 288 possible first moves including the first rotation.
-        To reduce the branching factor to a more manageable level, we perform all computations in terms
-        of rotation-agnostic "superpositions" consisting of all ways of rotating a given board.  Since there
-        are four ways to rotate each of four quadrants, this requires a 4-dimensional array with
+        To reduce the branching factor to a manageable level, we perform all computations in terms
+        of rotation-abstracted "superpositions" consisting of all ways of rotating the quadrants of a given
+        board.  Since there
+        are four ways to rotate each of four quadrants, one bit per position becomes a 4-dimensional array with
         4<sup>4</sup> = 256 bits total.  These 256 bits are packed into two 128-bit SSE registers,
         allowing us to compute 256 values at a time using SSE bit twiddling.  The resulting code is
         <a href="https://github.com/girving/pentago/blob/b1aaaa2850492a1a310913a963c2c5b44cddd2a7/pentago/base/symmetry.cpp#L233">fairly hairy</a>,
@@ -107,7 +108,7 @@
         deal with thanks to abstracting away the rotations, as the set of empty spots does not
         move around.  These smaller solves have the same structure as the full solve, but require only 1 GB of RAM
         and 15-20 seconds on a single thread.  As a perk, we can take advantage of parity to store only half of
-        the 256 possible rotations at each step, since the rotation parity flips every move.
+        the 256 possible rotations at each step since the rotation parity flips every move.
         </p>
       </section>
 
@@ -128,7 +129,7 @@
         </p><p>
         The backend server is
         <a href="http://backend.perfect-pentago.net:2048"> http://backend.perfect-pentago.net:2048</a>.  The
-        API is fairly simple: give it the code for a pentago board and it replies with json giving the values
+        API is fairly simple: give it the code for a pentago board and it replies with json containing the values
         of all child positions.  For example,
         <a href="http://backend.perfect-pentago.net:2048/0">here is the start position</a>.  You are welcome
         to use the server directly for small numbers of queries, but please email me if you want to use it
