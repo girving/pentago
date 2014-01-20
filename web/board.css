@@ -36,6 +36,20 @@
   text-anchor: middle;
 }
 
+.backrect {
+  fill: #c0c0c0;
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.back:hover > .backrect {
+  fill: white;
+}
+.backlabel {
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
 .five {
   stroke: black;
   stroke-width: 1;

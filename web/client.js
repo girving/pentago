@@ -32,13 +32,16 @@ function draw_base() {
   // Drawing parameters
   var header_size = 2.5
   var footer_size = 3.5
-  var margin_size = 2
+  var margin_size = 3
   var value_radius = .15
   var rotator_radius = 2.5
   var rotator_thickness = .2
   var rotator_arrow = .4
   var select_radius = 4
   var font_size = .4
+  var back_center = [1.5+2.5+.05+1,0]
+  var back_size = [1.4,.7]
+  var back_round = .1
 
   // Grab and resize svg
   var root = d3.select('svg#board')
@@ -209,22 +212,27 @@ function draw_base() {
 // Keep track of currently shown board for asynchronous callback purposes
 var current_board = null
 
-function draw_board(svg,board) {
+function draw_board(svg,board,history) {
   // Update turn
   svg.select('circle')
     .attr('class',board.turn ? 'white' : 'black')
 
+  // Update back button
+  d3.select('a.back')
+    .attr('href',history.length>1 ? '#'+history.slice(0,history.length-1).join(',') : null)
+
   // Update circles
   var classes = {0:board.middle?'empty':board.turn?'emptywhite':'emptyblack',1:'black',2:'white'}
+  var base = '#'+history.join(',')+','
   var links = svg.selectAll('a#spot')
     .attr('xlink:href',board.middle ? null : function (d) {
-      return board.grid[6*d.x+d.y] ? null : '#'+board.place(d.x,d.y).name })
+      return board.grid[6*d.x+d.y] ? null : base+board.place(d.x,d.y).name})
   links.selectAll('circle#spot')
     .attr('class',function (d) { return classes[board.grid[6*d.x+d.y]] })
 
   // Update rotators
   svg.selectAll('a#rotate')
-    .attr('xlink:href',board.middle ? function (d) { return '#'+board.rotate(d.qx,d.qy,d.d).name } : null)
+    .attr('xlink:href',board.middle ? function (d) { return base+board.rotate(d.qx,d.qy,d.d).name } : null)
   svg.selectAll('.rotateselect') // Hide rotate selectors from the mouse when they aren't active
     .style('pointer-events',board.middle ? null : 'none')
   svg.selectAll('.norotate,.rotateblack,.rotatewhite')
@@ -318,7 +326,6 @@ function draw_values(svg) {
   }
 
   // Draw values if we have them
-  console.log('drawing values')
   svg.selectAll('.cvalue')
     .style('opacity',board.middle || board.done() ? 0 : function (d) {
       return board.grid[6*d.x+d.y] || !has(board.place(d.x,d.y)) ? 0 : 1 })
@@ -365,17 +372,17 @@ function draw_values(svg) {
 }
 
 function set_status(s) {
-  console.log(s)
+  console.log(s.replace('<br>',', '))
   d3.select('.status').html(s)
 }
 
 function set_error(s) {
-  console.error(s)
+  console.log(s.replace('<br>',', '))
   d3.select('.status').html('<div id="'+mode+'">'+s+'</div>')
 }
 
 function set_loading(s) {
-  console.log(s)
+  console.log(s.replace('<br>',', '))
   var h = ''
   for (var i=0;i<s.length;i++)
     h += '<div class="load" style="animation-delay:'+1.7*i/s.length+'s">'+s[i]+'</div>'
@@ -383,18 +390,20 @@ function set_loading(s) {
 }
 
 function update(svg) {
+  var board = new board_t([0,0,0,0],false)
+  var history = [board.name]
   if (window.location.hash) {
     try {
       var hash = window.location.hash.substr(1)
-      var board = new board_t(hash)
+      history = hash.split(',')
+      if (history.length)
+        board = new board_t(history[history.length-1])
     } catch (e) {
       set_error('Invalid board '+hash+', error = '+e)
       return
     }
-  } else
-    var board = new board_t([0,0,0,0],false)
-  console.log('update',board.name)
-  draw_board(svg,board)
+  }
+  draw_board(svg,board,history)
 }
 
 function main() {
