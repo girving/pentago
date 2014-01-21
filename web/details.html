@@ -96,14 +96,31 @@
         With the branching factor under control, we solve the game by traversing every possible position, starting
         at 36 stone positions and moving backwards through the game to the zero stone start.
         Around the peak at 24 stones, the computation requires 80 TB of RAM even with compression,
-        and was therefore run on 98304 threads of
+        and was therefore parallelized using MPI and run on 98304 threads of
         <a href="http://www.nersc.gov/users/computational-systems/edison">Edison</a>,
         a Cray supercomputer at NERSC (the National Energy Research Supercomputing Center).  Positions with more
         than 18 stones were discarded after use, and those with 18 or fewer were written to disk using lzma
         compression to reduce down to 4 TB total.  The large scale computation took less than four hours, plus
         a few more hours on fewer nodes to finish up.
         </p><p>
-        If this site sees a position with 18 or more stones, its children are outside the database, so we perform
+        In the majority of existing supercomputer codes, all processes operate in lockstep performing the same
+        operation on a subset of the data (SIMD).  The pentago computation is in some sense even easier: positions
+        with the same number of stones do not depend on each other, so for each stone count the computation is
+        embarassingly parallel.  Unfortunately, this simplicity evaporates when we take memory in account: at the
+        peak of the computation each node is operating near the limit of its available RAM, leaving only a small
+        amount of space left over to store the inputs for required computations (which come from other nodes).  Thus,
+        each node must request only a few inputs a time, compute the result, and possibly send the data off to
+        be stored.  The overall control flow becomes asynchronous, with each process dynamically responding
+        to requests for data, replies to its own requests, etc., taking care to never exceed the memory limit.
+        In addition to increasing the complexity, the requirement to only store a few inputs at a time turns an
+        otherwise bandwidth-limited computation into a latency-limited one.  Indeed, the computation was
+        significantly slower than expected on the older NERSC supercomputer
+        <a href="http://www.nersc.gov/users/computational-systems/hopper">Hopper</a> due to unexpectedly
+        high latency, possibly exacerbated by the asynchronous structure of the communication.
+        </p><p>
+        The above discussion applies to the full solve required to compute the 4 TB database, which this website
+        uses to lookup perfect play for positions with 17 or fewer stones.
+        If the site sees a position with 18 or more stones, its children are outside the database, so we perform
         a much smaller traversal over all downstream positions.  The set of downstream positions is much easier to
         deal with thanks to abstracting away the rotations, as the set of empty spots does not
         move around.  These smaller solves have the same structure as the full solve, but require only 1 GB of RAM
