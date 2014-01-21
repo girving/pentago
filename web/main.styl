@@ -3,6 +3,12 @@
 @import 'nib'
 global-reset()
 
+html {
+  // Make a scrollbar always exist, so avoid jumps in centering between index.html and details.html.
+  // For details, see http://css-tricks.com/eliminate-jumps-in-horizontal-centering-by-forcing-a-scroll-bar.
+  overflow-y: scroll;
+}
+
 body {
   background: #d5d6d7;
   margin: 8px;
