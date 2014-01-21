@@ -397,8 +397,10 @@ function set_error(s) {
 function set_loading(s) {
   console.log(s.replace('<br>',', '))
   var h = ''
-  for (var i=0;i<s.length;i++)
-    h += '<div class="load" style="animation-delay:'+1.7*i/s.length+'s">'+s[i]+'</div>'
+  for (var i=0;i<s.length;i++) {
+    var t = 1.7*i/s.length
+    h += '<div class="load" style="animation-delay:'+t+'s;-webkit-animation-delay:'+t+'s">'+s[i]+'</div>'
+  }
   d3.select('.status').html(h)
 }
 
