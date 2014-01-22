@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 from __future__ import division
-from other.core import *
-from other.core.value import parser
-from pentago.old.interface import *
+from geode import *
+from geode.value import parser
+from pentago import *
 import time
 
 props = PropManager()
@@ -13,6 +13,8 @@ do_lowrank = props.add('lowrank',False)
 plot = props.add('plot',0)
 parser.parse(props,'Pentago filter benchmarks')
 level = level()
+
+unevent = 0
 
 def count(data):
   with Log.scope('count causal'):
@@ -163,8 +165,8 @@ def unwavelet_help(data,shape):
 def driver():
   Log.configure('filter test',0,0,100)
   init_threads(-1,-1)
-  reader = supertensor_reader_t('data/section-32-44444444.pentago')
-  header = reader.header
+  readers = open_supertensors('../../data/edison/project/all/slice-10.pentago')
+  reader = max((product(r.header.shape),r) for r in readers)[1]
   random.seed(9454242)
 
   # Define filters
@@ -183,8 +185,8 @@ def driver():
   total = 0
   for i in xrange(32):
     with Log.scope('block'): 
-      b = [random.randint(header.blocks[i]) for i in xrange(4)]
-      Log.write('block shape = %s'%header.block_shape(b))
+      b = [random.randint(reader.header.blocks[i]) for i in xrange(4)]
+      Log.write('block shape = %s'%reader.header.block_shape(b))
       compressed = reader.compressed_size(b)
       uncompressed = reader.uncompressed_size(b)
       total_compressed += compressed
@@ -207,7 +209,7 @@ def driver():
       # Test the compression after each filter
       for name,filter,inverse in filters:
         d = filter(data.copy())
-        fsize = len(compress(char_view(d),level))
+        fsize = len(compress(char_view(d),level,unevent))
         totals[name] += fsize
         Log.write('%s ratio = %g'%(name,fsize/uncompressed))
         if inverse is not None:

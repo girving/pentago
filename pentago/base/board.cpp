@@ -221,4 +221,5 @@ void wrap_board() {
   GEODE_FUNCTION(from_table)
   GEODE_FUNCTION(check_board)
   GEODE_FUNCTION(black_to_move)
+  GEODE_FUNCTION_2(flip_board_py,flip_board)
 }

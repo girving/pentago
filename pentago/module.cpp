@@ -22,7 +22,6 @@ GEODE_PYTHON_MODULE(pentago_core) {
   GEODE_WRAP(file)
   GEODE_WRAP(lru)
   GEODE_WRAP(supertensor)
-  GEODE_WRAP(endgame)
   GEODE_WRAP(filter)
   GEODE_WRAP(analyze)
   GEODE_WRAP(thread)
@@ -43,6 +42,7 @@ GEODE_PYTHON_MODULE(pentago_core) {
   GEODE_WRAP(load_balance)
   GEODE_WRAP(store_block_cache)
   GEODE_WRAP(compacting_store)
+  GEODE_WRAP(verify)
 
   // Configuration
   GEODE_OBJECT_2(pentago_end_pad_io,pentago::end::pad_io)

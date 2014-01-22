@@ -5,10 +5,12 @@ from pentago import *
 from geode import *
 from geode.value import parser
 from geode.utility import tryfile
-from other.gui import *
-from pentago.old.interface import *
+from gui import *
 from OpenGL import GL
+import gzip
 import glob
+import sys
+import re
 
 # Parse arguments
 props = PropManager()
@@ -47,9 +49,18 @@ def read_history(dir):
     ranks = [None]*len(names)
     assert ranks
     for name in names:
-      m = re.search(r'history-r(\d+)',name)
+      m = re.search(r'history-r(\d+)((?:\.gz)?)$',name)
+      if not m:
+        raise RuntimeError('weird file: '+name)
       rank = int(m.group(1))
-      data = fromfile(name,dtype=int64).reshape(-1,3)
+      extension = m.group(2)
+      if not extension:
+        data = fromfile(name,dtype=int64)
+      elif extension == '.gz':
+        data = fromstring(gzip.open(name).read(),dtype=int64)
+      else:
+        raise RuntimeError('unknown extension %s'%extension)
+      data = data.reshape(-1,3)
       if not (data[0][0]&0xffffffff): # Check for bad endianness
         data = data.view(data.dtype.newbyteorder('<')).astype(data.dtype.newbyteorder('>')).view(int64)
       threads,kinds,_ = data[0]
