@@ -1,5 +1,9 @@
 // Tracing code for use in debugging inconsistency detections
-
+//
+// The superengine contains a code to detect certain kinds of inconsistencies
+// in the results.  If such an inconsistency is found, this module can help
+// to track it down to the source bug.  Since it is disabled at compile time,
+// it may or may not work at any given time.
 #pragma once
 
 #include <pentago/base/board.h>

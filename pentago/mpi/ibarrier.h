@@ -1,4 +1,13 @@
 // A nonblocking version of MPI_Barrier
+//
+// MPI contains the wonderfully useful routine MPI_Ibarrier, a nonblocking version
+// of MPI_Barrier.  For why this is useful, see
+//
+//   http://scicomp.stackexchange.com/questions/2876/nonblocking-version-of-mpi-barrier-in-mpi-2
+//
+// Here, ibarrier_t is used to divide up the computation by slice, so that ranks know when
+// they can safely deallocate the previous slice's data.
+#pragma once
 
 #include <pentago/end/config.h>
 #include <boost/noncopyable.hpp>

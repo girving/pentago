@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""
+filter-test: Benchmark various filtering and compression schemes against each other
+"""
 
 from __future__ import division
 from geode import *
@@ -7,7 +10,7 @@ from pentago import *
 import time
 
 props = PropManager()
-level = props.add('level',21)
+level = props.add('level',26)
 do_count = props.add('count',False)
 do_lowrank = props.add('lowrank',False)
 plot = props.add('plot',0)

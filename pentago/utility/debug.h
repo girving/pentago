@@ -1,4 +1,9 @@
 // Wrapper around C++ exceptions so that we can turn them off during MPI
+//
+// The pentago code does not exceptions during correct use.  If we see an exception,
+// something terrible has happened and the entire application should be killed.
+// This file implements wrappers that allow exceptions to be replaced with calls
+// to MPI_Abort if any occur during parallel runs.
 #pragma once
 
 #include <geode/utility/debug.h>

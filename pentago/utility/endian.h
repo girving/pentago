@@ -1,4 +1,7 @@
 // Endianness utilities
+//
+// Conversion from native endianness to/from little endianness, useful
+// for writing platform independent files on Blue Gene.
 #pragma once
 
 #include <geode/array/view.h>

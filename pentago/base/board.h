@@ -1,4 +1,10 @@
 // Board definitions and utility functions
+//
+// For efficiency, pentago boards are packed into 64-bit integers, using
+// 16 bits for each quadrant as a 9 digit radix 3 integer.  Utilities are
+// provided for breaking 64-bit boards into their component quadrants, or
+// switching from radix 3 to 2 (a bitmask for one side).  The code relies
+// heavily on lookup tables, computed at compile time by precompute.py.
 #pragma once
 
 #include <geode/array/forward.h>

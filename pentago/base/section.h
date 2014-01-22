@@ -1,4 +1,10 @@
 // Sections: sets of positions classified by stone counts in each quadrant
+//
+// A section consists of all boards with the same numbers of black and white
+// stones in each quadrant.  For example, the largest section is 33333333,
+// and consists of stones with 3 stones of each color in each quadrant.
+// Sections play a key role in the distribution of data in the endgame solver,
+// and in the resulting output data formats.
 #pragma once
 
 #include <pentago/base/board.h>

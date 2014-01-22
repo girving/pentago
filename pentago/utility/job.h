@@ -1,6 +1,5 @@
 // Specialize version of function<void()> for use in thread pools
-#pragma once
-
+//
 // boost::function has the following disadvantages:
 //
 // 1. It is complicated, which in particular makes stack traces sad looking.
@@ -9,6 +8,7 @@
 // In hindsight, it looks like the functor_manager might have been justified
 // in taking time since in one case it was deallocating a bunch of memory.
 // However, I still prefer my version.
+#pragma once
 
 #include <geode/utility/debug.h>
 #include <geode/utility/SanitizeFunction.h>

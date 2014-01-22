@@ -1,4 +1,8 @@
 // Insertion sort
+//
+// Intended for high performance situations where all key and value
+// arrays are stack allocated, and therefore not contained in any
+// fancy data structures.
 #pragma once
 
 #include <geode/structure/Tuple.h>

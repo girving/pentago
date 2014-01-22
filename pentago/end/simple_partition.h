@@ -1,4 +1,10 @@
 // Partitioning of sections and lines for MPI purposes
+//
+// A significantly more complicated partitioning scheme, implemented before I
+// thought of the random_partition_t trick.  This is slightly more uniform in
+// some senses, but much less in others; in particular, it gives different
+// ranks quite different numbers of small vs. large blocks.  It was not used
+// in the final endgame computation.
 #pragma once
 
 #include <pentago/end/partition.h>

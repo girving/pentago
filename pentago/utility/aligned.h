@@ -1,4 +1,9 @@
 // Aligned array allocation
+//
+// For performance reasons, it is useful for certain arrays to be aligned to cache
+// lines even if they don't need to be for correctness.  The most important example
+// of this is Vector<super_t,2>, the core data type in the endgame solver.  This
+// type takes up 64 bytes, exactly the cache line size on most modern machines.
 #pragma once
 
 #include <geode/array/Array.h>

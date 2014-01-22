@@ -1,4 +1,6 @@
 // Array allocation using mmap
+//
+// Similar to aligned_buffer in aligned.h, but for particularly huge arrays.
 #pragma once
 
 #include <geode/array/Array.h>

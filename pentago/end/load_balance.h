@@ -1,4 +1,9 @@
 // Load balancing statistics (see partition.h for actual balancing)
+//
+// These routines are used both at runtime to monitor current load balancing
+// at offline by the "predict" script to analyze load balancing before a job
+// is launched.  Note that this depends critically on load balancing being
+// sufficiently fast and lightweight for computation on a single rank.
 #pragma once
 
 #include <pentago/end/partition.h>

@@ -1,213 +1,172 @@
-A brute force pentago solver
-============================
+A massively parallel pentago solver
+===================================
 
-The goal of this project is a strong solution of the board game pentago, which
-means a practical algorithm for perfect play starting from any position.
-For the rules of pentago, see http://en.wikipedia.org/wiki/Pentago.
+This project implements a strong solution of the board game pentago, which means
+that perfect play can be efficiently computed starting from any position.  The
+results can be explored at http://perfect-pentago.net.  Some high level details
+are described at http://perfect-pentago.net/details.html.
 
-The code consists of two parts: a serial forward engine capable of search out to
-depth 17, and a parallel out-of-core backward engine suitable for endgame
-database computation on hundreds to thousands of machines.  The main features
-of the forward engine are
+In the quest towards a strong solution, a total of five separate engines were
+implemented, three forward tree search engines and two backwards endgame engines.
+The final strong solution uses only the backwards engines, but the strongest
+forward engine was essential in developing and testing the backwards engines.
+Descriptions of the various engines are given below.
 
-1. Alpha-beta search specialized to binary choices (win vs. tie or tie vs. loss,
-   equivalent to MTD(f) for the case of three possible outcomes).
+The easiest interface to the strong solution is the website at
+http://perfect-pentago.net, implemented in the `web` directory.  To compute perfect
+play for a given position, the backend server looks up the answer in a 4 TB database
+for positions with 17 or fewer stones or computes the answer from scratch using the
+small scale backwards engine.
 
-2. Simultaneous evaluation of all 256 different rotated versions of a given
-   board in parallel using SSE instructions.  This reduces the branching factor
-   by a factor of 8, which is critical in both the forward and backward engines.
+The pentago code is released under a BSD license, and the 4 TB data set has been
+released into the public domain for anyone who wants to tinker around.  The data set
+is generously hosted by Rackspace.  If you want links, please email me at <irving@naml.us>.
 
-3. Symmetry-aware transposition tables, using the full 2048 element symmetry
-   group of global+local transformations.
+For background on the complexity of pentago and the applicability of a variety of
+solution algorithms, see Niklas Buscher's 2011 thesis
+["On Solving Pentago"](http://www.ke.tu-darmstadt.de/lehre/arbeiten/bachelor/2011/Buescher_Niklas.pdf),
+which analyzed the game but did not solve it.
 
-Starting from an empty board, the forward engine takes about 8.2 hours on a 2.3
-GHz Macbook Pro to prove that pentago is a tie within the first 17 moves.  Since
-forward search cost increases exponentially with depth, it would have no hope
-of establishing the value of the game unless it ended within a few ply after
-depth 17, even with large parallel resources.  Therefore, I switched to a
-backward solver, attempting to enumerate the entire state space of 3e15
-positions (after symmetry reduction).  The backwards endgame solver will be
-described in more detail once it I try it out on a suitable supercomputer.
+I will be writing up additional details of the application in paper form soon.
 
 ### Dependencies
 
-The code is a mix of pure C++ (for MPI code), C++ routines exposed to Python, and
-Python code for tests, interfaces, etc.  The direct dependencies are
+The code is a mix of pure C++ (for MPI code), C++ routines exposed to Python,
+Python code for tests and interfaces, and Node.js for the backend server.  The
+direct dependencies are
 
-* [other/core](https://github.com/otherlab/core): Otherlab core utilities and Python bindings
+* [geode](https://github.com/otherlab/geode): The Otherlab computational geometry library
 * [mpi](http://en.wikipedia.org/wiki/Message_Passing_Interface): OpenMPI, MPICH2, etc.
 * [zlib](http://zlib.net): Okay but slow lossless compression.
 * [xz](http://tukaani.org/xz): Good but slower lossless compression
 * [snappy](http://code.google.com/p/snappy): Fast but poor lossless compression
+* [node.js >= 0.10.x](http://nodejs.org): Asynchronous javascript framework
 
-other/core has a few additional indirect dependencies (python, numpy, boost).
+Geode has a few additional indirect dependencies (python, numpy, boost).  Pentago
+uses only core utilities in geode such as arrays and python bindings, not any of
+the actual computational geometry.
 
-### Setup
+### Installation
 
-1. Install `other/core` and the other dependencies.
-2. Configure `other/core` to be reference-count thread safe, by adding
+Install geode via the instructions at https://github.com/otherlab/geode.  On Debian/Ubuntu,
+the other direct dependencies can be installed via
 
-        thread_safe = 1
+    sudo apt-get install openmpi-bin libopenmpi-dev zlib1g-dev liblzma-dev libsnappy-dev
 
-   to `other/config.py`.  Rebuild `other/core` if necessary.
+You can then build and run the tests via
 
-3. Setup and build `pentago`:
+    cd pentago
+    scons -j 5
+    py.test
 
-        cd pentago
-        $OTHER/core/build/setup
-        scons -j 5
+If you need the node.js backend, make sure the pentago headers and libraries are
+globally installed via
 
-4. Test.  Note that the mpi tests will fail if mpirun/aprun does not exist on the host machine.
+    sudo scons install
 
-        py.test
+Assuming you have node.js and npm installed (unfortunately apt-get produces very old
+versions of these for me), you can build and test the backend server with
 
-### Usage
+    cd web/pentago
+    node-gyp configure build --verbose
+    cd ..
+    npm install
+    make
 
-The interface consists of a variety of python scripts.  I'll give a few
-examples of their usage here; for more details run "script -h".
+This will also build the frontend webpage: point your browser at `web/index.html`.
 
-1. pentago: Main forward evaluation driver script
+## Algorithm summary
 
-        ./pentago -d 11 # Play a low depth automated game against itself
-        ./pentago -d 17 # Prove that depth 17 is a tie (takes many hours)
+### Forward engines
 
-2. endgame: Out-of-core endgame database computation.  The state space is
-   divided into "sections" consisting of positions with the same number of
-   each color stone in each quadrant.  Depending on symmetries, each section
-   depends on up to four child sections with one additional stone.  None of
-   the files necessarily fit in RAM, so they are streamed from and to disk
-   during the computation.  In addition to the large `section-*-.pentago`
-   file containing the full data, endgame produces a sparse random sample
-   file named `sparse-*-.try` for testing purposes.
+The first forward engine was a naive alpha-beta tree search code, plus a few pentago
+specific optimizations.  Performance was dismal: the code reached only to 4 or 5 ply
+(here one ply means the combination of stone placement and quadrant rotation).
+The problem was branching factor, which starts out at a frightening 288 possible
+first moves (36 empty spots times 8 rotations).
 
-        ./endgame --recurse 1 44444444 # Recursively compute section 44444444 and all its children
+Based on a belief that pentago was likely a tie (wrong!), I modified the solver so
+that the second player always reversed the rotation of the first player.  This can't
+be any better for the second player, so if the result was a tie the game would be
+solved.  Unfortunately, this "simple" solver declared the game to be a first player
+win after 15 moves, providing no information about the real value of the game.
 
-   By default, all files are written into ./data.  Use `--dir` to change this.
+The key to the speed of the simple solver was eliminating the branching factor due
+to rotations.  The final forward solver accomplished the same thing without weakening
+the second player.  Instead of computing the value of one board at a time, this
+"super" solver operated on 256 different rotated version of a given board in parallel
+using SSE instructions.  This also allowed the transposition tables to take advantage
+of the full 2048 element symmetry group of all global+local transpositions.  With
+rotations eliminated, the supersolver managed to compute out to 17 ply, declaring the
+game up to that point a tie.  See `pentago/search/superengine.{h,cpp}` for the core
+algorithm.
 
-3. analyze: Compute various statistics and estimates about the game
+What next?  Parallelizing the engine would get further, but I still thought the
+game was a tie, and no forward engine would reach all the way to move 36.  The similar
+games gomoku and renju were solved using threat space search, but it was unclear how
+to combine this technique with a rotation abstracted solver.  So much for going forward.
 
-        ./analyze approx # Print statistics for each level of the endgame traversal
+### A massively parallel backward engine
 
-4. draw-history: Visualize a history file written with the `--history <file>` option to endgame.
+What about backward?  Typically, backward (or retrograde) analyses are used to solve
+convergent games, where the number of positions decreases towards the end of the game.
+The canonical examples are chess and checkers, where fewer pieces near the end mean
+fewer positions.  Pentago is divergent: the number of positions increases exponentially
+all the way to ply 24, but the total number of positions is only 3e15.
 
-        ./endgame --history history.try ...
-        ./draw-history history.try
+Unfortunately, the computation required 80 TB of memory at peak.  Since the arithmetic
+intensity of computing pentago positions is fairly low, shuffling all of this data in
+and out of disks would have destroyed performance.  Therefore, the endgame solver was
+implemented in-core, parallelized using MPI for use on a supercomputer.
+Like the final forward solver, the endgame solver takes advantage of symmetry
+by operating on 256 positions at a time and eliminating symmetric positions.  The code
+for the massively parallel endgame solver is contained in `pentago/end` and `pentago/mpi`.
 
-5. tensor-info: Summarize a .pentago file
+This backward engine was sufficient to strongly solve the game, requiring
+about four hours of time on 98304 threads of Edison, a Cray supercomputer at NERSC.
 
-6. filter-test: Benchmark various filtering and compression schemes against each other
+Like endgame solvers for other games, the backwards engine starts at the end of the game
+and walks backwards towards the beginning, computing the value of each position.  Unlike
+previous endgame solvers, nearly all of the data is discarded once it is used, and only
+positions with 18 or fewer stones are kept and written to disk.  To my knowledge, this is
+the first use of an endgame solver to directly compute an opening book for a nontrivial game.
 
-7. learn: Obsolete script generating statistics from a large list of random games.
+### A tiny backward engine
 
-8. opening: Obsolete opening book computation
+Since the massively parallel computation discarded all positions with more than 18 stones,
+the game isn't strongly solved unless the missing values can be quickly recomputed.  Before
+the massively parallel computation, I tried the forward solver on a variety of 18 stone
+positions and got satisfactory performance: the solver was capable of reaching forwards to
+the end of the game.  This turned out to be naive: random positions are much easier than
+interesting positions, and I quickly found interesting positions once I began exploring the
+results.  The first time I came across one of these the solve took an hour; I managed to
+get it down to 10 minutes, but this was still much too slow for an interactive website.
 
-### Code overview
+To solve the problem, I implemented yet another backward engine, this one specialized to
+traverse only positions downstream of a given root board with 18 or more stones.  In addition to
+tackling a much smaller problem than the massively parallel engine, this "midgame" engine
+is also much simpler: since rotations are abstracted away, the set of empty positions is
+fixed by the root board.  As a perk, we can use parity to operate on only 128 different
+rotated positions instead of 256, as rotating the board flips the parity of the local
+rotation group.  Conveniently, the performance of the midgame engine is about 15 seconds
+for *all* 18 stone positions; unlike the forward solver performance does not vary with the
+board.  The code for the midgame engine is in `pentago/mid`.
 
-Here's a brief summary of each file in the code:
+Together, the 4 TB data set and the midgame engine comprise a strong solution of pentago.
+Go to http://perfect-pentago.net to see the results.
 
-##### Utilities
+### Code structure
 
-1. sort: Indirect insertion sort
-2. thread: Utilities for job management via thread pools (a thin layer on top of pthreads)
-3. stat: Fast statistics collection for use in the forward solvers
-4. ashelve.py: Obsolete atomic python shelf for use in the (obsolete) opening book computation
-5. convert: Utility file exposing different types of arrays to python
+The code is organized into the following directories:
 
-##### Standard and simple forward solvers:
+* utility: Thread pools, memory allocation, and other non-pentago-specific utilities
+* base: Pentago boards, moves, scores, symmetries, counts, etc., used by the various solvers.
+* search: Forward search engines
+* data: File formats and I/O for the backwards engine
+* end: Everything in the backwards engine that doesn't directly touch mpi
+* mpi: Everything in the backwards engine that does touch mpi
+* high: High level interface used in the website backend
+* mid: "Midgame" backward solver used to complete the strong solution for 18 or more stone boards.
 
-1. board: Pentago boards are packed in 64-bit integers, using 16 bits for each quadrant as
-   a 9 digit radix 3 integer.  Utilities are provided for breaking 64-bit boards into their
-   component quadrants, or switching from radix 3 to 2 (a bitmask for one side) using
-   lookup tables.
-
-2. moves: Move generation code using macros and variable-length arrays to allocate memory
-   only on the heap, for use in the forward solvers. 
-
-3. score: Check whether a given position is a win for either player, or bound the number of
-   moves required for a win for use as a search cutoff (win-distance pruning).
-
-4. table: Hashed transposition table.  Since we use a 64-bit invertible has function, each
-   entry need only store the high bits of the hash left out of the array index.
-
-5. engine: Two different forward solvers operating on single positions at a time.  The first
-   (normal) solver recursed over the full branching factor of pentago, which starts out in
-   the 200s.  As a consequence, exhaustive search could only reach depth 4 or so.  Believing
-   that the game was a strong tie, I wrote a second "simple" solver which handicapped white's
-   (the second player's) choices by (1) always having white reverse black's last rotation,
-   and (2) ignoring any white five-in-a-rows.  This avoided the need to branch on rotation:
-   the `rotated_won` function in score simultaneously checks whether a win is possible if
-   at most one of the quadrants is rotated.
-
-   Unfortunately, the simple solver was too much of a simplification: black wins the modified
-   game on move 15, establishing nothing about the real game.  It was a useful exercise,
-   though, so it showed the speedups possible by dodging the rotation branching factor.
-
-##### "Super" forward solver:
-
-The "superengine" is essentially a standard alpha-beta tree search engine, but operating on
-the lattice {0,1}^256 representing win flags for each the 256 possible boards given by rotating
-a given start board.
-
-1. superscore: Definition of the basic type `super_t`, storing 256 bits as 2 `__m128i`'s,
-   together with a lookup table-based routine mapping a board to the super\_t of which of
-   its rotations are wins.  Another key routine is `rmax`, which computes a bitwise or over
-   each the 8 possible single rotations.  `rmax` is used to simulate branching over rotation
-   without actually branching.
-
-2. symmetry: In addition to avoid rotation branching, abstracting over rotations has the advantage
-   of raising the size of the symmetry group from 8 to 2048.  An element of this group is
-   stored as the type `symmetry_t` and acts on boards and `super_t`'s using the various `transform_*`
-   functions.  The smallest board equivalent to a given board can be found with `superstandardize`.
-
-3. supertable: Symmetry-aware transposition tables.  Entries exist only in superstandardized form,
-   and store two `super_t`'s: a mask of which entries we know and the values of those we do.  A bit
-   of logic is required when combining values of different depths together: information of low depth
-   can be used if it signified an immediate end to the game, otherwise not.
-
-4. superengine: The main rotation abstracted forward solver.  It is structurally similar to the
-   "simple" solver, including the use of pruning and move ordering based on bounds on closeness
-   to the nearest win, but operates on the full game rather than an approximate version.  As
-   mentioned above, starting from an empty board, this solver takes about 8.2 hours on a 2.3
-   GHz Macbook Pro to prove that pentago is a tie within the first 17 moves.
-
-5. trace: Optional debugging code used to track down bugs in the superengine.
-
-##### Enumeration and counting
-
-1. count: Exact counting of the number of symmetry-reduce pentago positions using the
-   Polya enumeration theorem.
-
-2. all\_boards: Explicit enumeration of symmetry-reduced pentago positions with a given
-   number of stones.  Also contains routines for enumerating "sections", describing all
-   stones with a given number of stones in each quadrant.
-
-3. analyze.cpp: Helper routines for the `analyze` script.
-
-##### Endgame (backward) solver
-
-1. filter: Various routines to precondition win/loss/tie data for input to zlib/xz.
-   Sadly, the complicated ones didn't seem promising enough to implement, so the currently
-   used default is `interleave`, which simply transposes a pair of `super_t`'s into 256 2-bit
-   pairs.
-
-2. supertensor: A supertensor file is 4 dimensional array of `Vector<super_t,2>` giving
-   win/loss/tie values for all positions in a given section.  Since a section is defined
-   by the number of black and white stones in each quadrant, the four quadrants define the
-   four dimensions of an array.  The largest supertensor files consume up to a terabyte
-   uncompressed, so we perform blocking along all four dimensions with a block size small
-   enough that an entire two dimensional block slice fits easily into RAM.  The 4-symmetry
-   of the format is critical, since during computation each section is first standardized
-   (rotated and reflected into the minimal configuration), and thus the dimensions on disk
-   are often a permuted version of what we actually need.
-
-3. endgame.cpp: Read/compute/write routines for block slices of supertensor files.
-   Parallelized using the thread pools defined in `thread.h`.
-
-4. endgame: Python driver routine for endgame computation.
-
-##### Precomputation
-
-Many of the above files depend on precomputated tables generated during the build process
-by `precompute.py`.  These include tables for rotated or reflecting a quadrant, helper tables
-for detecting wins or win proximity, tables to switch between radix 2 and 3, tables to help
-with symmetry operations, and enumeration of rotation minimal quadrants in special orderings.
+Most files have summarizing comments at the top, but otherwise documentation is fairly scant.
+Email me if you have questions at <irving@naml.us>!

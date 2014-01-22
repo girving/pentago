@@ -1,4 +1,8 @@
-// Abstract base class for partitioning of lines and blocks
+// Abstract base classes for partitioning of lines and blocks
+//
+// These classes partition blocks and lines (1D strings of blocks) across some
+// number of ranks.  The partitioning is designed to be both fast and lightweight,
+// so that it can be computed independently and stored on all ranks.
 #pragma once
 
 #include <pentago/end/line.h>

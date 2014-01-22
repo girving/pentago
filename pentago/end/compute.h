@@ -1,4 +1,12 @@
 // Core compute kernels for the MPI code
+//
+// Since the endgame solver operates near the limit of available RAM, it is
+// critical to minimize the amount of working memory required during computation.
+// To do this, moves in different quadrants are analyzed on potentially different
+// machines, and combined together after communication.  The basic unit of work
+// becomes a "block line", a set of positions which share the same block in all
+// dimensions but one.  By considering only those moves that change the uncommon
+// quadrant, the set of inputs for a given block line is exactly another block line.
 #pragma once
 
 #include <pentago/end/config.h>

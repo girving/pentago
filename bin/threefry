@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+"A threefry benchmark"
 
 from pentago import *
 from geode import *

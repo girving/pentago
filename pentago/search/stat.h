@@ -1,4 +1,9 @@
 // Statistics
+//
+// These statistics are collected during forward tree searches to get some idea
+// what's going on, since the control flow of forward tree searches is dynamic
+// and complicated.  No such thing is necessary for the backwards engines, since
+// all quantitative information there is knowable in advance.
 #pragma once
 
 #include <geode/structure/forward.h>

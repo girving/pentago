@@ -1,4 +1,9 @@
 // Thread utilities
+//
+// Utilities for parallel job management via thread pools.  This is a thin
+// layer on top of pthreads used to organize work during the endgame solve.
+// The different ranks are managed using MPI, but each rank contains several
+// threads managed using the routines below.
 #pragma once
 
 #include <pentago/utility/job.h>

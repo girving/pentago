@@ -1,4 +1,7 @@
 // Board enumeration
+//
+// Various ways of listing all boards or sections with a given number of stones,
+// possibly with various numbers of symmetries eliminated.
 #pragma once
 
 #include <pentago/base/board.h>

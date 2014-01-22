@@ -1,5 +1,13 @@
 #!/usr/bin/env python
-'''Pentago precomputation code'''
+'''
+Pentago lookup table precomputation:
+
+In order to avoid needless work, a good chunk of the logic for basic pentago
+operations is baked into lookup tables computed by this script.  This includes
+state transformation (rotations, base-2 to/from base-3, etc.), win computation,
+symmetry helpers, etc.  These tables also show up in the file formats, since
+the ordering of boards within a section is defined by rotation_minimal_quadrants.
+'''
 
 from __future__ import division
 import os

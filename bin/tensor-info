@@ -1,4 +1,16 @@
 #!/usr/bin/env python
+"""
+tensor-info: Summarize a .pentago file
+
+.pentago files contain the packed, compressed output of the endgame solver.
+Each file contains one or more "sections", where a section consists of all
+boards with the same numbers of black and white stones in each quadrant.
+Each section consists of a 4D array of boards, divided into a 4D array of
+typically 8x8x8x8 blocks, each entry of which is two super_t's containing
+which rotations under which black or white win the game.  The data is
+prefiltered (interleaving the two super_t's) and the compressed.  For more
+details, see data/supertensor.h.
+"""
 
 from __future__ import division
 from geode import *

@@ -1,4 +1,4 @@
-// Thread safe counters
+// Atomic thread safe counters
 #pragma once
 
 #include <geode/python/config.h>

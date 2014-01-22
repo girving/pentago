@@ -17,27 +17,8 @@ def command(f):
   return f
 
 @command
-def patterns():
-  random.seed(91131)
-  board = 2001290911234536713
-  wins = precompute.win_patterns()
-  for i in xrange(100):
-    board = random_board(24)
-    #print show_board(board)
-    min_ds = 6*ones(32,int)
-    for r0 in xrange(4):
-      for r1 in xrange(4):
-        for r2 in xrange(4):
-          for r3 in xrange(4):
-            b = rotate(board,(r0,r1,r2,r3))
-            s0,s1 = unpack(b).astype(int64)
-            ds = asarray([6 if s1&w else precompute.popcount(w&~s0) for w in wins])
-            min_ds = minimum(min_ds,ds)
-            #print '%d %d %d %d : %s'%(r0,r1,r2,r3,' '.join('%d'%d for d in ds if d<6))
-    print 'min ds : %s'%(' '.join('%d'%d for d in min_ds if d<6))
-
-@command
 def estimate():
+  "Estimate how many random boards are close to a win"
   random.seed(91131)
   total = 1000000
   close = 0
@@ -53,6 +34,7 @@ def estimate():
 
 @command
 def counts():
+  "Count supersymmetry-reduced boards with each number of stones"
   counts = [large(count_boards(n,2048)) for n in xrange(37)]
   width = max(len(s) for s in counts)
   print 'counts:'
@@ -61,6 +43,7 @@ def counts():
 
 @command
 def estimates():
+  "Compare the exact count of supersymmetry-reduced boards to a Monte-Carlo estimate"
   tol = .01
   for n in xrange(0,37):
     count = count_boards(n,2048)
@@ -68,23 +51,14 @@ def estimates():
     print 'n %d, count %d, estimate %g, estimate/count %g'%(n,count,estimate,estimate/count)
 
 @command
-def final():
-  boards = all_boards(36,2048)
-  print 'generated %d boards'%len(boards)
-  sides = unpack(boards)[:,0].copy()
-  print 'unpacked sides'
-  wins = super_wins(sides)
-  print 'computed wins'
-  open('super-wins-36.raw','w').write(wins)
-  print 'write complete'
-
-@command
 def quadrants():
+  "Count minimal quadrants"
   mins = minimal_quadrants()
   print 'minimal quadrants = %d'%len(mins)
 
 @command
 def probability():
+  "Estimate probability that a random 18 stone board is a win for black"
   random.seed(7384101)
   stones = 18 # 12 # 26
   turn = stones&1
@@ -105,6 +79,7 @@ def probability():
 
 @command
 def approx():
+  "Show a bunch of quantitative data about the full endgame computation"
   total = 0
   partials = zeros(36,dtype=uint64)
   raw_total = 0
@@ -124,16 +99,20 @@ def approx():
 
 @command
 def sections():
+  "Plot the data size distribution as a function of section size"
   symmetries = 8
   sizes = sort(hstack([all_boards_section_sizes(n,symmetries) for n in xrange(37)])).astype(double)
   totals = cumsum(sizes)
   fractions = totals/totals[-1]
   import pylab 
   pylab.plot(sizes,fractions) 
+  pylab.xlabel('section size')
+  pylab.ylabel('fraction of data in smaller sections')
   pylab.show()
 
 @command
 def quick():
+  "Estimate probability that a random board is already game over"
   section = (3,3),(3,3),(3,3),(3,3)
   random = Random(7523131)
   steps = 100000
@@ -142,12 +121,16 @@ def quick():
   print 'immediate endings: boring %g, black %g, white %g, tie %g'%tuple(p)
 
 @command
-def list():
+def help():
+  "Display help"
   print 'usage: analyze <command>'
-  print 'available commands = %s'%' '.join(commands.keys())
+  print 'available commands = %s\n'%' '.join(commands.keys())
+  n = max(map(len,commands.keys()))
+  for name,f in sorted(commands.items()):
+    print '%-*s : %s'%(n,name,f.__doc__)
 
 if __name__=='__main__':
   props = PropManager()
-  command = props.add('command','list').set_allowed(commands.keys())
+  command = props.add('command','help').set_allowed(commands.keys())
   parser.parse(props,'Endgame related stuff',positional=[command])
   commands[command()]()

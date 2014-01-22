@@ -1,4 +1,9 @@
 // Information about a single 1D block line
+//
+// Each section is a 4D array of positions, which after blocking is
+// a 4D array of 8x8x8x8 blocks.  A block line is a 1D sequence of
+// such blocks along one of the four dimensions.  Block lines are the
+// basic unit of work in the endgame solver, as discussed in compute.h.
 #pragma once
 
 #include <pentago/end/history.h>

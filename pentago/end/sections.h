@@ -1,4 +1,6 @@
 // Lists of sections
+//
+// See base/section.h for background on sections.
 #pragma once
 
 #include <pentago/base/section.h>

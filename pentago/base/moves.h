@@ -1,4 +1,8 @@
 // Move generation code
+//
+// This move generation code is a hideously ugly pile of macros to
+// ensure loop enrolling and allocate moves entirely on the stack.
+// See search/superengine.cpp for example usage.
 #pragma once
 
 #include <pentago/base/board.h>

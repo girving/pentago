@@ -1,4 +1,9 @@
 // Cache of precomputed blocks from supertensor files
+//
+// A block_cache_t serves as an intermediary between the forward search engines
+// and endgame information.  It was originally written for unit test purposes,
+// allowing the backward engine to be validated against forward search, but now
+// is also used by the web backend to manage cached portions of the data set.
 #pragma once
 
 #include <pentago/base/board.h>

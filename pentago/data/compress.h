@@ -1,4 +1,5 @@
 // Unified interface to compression libraries
+#pragma once
 
 #include <geode/array/Array.h>
 #include <pentago/utility/thread.h>

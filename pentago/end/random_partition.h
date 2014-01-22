@@ -1,4 +1,11 @@
 // Random partitioning of lines and blocks across processes
+//
+// random_partition_t is the lightest possible weight partitioning scheme:
+// the only shared state is a single uint128_t key (besides the list of
+// sections).  Internally, blocks and lines are assigned to different processors
+// using deterministic counter mode random number generators, relying on the
+// large of large numbers to spread work uniformly across the ranks.  Since there
+// is quite a lot of work to spread out, this works quite well.
 #pragma once
 
 #include <pentago/end/partition.h>

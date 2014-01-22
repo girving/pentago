@@ -1,4 +1,9 @@
 // Data structure keeping track of all blocks we own
+//
+// block_store_t organizes all the block data owned by a given process.  This consists
+// either of read only, finalized results (readable_block_store_t), or possibly incomplete
+// writable results.  Note that data for a given block arrives in four pieces, once for
+// each quadrant of board, and must be bitwise or'ed together before it is complete.
 #pragma once
 
 #include <pentago/end/partition.h>

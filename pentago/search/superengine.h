@@ -1,13 +1,24 @@
 // Core tree search engine abstracted over rotations
+//
+// The "superengine" is roughly a standard alpha-beta tree search engine, but operating on
+// packs of 256 boards at a time (see superscore.h).  During any particular search, we pretend
+// that one of the players wins ties, corresponding to an alpha-beta window of size 2 (similar
+// to MTD(f)).  The player who loses ties is termed "aggressive".  For historical reasons, in
+// some places we might accidentally call the aggressive player simply "black" and the other
+// player "white", though the code now works with either player as the aggressor.
+//
+// In addition to the base functionality in base/superscore.h and base/symmetry.h, this file
+// depends heavily on the symmetry-aware transposition tables in supertable.h.
+//
+// Starting from an empty board, this solver takes about 8.2 hours on a 2.3 GHz Macbook Pro
+// to prove that pentago is a tie within the first 17 moves.
+#pragma once
 
 #include <pentago/search/supertable.h>
 #include <pentago/base/score.h>
 #include <pentago/base/superscore.h>
 #include <vector>
 namespace pentago {
-
-// For historical reasons, we call the player who wins ties white, and the other player black,
-// even the code is also capable of computing in the other direction.
 
 using std::vector;
 struct block_cache_t;

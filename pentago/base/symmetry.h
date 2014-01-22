@@ -1,4 +1,11 @@
 // Operations involving pentago symmetries
+//
+// The symmetry group of rotation abstracted pentago is a semidirect product of the global
+// rotation group D_4 and the local quadrant rotation group Z_4^4.  Despite the fact that
+// the rest of the rotation abstracted code is prefixed with super, I somehow managed to
+// resist calling the class supersymmetry_t.
+//
+// In the comments below, x' is the inverse of x.
 #pragma once
 
 #include <pentago/base/board.h>
@@ -7,13 +14,6 @@
 namespace pentago {
 
 using std::ostream;
-
-// The symmetry group of rotation abstracted Pentago is a semidirect product of the
-// board rotation group D_4 and the quadrant group Z_4^4.  Despite the fact that
-// the rest of the rotation abstracted code is prefixed with super, I somehow
-// managed to resist calling this class supersymmetry_t.
-
-// In the following comments, x' is the inverse of x.
 
 // A purely local symmetry
 struct local_symmetry_t {

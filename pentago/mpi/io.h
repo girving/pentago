@@ -1,4 +1,7 @@
 // Parallel I/O for slice files
+//
+// These routines duplicate the functionality of supertensor.{h,cpp},
+// but in a massively parallel setting using MPI I/O.
 #pragma once
 
 #include <pentago/end/block_store.h>

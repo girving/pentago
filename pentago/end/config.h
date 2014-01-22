@@ -1,4 +1,6 @@
 // MPI configuration header
+//
+// Compile time parameters for the endgame solver.
 #pragma once
 
 #ifdef OMPI_MPI_H

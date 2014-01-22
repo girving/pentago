@@ -1,4 +1,7 @@
 // Hashed transposition table
+//
+// A naive hashed transposition table, with no symmetry awareness or rotation abstract.
+// See supertable.h for a more useful version.
 #pragma once
 
 // Notes:

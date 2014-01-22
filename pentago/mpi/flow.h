@@ -1,4 +1,7 @@
 // Endgame computation structure code with overlapped communication and compute
+//
+// This file contains the high level control flow of the endgame solver, which is
+// quite complicated due to the combination of fully asynchronous MPI+threads.
 #pragma once
 
 #include <pentago/end/block_store.h>

@@ -1,48 +1,22 @@
 // Operations on functions from rotations to scores
+//
+// A super_t encodes a subset of the rotation group G = Z_4^4, or equivalently a function
+// from G to {0,1}.  Typically, this means the set of rotations for which one player or another
+// wins.  Since |G| = 4^4 = 256, one super_t packs into two 128 bit __m128i values, or into
+// 4 uint64_t's if we lack SSE.  Packing these bits together lets us compute the values of
+// 256 different boards in parallel.
+//
+// There are two key interesting routines in this file: super_wins and rmax.  super_wins uses
+// lookup tables to map a board side (the positions of one side's stones) into the rotations
+// for which that player has five in a row.  rmax simulates branching over rotation by choosing
+// the best possible single move rotation separately for each of the 256 bits.  Specifically,
+// if R is the set of single move rotations, we have
+//
+//   f : G -> {0,1}
+//   rmax(f)(a) = max_{b in R} f(a+b)
+//
+// If you think the bit twiddling code in this file is complicated, look at base/symmetry.cpp.
 #pragma once
-
-/*
-The rotations state is the abelian group G = Z_4^4.  We begin with the set {0}.  Let R be the set of
-single move rotations.  Assume the set of stone placement plays is fixed, and that the player to
-move's score at ply k is given by a function f_k : G -> S, S = {-1,0,1}.  Assume first that the score
-is evaluated only at a fixed time n.  Let g_k be the minimax score at ply k.  We have
-
-  g_n(a) = f_n(a)
-  g_k(a) = -min_{b in R} g_{k+1}(a+b), k < n
-
-Say n = 2.  We have
-
-  g_0(0) = -min_{a in R} -min_{b in R} f_2(a+b)
-         = max_{a in R} min_{b in R} f_2(a+b)
-
-Do the min and max operations commute?  Well, no.  What about n = 4?
-
-  g_0(0) = max_{a in R} min_{c in R} max_{b in R} min_{c in R} f_4(a+b+c+d)
-
-Ah: Let F be the space of functions f : G -> S.  We have the basic operation
-
-  rmin : F -> F
-  rmin(f,a) = min_{b in R} f(a+b)
-
-so that
-
-  g_0 = (-rmin)^n(f_n)
-
-We have |F| = 2^256, so an element can be stored in 4 64-bit ints (32 bytes).  Now add back the
-choice of stone placement.  The game state is now the larger space A * G, with a unified
-score function f : A * G -> S.  We will specify that S = {-1,0,1} means lose, continue, win;
-ties are considered a win for white.  There is a move function m : A -> 2^A given the available
-moves from each position (incorporating side switching).  Let g : A * G -> S be the minimax
-value of all positions.  We have the recurrence
-
-  g(u,a) = f(u,a) || -min_{v in m(u), b in R} g(v,a+b)
-
-We want to rewrite this in terms of operations on F.  Let's see
-
-  g(u,a) = f(u,a) || -min_{v in m(u)} (-rmin(g(v)))(a)
-
-Given a state (u,a) in A*G, 
-*/
 
 #include <pentago/base/board.h>
 #include <geode/math/popcount.h>

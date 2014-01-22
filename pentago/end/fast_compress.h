@@ -1,4 +1,8 @@
 // Interface to snappy
+//
+// Snappy is used for in memory compression.  On average we get about a factor
+// of three, cutting the memory requirement from 240 TB to 80 TB.  By comparison,
+// lzma provides a factor of ten, but is far slower.
 #pragma once
 
 #include <pentago/base/superscore.h>

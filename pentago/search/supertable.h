@@ -1,5 +1,11 @@
 // Rotation abstracted hashed transposition table
-
+//
+// Symmetry-aware transposition tables.  Entries exist only in superstandardized
+// form, and store two super_t's: a mask of which entries we know and the values
+// of those we do (recall that one player is considered "aggressive" and loses ties,
+// so only one bit is needed per position).  Some logic is required when combining
+// values of different depths together: information of low depth can be used if it
+// signified an immediate end to the game, otherwise not.
 #pragma once
 
 #include <pentago/base/hash.h>

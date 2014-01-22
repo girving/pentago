@@ -1,4 +1,9 @@
 // Score definitions and immediately evaluation functions
+//
+// This file became vestigial as soon as the rotation abstraction
+// was introduced, since it mixes depth and values together.  This
+// is incompatible with super_t, since we might need different
+// depths for different bits.
 #pragma once
 
 #include <pentago/base/board.h>

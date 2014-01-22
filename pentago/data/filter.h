@@ -1,4 +1,13 @@
-// Multidimensional superscore filtering to precondition zlib compression
+// Multidimensional superscore filtering to precondition compression
+//
+// The results of endgame computation come in the form of myriad Vector<super_t,2>'s,
+// where the two super_t's give the rotations for which black and white win.  Since
+// black and white can't both win, there is significant redundancy in this representation.
+// To make the redundancy easier for zlib or lzma compression to detect, we interleave
+// the bits of the two super_t's together as a filtering step.  This cuts the final size
+// by 10% or so; run filter-test for detailed results.
+//
+// The rest of this file consists of failed experiments.
 #pragma once
 
 #include <pentago/base/superscore.h>

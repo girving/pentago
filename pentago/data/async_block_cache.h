@@ -1,4 +1,9 @@
 // Asynchronous version of the block cache
+//
+// A version of block_cache_t that does not know how to get its own data.
+// This is used to lift control flow into the asynchronous world of node.js,
+// which is responsible to actually retrieving the data via asynchronous
+// range requests.
 #pragma once
 
 #include <pentago/data/block_cache.h>
