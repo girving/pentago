@@ -115,7 +115,7 @@
         embarassingly parallel.  Unfortunately, this simplicity evaporates when we take memory in account: at the
         peak of the computation each node is operating near the limit of its available RAM, leaving only a small
         amount of space left over to store the inputs for required computations (which come from other nodes).  Thus,
-        each node must request only a few inputs a time, compute the result, and possibly send the data off to
+        each node must request only a few inputs at a time, compute the result, and possibly send the data off to
         be stored.  The overall control flow becomes asynchronous, with each process dynamically responding
         to requests for data, replies to its own requests, etc., taking care to never exceed the memory limit.
         In addition to increasing the complexity, the requirement to only store a few inputs at a time turns an
