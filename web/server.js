@@ -32,7 +32,7 @@ var server = http.createServer(function (req,res) {
   try {
     var board = pentago.high_board_t(req.url.substr(1))
     log.info('request %s',board.name())
-    var start = time.time()
+    var start = Date.now()
   } catch (e) {
     log.error('bad request %s',req.url)
     res.writeHead(404)
@@ -41,8 +41,8 @@ var server = http.createServer(function (req,res) {
   }
 
   values(board,function (results) {
-    var end = time.time()
-    log.info('response %s, elapsed %s',board.name(),end-start)
+    var elapsed = (Date.now()-start)/1000
+    log.info('response %s, elapsed %s s',board.name(),elapsed)
     // Send reply, following cache advice at https://developers.google.com/speed/docs/best-practices/caching
     res.writeHead(200,{
       'content-type': 'application/json; charset=utf-8',
