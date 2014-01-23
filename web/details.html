@@ -24,6 +24,7 @@
       <a href="details.html#algorithms">Algorithms</a>
       <a href="details.html#server">Server setup</a>
       <a href="details.html#open">Code and data</a>
+      <a href="details.html#useful">Usefulness</a>
       <a href="details.html#thanks">Acknowledgements</a>
       <a href="details.html#contact">Contact</a>
     </nav>
@@ -171,6 +172,20 @@
         </p>
       </section>
 
+      <section id="useful"><h2>Usefulness</h2>
+        <p>
+        The intrinsic value of solving pentago aside, my hope is that this project provides an example
+        of an MPI calculation with characteristics that are uncommon now but may be significantly more common in
+        future: asynchronous control flow, extreme memory limitations, and heavy dependence on fast compression
+        algorithms and integer performance.  Asynchrony in particular makes MPI algorithms far more difficult
+        to develop, debug, and optimize, emphasizing the need for better debugging and tracing tools.  Strong
+        asynchrony support in the underlying MPI implementations is a relatively new feature: the recent MPI 3
+        standard should ease the development of similar applications once it is widely available.  Finally,
+        in-memory compression will grow in importance as CPU speed increases relative to memory, memory bandwidth,
+        and disk, a particular problem on platforms such as Blue Gene with poor integer performance.
+        </p>
+      </section>
+
       <section id="thanks"><h2>Acknowledgements</h2>
         <p>
         I am extremely grateful to Jeff Hammond and <a href="http://nersc.gov">NERSC</a> for both Edison time
@@ -196,9 +211,7 @@
         <p>
         For questions or comments, email <a href="mailto:irving@naml.us">Geoffrey Irving &lt;irving@naml.us&gt</a>.
         My main research site and blog are at <a href="http://naml.us">http://naml.us</a> and
-        <a href="http://naml.us/blog">http://naml.us/blog</a>, respectively.
-        </p><p>
-        For bug reports, please use
+        <a href="http://naml.us/blog">http://naml.us/blog</a>, respectively.  For bug reports, please use
         <a href="https://github.com/girving/pentago/issues">https://github.com/girving/pentago/issues</a>.
         </p>
       </section>
