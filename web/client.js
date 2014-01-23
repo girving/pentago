@@ -17,8 +17,8 @@ var floor = Math.floor
 var backend_url = 'http://backend.perfect-pentago.net:2048/'
 var cache = LRU({max:2048})
 
-// Colors for each board value
-var value_colors = {'1':'green','0':'blue','-1':'red','undefined':null}
+// Colors for each board value, taking care to be nice to colorblind folk.
+var value_colors = {'1':'#00ff00','0':'#0000ff','-1':'#ff0000','undefined':null}
 
 // Which quadrant is currently spinning?
 var spinning = null
@@ -90,6 +90,7 @@ function draw_base() {
   var footer = svg.selectAll('.footer').data([1,0,-1]).enter().append('g')
     .attr('class','footer')
   footer.append('circle')
+    .attr('class','fvalue')
     .attr('cx',function (d) { return -footer_sep*d })
     .attr('cy',footer_cy)
     .attr('r',footer_radius)
