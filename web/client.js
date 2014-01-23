@@ -255,7 +255,7 @@ function draw_board(svg,board,history) {
   // Set status if we're done
   if (board.done()) {
     var v = board.immediate_value()
-    set_status('Game complete<br>'+(v?v==board.turn?'White wins!':'Black wins!':'Tie!'))
+    set_status('Game complete<br>'+(v?(v>0)==board.turn?'White wins!':'Black wins!':'Tie!'))
   }
 
   // Draw win/loss/tie values
