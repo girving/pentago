@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
-from __future__ import division
+from __future__ import division,print_function,unicode_literals,absolute_import
 from geode import *
 from geode.value import parser
 from pentago import *
 from pentago.base import precompute
+import sys
+
+# Make sure we're unbuffered
+sys.stdout = os.fdopen(sys.stdout.fileno(),'w',0)
 
 def random_board(n):
   s = hstack([16*q+arange(9) for q in xrange(4)])
@@ -30,16 +34,16 @@ def estimate():
     if d<=3:
       close += 1
       if not (close&1023):
-        print 'i %d, close %d, fraction %g'%(i,close,close/i)
+        print('i %d, close %d, fraction %g'%(i,close,close/i))
 
 @command
 def counts():
   "Count supersymmetry-reduced boards with each number of stones"
   counts = [large(count_boards(n,2048)) for n in xrange(37)]
   width = max(len(s) for s in counts)
-  print 'counts:'
+  print('counts:')
   for n,s in enumerate(counts):
-    print '  %2d:  %*s'%(n,width,s)
+    print('  %2d:  %*s'%(n,width,s))
 
 @command
 def estimates():
@@ -48,13 +52,13 @@ def estimates():
   for n in xrange(0,37):
     count = count_boards(n,2048)
     estimate = estimate_supercount_boards(n,tol)
-    print 'n %d, count %d, estimate %g, estimate/count %g'%(n,count,estimate,estimate/count)
+    print('n %d, count %d, estimate %g, estimate/count %g'%(n,count,estimate,estimate/count))
 
 @command
 def quadrants():
   "Count minimal quadrants"
   mins = minimal_quadrants()
-  print 'minimal quadrants = %d'%len(mins)
+  print('minimal quadrants = %d'%len(mins))
 
 @command
 def probability():
@@ -67,15 +71,15 @@ def probability():
   wins = 0
   init_supertable(21)
   clear_stats()
-  print 'random %d stone positions, depth %d, turn %d, aggressive %d'%(stones,depth,turn,aggressive)
+  print('random %d stone positions, depth %d, turn %d, aggressive %d'%(stones,depth,turn,aggressive))
   for total in xrange(1,100000):
     board = random_board(stones)
-    print show_board(board)
+    print(show_board(board))
     score = super_evaluate(aggressive,depth,flip_board(board,turn),zeros(4,int))
-    print 'board %d, score %d %d'%(board,score//4,score%4)
+    print('board %d, score %d %d'%(board,score//4,score%4))
     if score%4!=1:
       wins += 1
-    print 'total %d, black wins %d, fraction %g'%(total,wins,wins/total)
+    print('total %d, black wins %d, fraction %g'%(total,wins,wins/total))
 
 @command
 def approx():
@@ -84,18 +88,18 @@ def approx():
   partials = zeros(36,dtype=uint64)
   raw_total = 0
   symmetries = 8
-  print 'symmetries = %d'%symmetries
+  print('symmetries = %d'%symmetries)
   for n in xrange(37):
     count = all_boards_stats(n,symmetries)
     total += count
     partials[n:] += count
     raw_total += count_boards(n,2048)
   sections = sum(len(all_boards_sections(n,symmetries)) for n in xrange(37))
-  print 'grand total = %s, grand ratio = %g, total sections = %d'%(large(total),total/raw_total,sections)
+  print('grand total = %s, grand ratio = %g, total sections = %d'%(large(total),total/raw_total,sections))
   simple_total = sum(count_boards(n,8) for n in xrange(37))
-  print 'super ratio = %g, simple total = %s'%(256*total/simple_total,large(simple_total))
+  print('super ratio = %g, simple total = %s'%(256*total/simple_total,large(simple_total)))
   for p in 17,18:
-    print 'total up to %d stones = %s supers, %s bytes'%(p,large(partials[p]),large(64*long(partials[p])))
+    print('total up to %d stones = %s supers, %s bytes'%(p,large(partials[p]),large(64*long(partials[p]))))
 
 @command
 def sections():
@@ -104,8 +108,8 @@ def sections():
   sizes = sort(hstack([all_boards_section_sizes(n,symmetries) for n in xrange(37)])).astype(double)
   totals = cumsum(sizes)
   fractions = totals/totals[-1]
-  import pylab 
-  pylab.plot(sizes,fractions) 
+  import pylab
+  pylab.plot(sizes,fractions)
   pylab.xlabel('section size')
   pylab.ylabel('fraction of data in smaller sections')
   pylab.show()
@@ -118,16 +122,53 @@ def quick():
   steps = 100000
   counts = sample_immediate_endings(random,section,steps)
   p = counts/sum(counts)
-  print 'immediate endings: boring %g, black %g, white %g, tie %g'%tuple(p)
+  print('immediate endings: boring %g, black %g, white %g, tie %g'%tuple(p))
+
+@command
+def reachable():
+  "Estimate counts of reachable and unreachable positions, with symmetries removed"
+  init_threads(-1,-1)
+  samples = 100000*1000
+  print('samples = %s'%large(samples))
+  def s(i):
+    return '%22s'%large(int(rint(i)))
+  def mv(m,v):
+    return '%.3e+-%-.1e'%(m,sqrt(v))
+  sfull = 0
+  sexact = 0
+  smean = zeros(3)
+  svar = zeros(3)
+  for slice in xrange(36+1):
+    n = samples
+    full = binom(36,slice)*binom(slice,slice//2)
+    scale = full/8
+    x,xx = sample_reachable_boards(slice,n)
+    mean = scale*x/n
+    # var = 1/(n-1) sum_i (scale*x-m)^2
+    #     = 1/(n-1) sum_i (scale**2*x^2 - 2*scale*x*m + m^2)
+    #     = 1/(n-1) (scale**2 xx - 2n m^2 + n m^2)
+    #     = 1/(n-1) (scale**2 xx - n m^2)
+    var = maximum(0,scale**2*xx-n*mean**2)/(n-1) # Variance estimate
+    var = var/n # Sample mean variance estimate
+    #print('\n',tuple(x),tuple(xx),tuple(mean),tuple(var))
+    sfull += full
+    smean += mean
+    svar += var
+    exact = count_boards(slice,8)
+    sexact += exact
+    print(' %2d : %s   %s (error %.1e)   %s   %s   %s'%(slice,s(full),mv(mean[0],var[0]),abs(mean[0]-exact),
+      mv(mean[1],var[1]),mv(mean[2],var[2]),mv(mean[2]/exact,var[2]/exact**2)))
+  print('\nall : %s   %s (error %.1e)   %s   %s   %s'%(s(sfull),mv(smean[0],svar[0]),abs(smean[0]-sexact),
+    mv(smean[1],svar[1]),mv(smean[2],svar[2]),mv(smean[2]/sexact,svar[2]/sexact**2)))
 
 @command
 def help():
   "Display help"
-  print 'usage: analyze <command>'
-  print 'available commands = %s\n'%' '.join(commands.keys())
+  print('usage: analyze <command>')
+  print('available commands = %s\n'%' '.join(commands.keys()))
   n = max(map(len,commands.keys()))
   for name,f in sorted(commands.items()):
-    print '%-*s : %s'%(n,name,f.__doc__)
+    print('%-*s : %s'%(n,name,f.__doc__))
 
 if __name__=='__main__':
   props = PropManager()
