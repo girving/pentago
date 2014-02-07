@@ -162,6 +162,18 @@ def reachable():
     mv(smean[1],svar[1]),mv(smean[2],svar[2]),mv(smean[2]/sexact,svar[2]/sexact**2)))
 
 @command
+def branch():
+  "Average branching factor over all positions"
+  count = 0
+  branch = 0
+  for n in xrange(36+1):
+    c = count_boards(n,8)
+    count += c
+    branch += (36-n)*c
+  assert count==3009081623421558
+  print('average branching factor = %g (%g with rotations)'%(branch/count,8*branch/count))
+
+@command
 def help():
   "Display help"
   print('usage: analyze <command>')
