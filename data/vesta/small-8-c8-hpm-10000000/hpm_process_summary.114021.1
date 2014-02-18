@@ -1,0 +1,32 @@
+
+======================================================================
+Hardware counter report for BGQ  - sum for node <0,0,0,0,0>.
+cores with counting enabled = 8, active threads per core = 4.
+======================================================================
+----------------------------------------------------------------
+mpiAll, call count = 1, avg cycles = 422408362266, max cycles = 422586356008 :
+  -- Counter values summed over processes on this node ----
+0       8308762833   Committed Load Misses
+0     102898921433   Committed Cacheable Loads
+0      16890219967   L1p miss
+0     510812994312   All XU Instruction Completions
+0       1544084869   All AXU Instruction Completions
+0       1544254879   FP Operations Group 1 
+  -- L2 counters (shared for the node) -----------------
+100   574112941537  L2 Hits
+100     2080491670  L2 Misses
+100     1299565530  L2 lines loaded from main memory
+100     2220988743  L2 lines stored to   main memory
+
+
+Derived metrics for code block "mpiAll" averaged over process(es) on node <0,0,0,0,0>:
+Instruction mix:  FPU = 0.30 %,  FXU = 99.70 %
+Instructions per cycle completed per core = 0.1516
+Per cent of max issue rate per core = 15.11 %
+Total weighted GFlops for this node = 0.006
+Loads that hit in L1 d-cache =  91.93 %
+                  L1P buffer =   0.00 %
+                  L2 cache   =   8.07 %
+                  DDR        =   0.00 %
+DDR traffic for the node: ld = 0.394, st = 0.673, total = 1.066 (Bytes/cycle)
+

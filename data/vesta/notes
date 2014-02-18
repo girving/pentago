@@ -1,0 +1,25 @@
+Useful links:
+
+1. https://wiki.alcf.anl.gov/parts/index.php/Blue_Gene/Q
+
+Highlights:
+
+1. Each node has 16 cores, 4 hardware threads/core and 16 GB of RAM.
+2. Thus, each node has 64 threads and 16 GB of RAM.
+3. As far as I know, memory access is uniform, so any number of
+   threads/core between 4 and 64 is reasonable.  I think 8 and 16
+   are the serious options.
+
+Predictions:
+
+  ./end/predict --ranks 32 --threads 8 --save 0 --memory 2G --gather-limit 4 --line-limit 5 44444444 --dir data-small --randomize 17
+  summary                                         
+    lines = 1000
+    blocks = 5119
+    local ids = 63955
+    base memory = 947,340,815
+    line parallelism = 43.6017
+    total memory = 2,141,347,560
+    save memory = 0
+    time estimate = 9.24793 s
+  END summary                                       0.0002 s

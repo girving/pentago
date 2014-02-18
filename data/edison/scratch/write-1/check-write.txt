@@ -1,0 +1,44 @@
+check mpi                                         
+  cpu thread pool: threads = 48, priority = 0
+  io thread pool: threads = 2, priority = 0
+  dirs = data-write
+  dir data-write                                  
+    initializing supertable: bits = 16, size = 5MB
+    check slice 35                                
+      sections = 35-45545444 35-54455444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0076 s
+      WARNING: No slice file found, skipping consistency check for slice 35
+    END check slice 35                              0.9377 s
+    check slice 34                                
+      sections = 34-45544444 34-44455444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0110 s
+      WARNING: No slice file found, skipping consistency check for slice 34
+    END check slice 34                              0.0512 s
+    check slice 33                                
+      sections = 33-54444444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0133 s
+      WARNING: No slice file found, skipping consistency check for slice 33
+    END check slice 33                              0.0414 s
+    check slice 32                                
+      sections = 32-44444444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0141 s
+      consistency                                 
+        32-44444444 ....................................................................................................
+      END consistency                              83.7363 s
+    END check slice 32                             83.9495 s
+  END dir data-write                               85.0080 s
+  All tests passed!
+END check mpi                                      85.0489 s
+check mpi                                          85.0489 s
+  dir data-write                                   85.0080 s
+    check slice                                    84.9798 s
+      validity                                      0.0460 s
+      consistency                                  83.7363 s

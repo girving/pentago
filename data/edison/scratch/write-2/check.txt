@@ -1,0 +1,51 @@
+check mpi                                         
+  cpu thread pool: threads = 48, priority = 0
+  io thread pool: threads = 2, priority = 0
+  dirs = write-2
+  dir write-2                                     
+    initializing supertable: bits = 16, size = 5MB
+    check slice 35                                
+      sections = 35-45455453 35-54454553 35-45454463 35-44454563 35-45545444 35-54455444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0026 s
+      WARNING: No slice file found, skipping consistency check for slice 35
+    END check slice 35                              1.4220 s
+    check slice 34                                
+      sections = 34-45455443 34-54454543 34-45454453 34-44454553 34-45544444 34-44455444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0057 s
+      WARNING: No slice file found, skipping consistency check for slice 34
+    END check slice 34                              0.0631 s
+    check slice 33                                
+      sections = 33-45544443 33-54454443 33-44455443 33-45444453 33-44454453 33-54444444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0141 s
+      WARNING: No slice file found, skipping consistency check for slice 33
+    END check slice 33                              0.0590 s
+    check slice 32                                
+      sections = 32-45444443 32-44454443 32-44444444
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0124 s
+      WARNING: No slice file found, skipping consistency check for slice 32
+    END check slice 32                              0.0692 s
+    check slice 31                                
+      sections = 31-44444443
+      validity                                    
+        ....................................................................................................
+      END validity                                  0.0109 s
+      consistency                                 
+        31-44444443 ....................................................................................................
+      END consistency                             725.1593 s
+    END check slice 31                            725.5146 s
+  END dir write-2                                 727.1761 s
+  All tests passed!
+END check mpi                                     727.2040 s
+check mpi                                         727.2040 s
+  dir write-                                      727.1761 s
+    check slice                                   727.1279 s
+      validity                                      0.0456 s
+      consistency                                 725.1593 s

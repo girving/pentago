@@ -1,0 +1,153 @@
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 1,346,928,640, resident 13,213,696, share 6,156,288, text 8,192, peak known 0, known 0, data 1,161,924,608
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 1536 --threads 6 --save 18 --memory 7G --gather-limit 4 --line-limit 5 --dir data-restart --randomize 17 --restart all-1/slice-17.pentago 00000000
+    ranks = 1536
+    cores = 9216
+    threads / rank = 6
+    section = 0-00000000
+    block size = 8
+    saved slices = 18
+    level = 26
+    memory limit = 7,516,192,768
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 0
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0009 s
+  simple partition                                  0.0001 s
+  dependents                                        0.8906 s
+  memory base: virtual 1,353,539,584, resident 25,214,976, share 7,360,512, text 8,192, peak known 37, known 0, data 1,168,535,552
+  restart: slice 17, file all-1/slice-17.pentago
+  estimate                                        
+    random partition                                0.0041 s
+    random partition                                0.0037 s
+    random partition                                0.0026 s
+    random partition                                0.0019 s
+    random partition                                0.0013 s
+    random partition                                0.0011 s
+    random partition                                0.0007 s
+    random partition                                0.0005 s
+    random partition                                0.0003 s
+    random partition                                0.0002 s
+    random partition                                0.0001 s
+    random partition                                0.0001 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 3357363936
+  END estimate                                      0.3511 s
+  read sections                                   
+    read headers                                  429.2224 s
+    random partition                                0.0042 s
+    blob scatter                                  216.0219 s
+    (peak 3.1G)
+    (peak 3.2G)
+    (peak 3.4G)
+    (peak 3.6G)
+    (peak 3.8G)
+    (peak 4.0G)
+    total size = 1475380615039
+    read data                                     3383.3559 s
+    shuffle                                        30.5290 s
+    decompress                                    
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+      freeze                                      
+        collection: free ratio = 0.404382
+      END freeze                                    0.0120 s
+    END decompress                                176.9320 s
+  END read sections                               4240.9472 s
+  slice 16                                        
+    random partition                                0.0039 s
+    load balance                                  
+      lines = 10382 10383 (1)
+      line blocks = 55524 62084 (1.118)
+      line nodes = 141569144 160367584 (1.133)
+      blocks = 13858 15534 (1.121)
+      block nodes = 35324368 40263976 (1.14)
+    END load balance                                6.5367 s
+    memory usage: store = 3,484,327,696, partitions = 2156436, blocks = 3,219,624, lines = 789108, total = 3,490,492,864, free = 4,151,658,080
+    line parallelism = 150
+    memory compute: virtual 5,735,452,672, resident 3,043,725,312, share 15,974,400, text 8,192, peak known 4,372,153,400, known 3,483,277,888, data 5,552,599,040
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                   743.0029 s
+    memory free: virtual 7,497,060,352, resident 4,346,695,680, share 17,408,000, text 8,192, peak known 4,372,153,400, known 3,483,277,888, data 5,552,599,040
+    freeze                                        
+      collection: free ratio = 0.806204
+    END freeze                                      0.7438 s
+    compression ratio = 0.266537 +- 0.107298
+    write                                         
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END write                                     2459.4129 s
+    timing 
+      compress             16483407.6377 s
+      decompress           1271297.8314 s
+      snappy               434423.0705 s
+      unsnappy             471634.5308 s
+      filter               11791.2762 s
+      copy                     0.0018 s
+      schedule              2802.8052 s
+      wait                 1129395.1251 s
+      mpi                    301.6524 s
+      partition              112.9465 s
+      compute              1782171.1236 s
+      accumulate            3816.4161 s
+      count                 6468.0749 s
+      read                    48.9133 s
+      write_sections       1010572.9179 s
+      write_counts           959.4292 s
+      write_sparse         23234.6932 s
+      allocate_line          155.2414 s
+      request_send           984.4661 s
+      response_send         5736.2196 s
+      response_recv         3867.4180 s
+      wakeup                  82.5610 s
+      output_send           4849.7410 s
+      output_recv           3926.6370 s
+      compacting           18626.0489 s
+      master_idle           1889.3839 s
+      cpu_idle             39596090.9648 s
+      missing: master 6261391.4633, cpu 273392.2219
+      total 68803430.8127
+    speeds
+      elapsed = 3212.16, output nodes = 58,321,593,778, input nodes = 122,614,235,841
+      speeds (nodes/second/core): output = 1970.11, input = 4141.92, output+input = 6112.03
+      grand estimate = 1,230,755 core-hours
+  END slice 16                                    3212.9630 s
+  slice 15                                        
+    random partition                                0.0028 s
+    load balance                                  
+      lines = 5776 5777 (1)
+      line blocks = 24953 29201 (1.17)
+      line nodes = 52913640 64553176 (1.22)
+      blocks = 6149 7300 (1.187)
+      block nodes = 13159600 16258640 (1.235)
+    END load balance                                0.0723 s
+    memory usage: store = 3,483,798,568, partitions = 1708512, blocks = 1,703,016, lines = 439052, total = 3,487,649,072, free = 4,154,468,988
+    line parallelism = 150
+    memory compute: virtual 8,879,644,672, resident 4,347,269,120, share 17,596,416, text 8,192, peak known 4,372,153,400, known 3,483,277,888, data 6,935,183,360
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                   380.8043 s
+    memory free: virtual 8,923,598,848, resident 4,347,535,360, share 17,772,544, text 8,192, peak known 4,372,153,400, known 3,483,277,888, data 6,979,137,536
+    freeze                                        
+      collection: free ratio = 0.888553
+    END freeze                                      0.4236 s
+    compression ratio = 0.410404 +- 0.124552
+    write                                         
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 

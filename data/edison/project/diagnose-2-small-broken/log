@@ -1,0 +1,6 @@
+endgame                                           
+  cpu thread pool: threads = 1, priority = 0
+  memory threads: virtual 288,038,912, resident 5,451,776, share 4,050,944, text 8,192, peak known 0, known 0, data 9,015,296
+  read sections test                              
+    ranks = 24
+    random partition                                0.0043 s

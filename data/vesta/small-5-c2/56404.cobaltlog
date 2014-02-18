@@ -1,0 +1,50 @@
+/usr/bin/qsub.py -t 10 -n 16 --mode=c2 /home/irving/otherlab/other/install/compute/release/bin/endgame-mpi --ranks 32 --threads 8 --save 0 --memory 2G --gather-limit 4 --line-limit 5 44444444 --dir data-small --randomize 17
+
+submitted with cwd set to: /gpfs/vesta_home/irving/data
+
+Job 56404/irving/52654: Initiating boot at location VST-02460-13571-32.
+
+Command: '/usr/bin/runjob' '--np' '32' '--ranks-per-node' '2' '--cwd' '/gpfs/vesta_home/irving/data' '--block' 'VST-02460-13571-32' '--envs' 'COBALT_JOBID=56404' '--verbose' '4' ':' '/home/irving/otherlab/other/install/compute/release/bin/endgame-mpi' '--ranks' '32' '--threads' '8' '--save' '0' '--memory' '2G' '--gather-limit' '4' '--line-limit' '5' '44444444' '--dir' 'data-small' '--randomize' '17'
+
+Environment:
+LESSOPEN=|/usr/bin/lesspipe.sh %s
+CVS_RSH=ssh
+LOGNAME=root
+USER=root
+HOME=/root
+QTDIR=/usr/lib64/qt-3.3
+ARCH=linux-rhel_6-ppc64
+LD_LIBRARY_PATH=/bgsys/drivers/ppcfloor/lib64:/dbhome/db2cat/sqllib/lib64:/dbhome/db2cat/sqllib/lib32
+LANG=en_US.UTF-8
+IBM_DB_DIR=/dbhome/db2cat/sqllib
+TERM=screen
+SHELL=/bin/bash
+QTINC=/usr/lib64/qt-3.3/include
+IBM_DB_LIB=/dbhome/db2cat/sqllib/lib
+DB2INSTANCE=db2cat
+G_BROKEN_FILENAMES=1
+WHATAMI=linux-rhel_6-ppc64
+HISTSIZE=1000
+PLATFORM=linux-rhel_6-ppc64
+MPIRUN_VERBOSE=1
+QTLIB=/usr/lib64/qt-3.3/lib
+DB2LIB=/dbhome/db2cat/sqllib/lib
+CLASSPATH=/dbhome/bgqsysdb/sqllib/tools/clpplus.jar:/dbhome/bgqsysdb/sqllib/tools/antlr-3.2.jar:/dbhome/bgqsysdb/sqllib/tools/jline-0.9.93.jar:/dbhome/db2cat/sqllib/java/db2java.zip:/dbhome/db2cat/sqllib/java/sqlj.zip:/dbhome/db2cat/sqllib/function:/dbhome/db2cat/sqllib/java/db2jcc_license_cu.jar:/dbhome/db2cat/sqllib/tools/clpplus.jar:/dbhome/db2cat/sqllib/tools/antlr-3.2.jar:/dbhome/db2cat/sqllib/tools/jline-0.9.93.jar:/dbhome/db2cat/sqllib/java/db2jcc.jar:.
+PATH=/usr/lib64/qt-3.3/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/bgsys/drivers/ppcfloor/bin:/bgsys/drivers/ppcfloor/sbin:/opt/ibutils/bin:/usr/lpp/mmfs/bin:/root/bin:/dbhome/db2cat/sqllib/bin:/dbhome/db2cat/sqllib/adm:/dbhome/db2cat/sqllib/misc
+DB2_HOME=/dbhome/db2cat/sqllib
+_=/usr/bin/nohup
+IBM_DB_INCLUDE=/dbhome/db2cat/sqllib/include
+HOSTNAME=vestasn1
+HISTCONTROL=ignoredups
+SHLVL=2
+PWD=/soft/environment/softenv/etc
+MAIL=/var/spool/mail/root
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=01;05;37;41:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arj=01;31:*.taz=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lz=01;31:*.xz=01;31:*.bz2=01;31:*.tbz=01;31:*.tbz2=01;31:*.bz=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.rar=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.axv=01;35:*.anx=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=01;36:*.au=01;36:*.flac=01;36:*.mid=01;36:*.midi=01;36:*.mka=01;36:*.mp3=01;36:*.mpc=01;36:*.ogg=01;36:*.ra=01;36:*.wav=01;36:*.axa=01;36:*.oga=01;36:*.spx=01;36:*.xspf=01;36:
+COBALT_JOBID=56404
+
+Info: stdin received from /dev/null
+Info: stdout sent to /gpfs/vesta_home/irving/data/56404.output
+Info: stderr sent to /gpfs/vesta_home/irving/data/56404.error
+
+Job 56404/irving/52654: Block VST-02460-13571-32 for location VST-02460-13571-32 successfully booted.  Starting task for job 56404. (CBS)
+Info: task completed normally with an exit code of 0; initiating job cleanup and removal

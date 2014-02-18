@@ -1,0 +1,21 @@
+======================================================================
+Aggregate BG/Q counter data for jobid 114025
+This report includes all 32 processes in MPI_COMM_WORLD and a total of 64 cores
+======================================================================
+----------------------------------------------------------------
+mpiAll, call count = 1, avg cycles = 423314113353, max cycles = 423601919757 :
+  -- Counter values for processes in this reporting group ----
+    min-value  min-rank    max-value  max-rank    avg-value   label
+  3.927398e+09      16   4.098861e+09       7   4.027375e+09  Committed Load Misses
+  1.483253e+11       0   1.507751e+11       2   1.497186e+11  Committed Cacheable Loads
+  5.785690e+09      16   5.940594e+09      23   5.867430e+09  L1p miss
+  7.508995e+11      25   7.526700e+11       1   7.518935e+11  All XU Instruction Completions
+  1.856530e+08      28   2.017660e+08       5   1.941264e+08  All AXU Instruction Completions
+  1.856669e+08      28   2.017699e+08       5   1.941317e+08  FP Operations Group 1 
+
+Derived metrics for code block "mpiAll" averaged over process(es) in the reporting group
+Instruction mix:  FPU = 0.03 %,  FXU = 99.97 %
+Instructions per cycle completed per core = 0.8877
+Per cent of max issue rate per core = 88.75 %
+Total weighted GFlops = 0.023
+

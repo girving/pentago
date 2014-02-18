@@ -1,0 +1,23 @@
+endgame                                           
+  cpu thread pool: threads = 1, priority = 0
+  memory threads: virtual 288,026,624, resident 5,439,488, share 4,038,656, text 8,192, peak known 0, known 0, data 9,015,296
+  read sections test                              
+    ranks = 24
+    read headers                                  263.1417 s
+    random partition                                0.0042 s
+    blob scatter                                   70.4780 s
+    (peak 0.2G)
+    (peak 0.4G)
+    (peak 0.6G)
+    (peak 0.8G)
+    WARNING: compressed_total = 61542055456, real restart job would fail
+    total size = 1475380615039
+    shuffle                                         0.1927 s
+  END read sections test                          336.5369 s
+END endgame                                       336.8572 s
+endgame                                           336.8572 s
+  read sections test                              336.5369 s
+    read headers                                  263.1417 s
+    random partition                                0.0042 s
+    blob scatter                                   70.4780 s
+    shuffle                                         0.1927 s

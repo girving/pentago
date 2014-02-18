@@ -1,0 +1,12 @@
+#PBS -q debug
+#PBS -l mppwidth=24
+#PBS -l walltime=00:30:00
+#PBS -N output-unit
+#PBS -j oe
+#PBS -V
+#PBS -l gres=gscratch2
+
+export PENTAGO=/global/homes/g/girving/pentago
+
+cd $PENTAGO
+py.test

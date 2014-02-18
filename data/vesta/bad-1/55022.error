@@ -1,0 +1,12 @@
+2013-02-01 07:06:51.702 (INFO ) [0xfff829da210] 22357:ibm.runjob.AbstractOptions: using properties file /bgsys/local/etc/bg.properties
+2013-02-01 07:06:51.703 (INFO ) [0xfff829da210] 22357:ibm.runjob.AbstractOptions: max open file descriptors: 65536
+2013-02-01 07:06:51.703 (INFO ) [0xfff829da210] 22357:ibm.runjob.AbstractOptions: core file limit: 0
+2013-02-01 07:06:51.703 (INFO ) [0xfff829da210] 22357:tatu.runjob.client: scheduler job id is 55022
+2013-02-01 07:06:51.706 (INFO ) [0xfff9ded1a70] 22357:tatu.runjob.monitor: monitor started
+2013-02-01 07:06:51.706 (INFO ) [0xfff829da210] VST-02640-13751-32:22357:ibm.runjob.client.options.Parser: set local socket to runjob_mux from properties file
+2013-02-01 07:06:51.870 (FATAL) [0xfff829da210] VST-02640-13751-32:22357:ibm.runjob.client.Job: could not start job: job failed to start
+2013-02-01 07:06:51.871 (FATAL) [0xfff829da210] VST-02640-13751-32:22357:ibm.runjob.client.Job: Load failed on Q02-I7-J00: Application executable ELF header contains invalid value, errno 8 Exec format error
+2013-02-01 07:06:51.871 (INFO ) [0xfff829da210] tatu.runjob.client: task exited with status 1
+2013-02-01 07:06:55.520 (INFO ) [0xfff9ded1a70] 22357:tatu.runjob.monitor: tracklib completed
+2013-02-01 07:06:55.520 (INFO ) [0xfff9ded1a70] 22357:tatu.runjob.monitor: monitor terminating
+2013-02-01 07:06:55.521 (INFO ) [0xfff829da210] tatu.runjob.client: monitor completed

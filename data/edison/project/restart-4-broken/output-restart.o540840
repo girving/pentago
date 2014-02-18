@@ -1,0 +1,116 @@
+cray-shmem/6.1.1(7):ERROR:150: Module 'cray-shmem/6.1.1' conflicts with the currently loaded module(s) 'cray-shmem/6.0.2'
+cray-shmem/6.1.1(7):ERROR:102: Tcl command execution failed: conflict cray-shmem
+
+cray-mpich/6.1.1(41):ERROR:150: Module 'cray-mpich/6.1.1' conflicts with the currently loaded module(s) 'cray-mpich/6.0.2'
+cray-mpich/6.1.1(41):ERROR:102: Tcl command execution failed: conflict cray-mpich
+
+[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034hERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+ERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+memory mpi: virtual 1,281,789,952, resident 10,326,016, share 4,939,776, text 8,192, peak known 0, known 0, data 1,082,572,800
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 1,295,626,240, resident 12,058,624, share 5,464,064, text 8,192, peak known 0, known 0, data 1,098,559,488
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 1024 --threads 6 --save 18 --memory 7G --gather-limit 4 --line-limit 5 --dir data-restart --randomize 17 --restart all-1/slice-17.pentago 00000000
+    ranks = 1024
+    cores = 6144
+    threads / rank = 6
+    section = 0-00000000
+    block size = 8
+    saved slices = 18
+    level = 26
+    memory limit = 7,516,192,768
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 0
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0120 s
+  simple partition                                  0.0000 s
+  dependents                                        0.8847 s
+  memory base: virtual 1,305,518,080, resident 23,379,968, share 6,754,304, text 8,192, peak known 37, known 0, data 1,108,451,328
+  restart: slice 17, file all-1/slice-17.pentago
+  estimate                                        
+    random partition                                0.0041 s
+    random partition                                0.0037 s
+    random partition                                0.0026 s
+    random partition                                0.0018 s
+    random partition                                0.0013 s
+    random partition                                0.0011 s
+    random partition                                0.0007 s
+    random partition                                0.0005 s
+    random partition                                0.0003 s
+    random partition                                0.0002 s
+    random partition                                0.0001 s
+    random partition                                0.0001 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 5053685821
+  END estimate                                      0.5055 s
+  read sections                                   
+    read headers                                  428.7651 s
+    random partition                                0.0041 s
+    blob scatter                                  216.4167 s
+    (peak 4.7G)
+    (peak 4.8G)
+    (peak 5.0G)
+    (peak 5.2G)
+    (peak 5.4G)
+    (peak 5.6G)
+    total size = 1475380615039
+    read data                                     3412.0711 s
+    shuffle                                        27.1472 s
+    decompress                                    
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 
+rank 531: pentago/mpi/flow.cpp:schedule_lines:264: MPI_Isend((void*)&block_request->request_buffer,2,MPI_INT,owner,request_tag,comms.request_comm,&request_request) failed: Invalid tag, error stack:
+PMPI_Isend(154): MPI_Isend(buf=0x108a6c0, count=2, MPI_INT, dest=676, tag=5319939, comm=0x84000004, request=0x7fffffff84c0) failed
+PMPI_Isend(103): Invalid tag, value is 5319939
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabfeefda]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbdd0) [0x2aaaaaff2dd0]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_core.so(_ZN7pentago10die_helperERKSs+0x15) [0x2aaaab24b18e]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi12check_failedEPKcS2_iS2_i+0x61) [0x2aaaab011851]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi6flow_t14schedule_linesEv+0x11ed) [0x2aaaaaff5ffd]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi6flow_tC2ERKNS0_12flow_comms_tEN5geode3PtrIKNS_3end22readable_block_store_tEEERNS7_26accumulating_block_store_tENS5_8RawArrayIKNS7_6line_tELi1EEEmii+0xc2c) [0x2aaaaaff6cdc]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi13compute_linesERKNS0_12flow_comms_tEN5geode3PtrIKNS_3end22readable_block_store_tEEERNS6_26accumulating_block_store_tENS4_8RawArrayIKNS6_6line_tELi1EEEmii+0x67) [0x2aaaaaff73f7]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x3999) [0x2aaaab00ef49]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e99c16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+_pmiu_daemon(SIGCHLD): [NID 03477] [c2-2c0s5n1] [Sat Nov 30 08:25:59 2013] PE RANK 531 exit signal Aborted
+[NID 03477] 2013-11-30 08:26:00 Apid 2043147: initiated application termination
+Application 2043147 exit codes: 134
+Application 2043147 exit signals: Killed
+Application 2043147 resources: utime ~4344s, stime ~133s, Rss ~4200176, inblocks ~73124, outblocks ~4378
+[?1034h
+ + --------------------------------------------------------------------------
+ +        Job name: output-restart
+ +          Job Id: 540840.edique02
+ +          System: edison
+ +     Queued Time: Tue Nov 26 20:42:58 2013
+ +      Start Time: Sat Nov 30 07:12:35 2013
+ + Completion Time: Sat Nov 30 08:26:02 2013
+ +            User: girving
+ +        MOM Host: nid02819
+ +           Queue: reg_small
+ +  Req. Resources: gres=gscratch2,mppnodect=128,mppnppn=24,mppwidth=3072,walltime=08:00:00
+ +  Used Resources: cput=00:00:09,mem=8240kb,vmem=161064kb,walltime=01:13:29
+ +     Acct String: m1302
+ +   PBS_O_WORKDIR: /global/project/projectdirs/pentago
+ +     Submit Args: restart.pbs
+ + --------------------------------------------------------------------------
+

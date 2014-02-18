@@ -1,0 +1,301 @@
+predict                                           
+  command = /global/homes/g/girving/pentago/pentago/end/predict --ranks 1024 --threads 6 --save 18 --dir data-all --restart 16 --memory 7G --section 00000000 --randomize 17 --gather-limit 4 --line-limit 5
+  cpu thread pool: threads = 32, priority = 0
+  parameters                                      
+    ranks = 1024
+    cores = 6144
+    threads / rank = 6
+    section = 0-00000000
+    block size = 8
+    saved slices = 18
+    memory limit = 7,516,192,768
+  END parameters                                    0.0002 s
+  dependents                                        0.2810 s
+  slice 16                                        
+    random partition                                0.0064 s
+    load balance                                  
+      lines = 15574 15575 (1)
+      line blocks = 84367 91785 (1.088)
+      line nodes = 216229000 238674172 (1.104)
+      blocks = 21112 23014 (1.09)
+      block nodes = 54077968 60137568 (1.112)
+    END load balance                                0.0001 s
+    block local ids = 996788 (limit 1048575)
+  END slice 16                                      1.1126 s
+  slice 15                                        
+    random partition                                0.0044 s
+    load balance                                  
+      lines = 8664 8665 (1)
+      line blocks = 38029 42820 (1.126)
+      line nodes = 82070380 96312192 (1.174)
+      blocks = 9490 10814 (1.14)
+      block nodes = 20193576 24062544 (1.192)
+    END load balance                                0.0001 s
+    block local ids = 554548 (limit 1048575)
+    base memory = 2,409,836,133
+    line parallelism = 185.516
+    total memory = 7,501,983,333
+    save memory = 1,540,002,816
+    save size = 1,430,185,318,400
+  END slice 15                                      0.6010 s
+  slice 14                                        
+    random partition                                0.0032 s
+    load balance                                  
+      lines = 4749 4750 (1)
+      line blocks = 17130 20446 (1.194)
+      line nodes = 29645840 37125336 (1.252)
+      blocks = 4260 5088 (1.194)
+      block nodes = 7401056 9292976 (1.256)
+    END load balance                                0.0001 s
+    block local ids = 303975 (limit 1048575)
+    base memory = 958,006,451
+    line parallelism = 238.262
+    total memory = 7,508,985,011
+    save memory = 594,750,464
+    save size = 545,180,925,184
+  END slice 14                                      0.3244 s
+  slice 13                                        
+    random partition                                0.0020 s
+    load balance                                  
+      lines = 2288 2289 (1)
+      line blocks = 6897 8823 (1.279)
+      line nodes = 9381644 13347124 (1.423)
+      blocks = 1662 2238 (1.347)
+      block nodes = 2233272 3402576 (1.524)
+    END load balance                                0.0001 s
+    block local ids = 146471 (limit 1048575)
+    base memory = 366,464,572
+    line parallelism = 259.753
+    total memory = 7,495,470,652
+    save memory = 217,764,864
+    save size = 177,120,575,744
+  END slice 13                                      0.1459 s
+  slice 12                                        
+    random partition                                0.0020 s
+    load balance                                  
+      lines = 1114 1115 (1.001)
+      line blocks = 2778 3996 (1.438)
+      line nodes = 2826832 4664464 (1.65)
+      blocks = 670 1008 (1.504)
+      block nodes = 667904 1154672 (1.729)
+    END load balance                                0.0000 s
+    block local ids = 71333 (limit 1048575)
+    base memory = 132,537,667
+    line parallelism = 268.252
+    total memory = 7,509,269,827
+    save memory = 73,899,008
+    save size = 57,817,397,504
+  END slice 12                                      0.0747 s
+  slice 11                                        
+    random partition                                0.0012 s
+    load balance                                  
+      lines = 462 463 (1.002)
+      line blocks = 877 1529 (1.743)
+      line nodes = 645328 1340552 (2.077)
+      blocks = 214 399 (1.864)
+      block nodes = 143652 383008 (2.666)
+    END load balance                                0.0000 s
+    block local ids = 29582 (limit 1048575)
+    base memory = 45,396,620
+    line parallelism = 271.417
+    total memory = 7,504,704,140
+    save memory = 24,512,512
+    save size = 15,073,419,776
+  END slice 11                                      0.0349 s
+  slice 10                                        
+    random partition                                0.0008 s
+    load balance                                  
+      lines = 196 197 (1.005)
+      line blocks = 292 685 (2.346)
+      line nodes = 140840 434652 (3.086)
+      blocks = 66 178 (2.697)
+      block nodes = 30144 114180 (3.788)
+    END load balance                                0.0000 s
+    block local ids = 12583 (limit 1048575)
+    base memory = 15,031,862
+    line parallelism = 272.521
+    total memory = 7,501,864,502
+    save memory = 7,307,520
+    save size = 3,998,676,992
+  END slice 10                                      0.0227 s
+  slice 9                                         
+    random partition                                0.0005 s
+    load balance                                  
+      lines = 73 74 (1.014)
+      line blocks = 88 274 (3.114)
+      line nodes = 23528 122512 (5.207)
+      blocks = 16 73 (4.562)
+      block nodes = 4048 36904 (9.117)
+    END load balance                                0.0001 s
+    block local ids = 4685 (limit 1048575)
+    base memory = 4,755,713
+    line parallelism = 272.894
+    total memory = 7,491,588,353
+    save memory = 2,361,856
+    save size = 887,707,136
+  END slice 9                                       0.0318 s
+  slice 8                                         
+    random partition                                0.0003 s
+    load balance                                  
+      lines = 29 30 (1.034)
+      line blocks = 29 148 (5.103)
+      line nodes = 3912 41072 (10.5)
+      blocks = 3 48 (16)
+      block nodes = 176 13320 (75.68)
+    END load balance                                0.0001 s
+    block local ids = 1863 (limit 1048575)
+    base memory = 1,695,719
+    line parallelism = 273.005
+    total memory = 7,516,053,479
+    save memory = 852,480
+    save size = 208,126,976
+  END slice 8                                       0.0198 s
+  slice 7                                         
+    random partition                                0.0002 s
+    load balance                                  
+      lines = 9 10 (1.111)
+      line blocks = 9 85 (9.444)
+      line nodes = 440 10958 (24.9)
+      blocks = 0 26 (inf)
+      block nodes = 0 4288 (inf)
+    END load balance                                0.0000 s
+    block local ids = 581 (limit 1048575)
+    base memory = 681,641
+    line parallelism = 273.042
+    total memory = 7,515,039,401
+    save memory = 274,432
+    save size = 36,161,280
+  END slice 7                                       0.0167 s
+  slice 6                                         
+    random partition                                0.0001 s
+    load balance                                  
+      lines = 3 4 (1.333)
+      line blocks = 3 55 (18.33)
+      line nodes = 24 2762 (115.1)
+      blocks = 0 17 (inf)
+      block nodes = 0 1368 (inf)
+    END load balance                                0.0000 s
+    block local ids = 211 (limit 1048575)
+    base memory = 261,304
+    line parallelism = 273.057
+    total memory = 7,514,619,064
+    save memory = 87,552
+    save size = 6,760,192
+  END slice 6                                       0.0149 s
+  slice 5                                         
+    random partition                                0.0001 s
+    load balance                                  
+      lines = 0 1 (inf)
+      line blocks = 0 40 (inf)
+      line nodes = 0 576 (inf)
+      blocks = 0 8 (inf)
+      block nodes = 0 270 (inf)
+    END load balance                                0.0000 s
+    block local ids = 39 (limit 1048575)
+    base memory = 102,362
+    line parallelism = 273.063
+    total memory = 7,514,460,122
+    save memory = 17,280
+    save size = 1,009,408
+  END slice 5                                       0.0156 s
+  slice 4                                         
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 0 1 (inf)
+      line blocks = 0 24 (inf)
+      line nodes = 0 192 (inf)
+      blocks = 0 4 (inf)
+      block nodes = 0 96 (inf)
+    END load balance                                0.0000 s
+    block local ids = 19 (limit 1048575)
+    base memory = 39,310
+    line parallelism = 273.065
+    total memory = 7,514,397,070
+    save memory = 6,144
+    save size = 180,224
+  END slice 4                                       0.0152 s
+  slice 3                                         
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 0 1 (inf)
+      line blocks = 0 8 (inf)
+      line nodes = 0 64 (inf)
+      blocks = 0 1 (inf)
+      block nodes = 0 27 (inf)
+    END load balance                                0.0000 s
+    block local ids = 3 (limit 1048575)
+    base memory = 17,667
+    line parallelism = 273.066
+    total memory = 7,514,375,427
+    save memory = 1,728
+    save size = 18,304
+  END slice 3                                       0.0139 s
+  slice 2                                         
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 0 1 (inf)
+      line blocks = 0 3 (inf)
+      line nodes = 0 18 (inf)
+      blocks = 0 1 (inf)
+      block nodes = 0 9 (inf)
+    END load balance                                0.0000 s
+    block local ids = 0 (limit 1048575)
+    base memory = 7,505
+    line parallelism = 273.066
+    total memory = 7,514,365,265
+    save memory = 576
+    save size = 2,304
+  END slice 2                                       0.0148 s
+  slice 1                                         
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 0 1 (inf)
+      line blocks = 0 1 (inf)
+      line nodes = 0 3 (inf)
+      blocks = 0 1 (inf)
+      block nodes = 0 3 (inf)
+    END load balance                                0.0000 s
+    block local ids = 0 (limit 1048575)
+    base memory = 4,909
+    line parallelism = 273.066
+    total memory = 7,514,362,669
+    save memory = 192
+    save size = 192
+  END slice 1                                       0.0151 s
+  slice 0                                         
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 0 1 (inf)
+      line blocks = 0 1 (inf)
+      line nodes = 0 1 (inf)
+      blocks = 0 1 (inf)
+      block nodes = 0 1 (inf)
+    END load balance                                0.0000 s
+    block local ids = 0 (limit 1048575)
+    base memory = 3,980
+    line parallelism = 273.067
+    total memory = 7,514,361,740
+    save memory = 64
+    save size = 64
+  END slice 0                                       0.0132 s
+  summary                                         
+    lines = 8665
+    blocks = 10814
+    local ids = 554548
+    base memory = 2,409,836,133
+    line parallelism = 185.516
+    total memory = 7,516,053,479
+    save memory = 1,540,002,816
+    total inputs = 93,173,410,647
+    total outputs = 34,851,816,870
+    save bytes = 2,230,516,279,680
+    time estimate = 45.7873 s
+  END summary                                       0.0003 s
+END predict                                         2.7960 s
+predict                                             2.7960 s
+  parameters                                        0.0002 s
+  dependents                                        0.2810 s
+  slice                                             2.4872 s
+    random partition                                0.0212 s
+    load balance                                    0.0009 s
+  summary                                           0.0003 s

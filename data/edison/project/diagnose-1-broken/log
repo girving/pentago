@@ -1,0 +1,12 @@
+endgame                                           
+  cpu thread pool: threads = 1, priority = 0
+  memory threads: virtual 1,599,897,600, resident 12,546,048, share 5,971,968, text 8,192, peak known 0, known 0, data 1,152,282,624
+  read sections test                              
+    random partition                                0.0043 s
+    (peak 0.2G)
+    (peak 0.4G)
+    (peak 0.6G)
+    (peak 0.8G)
+    total size = 1475380615039
+    shuffle                                         0.0017 s
+  END read sections test                          257.8066 s

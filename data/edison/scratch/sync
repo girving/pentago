@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cd `dirname $0`
+rsync -avzP --max-size=50G edison:edison/scratch/pentago/* .
+chmod -R -w *

@@ -1,0 +1,102 @@
+[?1034h[?1034h[?1034h[?1034hscipy/0.12.0(12):ERROR:150: Module 'scipy/0.12.0' conflicts with the currently loaded module(s) 'scipy/0.11.0'
+scipy/0.12.0(12):ERROR:102: Tcl command execution failed: conflict $name
+
+[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034hscipy/0.12.0(12):ERROR:150: Module 'scipy/0.12.0' conflicts with the currently loaded module(s) 'scipy/0.11.0'
+scipy/0.12.0(12):ERROR:102: Tcl command execution failed: conflict $name
+
+[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034hERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+ERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+memory mpi: virtual 1,281,028,096, resident 10,313,728, share 4,939,776, text 8,192, peak known 0, known 0, data 1,082,572,800
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 1,294,864,384, resident 12,042,240, share 5,459,968, text 8,192, peak known 0, known 0, data 1,098,559,488
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 1024 --threads 6 --save 18 --memory 7G --gather-limit 4 --line-limit 5 --dir data-restart --randomize 17 --restart all-1/slice-17.pentago 00000000
+    ranks = 1024
+    cores = 6144
+    threads / rank = 6
+    section = 0-00000000
+    block size = 8
+    saved slices = 18
+    level = 26
+    memory limit = 7,516,192,768
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 0
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0008 s
+  simple partition                                  0.0000 s
+  dependents                                        0.8673 s
+  memory base: virtual 1,305,018,368, resident 23,330,816, share 6,610,944, text 8,192, peak known 37, known 0, data 1,108,713,472
+  restart: slice 17, file all-1/slice-17.pentago
+  estimate                                        
+    random partition                                0.0040 s
+    random partition                                0.0035 s
+    random partition                                0.0026 s
+    random partition                                0.0019 s
+    random partition                                0.0013 s
+    random partition                                0.0011 s
+    random partition                                0.0007 s
+    random partition                                0.0005 s
+    random partition                                0.0003 s
+    random partition                                0.0002 s
+    random partition                                0.0001 s
+    random partition                                0.0001 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 5053685821
+  END estimate                                      0.4820 s
+  read sections                                   
+    random partition                                0.0039 s
+    read data                                     
+rank 0: pentago/mpi/io.cpp:read_sections:397: MPI_File_read_ordered(file,raw.data(),raw.size(),MPI_BYTE,MPI_STATUS_IGNORE) failed: Access denied to file, error stack:
+ADIOI_CRAY_OPEN(102): Access denied to file all-1/.slice-17.pentago.shfp.670064
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabf5b05a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xb81c) [0x2aaaaaff281c]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_core.so(_ZN7pentago10die_helperERKSs+0x15) [0x2aaaab24919e]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi12check_failedEPKcS2_iS2_i+0x61) [0x2aaaab00f291]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi13read_sectionsEiRKSsRNS_3end18compacting_store_tERKN5boost8functionIFN5geode3RefINS3_11partition_tEEEiRKNS3_10sections_tEEEE+0x3e33) [0x2aaaab001983]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x3ebc) [0x2aaaab00d7fc]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0ddfc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+
+_pmiu_daemon(SIGCHLD): [NID 04191] [c5-2c2s7n3] [Sun Nov 24 06:22:14 2013] PE RANK 0 exit signal Aborted
+[NID 04191] 2013-11-24 06:22:14 Apid 1928280: initiated application termination
+Application 1928280 exit codes: 134
+Application 1928280 exit signals: Killed
+Application 1928280 resources: utime ~433s, stime ~129s, Rss ~1030944, inblocks ~631106, outblocks ~4374
+[?1034h
+ + --------------------------------------------------------------------------
+ +        Job name: output-restart
+ +          Job Id: 517905.edique02
+ +          System: edison
+ +     Queued Time: Mon Nov 18 14:02:47 2013
+ +      Start Time: Sun Nov 24 06:13:43 2013
+ + Completion Time: Sun Nov 24 06:22:17 2013
+ +            User: girving
+ +        MOM Host: nid02818
+ +           Queue: reg_small
+ +  Req. Resources: gres=gscratch2,mppnodect=128,mppnppn=24,mppwidth=3072,walltime=08:00:00
+ +  Used Resources: cput=00:00:07,mem=8212kb,vmem=161188kb,walltime=00:08:36
+ +     Acct String: m1302
+ +   PBS_O_WORKDIR: /global/project/projectdirs/pentago
+ +     Submit Args: restart.pbs
+ + --------------------------------------------------------------------------
+

@@ -1,0 +1,6 @@
+#!/bin/sh
+
+for i in 12 13 14 15 16 17 18; do
+  echo hashing slice-$i.pentago
+  ~/pentago/web/hash-chunks slice-$i.pentago > md5s-$i
+done

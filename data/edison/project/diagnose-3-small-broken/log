@@ -1,0 +1,27 @@
+endgame                                           
+  cpu thread pool: threads = 1, priority = 0
+  memory threads: virtual 288,038,912, resident 5,451,776, share 4,050,944, text 8,192, peak known 0, known 0, data 9,015,296
+  read sections test                              
+    ranks = 24
+    read headers                                  263.3691 s
+    random partition                                0.0043 s
+    blob scatter                                   70.9070 s
+    (peak 0.2G)
+    (peak 0.4G)
+    (peak 0.6G)
+    (peak 0.8G)
+    WARNING: compressed_total = 61542055456, real restart job would fail
+    total size = 1475380615039
+    shuffle                                       
+
+rank 0: pentago/mpi/io.cpp:unknown:546: b 61231, offset 2147495226, cs 16132, br -2147472070 -2147455938, condition = false
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabff098a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbd90) [0x2aaaaaff2d90]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd87910]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi18read_sections_testEiRKSsRKN5boost8functionIFN5geode3RefINS_3end11partition_tEEEiRKNS7_10sections_tEEEE+0xa86) [0x2aaaab0033e6]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x4b4e) [0x2aaaab00fe3e]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e9bc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================

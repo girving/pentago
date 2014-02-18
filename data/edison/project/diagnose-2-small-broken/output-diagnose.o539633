@@ -1,0 +1,93 @@
+[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034hERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+ERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+memory mpi: virtual 281,739,264, resident 4,927,488, share 3,592,192, text 8,192, peak known 0, known 0, data 2,715,648
+endgame                                           
+  cpu thread pool: threads = 1, priority = 0
+  memory threads: virtual 288,038,912, resident 5,451,776, share 4,050,944, text 8,192, peak known 0, known 0, data 9,015,296
+  read sections test                              
+    ranks = 24
+    random partition                                0.0043 s
+
+rank 1: pentago/mpi/io.cpp:unknown:521: Assertion failed, condition = compressed_total<uint64_t(numeric_limits<int>::max())
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabff098a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbd90) [0x2aaaaaff2d90]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd87910]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi18read_sections_testEiRKSsRKN5boost8functionIFN5geode3RefINS_3end11partition_tEEEiRKNS7_10sections_tEEEE+0xdf0) [0x2aaaab0035c0]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x4b4e) [0x2aaaab00fc2e]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e9bc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+
+rank 13: pentago/mpi/io.cpp:unknown:521: Assertion failed, condition = compressed_total<uint64_t(numeric_limits<int>::max())
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabff098a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbd90) [0x2aaaaaff2d90]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd87910]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi18read_sections_testEiRKSsRKN5boost8functionIFN5geode3RefINS_3end11partition_tEEEiRKNS7_10sections_tEEEE+0xdf0) [0x2aaaab0035c0]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x4b4e) [0x2aaaab00fc2e]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e9bc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+
+rank 12: pentago/mpi/io.cpp:unknown:521: Assertion failed, condition = compressed_total<uint64_t(numeric_limits<int>::max())
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabff098a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbd90) [0x2aaaaaff2d90]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd87910]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi18read_sections_testEiRKSsRKN5boost8functionIFN5geode3RefINS_3end11partition_tEEEiRKNS7_10sections_tEEEE+0xdf0) [0x2aaaab0035c0]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x4b4e) [0x2aaaab00fc2e]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e9bc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+_pmiu_daemon(SIGCHLD): [NID 01848] [c1-1c1s14n0] [Tue Nov 26 16:31:34 2013] PE RANK 1 exit signal Aborted
+
+rank 17: pentago/mpi/io.cpp:unknown:521: Assertion failed, condition = compressed_total<uint64_t(numeric_limits<int>::max())
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabff098a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbd90) [0x2aaaaaff2d90]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd87910]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi18read_sections_testEiRKSsRKN5boost8functionIFN5geode3RefINS_3end11partition_tEEEiRKNS7_10sections_tEEEE+0xdf0) [0x2aaaab0035c0]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x4b4e) [0x2aaaab00fc2e]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e9bc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+
+rank 11: pentago/mpi/io.cpp:unknown:521: Assertion failed, condition = compressed_total<uint64_t(numeric_limits<int>::max())
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabff098a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xbd90) [0x2aaaaaff2d90]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd87910]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi18read_sections_testEiRKSsRKN5boost8functionIFN5geode3RefINS_3end11partition_tEEEiRKNS7_10sections_tEEEE+0xdf0) [0x2aaaab0035c0]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x4b4e) [0x2aaaab00fc2e]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0e9bc16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================
+
+rank 10: pentago/mpi/io.cpp:unknown:521: Assertion failed, condition = compressed_total<uint64_t(numeric_limits<int>::max())
+[NID 01848] 2013-11-26 16:31:34 Apid 1976101: initiated application termination
+Application 1976101 exit codes: 134
+Application 1976101 resources: utime ~336s, stime ~4s, Rss ~82832, inblocks ~1707, outblocks ~38
+[?1034h
+ + --------------------------------------------------------------------------
+ +        Job name: output-diagnose
+ +          Job Id: 539633.edique02
+ +          System: edison
+ +     Queued Time: Tue Nov 26 16:24:42 2013
+ +      Start Time: Tue Nov 26 16:25:13 2013
+ + Completion Time: Tue Nov 26 16:31:34 2013
+ +            User: girving
+ +        MOM Host: nid02817
+ +           Queue: debug
+ +  Req. Resources: gres=gscratch2,mppnodect=1,mppnppn=24,mppwidth=24,walltime=00:10:00
+ +  Used Resources: cput=00:00:07,mem=8208kb,vmem=95644kb,walltime=00:06:23
+ +     Acct String: m1302
+ +   PBS_O_WORKDIR: /global/project/projectdirs/pentago
+ +     Submit Args: diagnose-small.pbs
+ + --------------------------------------------------------------------------
+

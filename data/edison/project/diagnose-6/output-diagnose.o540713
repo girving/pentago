@@ -1,0 +1,44 @@
+[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034hERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+ERROR: ld.so: object 'libstdc++.so.6' from LD_PRELOAD cannot be preloaded: ignored.
+memory mpi: virtual 1,594,613,760, resident 10,690,560, share 5,382,144, text 8,192, peak known 0, known 0, data 1,082,646,528
+endgame                                           
+  cpu thread pool: threads = 1, priority = 0
+  memory threads: virtual 1,599,889,408, resident 12,533,760, share 5,959,680, text 8,192, peak known 0, known 0, data 1,090,064,384
+  read sections test                              
+    ranks = 1024
+    read headers                                  191.9593 s
+    random partition                                0.0041 s
+    blob scatter                                   69.4298 s
+    (peak 0.2G)
+    (peak 0.4G)
+    (peak 0.6G)
+    (peak 0.8G)
+    total size = 1475380615039
+    shuffle                                         0.0022 s
+  END read sections test                          261.5369 s
+END endgame                                       262.8578 s
+endgame                                           262.8578 s
+  read sections test                              261.5369 s
+    read headers                                  191.9593 s
+    random partition                                0.0041 s
+    blob scatter                                   69.4298 s
+    shuffle                                         0.0022 s
+Application 2016995 resources: utime ~267667s, stime ~1801s, Rss ~2014176, inblocks ~773306, outblocks ~976
+[?1034h
+ + --------------------------------------------------------------------------
+ +        Job name: output-diagnose
+ +          Job Id: 540713.edique02
+ +          System: edison
+ +     Queued Time: Tue Nov 26 20:01:08 2013
+ +      Start Time: Wed Nov 27 06:35:03 2013
+ + Completion Time: Wed Nov 27 06:40:27 2013
+ +            User: girving
+ +        MOM Host: nid01283
+ +           Queue: debug
+ +  Req. Resources: gres=gscratch2,mppnodect=43,mppnppn=24,mppwidth=1032,walltime=00:20:00
+ +  Used Resources: cput=00:00:07,mem=9796kb,vmem=161184kb,walltime=00:05:24
+ +     Acct String: m1302
+ +   PBS_O_WORKDIR: /global/project/projectdirs/pentago
+ +     Submit Args: diagnose.pbs
+ + --------------------------------------------------------------------------
+

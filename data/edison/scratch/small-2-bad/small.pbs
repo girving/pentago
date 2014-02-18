@@ -1,0 +1,11 @@
+#PBS -q debug
+#PBS -l mppwidth=96
+#PBS -l walltime=00:10:00
+#PBS -N output-small
+#PBS -j oe
+#PBS -V
+#PBS -l gres=scratch
+
+cd $PBS_O_WORKDIR
+aprun -n 8 -N 2 $OTHER/install/edison-release/bin/endgame-mpi --ranks 8 --threads 12 --save 0 --memory 4G --gather-limit 4 --line-limit 5 --per-rank-times 44444444 --dir data-small --randomize 17
+# -j 2 for hyperthreaded

@@ -1,0 +1,69 @@
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 1,359,925,248, resident 12,058,624, share 5,468,160, text 8,192, peak known 0, known 0, data 1,161,474,048
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 1024 --threads 6 --save 18 --memory 7G --gather-limit 4 --line-limit 5 --dir data-restart --randomize 17 --restart /global/scratch2/sd/girving/pentago/all-1/slice-17.pentago 00000000
+    ranks = 1024
+    cores = 6144
+    threads / rank = 6
+    section = 0-00000000
+    block size = 8
+    saved slices = 18
+    level = 26
+    memory limit = 7,516,192,768
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 0
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0008 s
+  simple partition                                  0.0000 s
+  dependents                                        0.8805 s
+  memory base: virtual 1,366,478,848, resident 23,040,000, share 6,639,616, text 8,192, peak known 37, known 0, data 1,168,027,648
+  restart: slice 17, file /global/scratch2/sd/girving/pentago/all-1/slice-17.pentago
+  estimate                                        
+    random partition                                0.0039 s
+    random partition                                0.0035 s
+    random partition                                0.0026 s
+    random partition                                0.0018 s
+    random partition                                0.0013 s
+    random partition                                0.0011 s
+    random partition                                0.0007 s
+    random partition                                0.0005 s
+    random partition                                0.0003 s
+    random partition                                0.0002 s
+    random partition                                0.0001 s
+    random partition                                0.0001 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 5053685821
+  END estimate                                      0.4395 s
+  read sections                                   
+    partition                                     
+
+rank 0: pentago/end/restart_partition.cpp:unknown:84: Assertion failed, condition = lo<numeric_limits<int>::max()
+=================== Begin Stack Backtrace ===================
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode7process9backtraceEv+0x2a) [0x2aaaabf5a05a]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(+0xb97c) [0x2aaaaaff297c]
+/global/homes/g/girving/geode/build/native/flavor/lib/libgeode.so(_ZN5geode16assertion_failedEPKcS1_jS1_S1_+0x106) [0x2aaaabd5e066]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_core.so(_ZN7pentago3end19restart_partition_t20minimum_memory_limitEiN5geode8RawArrayIKNS2_3RefIKNS_20supertensor_reader_tEEELi1EEE+0x27d) [0x2aaaab2cf9cd]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_core.so(_ZN7pentago3end19restart_partition_tC1EiN5geode8RawArrayIKNS2_3RefIKNS_20supertensor_reader_tEEELi1EEE+0x43) [0x2aaaab2d0353]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi13read_sectionsEiRKSsRNS_3end18compacting_store_tE+0x23dd) [0x2aaaab00000d]
+/global/homes/g/girving/pentago/build/native/flavor/lib/libpentago_mpi.so(_ZN7pentago3mpi8toplevelEiPPc+0x3eb9) [0x2aaaab00cc39]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400d76]
+/lib64/libc.so.6(__libc_start_main+0xe6) [0x2aaab0ddec16]
+/global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi() [0x400e49]
+==================== End Stack Backtrace ====================

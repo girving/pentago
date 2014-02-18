@@ -1,0 +1,68 @@
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 1,295,626,240, resident 12,058,624, share 5,464,064, text 8,192, peak known 0, known 0, data 1,098,559,488
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 1024 --threads 6 --save 18 --memory 7G --gather-limit 4 --line-limit 5 --dir data-restart --randomize 17 --restart all-1/slice-17.pentago 00000000
+    ranks = 1024
+    cores = 6144
+    threads / rank = 6
+    section = 0-00000000
+    block size = 8
+    saved slices = 18
+    level = 26
+    memory limit = 7,516,192,768
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 0
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0120 s
+  simple partition                                  0.0000 s
+  dependents                                        0.8847 s
+  memory base: virtual 1,305,518,080, resident 23,379,968, share 6,754,304, text 8,192, peak known 37, known 0, data 1,108,451,328
+  restart: slice 17, file all-1/slice-17.pentago
+  estimate                                        
+    random partition                                0.0041 s
+    random partition                                0.0037 s
+    random partition                                0.0026 s
+    random partition                                0.0018 s
+    random partition                                0.0013 s
+    random partition                                0.0011 s
+    random partition                                0.0007 s
+    random partition                                0.0005 s
+    random partition                                0.0003 s
+    random partition                                0.0002 s
+    random partition                                0.0001 s
+    random partition                                0.0001 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 5053685821
+  END estimate                                      0.5055 s
+  read sections                                   
+    read headers                                  428.7651 s
+    random partition                                0.0041 s
+    blob scatter                                  216.4167 s
+    (peak 4.7G)
+    (peak 4.8G)
+    (peak 5.0G)
+    (peak 5.2G)
+    (peak 5.4G)
+    (peak 5.6G)
+    total size = 1475380615039
+    read data                                     3412.0711 s
+    shuffle                                        27.1472 s
+    decompress                                    
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 

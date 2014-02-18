@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+
+from __future__ import division
+from other.core import *
+from other.core.value import parser
+import subprocess
+import os
+import re
+
+props = PropManager()
+dir = props.add('dir','data-small')
+program = props.add('program','/home/irving/otherlab/other/install/compute/release/bin/endgame-mpi')
+nop = props.add('nop',False).set_abbrev('n')
+run = props.add('run',False)
+
+nodes = props.add('nodes',8)
+ranks = props.add('ranks',32)
+threads = props.add('threads',8)
+time = props.add('time',10)
+
+parser.parse(props,'endgame-mpi launcher')
+
+cmd = 'qsub -t $time -n $nodes --mode=c$ranks_per_node $program --ranks $ranks --threads $threads --save 0 --memory 2G --gather-limit 4 --line-limit 5 44444444 --dir $dir --randomize 17'
+props.add('ranks_per_node',ranks()//nodes())
+for prop in props.items.values():
+  cmd = re.sub(r'\$%s\b'%prop.name,str(prop()),cmd)
+
+print cmd
+if not nop() and run():
+  if os.path.exists(dir()):
+    raise RuntimeError('%s exists'%dir())
+  subprocess.call(cmd.split())

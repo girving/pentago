@@ -1,0 +1,13 @@
+#PBS -q debug
+#PBS -l mppwidth=48
+#PBS -l walltime=00:20:00
+#PBS -N output-bad
+#PBS -j oe
+#PBS -V
+#PBS -l gres=gscratch2
+
+cd $PBS_O_WORKDIR
+aprun -n 8 -N 4 $OTHER/install/edison-release/bin/endgame-mpi --ranks 8 --threads 6 --save 0 --memory 6G --gather-limit 4 --line-limit 5 --per-rank-times 44444444 --dir data-bad --randomize 17
+# -j 2 for hyperthreaded
+
+# 1 node = 24 cores (x2 with hyperthreading via -j 2), 64 GB RAM

@@ -1,0 +1,22 @@
+#!/bin/bash -x
+
+#  mpirun -n 2 endgame-mpi --threads 3 --dir tmp/write-3 --test write-3
+#  ../end/check tmp/write-3
+#  mpirun -n 2 endgame-mpi --threads 3 --dir tmp/write-4 --test write-4
+#  ../end/check tmp/write-4
+#  mpirun -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 4 --randomize 0 00000000 --dir tmp/meaningless-s4-r0
+#  ../end/check tmp/meaningless-s4-r0
+#  mpirun -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 5 --randomize 0 00000000 --dir tmp/meaningless-s5-r0
+#  ../end/check tmp/meaningless-s5-r0
+#  mpirun -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 4 --randomize 17 00000000 --dir tmp/meaningless-s4-r17
+#  ../end/check tmp/meaningless-s4-r17
+#  mpirun -n 2 endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 5 --randomize 17 00000000 --dir tmp/meaningless-s5-r17
+#  ../end/check tmp/meaningless-s5-r17
+
+mkdir tmp
+rm -rf tmp/write-3 && qsub -t 10 -n 2 --mode=c4 ~/otherlab/other/install/compute/release/bin/endgame-mpi --threads 3 --dir tmp/write-3 --test write-3
+rm -rf tmp/write-4 && qsub -t 10 -n 2 --mode=c4 ~/otherlab/other/install/compute/release/bin/endgame-mpi --threads 3 --dir tmp/write-4 --test write-4
+rm -rf tmp/meaningless-s4-r0 && qsub -t 10 -n 2 --mode=c4 ~/otherlab/other/install/compute/release/bin/endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 4 --randomize 0 00000000 --dir tmp/meaningless-s4-r0
+rm -rf tmp/meaningless-s5-r0 && qsub -t 10 -n 2 --mode=c4 ~/otherlab/other/install/compute/release/bin/endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 5 --randomize 0 00000000 --dir tmp/meaningless-s5-r0
+rm -rf tmp/meaningless-s4-r17 && qsub -t 10 -n 2 --mode=c4 ~/otherlab/other/install/compute/release/bin/endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 4 --randomize 17 00000000 --dir tmp/meaningless-s4-r17
+rm -rf tmp/meaningless-s5-r17 && qsub -t 10 -n 2 --mode=c4 ~/otherlab/other/install/compute/release/bin/endgame-mpi --threads 3 --save 20 --memory 3G --meaningless 5 --randomize 17 00000000 --dir tmp/meaningless-s5-r17

@@ -1,0 +1,18 @@
+total 9317888
+-rw------- 1 girving girving       3258 Sep 28 18:38 check.txt
+-rw------- 1 girving girving        112 Sep 28 18:17 counts-31.npy
+-rw------- 1 girving girving        176 Sep 28 18:16 counts-32.npy
+-rw------- 1 girving girving        272 Sep 28 18:16 counts-33.npy
+-rw------- 1 girving girving        272 Sep 28 18:16 counts-34.npy
+-rw------- 1 girving girving        272 Sep 28 18:16 counts-35.npy
+-rw------- 1 girving girving        544 Sep 28 18:16 empty.pentago
+-rw------- 1 girving girving      18814 Sep 28 18:22 log
+-rw-r--r-- 1 girving girving          0 Sep 28 18:38 ls.txt
+-rw------- 1 girving girving      20063 Sep 28 18:22 output-write.o318647
+-rw------- 1 girving girving 9523367441 Sep 28 18:22 slice-31.pentago
+-rw------- 1 girving girving      18512 Sep 28 18:17 sparse-31.npy
+-rw------- 1 girving girving      55376 Sep 28 18:17 sparse-32.npy
+-rw------- 1 girving girving     110672 Sep 28 18:16 sparse-33.npy
+-rw------- 1 girving girving     110672 Sep 28 18:16 sparse-34.npy
+-rw------- 1 girving girving     110672 Sep 28 18:16 sparse-35.npy
+-rw-r--r-- 1 girving girving        410 Sep 28 18:23 write.pbs

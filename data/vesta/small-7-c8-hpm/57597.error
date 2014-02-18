@@ -1,0 +1,12 @@
+2013-02-12 04:25:28.119 (INFO ) [0xfff9000a270] 1995:ibm.runjob.AbstractOptions: using properties file /bgsys/local/etc/bg.properties
+2013-02-12 04:25:28.120 (INFO ) [0xfff9000a270] 1995:ibm.runjob.AbstractOptions: max open file descriptors: 65536
+2013-02-12 04:25:28.120 (INFO ) [0xfff9000a270] 1995:ibm.runjob.AbstractOptions: core file limit: 0
+2013-02-12 04:25:28.120 (INFO ) [0xfff9000a270] 1995:tatu.runjob.client: scheduler job id is 57597
+2013-02-12 04:25:28.123 (INFO ) [0xfff86111ab0] 1995:tatu.runjob.monitor: monitor started
+2013-02-12 04:25:28.123 (INFO ) [0xfff9000a270] VST-02260-13371-32:1995:ibm.runjob.client.options.Parser: set local socket to runjob_mux from properties file
+2013-02-12 04:25:30.355 (INFO ) [0xfff9000a270] VST-02260-13371-32:113455:ibm.runjob.client.Job: job 113455 started
+2013-02-12 04:25:34.645 (INFO ) [0xfff86111ab0] 1995:tatu.runjob.monitor: tracklib completed
+2013-02-12 04:29:57.001 (INFO ) [0xfff9000a270] VST-02260-13371-32:113455:ibm.runjob.client.Job: exited with status 0
+2013-02-12 04:29:57.003 (INFO ) [0xfff9000a270] tatu.runjob.client: task exited with status 0
+2013-02-12 04:29:57.003 (INFO ) [0xfff86111ab0] 1995:tatu.runjob.monitor: monitor terminating
+2013-02-12 04:29:57.005 (INFO ) [0xfff9000a270] tatu.runjob.client: monitor completed

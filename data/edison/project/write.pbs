@@ -1,0 +1,15 @@
+#PBS -q regular
+#PBS -l mppwidth=768
+#PBS -l walltime=01:00:00
+#PBS -N output-write
+#PBS -j oe
+#PBS -V
+#PBS -l gres=gscratch2
+
+cd $PBS_O_WORKDIR
+export OTHER=/global/homes/g/girving/otherlab/other
+
+aprun -n 256 -N 8 -j 2 $OTHER/install/edison-release/bin/endgame-mpi --ranks 256 --threads 6 --save 31 --memory 7G --gather-limit 4 --line-limit 5 43444444 --dir data-write --randomize 17
+# 32 nodes
+
+# 1 node = 24 cores (x2 with hyperthreading via -j 2), 64 GB RAM

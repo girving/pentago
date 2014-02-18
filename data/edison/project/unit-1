@@ -1,0 +1,64 @@
+[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h[?1034h============================= test session starts ==============================
+platform linux2 -- Python 2.7.3 -- pytest-2.3.4 -- /usr/common/usg/python/2.7.3/bin/python
+collecting ... collected 40 items
+
+pentago/base/test_all_boards.py:49: test_all_boards_raw PASSED
+pentago/base/test_all_boards.py:52: test_all_boards PASSED
+pentago/base/test_all_boards.py:55: test_all_boards_super PASSED
+pentago/base/test_all_boards.py:58: test_small_hashes PASSED
+pentago/base/test_all_boards.py:64: test_sample PASSED
+pentago/base/test_all_boards.py:70: test_rmin PASSED
+pentago/base/test_pentago.py:13: test_misc PASSED
+pentago/base/test_pentago.py:31: test_known PASSED
+pentago/base/test_pentago.py:60: test_moves PASSED
+pentago/base/test_pentago.py:64: test_simple_moves PASSED
+pentago/base/test_pentago.py:144: test_unrotated_win PASSED
+pentago/base/test_pentago.py:147: test_rotated_win PASSED
+pentago/base/test_pentago.py:150: test_arbitrarily_rotated_win PASSED
+pentago/base/test_pentago.py:153: test_hash PASSED
+pentago/base/test_super.py:6: test_wins PASSED
+pentago/base/test_super.py:18: test_rmax PASSED
+pentago/base/test_super.py:21: test_bool PASSED
+pentago/base/test_super.py:24: test_group PASSED
+pentago/base/test_super.py:27: test_action PASSED
+pentago/base/test_super.py:30: test_standardize PASSED
+pentago/base/test_super.py:33: test_super_action PASSED
+pentago/base/test_super.py:36: test_table PASSED
+pentago/base/test_super.py:39: test_count PASSED
+pentago/data/test_filter.py:13: test_interleave PASSED
+pentago/data/test_filter.py:22: test_compact PASSED
+pentago/data/test_filter.py:31: test_wavelet PASSED
+pentago/end/test_end.py:11: test_partition PASSED
+pentago/end/test_end.py:30: test_simple_partition PASSED
+pentago/end/test_end.py:34: test_counts PASSED
+pentago/end/test_end.py:52: test_fast_compress PASSED
+pentago/end/test_end.py:79: test_local_fast_compress PASSED
+pentago/end/test_end.py:82: test_compacting_store PASSED
+pentago/mpi/test_mpi.py:42: test_write PASSED
+pentago/mpi/test_mpi.py:69: test_meaningless_simple PASSED
+pentago/mpi/test_mpi.py:72: test_meaningless_random PASSED
+pentago/old/test_endgame.py:9: test_supertensor PASSED
+pentago/old/test_endgame.py:67: test_popcounts_over_stabilizers PASSED
+pentago/utility/test_aligned.py:6: test_aligned PASSED
+pentago/utility/test_ashelve.py:17: test_ashelf PASSED
+pentago/utility/test_thread.py:8: test_thread_pool PASSED
+
+========================= 40 passed in 190.28 seconds ==========================
+[?1034h
+ + --------------------------------------------------------------------------
+ +        Job name: output-unit
+ +          Job Id: 564294.edique02
+ +          System: edison
+ +     Queued Time: Sat Dec  7 09:16:08 2013
+ +      Start Time: Sat Dec  7 09:16:32 2013
+ + Completion Time: Sat Dec  7 09:20:37 2013
+ +            User: girving
+ +        MOM Host: nid02435
+ +           Queue: debug
+ +  Req. Resources: gres=gscratch2,mppnodect=1,mppnppn=24,mppwidth=24,walltime=00:30:00
+ +  Used Resources: cput=02:05:19,mem=90076kb,vmem=1488380kb,walltime=00:04:06
+ +     Acct String: m1302
+ +   PBS_O_WORKDIR: /global/project/projectdirs/pentago
+ +     Submit Args: unit.pbs
+ + --------------------------------------------------------------------------
+
