@@ -129,10 +129,11 @@ exports.values = function (options,log) {
       var zeros = 1+(slice>13)+(slice>16)
       var chunk_size = 5368709119
       var chunk_get = function (c,cont) {
-        simple_get(path+'.'+('000'+(c+1)).slice(-zeros),{
-          'offset': max(0,blob.offset-chunk_size*c),
-          'size': min(blob.size,chunk_size*(c+1)-blob.offset)},
-          cont)
+        var lo = max(blob.offset-chunk_size*c,0)
+        var hi = min(blob.offset+blob.size-chunk_size*c,chunk_size)
+        simple_get(path+'.'+('000'+(c+1)).slice(-zeros),
+          {'offset': lo, 'size': hi-lo},
+          cont,true)
       }
       var c0 = floor(blob.offset/chunk_size)
       var c1 = floor((blob.offset+blob.size-1)/chunk_size)
