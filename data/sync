@@ -3,34 +3,43 @@
 
 from __future__ import division,print_function,unicode_literals,absolute_import
 import subprocess
-import pyrax
 import glob
+import sys
 import os
 
 # Make sure we're in the right directory
 os.chdir(os.path.dirname(__file__))
 
-# Grab container if possible
-cred = os.environ['HOME']+'/.pyrax.cfg'
-if os.path.exists(cred):
-  pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
-  container = pyrax.cloudfiles.get_container('pentago-annex')
-  files = frozenset(f.name for f in container.get_objects())
-else:
-  container = None
-  files = ()
+def run(*cmd):
+  print(' '.join(cmd))
+  subprocess.check_call(cmd)
 
-# Synchronize
+# Download
 url_base = 'http://bb01ad8989013bafe684-a8c0752bc33212c60bfd142a4a43c4f2.r66.cf5.rackcdn.com/'
-for path in subprocess.check_output('git annex find'.split()).split('\n'):
+for path in subprocess.check_output('git annex find --include *'.split()).split('\n'):
   if path:
     data = os.path.join(os.path.dirname(path),os.readlink(path))
     annex = os.path.basename(data)
     url = url_base+annex
     if not os.path.exists(data):
-      cmd = 'git-annex','addurl','--file',path,url
-      print(' '.join(cmd))
-      subprocess.check_call(cmd)
-    elif annex not in files:
+      run('git-annex','addurl','--file',path,url)
+      run('git-annex','get',path)
+
+# Can we upload?
+cred = os.environ['HOME']+'/.pyrax.cfg'
+if not os.path.exists(cred):
+  print("Warning: can't upload without pyrax credentials")
+  sys.exit(0)
+
+# Yes!  Upload all missing files
+import pyrax
+pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
+container = pyrax.cloudfiles.get_container('pentago-annex')
+files = frozenset(f.name for f in container.get_objects())
+for path in subprocess.check_output('git annex find --include *'.split()).split('\n'):
+  if path:
+    data = os.path.join(os.path.dirname(path),os.readlink(path))
+    annex = os.path.basename(data)
+    if os.path.exists(data) and annex not in files:
       print('upload %s'%path)
       container.upload_file(data,obj_name=annex)
