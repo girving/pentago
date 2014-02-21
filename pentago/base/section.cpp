@@ -241,6 +241,10 @@ string show_board_rmins(const board_t board) {
                                show_quadrant_rmins(quadrant(board,2)));
 }
 
+static Array<const quadrant_t> rmin_slice_py(Vector<uint8_t,2> counts, int lo, int hi) {
+  return safe_rmin_slice(counts,lo,hi).copy();
+}
+
 }
 using namespace pentago;
 using namespace geode::python;
@@ -252,4 +256,5 @@ void wrap_section() {
   GEODE_FUNCTION(standardize_section)
   GEODE_FUNCTION(rmin_test)
   GEODE_FUNCTION(board_section)
+  GEODE_FUNCTION_2(rmin_slice,rmin_slice_py)
 }
