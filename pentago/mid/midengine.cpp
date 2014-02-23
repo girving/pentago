@@ -148,12 +148,13 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
   // List empty spots as bit indices into side_t
   uint8_t empty[spots];
   {
+    memset(empty,0,sizeof(empty)); // Avoid uninitialization warnings
     const auto free = side_mask&~(black_root|white_root);
     int next = 0;
     for (int i=0;i<64;i++)
       if (free&side_t(1)<<i)
         empty[next++] = i;
-    GEODE_ASSERT(next==36-slice);
+    GEODE_ASSERT(next==spots);
   }
   #define set_side(count,set) ({ \
     const int c_ = (count); \
@@ -361,8 +362,8 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
         info.known   = (n+parity)&1 ? merge(0, all) : merge( all,0);
         info.win     = (n+parity)&1 ? merge(0,us.x) : merge(us.x,0);
         info.notlose = (n+parity)&1 ? merge(0,us.y) : merge(us.y,0);
-        const uint32_t filled_black = slice+n&1 ? filled1 : filled0,
-                       filled_white = slice+n&1 ? filled0 : filled1;
+        const uint32_t filled_black = (slice+n)&1 ? filled1 : filled0,
+                       filled_white = (slice+n)&1 ? filled0 : filled1;
         board_t board = root;
         for (int i=0;i<spots;i++)
           board += ((filled_black>>i&1)+2*(filled_white>>i&1))*pack(side_t(1)<<empty[i],side_t(0));

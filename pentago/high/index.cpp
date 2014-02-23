@@ -43,8 +43,10 @@ string supertensor_index_t::header() const {
 compact_blob_t supertensor_index_t::blob_location(const block_t block) const {
   const uint64_t base = section_offset[sections->section_id.get(block.x)];
   const int i = index(section_blocks(block.x),Vector<int,4>(block.y));
+  const uint64_t offset = base+sizeof(compact_blob_t)*i;
   compact_blob_t b;
-  b.offset = base+sizeof(compact_blob_t)*i;
+  b.offset[0] = uint32_t(offset);
+  b.offset[1] = uint32_t(offset>>32);
   b.size = 12;
   return b;
 }
@@ -69,7 +71,8 @@ struct compact_blob_py : public Object {
   const uint32_t size;
 protected:
   compact_blob_py(const compact_blob_t b)
-    : offset(b.offset), size(b.size) {}
+    : offset(b.offset[0]|uint64_t(b.offset[1])<<32)
+    , size(b.size) {}
 };
 GEODE_DEFINE_TYPE(compact_blob_py)
 }
@@ -103,7 +106,9 @@ void write_supertensor_index(const string& name, const vector<Ref<const superten
     const auto reader = section_reader.get(section);
     Array<compact_blob_t> blobs(reader->offset.flat.size(),false);
     for (const int i : range(blobs.size())) {
-      blobs[i].offset = reader->offset.flat[i];
+      const uint64_t offset = reader->offset.flat[i];
+      blobs[i].offset[0] = uint32_t(offset);
+      blobs[i].offset[1] = uint32_t(offset>>32);
       blobs[i].size = reader->compressed_size_.flat[i];
     }
     fwrite(blobs.data(),sizeof(compact_blob_t),blobs.size(),file);

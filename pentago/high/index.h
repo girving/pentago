@@ -19,8 +19,8 @@
 #ifdef BOOST_LITTLE_ENDIAN
 namespace pentago {
 
-struct __attribute__ ((packed)) compact_blob_t {
-  uint64_t offset;
+struct compact_blob_t {
+  uint32_t offset[2]; // Split into two to guarantee struct packing
   uint32_t size; // compressed for blocks, uncompressed for blob information
 };
 static_assert(sizeof(compact_blob_t)==12,"struct packing failed");
