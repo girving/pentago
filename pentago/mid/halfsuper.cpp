@@ -5,6 +5,7 @@
 #include <geode/array/Array.h>
 #include <geode/python/wrap.h>
 #include <geode/random/Random.h>
+#if PENTAGO_SSE
 namespace pentago {
 
 using std::cout;
@@ -139,9 +140,12 @@ static void halfsuper_test(const int steps) {
 }
 
 }
+#endif
 using namespace pentago;
 
 void wrap_halfsuper() {
+#if PENTAGO_SSE
   GEODE_FUNCTION(view_rmax)
   GEODE_FUNCTION(halfsuper_test)
+#endif
 }

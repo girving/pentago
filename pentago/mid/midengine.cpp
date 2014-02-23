@@ -13,6 +13,7 @@
 #include <geode/array/view.h>
 #include <geode/python/wrap.h>
 #include <geode/utility/Log.h>
+#if PENTAGO_SSE
 namespace pentago {
 
 using Log::cout;
@@ -471,10 +472,13 @@ static void midsolve_internal_test(const board_t board, const bool parity) {
 }
 
 }
+#endif
 using namespace pentago;
 
 void wrap_midengine() {
+#if PENTAGO_SSE
   GEODE_FUNCTION(midsolve_workspace)
   GEODE_FUNCTION(midsolve)
   GEODE_FUNCTION(midsolve_internal_test)
+#endif
 }

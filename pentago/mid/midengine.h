@@ -12,6 +12,7 @@
 #include <pentago/mid/halfsuper.h>
 #include <pentago/high/board.h>
 #include <geode/structure/Hashtable.h>
+#if PENTAGO_SSE
 namespace pentago {
 
 // (win,notlose)
@@ -39,3 +40,4 @@ GEODE_EXPORT Hashtable<Ref<const high_board_t>,int>
 high_midsolve(const high_board_t& root, const vector<Ref<const high_board_t>>& boards, RawArray<uint8_t> workspace);
 
 }
+#endif

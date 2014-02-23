@@ -146,8 +146,8 @@ struct super_t {
     return super_t(1,0,0,0);
   }
 
-  operator SafeBool() const {
-    return safe_bool(a||b||c||d);
+  operator SafeBool<super_t>::type() const {
+    return safe_bool<super_t>(a||b||c||d);
   }
 
   super_t operator~() const {
