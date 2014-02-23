@@ -1,5 +1,4 @@
 #!/bin/bash
 
 cd `dirname $0`
-rsync -avzP --max-size=2G data1:project/* .
-chmod -R -w *
+rsync -avzP --max-size=2G --ignore-existing data1:project/* .
