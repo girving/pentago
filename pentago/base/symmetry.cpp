@@ -230,26 +230,29 @@ void superstandardize_test(int steps) {
   }
 }
 
+// Cost: 57+[2,12+90+40] = [59,199] ops
 super_t transform_super(symmetry_t s, super_t C) {
   // We view C as a subset of the local rotation group L: C(r0,r1,r2,r3) iff (rotation of quadrant i by ri) in C.
   // See the header for more details.
 
   // First apply the local part: C = C local'
 #if PENTAGO_SSE
-  #define APPLY_ALL(f,k) ({ C.x = f(C.x,(k)); C.y = f(C.y,(k)); })
-  #define ROTATE_RIGHT_MOD_4(x,k) ((_mm_srli_epi16(x,(k))&_mm_set1_epi8(0x11*(0xf>>(k))))|(_mm_slli_epi16(x,(4-(k))&3)&_mm_set1_epi8(0x11*((0xf<<(4-(k)))&0xf))))
-  #define ROTATE_RIGHT_MOD_16(x,k) (_mm_srli_epi16(x,(k))|_mm_slli_epi16(x,(16-(k))&15))
-  #define ROTATE_RIGHT_MOD_64(x,k) (_mm_srli_epi64(x,(k))|_mm_slli_epi64(x,(64-(k))&63))
+  #define APPLY_ALL(f,k) /* 2cost(f) */ ({ C.x = f(C.x,(k)); C.y = f(C.y,(k)); })
+  #define ROTATE_RIGHT_MOD_4(x,k) /* 15 ops */ ((_mm_srli_epi16(x,(k))&_mm_set1_epi8(0x11*(0xf>>(k))))|(_mm_slli_epi16(x,(4-(k))&3)&_mm_set1_epi8(0x11*((0xf<<(4-(k)))&0xf))))
+  #define ROTATE_RIGHT_MOD_16(x,k) /* 5 ops */ (_mm_srli_epi16(x,(k))|_mm_slli_epi16(x,(16-(k))&15))
+  #define ROTATE_RIGHT_MOD_64(x,k) /* 5 ops */ (_mm_srli_epi64(x,(k))|_mm_slli_epi64(x,(64-(k))&63))
 #else // No SSE
   #define APPLY_ALL(f,k) ({ C.a = f(C.a,(k)); C.b = f(C.b,(k)); C.c = f(C.c,(k)); C.d = f(C.d,(k)); })
   #define ROTATE_RIGHT_MOD_4(x,k)  (((x>>k)&(0x1111111111111111*(0xf   >>(k))))|(x<<(( 4-(k))&3) &(0x1111111111111111*((0xf   <<( 4-(k)))&0xf))))
   #define ROTATE_RIGHT_MOD_16(x,k) (((x>>k)&(0x0001000100010001*(0xffff>>(k))))|(x<<((16-(k))&15)&(0x0001000100010001*((0xffff<<(16-(k)))&0xffff))))
   #define ROTATE_RIGHT_MOD_64(x,k) (((x>>k)&(            (~(uint64_t)0)>>(k))) |(x<<((64-(k))&63)&(             (~(uint64_t)0)<<(64-(k)))))
 #endif
+  // 7+2*(15+5+5) = 57 ops
   APPLY_ALL(ROTATE_RIGHT_MOD_4,s.local&3);
   APPLY_ALL(ROTATE_RIGHT_MOD_16,4*(s.local>>2&3));
   APPLY_ALL(ROTATE_RIGHT_MOD_64,16*(s.local>>4&3));
 #if PENTAGO_SSE
+  // ~12 ops
   if (s.local&1<<6) { // Low bit of quadrant 3 rotations
     const int swap = LE_MM_SHUFFLE(2,3,0,1);
     const __m128i sx = _mm_shuffle_epi32(C.x,swap),
@@ -276,14 +279,14 @@ super_t transform_super(symmetry_t s, super_t C) {
   // LOW_TRANSPOSE(i,j) transposes quadrants i and j where i,j < 3.
   #define BIT(i) ((uint64_t)1<<(i))
 #if PENTAGO_SSE
-  #define LOW_HALF_TRANSPOSE(x,i,j) ({ \
+  #define LOW_HALF_TRANSPOSE(x,i,j) ({ /* 12 ops */ \
     const int ii = 1<<2*i, jj = 1<<2*j, kk = 1<<2*(3-i-j), sh = jj-ii; \
     const uint64_t other = 1|BIT(kk)|BIT(2*kk)|BIT(3*kk); \
     auto t = (x^_mm_srli_epi64(x,sh))&_mm_set1_epi64x(other*(BIT(ii)|BIT(3*ii)|BIT(ii+2*jj)|BIT(3*ii+2*jj))); \
     x ^= t^_mm_slli_epi64(t,sh); \
     t = (x^_mm_srli_epi64(x,2*sh))&_mm_set1_epi64x(other*(BIT(2*ii)|BIT(3*ii)|BIT(2*ii+jj)|BIT(3*ii+jj))); \
     x ^= t^_mm_slli_epi64(t,2*sh); })
-  #define LOW_TRANSPOSE(i,j) ({ LOW_HALF_TRANSPOSE(C.x,i,j); LOW_HALF_TRANSPOSE(C.y,i,j); })
+  #define LOW_TRANSPOSE(i,j) ({ LOW_HALF_TRANSPOSE(C.x,i,j); LOW_HALF_TRANSPOSE(C.y,i,j); }) // 24 ops
 #else // No SSE
   #define LOW_QUARTER_TRANSPOSE(x,i,j) ({ \
     const int ii = 1<<2*i, jj = 1<<2*j, kk = 1<<2*(3-i-j), sh = jj-ii; \
@@ -297,7 +300,7 @@ super_t transform_super(symmetry_t s, super_t C) {
 
 #if PENTAGO_SSE
   // Transposing quadrants 2 and 3 is analogous, but operates on 16 bit chunks instead of single bits, and knits the two __m128i's together
-  #define TRANSPOSE_23() ({ \
+  #define TRANSPOSE_23() ({ /* 18 ops */ \
     const auto a = geode::pack<uint32_t>(0xffff0000,0xffff0000,0,0); \
     auto t = (C.x^_mm_srli_si128(C.x,6))&a; \
     C.x ^= t^_mm_slli_si128(t,6); \
@@ -326,7 +329,7 @@ super_t transform_super(symmetry_t s, super_t C) {
   static const uint8_t transpositions[] = { // Here r = global rotate left by 90, s = reflect about x = y line
     /* nothing */                // e    = ()
     T(0,1),T(0,2),T(2,3),        // r    = (01)(02)(23)
-    T(0,2),T(0,1),T(2,3),T(0,2), // r^2  = (02)(01)(23)(02)
+    T(0,2),T(0,1),T(2,3),T(0,2), // r^2  = (02)(01)(23)(02) // 3*24+18 = 90 ops
     T(2,3),T(0,2),T(0,1),        // r^3  = (23)(02)(01)
     T(0,2),T(2,3),T(0,2),        // s    = (02)(23)(02)
     T(0,2),T(1,2),T(2,3),T(1,2), // sr   = (02)(12)(23)(12)
@@ -342,10 +345,10 @@ super_t transform_super(symmetry_t s, super_t C) {
     }
 
   // Finally, if necessary, we conjugate by the quadrant-local reflection map, which amounts to applying the
-  // negation isomorphism to each direct product term in Z_4^4.
+  // negation isomorphism to each direct product term in Z_4^4.  40 ops.
   if (s.global&4) {
 #if PENTAGO_SSE
-    #define HALF_NEGATE(x) ({ \
+    #define HALF_NEGATE(x) ({ /* 18 ops */ \
       /* Negate quadrant 0 rotations */ \
       auto t = (x^_mm_srli_epi16(x,2))&_mm_set1_epi8(0x22); \
       x ^= t^_mm_slli_epi16(t,2); \
@@ -355,10 +358,10 @@ super_t transform_super(symmetry_t s, super_t C) {
       /* Negate quadrant 2 rotations */ \
       t = (x^_mm_srli_epi64(x,2*16))&_mm_set1_epi64x(0xffff0000); \
       x ^= t^_mm_slli_epi64(t,2*16); })
-    // Negate rotations of the first three quadrants
+    // Negate rotations of the first three quadrants: 36 ops
     HALF_NEGATE(C.x);
     HALF_NEGATE(C.y);
-    // Negate quadrant 3 rotations
+    // Negate quadrant 3 rotations: 4 ops
     auto t = (C.x^C.y)&geode::pack(0,0,-1,-1);
     C.x ^= t;
     C.y ^= t;

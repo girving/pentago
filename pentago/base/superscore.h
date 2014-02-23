@@ -283,12 +283,14 @@ GEODE_EXPORT int popcount(super_t s);
 // Version of shuffle with arguments in expected little endian order
 #define LE_MM_SHUFFLE(i0,i1,i2,i3) _MM_SHUFFLE(i3,i2,i1,i0)
 
+// 2*29+4+14 = 76 ops
 static inline super_t rmax(const super_t f) {
   const uint32_t each0 = 0x11111111,
                  each1 = 0x000f000f;
-  #define SHIFT_MASK(x,shift,mask) ((shift>0?_mm_slli_epi32(x,shift):_mm_srli_epi32(x,-(shift)))&_mm_set1_epi32(mask))
+  #define SHIFT_MASK(x,shift,mask) /* 2 ops */ \
+    ((shift>0?_mm_slli_epi32(x,shift):_mm_srli_epi32(x,-(shift)))&_mm_set1_epi32(mask))
   const int left = LE_MM_SHUFFLE(3,0,1,2), right = LE_MM_SHUFFLE(1,2,3,0);
-  #define FIRST_THREE(x) \
+  #define FIRST_THREE(x) /* 9+2*8+4 = 29 ops */ \
     (  SHIFT_MASK(x, 1,~each0)   |SHIFT_MASK(x, -3,each0)       /* Rotate quadrant 0 left */ \
      | SHIFT_MASK(x,-1,~each0>>1)|SHIFT_MASK(x,  3,each0<<3)    /* Rotate quadrant 0 right */ \
      | SHIFT_MASK(x, 4,~each1)   |SHIFT_MASK(x,-12,each1)       /* Rotate quadrant 1 left */ \

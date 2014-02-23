@@ -34,35 +34,37 @@ struct superwin_info_t {
 // To do this, we consider each pair or triple of quadrants which could give a win,
 // and use the state space of the unused quadrants to store the various ways a win
 // could be achieved.  We then do an or reduction over those quadrants.
+//
+// Cost: 4*5*32 = 640 bytes, 16+174 = 190 ops
 super_t super_wins(side_t side) {
-  // Load lookup table entries
+  // Load lookup table entries: 4*(1+3) = 16 ops
   const superwin_info_t* table = (const superwin_info_t*)superwin_info;
   #define LOAD(q) const superwin_info_t& i##q = table[512*q+quadrant(side,q)];
   LOAD(0) LOAD(1) LOAD(2) LOAD(3)
 
   // Prepare for reductions over unused quadrant rotations.  OR<i> is an all-reduce over the ith quadrant.
 #if PENTAGO_SSE
-  #define OR3 \
+  #define OR3 /* 3 ops */ \
     w.x |= w.y; \
     w.x |= _mm_shuffle_epi32(w.x,LE_MM_SHUFFLE(2,3,0,1)); \
     w.y = w.x;
   const int swap = LE_MM_SHUFFLE(1,0,3,2);
-  #define OR2_HALF(x) \
+  #define OR2_HALF(x) /* 5 ops */ \
     x |= _mm_shuffle_epi32(x,swap); \
     x |= _mm_shufflelo_epi16(_mm_shufflehi_epi16(x,swap),swap);
-  #define OR1_HALF(x) \
+  #define OR1_HALF(x) /* 8 ops */ \
     x |= _mm_slli_epi16(x,4); \
     x |= _mm_srli_epi16(x,4); \
     x |= _mm_slli_epi16(x,8); \
     x |= _mm_srli_epi16(x,8);
-  #define OR0_HALF(x) \
+  #define OR0_HALF(x) /* 12 ops */ \
     x |= _mm_slli_epi16(x,1)&_mm_set1_epi8(0xaa); \
     x |= _mm_srli_epi16(x,1)&_mm_set1_epi8(0x55); \
     x |= _mm_slli_epi16(x,2)&_mm_set1_epi8(0xcc); \
     x |= _mm_srli_epi16(x,2)&_mm_set1_epi8(0x33);
-  #define OR0 OR0_HALF(w.x) OR0_HALF(w.y)
-  #define OR1 OR1_HALF(w.x) OR1_HALF(w.y)
-  #define OR2 OR2_HALF(w.x) OR2_HALF(w.y)
+  #define OR0 OR0_HALF(w.x) OR0_HALF(w.y) // 24 ops
+  #define OR1 OR1_HALF(w.x) OR1_HALF(w.y) // 16 ops
+  #define OR2 OR2_HALF(w.x) OR2_HALF(w.y) // 10 ops
 #else // No SSE
   #define OR3 \
     w.a = w.b = w.c = w.d = w.a|w.b|w.c|w.d;
@@ -81,7 +83,7 @@ super_t super_wins(side_t side) {
 #endif
   #define WAY(base,reduction) { super_t w = base; reduction; wins |= w; }
 
-  // Consider all ways to win
+  // Consider all ways to win: 2*12+3*(10+16+24) = 174 ops
   super_t wins(0);
   WAY(i0.vertical & i1.vertical,     OR3 OR2) // Vertical between quadrant 0=(0,0) and 1=(0,1)
   WAY(i0.horizontal & i2.horizontal, OR3 OR1) // Horizontal between quadrant 0=(0,0) and 2=(1,0)
