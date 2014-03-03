@@ -196,6 +196,13 @@ uint64_t choose(int n, int k) {
 }
 
 uint64_t count_boards(int n, int symmetries) {
+  if (n == -1) {
+    // Count all slices
+    uint64_t sum = 0;
+    for (const int i : range(37))
+      sum += count_boards(i,symmetries);
+    return sum;
+  }
   GEODE_ASSERT(0<=n && n<=36);
   GEODE_ASSERT(symmetries==1 || symmetries==8 || symmetries==2048);
   static Polynomial<2> Fs[3]; // 1, 8, and 2048 symmetries

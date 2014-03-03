@@ -94,6 +94,7 @@ def approx():
     total += count
     partials[n:] += count
     raw_total += count_boards(n,2048)
+  all_boards_stats(-1,symmetries)
   sections = sum(len(all_boards_sections(n,symmetries)) for n in xrange(37))
   print('grand total = %s, grand ratio = %g, total sections = %d'%(large(total),total/raw_total,sections))
   simple_total = sum(count_boards(n,8) for n in xrange(37))

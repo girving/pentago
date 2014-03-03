@@ -176,7 +176,14 @@ static Array<quadrant_t> minimal_quadrants() {
   return mins;
 }
 
-Array<section_t> all_boards_sections(int n, int symmetries) {
+Array<section_t> all_boards_sections(const int n, const int symmetries) {
+  if (n == -1) {
+    // Collect all sections
+    Array<section_t> sections;
+    for (const int i : range(36+1))
+      sections.extend(all_boards_sections(i,symmetries));
+    return sections;
+  }
   GEODE_ASSERT(0<=n && n<=36);
   GEODE_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
   const int white = n/2, black = n-white;
@@ -221,7 +228,7 @@ Array<uint64_t> all_boards_section_sizes(int n, int symmetries) {
   return sizes;
 }
 
-uint64_t all_boards_stats(int n, int symmetries) {
+uint64_t all_boards_stats(const int n, const int symmetries) {
   if (n==0) {
     RawArray<const uint16_t> offsets(10*(10+1)/2,rotation_minimal_quadrants_offsets);
     cout << "maximum rmin bucket size = "<<(offsets.slice(1,offsets.size())-offsets.slice(0,offsets.size()-1)).max()<<endl;
@@ -253,8 +260,9 @@ uint64_t all_boards_stats(int n, int symmetries) {
   }
   const uint64_t exact = count_boards(n,2048);
   const double inv_exact = exact ? 1./exact : 0;
-  cout << format("n = %2d, simple count = %17s, ratio = %5.3f (unreduced %5.3f), sections = %*d (unreduced %5d), blocks = %9lld %9lld, lines = %8lld %9lld, max section = %14s, mean = %.4g",
-    n,large(reduced_total),inv_exact*reduced_total,inv_exact*total,symmetries<8?5:4,reduced_sections,sections.size(),blocks.min,blocks.max,lines.min,lines.max,large(max_section),
+  cout << format("%s, simple count = %18s, ratio = %5.3f (unreduced %5.3f), sections = %6d (unreduced %6d), blocks = %10lld %10lld, lines = %9lld %9lld, max section = %14s, mean = %.4g",
+    n < 0 ? "   all" : format("n = %2d",n),
+    large(reduced_total),inv_exact*reduced_total,inv_exact*total,reduced_sections,sections.size(),blocks.min,blocks.max,lines.min,lines.max,large(max_section),
     reduced_sections?(double)reduced_total/reduced_sections:0) << endl;
   GEODE_ASSERT(8*reduced_sections>=sections.size());
   return reduced_total;
