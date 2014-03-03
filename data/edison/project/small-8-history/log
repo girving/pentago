@@ -1,0 +1,281 @@
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 201,277,440, resident 12,881,920, share 6,709,248, text 8,192, peak known 0, known 0, data 22,511,616
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 32 --threads 6 --save 0 --memory 3G --gather-limit 4 --line-limit 5 --dir data-small --randomize 17 44444444
+    ranks = 32
+    cores = 192
+    threads / rank = 6
+    section = 32-44444444
+    block size = 8
+    saved slices = 0
+    level = 26
+    memory limit = 3,221,225,472
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 1
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0009 s
+  simple partition                                  0.0000 s
+  memory base: virtual 209,747,968, resident 19,492,864, share 7,548,928, text 8,192, peak known 37, known 0, data 30,982,144
+  estimate                                        
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 715732499
+  END estimate                                      0.0218 s
+  slice 35                                        
+    random partition                                0.0000 s
+    load balance                                  
+      (peak 0.6G)
+      lines = 7 8 (1.143)
+      line blocks = 140 160 (1.143)
+      line nodes = 236800 578560 (2.443)
+      blocks = 140 160 (1.143)
+      block nodes = 236800 578560 (2.443)
+    END load balance                                0.0003 s
+    memory usage: store = 718,210,816, partitions = 544, blocks = 16,576, lines = 608, total = 718,228,544, free = 2,505,471,360
+    line parallelism = 91
+    memory compute: virtual 925,483,008, resident 19,697,664, share 7,753,728, text 8,192, peak known 718,206,976, known 718,206,976, data 746,717,184
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                     0.6661 s
+    memory free: virtual 1,010,966,528, resident 68,210,688, share 8,388,608, text 8,192, peak known 756,627,008, known 718,206,976, data 832,200,704
+    freeze                                        
+      collection: free ratio = 0.984549
+    END freeze                                      0.0001 s
+    compression ratio = 0.366932 +- 0.0672949
+    write                                           2.3022 s
+    timing 
+      compress                 0.0618 s
+      decompress               0.0000 s
+      snappy                  22.8320 s
+      schedule                 0.0079 s
+      wait                    19.2801 s
+      mpi                      0.4671 s
+      partition                0.0010 s
+      compute                 19.3989 s
+      count                    3.7171 s
+      write_sections          42.3675 s
+      write_counts             0.5170 s
+      write_sparse            82.8534 s
+      allocate_line            0.0019 s
+      wakeup                   0.4602 s
+      output_send              0.0981 s
+      output_recv              0.0027 s
+      compacting               0.8455 s
+      master_idle              0.1040 s
+      cpu_idle               701.4095 s
+      missing: master 5.6717, cpu 8.5363
+      total 908.6338
+    speeds
+      elapsed = 3.03097, output nodes = 12,577,280, input nodes = 0
+      speeds (nodes/second/core): output = 21612.5, input = 0, output+input = 21612.5
+      grand estimate = 348,058 core-hours
+  END slice 35                                      3.2207 s
+  slice 34                                        
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 62 63 (1.016)
+      line blocks = 1240 1260 (1.016)
+      line nodes = 3251200 4162560 (1.28)
+      blocks = 599 660 (1.102)
+      block nodes = 1555200 2076672 (1.335)
+    END load balance                                0.0003 s
+    memory usage: store = 718,225,192, partitions = 1128, blocks = 49,536, lines = 4788, total = 718,280,644, free = 2,505,418,804
+    line parallelism = 91
+    memory compute: virtual 1,010,966,528, resident 68,509,696, share 8,654,848, text 8,192, peak known 756,627,008, known 718,206,976, data 832,200,704
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                     5.9848 s
+    memory free: virtual 1,741,271,040, resident 179,286,016, share 9,490,432, text 8,192, peak known 757,980,416, known 718,206,976, data 940,199,936
+    freeze                                        
+      collection: free ratio = 0.943616
+    END freeze                                      0.0156 s
+    compression ratio = 0.326466 +- 0.0541761
+    write                                           2.8605 s
+    timing 
+      snappy                 177.7079 s
+      unsnappy                52.1026 s
+      schedule                 0.3751 s
+      wait                   182.8402 s
+      mpi                      1.8334 s
+      partition                0.0001 s
+      compute                292.5341 s
+      accumulate               3.0951 s
+      count                   12.1923 s
+      write_counts             0.0904 s
+      write_sparse           101.1404 s
+      allocate_line            0.3173 s
+      request_send             0.1088 s
+      response_send            0.4020 s
+      response_recv            0.2738 s
+      wakeup                   0.2949 s
+      output_send              2.2063 s
+      output_recv              0.7732 s
+      compacting              23.8623 s
+      master_idle              0.0000 s
+      cpu_idle               869.3901 s
+      missing: master 4.8054, cpu 44.1936
+      total 1770.5393
+    speeds
+      elapsed = 9.01569, output nodes = 59,187,200, input nodes = 12,577,280
+      speeds (nodes/second/core): output = 34192.2, input = 7265.85, output+input = 41458.1
+      grand estimate = 181,446 core-hours
+  END slice 34                                      9.2478 s
+  slice 33                                        
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 187 188 (1.005)
+      line blocks = 3740 3760 (1.005)
+      line nodes = 12574720 13864960 (1.103)
+      blocks = 1189 1309 (1.101)
+      block nodes = 4038656 4602880 (1.14)
+    END load balance                                0.0003 s
+    memory usage: store = 718,251,064, partitions = 1140, blocks = 98,664, lines = 14288, total = 718,365,156, free = 2,505,334,700
+    line parallelism = 91
+    memory compute: virtual 1,741,271,040, resident 179,286,016, share 9,502,720, text 8,192, peak known 757,980,416, known 718,206,976, data 940,199,936
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                    18.3832 s
+    memory free: virtual 2,609,491,968, resident 342,441,984, share 10,207,232, text 8,192, peak known 764,820,608, known 718,206,976, data 933,842,944
+    freeze                                        
+      collection: free ratio = 0.862312
+    END freeze                                      0.0397 s
+    compression ratio = 0.350782 +- 0.0522486
+    write                                           2.3578 s
+    timing 
+      snappy                 682.2668 s
+      unsnappy               253.3372 s
+      schedule                 1.2681 s
+      wait                   566.8066 s
+      mpi                      0.7655 s
+      partition                0.0001 s
+      compute               1165.2658 s
+      accumulate              14.8947 s
+      count                   32.8886 s
+      write_counts             0.0670 s
+      write_sparse            82.1411 s
+      allocate_line            0.2955 s
+      request_send             0.1882 s
+      response_send            4.2349 s
+      response_recv            1.1085 s
+      wakeup                   0.1335 s
+      output_send              5.9751 s
+      output_recv              2.6503 s
+      compacting              50.6638 s
+      master_idle              0.0000 s
+      cpu_idle              1029.0717 s
+      missing: master 6.8895, cpu 136.8863
+      total 4037.7988
+    speeds
+      elapsed = 20.9894, output nodes = 139,264,000, input nodes = 59,187,200
+      speeds (nodes/second/core): output = 34557.1, input = 14686.8, output+input = 49243.9
+      grand estimate = 152,758 core-hours
+  END slice 33                                     21.0156 s
+  slice 32                                        
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 1000 1000 (1)
+      line blocks = 20000 20000 (1)
+      line nodes = 81920000 81920000 (1)
+      blocks = 4907 5119 (1.043)
+      block nodes = 20099072 20967424 (1.043)
+    END load balance                                0.0602 s
+    memory usage: store = 718,359,544, partitions = 1132, blocks = 328,016, lines = 76000, total = 718,764,692, free = 2,504,936,436
+    line parallelism = 91
+    memory compute: virtual 2,609,491,968, resident 342,441,984, share 10,215,424, text 8,192, peak known 764,820,608, known 718,206,976, data 933,842,944
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% collection: free ratio = 0.280519
+      68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                   102.3673 s
+    memory free: virtual 2,877,898,752, resident 876,642,304, share 10,276,864, text 8,192, peak known 776,470,080, known 718,206,976, data 937,525,248
+    freeze                                        
+      collection: free ratio = 0.457954
+    END freeze                                      0.4075 s
+    compression ratio = 0.29102 +- 0.0399798
+    write                                           2.7115 s
+    timing 
+      snappy                4055.7997 s
+      unsnappy              1723.0993 s
+      schedule                10.0796 s
+      wait                  3150.3166 s
+      mpi                      2.1928 s
+      partition                0.0001 s
+      compute               7305.5938 s
+      accumulate              93.7897 s
+      count                  143.3299 s
+      write_counts             0.3260 s
+      write_sparse            97.8007 s
+      allocate_line            2.0263 s
+      request_send             1.5329 s
+      response_send           41.4728 s
+      response_recv            5.5868 s
+      wakeup                   0.1627 s
+      output_send             30.8745 s
+      output_recv             16.2655 s
+      compacting             231.7241 s
+      master_idle              0.0000 s
+      cpu_idle              2573.7171 s
+      missing: master 22.7123, cpu 795.3274
+      total 20303.7305
+    speeds
+      elapsed = 105.719, output nodes = 655,360,000, input nodes = 139,264,000
+      speeds (nodes/second/core): output = 32286.9, input = 6860.96, output+input = 39147.8
+      grand estimate = 192,153 core-hours
+  END slice 32                                    105.7317 s
+  timing 
+    compress                 0.0618 s
+    decompress               0.0000 s
+    snappy                4938.6064 s
+    unsnappy              2028.5391 s
+    schedule                11.7307 s
+    wait                  3919.2435 s
+    mpi                      5.2588 s
+    partition                0.0012 s
+    compute               8782.7926 s
+    accumulate             111.7795 s
+    count                  192.1279 s
+    write_sections          42.3675 s
+    write_counts             1.0004 s
+    write_sparse           363.9355 s
+    allocate_line            2.6410 s
+    request_send             1.8298 s
+    response_send           46.1097 s
+    response_recv            6.9691 s
+    wakeup                   1.0514 s
+    output_send             39.1540 s
+    output_recv             19.6918 s
+    compacting             307.0958 s
+    master_idle              0.1041 s
+    cpu_idle              5173.6638 s
+    missing: master 40.0940, cpu 984.9435
+    total 27020.7928
+  speeds
+    elapsed = 138.755, output nodes = 866,388,480, input nodes = 211,028,480
+    speeds (nodes/second/core): output = 32520.9, input = 7921.2, output+input = 40442.1
+    grand estimate = 186,004 core-hours
+  memory final: virtual 2,877,898,752, resident 876,642,304, share 10,280,960, text 8,192, peak known 776,470,080, known 718,206,976, data 937,525,248
+END endgame                                       141.6797 s
+endgame                                           141.6797 s
+  parameters                                        0.0009 s
+  simple partition                                  0.0000 s
+  estimate                                          0.0218 s
+    random partition                                0.0000 s
+  slice                                           139.2157 s
+    random partition                                0.0000 s
+    load balance                                    0.0610 s
+    compute                                       127.4014 s
+    freeze                                          0.4629 s
+    write                                          10.2320 s
