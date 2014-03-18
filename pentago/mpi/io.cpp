@@ -679,10 +679,18 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, accumulat
     index += sizeof(s.wins);
   }
 
+  // Compute offsets.  MPI_File_write_ordered would do this for us, but MPI_File_write_ordered
+  // is completely broken performance-wise.
+  uint64_t offset = 0;
+  {
+    uint64_t buffer_size = buffer.size();
+    CHECK(MPI_Exscan(&buffer_size,&offset,1,datatype<uint64_t>(),MPI_SUM,comm));
+  }
+
   // Write the file
   MPI_File file;
   file_open(comm,filename,&file);
-  CHECK(MPI_File_write_ordered(file,buffer.data(),buffer.size(),MPI_BYTE,MPI_STATUS_IGNORE));
+  CHECK(MPI_File_write_at_all(file,offset,buffer.data(),buffer.size(),MPI_BYTE,MPI_STATUS_IGNORE));
   CHECK(MPI_File_close(&file));
 }
 
