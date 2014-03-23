@@ -1,0 +1,10 @@
+*.aux
+*.fls
+*.log
+*.bbl
+*.blg
+*.cpt
+*.out
+pentago.pdf
+bare_conf.tex
+IEEEtran_HOWTO.pdf

@@ -18,7 +18,7 @@ pylab.xticks(nn)
 
 size = 20
 pylab.xlabel('stones on the board',fontsize=size)
-pylab.ylabel('positions',fontsize=size)
+pylab.ylabel('symmetry reduced positions',fontsize=size)
 pylab.text(24,counts[24]/10,'all boards',horizontalalignment='center',fontsize=size)
 pylab.text(30,mid[30-18]/200,'descendents of an\n18 stone board',horizontalalignment='center',fontsize=size)
 

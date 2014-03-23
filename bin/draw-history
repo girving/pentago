@@ -30,14 +30,17 @@ forwards = props.add('forwards',False).set_help('draw ancestors of picked events
 run_checks = props.add('check',False).set_help('run expensive self checks').set_category('history')
 bandwidth_file = props.add('bandwidth_file','').set_help('save bandwidth to given file').set_category('history')
 bandwidth_dt = props.add('bandwidth_dt',1).set_help('time interval for bandwidth computation').set_category('history')
+max_ranks = props.add('max_ranks',1<<30).set_help('Show at most the first n ranks')
+resolution = props.add('resolution',2048).set_help('Horizontal resolution for rasterization')
+yresolution = props.add('yresolution',10).set_help('Vertical resolution per thread for rasterization')
+save = props.add('save','').set_help('save rasterized image to given file')
+picked = props.add('picked',(0,-1)).set_help('Picked point').set_hidden(1)
 parser.parse(props,'Thread history visualization',positional=[history_dir])
 
 # Positioning is a bit strange.  We want the horizontal and vertical axes to operate entirely independently.  To do this, we'll take
 # complete control over zoom, and let the naive other/gui camera control only translation.  Here goes:
-scales = Prop('scales',(1,1))
+scales = Prop('scales',(1.,1.))
 
-# Picked point
-picked = Prop('picked',(0,-1))
 
 # Initialize threads
 init_threads(-1,0)
@@ -54,38 +57,37 @@ def directions():
 def read_history(dir):
   with Log.scope('read'):
     names = glob.glob(dir+'/history-r*')
-    ranks = [None]*len(names)
+    ranks = [None]*min(len(names),max_ranks())
     assert ranks
     for name in names:
       m = re.search(r'history-r(\d+)((?:\.gz)?)$',name)
       if not m:
         raise RuntimeError('weird file: '+name)
       rank = int(m.group(1))
-      extension = m.group(2)
-      if not extension:
-        data = fromfile(name,dtype=int64)
-      elif extension == '.gz':
-        data = fromstring(gzip.open(name).read(),dtype=int64)
-      else:
-        raise RuntimeError('unknown extension %s'%extension)
-      data = data.reshape(-1,3)
-      if not (data[0][0]&0xffffffff): # Check for bad endianness
-        data = data.view(data.dtype.newbyteorder('<')).astype(data.dtype.newbyteorder('>')).view(int64)
-      threads,kinds,_ = data[0]
-      ranks[rank] = [[data[data[i][0]:data[i][1]] for kind in xrange(kinds) for i in (1+thread*kinds+kind,)] for thread in xrange(threads)]
+      if rank < len(ranks):
+        extension = m.group(2)
+        if not extension:
+          data = fromfile(name,dtype=int64)
+        elif extension == '.gz':
+          data = fromstring(gzip.open(name).read(),dtype=int64)
+        else:
+          raise RuntimeError('unknown extension %s'%extension)
+        data = data.reshape(-1,3)
+        if not (data[0][0]&0xffffffff): # Check for bad endianness
+          data = data.view(data.dtype.newbyteorder('<')).astype(data.dtype.newbyteorder('>')).view(int64)
+        threads,kinds,_ = data[0]
+        ranks[rank]
+        ranks[rank] = [[data[data[i][0]:data[i][1]] for kind in xrange(kinds) for i in (1+thread*kinds+kind,)] for thread in xrange(threads)]
   return [thread for rank in ranks for thread in rank],len(ranks)
 
-def line_between_boxes(color,box0,box1):
+def line_between_boxes(box0,box1):
   if 0:
     x0 = box0.clamp(box1.center())
     x1 = box1.clamp(box0.center())
   else:
     x0 = box0.center()
     x1 = box1.center()
-  GL.glColor(color)
-  GL.glBegin(GL.GL_LINES)
-  gl_vertices([x0,x1])
-  GL.glEnd()
+  return x0,x1
 
 class HistoryScene(Scene):
   def __init__(self):
@@ -105,20 +107,23 @@ class HistoryScene(Scene):
       self.history = history
 
     # Check dependencies
-    with Log.scope('dependencies'):
-      def sort_by_events(events):
-        return events[argsort(events[:,0])] if len(events) else events
-      self.event_sorted_history = map(curry(map,sort_by_events),history)
-      if run_checks():
+    def sort_events():
+      with Log.scope('dependencies'):
+        def sort_by_events(events):
+          return events[argsort(events[:,0])] if len(events) else events
+        return map(curry(map,sort_by_events),history)
+    self.event_sorted_history = cache(sort_events)
+    if run_checks():
+      with Log.scope('dependency checks'):
         for direction in -1,+1:
-          check_dependencies(self.event_sorted_history,direction)
+          check_dependencies(self.event_sorted_history(),direction)
 
     # Compute bandwidth if desired
     if bandwidth_file():
       assert bandwidth_file().endswith('.npz')
       dt = min(bandwidth_dt(),self.elapsed)
       assert 1-1e-4 <= self.elapsed/dt <= 1000
-      bandwidth = estimate_bandwidth(self.event_sorted_history,threads,dt)
+      bandwidth = estimate_bandwidth(self.event_sorted_history(),threads,dt)
       savez(bandwidth_file(),name=history_dir(),dt=dt,bandwidth=bandwidth)
       sys.exit(0)
 
@@ -166,29 +171,59 @@ class HistoryScene(Scene):
                 GL.glEnd()
     self.event_list = cache_render(draw_events)
 
-    # Draw picked information
-    def draw_picked():
+    # Render into a large image
+    def box_and_image():
+      events = self.picked_events()
+      lines = self.picked_lines()
+      with Log.scope('rasterize'):
+        image = zeros((resolution(),yresolution()*len(history),4))
+        sizes = self.elapsed,len(history)
+        Log.write('full sizes = %g %g'%sizes)
+        if len(lines):
+          lo = 1e-6*lines[:,:,0].min()
+          hi = 1e-6*lines[:,:,0].max()
+          extra = .1*(hi-lo)
+          box = Box((lo-extra,0),(hi+extra,len(history)))
+        else:
+          box = Box(0,sizes)
+        Log.write('box = %s'%box)
+        for n,thread in enumerate(history):
+          for k,events in enumerate(thread):
+            if len(events) and 'idle' not in self.kind_names[k]:
+              rasterize_history(image,box,events,(n+.1,n+.9),hstack([colors[k],1]))
+        return box,image[:,:,:3]+(1-image[:,:,3,None])
+    self.image = cache(lambda:box_and_image()[1])
+    self.image_box = cache(lambda:box_and_image()[0])
+
+    def event_box((thread,kind,event)):
+      assert 0<=thread<len(self.history)
+      return Box((event[1],thread+.1),(event[2],thread+.9))
+    def event_name(event):
+      return str_event(event.view(uint64)[0])
+    def event_text((thread,kind,event)):
+      return '%s: %s'%(self.kind_names[kind],event_name(event))
+
+    # Compute but don't draw pick information
+    def pick_info():
       px,pn = picked()
       pn = int(pn)
+      events = []
+      lines = []
       if pn>=0:
         with Log.scope('graph'):
-          thread = self.history[pn]
+          try:
+            thread = self.history[pn]
+          except IndexError:
+            Log.write('invalid picked %s, pn = %d'%(picked(),pn))
           kind,event = search_thread(thread,px)
           if kind<0:
             Log.write('thread %d, time %d: found nothing'%(pn,px))
           else:
             event = thread[kind][event]
-            def name(event):
-              return str_event(event.view(uint64)[0])
-            Log.write('thread %d, time %d: found %s from %d to %d'%(pn,px,name(event),event[1],event[2]))
-            text = '%s: %s'%(self.kind_names[kind],name(event))
-            GL.glColor(zeros(3))
-            draw_text(((event[1]+event[2])/2,pn+.5,0),text,0)
+            Log.write('thread %d, time %d: found %s from %d to %d'%(pn,px,event_name(event),event[1],event[2]))
+            events.append((pn,kind,event))
             # Draw dependency edges
-            def event_box((thread,kind,event)):
-              return Box((event[1],thread+.1),(event[2],thread+.9))
             max_depth = dependency_depth()
-            circles = []
             label = label_dependencies()
             for direction in directions():
               work = [((pn,kind,event),0)]
@@ -198,20 +233,31 @@ class HistoryScene(Scene):
                 key = source[0],source[1],tuple(source[2])
                 if key not in seen and depth<max_depth:
                   seen.add(key)
-                  source_box = event_box(source)
-                  source_text = '%s: %s'%(self.kind_names[source[1]],name(source[2]))
-                  Log.write(source_text)
-                  if depth and label:
-                    draw_text(hstack([source_box.center(),0]),source_text,0)
-                  circles.append(source_box.center())
-                  for dep in event_dependencies(self.event_sorted_history,direction,source[0],source[1],source[2]):
+                  Log.write(event_text(source))
+                  events.append(source)
+                  for dep in event_dependencies(self.event_sorted_history(),direction,source[0],source[1],source[2]):
                     work.append((dep,depth+1))
-                    Log.write('  %s: %s'%(self.kind_names[dep[1]],name(dep[2])))
-                    line_between_boxes(zeros(3),source_box,event_box(dep))
-            self.circles.set(circles)
-    self.circles = Prop('circles',None).set([])
+                    Log.write('  %s: %s'%(self.kind_names[dep[1]],event_name(dep[2])))
+                    lines.append(line_between_boxes(event_box(source),event_box(dep)))
+      return events,asarray(lines)
+    pick_info = cache(pick_info)
+    self.picked_events = cache(lambda:pick_info()[0])
+    self.picked_lines = cache(lambda:pick_info()[1])
+    self.circles = cache(lambda:[event_box(e).center() for e in self.picked_events()])
+
+    # Draw picked information
+    def draw_picked():
+      GL.glColor(zeros(3))
+      label = label_dependencies()
+      for i,e in enumerate(self.picked_events()):
+        if label or not i:
+          draw_text(hstack([event_box(e).center(),0]),event_text(e),0)
+      if len(self.picked_lines()):
+        GL.glBegin(GL.GL_LINES)
+        gl_vertices(self.picked_lines())
+        GL.glEnd()
     self.picked_list = cache_render(draw_picked)
- 
+
   def bounding_box(self):
     return Box(zeros(3),(self.elapsed,len(self.history),0))
 
@@ -296,7 +342,7 @@ def region(start,end):
   center = (start+end)/2/scales()
   goal_size = absolute(start-end)
   current_size = absolute(warp(zeros(2))-warp(cam.viewport[2:]))
-  scales.set(scales()*current_size/goal_size) 
+  scales.set(scales()*current_size/goal_size)
   cam.frame = Frames(hstack([center*scales(),0]),cam.frame.r)
 
 def mouse_press(x,y,button,view):
@@ -308,10 +354,31 @@ def mouse_press(x,y,button,view):
     if n<0 or n>=len(scene.history):
       n = -1
     picked.set((1e6*x,n))
-    #print 'press: n %d, x %g'%(n,x)
+
+def save_image():
+  with Log.scope('save image'):
+    Log.write('elapsed = %g'%scene.elapsed)
+    Log.write('threads = %d'%len(scene.history))
+    Log.write('legend:')
+    for c,n in scene.legend:
+      Log.write('  %s %s'%(n,compact_str(c)))
+    if save():
+      Image.write(save(),scene.image())
+      with Log.scope('lines'):
+        box = scene.image_box()
+        bx,by = box.min
+        sx,sy = 1/box.sizes()
+        for (x0,y0),(x1,y1) in scene.picked_lines():
+          Log.write(r'\draw (%g,%g) -- (%g,%g);'%(sx*(1e-6*x0-bx),sy*(y0-by),sx*(1e-6*x1-bx),sy*(y1-by)))
+    else:
+      Log.write('Must set save filename')
 
 # Visualize
 Log.configure('draw history',0,0,100)
+scene = HistoryScene()
+if save():
+  save_image()
+  sys.exit(0)
 app = QEApp(sys.argv,True)
 main = MainWindow(props)
 main.view.toggle_2d_mode(True)
@@ -320,8 +387,8 @@ flat.track = 0
 flat.select_region = QT_ALT
 flat.mouse_press_callback = mouse_press
 main.view.interaction_mode.set(flat)
-scene = HistoryScene()
 main.view.add_scene('history',scene)
+main.add_menu_item('File','Save image',save_image,'Ctrl+s')
 main.init()
 main.show_prop_section('history')
 main.view.show_all(True)

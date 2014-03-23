@@ -20,7 +20,7 @@ small scale backwards engine.
 
 The pentago code is released under a BSD license, and the 4 TB data set has been
 released into the public domain for anyone who wants to tinker around.  The data set
-is generously hosted by Rackspace.  If you want links, please email me at <irving@naml.us>.
+is generously hosted by Rackspace.  If you want links to download the data, see below.
 
 For background on the complexity of pentago and the applicability of a variety of
 solution algorithms, see Niklas Buscher's 2011 thesis
@@ -170,3 +170,26 @@ The code is organized into the following directories:
 
 Most files have summarizing comments at the top, but otherwise documentation is fairly scant.
 Email me if you have questions at <irving@naml.us>!
+
+### Data
+
+The computed data set of perfect pentago results up to slice 18 can be downloaded directly from
+Rackspace.  If you do download it and play around, I'd love to get an email, but you should feel
+no obligation to do so.  Also available are sparse sample files and win/losss/tie counts for all slices,
+which would be useful for cross-validation.  The data is all in custom formats, so the easiest way
+to access it is via compiling this repository.
+
+Warning: The total size of the data is 3.7 TB.  If you want something more manageable, you can download
+only the first few slices (say up to move 12).  To see the sizes of all slices before downloading, look
+at [data/edison/final.txt](https://github.com/girving/pentago/tree/master/data/edison/final.txt).  If
+you've gotten past this warning, you can download the data via
+
+    # Base url
+    url="http://582aa28f4f000f497ad5-81c103f827ca6373fd889208ea864720.r52.cf5.rackcdn.com"
+
+    # Download a sparse sample or count file.  Replace <n> with the desired slice in [0,35].
+    wget $url/sparse-<n>.npy
+    wget $url/counts-<n>.npy
+
+    # Download a slice file.  Replace <n> with the desired slice in [0,18]
+    wget $url/slice-<n>/pentago

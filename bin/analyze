@@ -38,12 +38,15 @@ def estimate():
 
 @command
 def counts():
-  "Count supersymmetry-reduced boards with each number of stones"
-  counts = [large(count_boards(n,2048)) for n in xrange(37)]
-  width = max(len(s) for s in counts)
-  print('counts:')
-  for n,s in enumerate(counts):
-    print('  %2d:  %*s'%(n,width,s))
+  "Count boards with each number of stones and 1, 8, or 2048 symmetries removed"
+  counts = asarray([[count_boards(n,s) for s in 1,8,2048] for n in xrange(37)])
+  width = [len(large(c)) for c in counts.sum(axis=0)]
+  print('\ncounts with symmetries:    1                      8                2048\n')
+  def wc(counts):
+    return tuple(x for w,c in zip(width,map(large,counts)) for x in (w,c))
+  for n,cs in enumerate(counts):
+    print(' %2d:  %*s  %*s  %*s'%((n,)+wc(cs)))
+  print('\nall:  %*s  %*s  %*s'%wc(counts.sum(axis=0)))
 
 @command
 def estimates():
@@ -101,6 +104,20 @@ def approx():
   print('super ratio = %g, simple total = %s'%(256*total/simple_total,large(simple_total)))
   for p in 17,18:
     print('total up to %d stones = %s supers, %s bytes'%(p,large(partials[p]),large(64*long(partials[p]))))
+
+@command
+def ratio():
+  "Compute ratios of symmetry-reduced positions, supers, and section supers."
+  positions = sum(count_boards(n,8) for n in xrange(37))
+  supers = sum(256*count_boards(n,2048) for n in xrange(37))
+  section_supers = sum(256*all_boards_section_sizes(n,8).sum() for n in xrange(37))
+  print('Symmetry-reduced positions, supers, and supers in sections:')
+  print('positions      = %s'%large(positions))
+  print('supers         = %s'%large(supers))
+  print('section supers = %s'%large(section_supers))
+  print('supers / positions = %g'%(supers/positions))
+  print('section supers / supers = %g'%(section_supers/supers))
+  print('section supers / positions = %g'%(section_supers/positions))
 
 @command
 def sections():
@@ -185,6 +202,11 @@ def help():
 
 if __name__=='__main__':
   props = PropManager()
-  command = props.add('command','help').set_allowed(commands.keys())
+  command = props.add('command','help')
   parser.parse(props,'Endgame related stuff',positional=[command])
-  commands[command()]()
+  if command() in commands:
+    commands[command()]()
+  else:
+    print("error: invalid command '%s'\n"%command())
+    help()
+    sys.exit(1)

@@ -121,18 +121,23 @@ Array<Vector<wall_time_t,2>> simplify_history(RawArray<const history_t> history,
 }
 
 // Rasterize a piece of history data into an rgba image
-void rasterize_history(RawArray<Vector<real,4>,2> image, const Vector<real,2> sizes, RawArray<const history_t> history, const Box<real> y_range, const Vector<real,4> color) {
+void rasterize_history(RawArray<Vector<real,4>,2> image, const Box<Vector<real,2>> box,
+                       RawArray<const history_t> history, const Box<real> y_range, const Vector<real,4> color) {
   typedef Vector<real,2> TV;
   typedef Vector<int,2> IV;
-  auto scales = TV(image.sizes()+1)/sizes;
-  scales.x *= 1e-6;
+  const auto prescales = TV(image.sizes())/box.sizes();
+  const auto scales = prescales*TV(1e-6,1);
   const auto scaled_y_range = scales.y*y_range;
+  const auto base = prescales*box.min;
   for (const auto event : history) {
-    const Box<TV> box(vec(scales.x*event.start.us,scaled_y_range.min),vec(scales.x*event.end.us,scaled_y_range.max));
-    const Box<IV> ibox(clamp_min(IV(floor(box.min)),0),clamp_max(IV(ceil(box.max)),image.sizes()));
-    for (int i : range(ibox.min.x,ibox.max.x))
-      for (int j : range(ibox.min.y,ibox.max.y))
-        image(i,j) += color*Box<TV>::intersect(box,Box<TV>(TV(i,j),TV(i+1,j+1))).volume();
+    const auto ebox = Box<TV>(vec(scales.x*event.start.us,scaled_y_range.min),
+                              vec(scales.x*event.end.us  ,scaled_y_range.max))-Box<TV>(base);
+    const Box<IV> ibox(clamp_min(IV(floor(ebox.min)),0),
+                       clamp_max(IV( ceil(ebox.max)),image.sizes()));
+    if (ibox.sizes().min() > 0)
+      for (const int i : range(ibox.min.x,ibox.max.x))
+        for (const int j : range(ibox.min.y,ibox.max.y))
+          image(i,j) += color*Box<TV>::intersect(ebox,Box<TV>(TV(i,j),TV(i+1,j+1))).volume();
   }
 }
 

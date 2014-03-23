@@ -1,0 +1,55 @@
+#!/usr/bin/env python
+'''Script to generate history visualizations for paper'''
+
+from __future__ import division,print_function,unicode_literals
+from numpy import *
+import subprocess
+import ast
+import re
+import os
+
+# Make sure we know which directory we're in
+os.chdir(os.path.dirname(__file__))
+
+# Generate full resolution visualization
+ratio = 1.5
+name = 'tiny-history.png'
+cmd = (  '../bin/draw-history ../data/edison/project/tiny-1-history '
+       + '--save %s --resolution %d --yresolution %d'
+       % (name,int(2048*ratio),int(10*ratio))).split()
+print(' '.join(cmd))
+if not os.path.exists(name):
+  subprocess.check_call(cmd)
+
+name = 'tiny-history-graph.png'
+cmd = (  '../bin/draw-history ../data/edison/project/tiny-1-history --forwards 1 '
+       + '--picked 230323986,51 --save %s --resolution %d --yresolution %d'
+       % (name,int(1024*ratio),int(10*ratio))).split()
+print(' '.join(cmd))
+if not os.path.exists(name):
+  subprocess.check_call(cmd)
+
+# Generate associated tikz
+elapsed = 263.473
+threads = 96
+legend = '''\
+  compute [0.0,1.0,0.571428571429]
+  snappy [1.0,0.857142857143,0.0]
+  wait [1.0,0.0,0.0]
+  unsnappy [0.0,0.571428571429,1.0]
+  compact [0.285714285714,0.0,1.0]
+  count [0.285714285714,1.0,0.0]
+  accumulate [1.0,0.0,0.857142857143]
+  other [0.5,0.5,0.5]'''.split('\n')
+print('\nLegend:')
+w = .05
+mx = .005/2
+my = 1/96/2
+dy = 3/96
+print(r'    \filldraw[draw=black,fill=white] (0,1) rectangle +(%g,-%g);'%(mx+w+.085,2*my+len(legend)*dy))
+for i,line in enumerate(legend):
+  n,c = line.split()
+  c = ast.literal_eval(c)
+  print(r'    \definecolor{%s}{rgb}{%g,%g,%g};'%((n,)+tuple(c)))
+  print(r'    \fill[%s] (%g,1-%g) rectangle +(%g,-%g);'%(n,mx,my+dy*i,w,dy))
+  print(r'    \node [right,scale=.5,anchor=base west] at (%g,1-%g) {%s};'%(mx+w,my+dy*(i+.8),n))

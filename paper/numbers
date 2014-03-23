@@ -1,0 +1,255 @@
+#!/usr/bin/env python
+
+from __future__ import division,print_function,unicode_literals,absolute_import
+from pentago import *
+from geode import *
+import glob
+import sys
+import re
+
+# Make sure we know which directory we're in
+os.chdir(os.path.dirname(__file__))
+
+class Info(object):
+  '''Parse timing information out of a log file'''
+  def __init__(self,path):
+    assert not os.path.islink(path)
+    lines = tuple(line.rstrip() for line in open(path))
+    times = {}
+    walltime = {}
+    compression = {}
+    balance = {}
+    def re_find(pattern,lo,hi=len(lines)):
+      pat = re.compile(pattern)
+      for i in xrange(lo,hi):
+        m = pat.match(lines[i])
+        if m:
+          return i,m
+      raise RuntimeError('path %s: pattern not found: %s'%(path,pattern))
+    self.ranks = int(re_find(r'^\s+ranks = (\d+)$',0,10)[1].group(1))
+    for slice in range(36)+['all']:
+      if '/all-1' in path and slice in (16,'all'):
+        continue # Skip over crash
+      if slice=='all':
+        hi,_ = re_find('  memory final: virtual',0)
+        lo = hi-32
+      else:
+        try:
+          lo = lines.index('  slice %d'%slice)
+        except ValueError:
+          continue
+        hi,m = re_find('  END slice %d\s+(\d+\.\d+) s$'%slice,lo)
+        walltime[slice] = float(m.group(1))
+        load = lines.index('    load balance',lo,hi)
+        for kind in 'lines','line blocks','line nodes','blocks','block nodes':
+          _,m = re_find('^      %s = (\d+) (\d+) \((\d+\.?\d*|inf)\)$'%kind,load,load+7)
+          balance[slice,kind] = float(m.group(3))
+      timing,_ = re_find('\s+timing$',lo,hi)
+      speeds,_ = re_find('\s+speeds$',lo,hi)
+      times[slice,'total'] = float(re.match('\s+total (\d+\.\d+)$',lines[speeds-1]).group(1))
+      if slice != 'all':
+        m = re_find(r'^    compression ratio = (0\.\d+) \+- 0\.\d+$',lo,hi)[1]
+        compression[slice] = float(m.group(1))  
+      for i in xrange(timing+1,speeds-2):
+        m = re.match(r'^\s+(\w+)\s+(\d+\.\d+) s$',lines[i])
+        if not m:
+          raise RuntimeError('weird time: %s'%lines[i])
+        times[slice,bytes.decode(m.group(1))] = float(m.group(2))
+    # Remember
+    self.times = times
+    self.walltime = walltime
+    self.compression = compression
+    self.balance = balance
+
+# Parse timing information out of all-1 log
+all_info = Info('../data/edison/project/all-1/log')
+
+# Total time from up through slice 19 (bulk of compute without the I/O stages)
+most = sum(all_info.walltime[n] for n in xrange(19,36))
+most_without_io = sum(all_info.walltime[n]
+  -sum(all_info.times[n,'write_'+k] for k in ('sparse','counts'))/all_info.ranks for n in xrange(19,36))
+print('\nmost time = %g s (%g hours)'%(most,most/3600))
+print('most without I/O = %g s (%g hours)'%(most_without_io,most_without_io/3600))
+
+# Measured I/O bandwidth
+def io():
+  print('\nMeasured I/O bandwidth:')
+  ranks = all_info.ranks
+  sizes = {'slice-17.pentago':1475380615039,'slice-18.pentago':1954957518434}
+  ns = arange(17,36)[::-1]
+  sparse_size = []
+  sparse_time = []
+  for n in ns:
+    for kind in ['sparse']+['sections']*(n<19):
+      time = all_info.times[n,'write_'+kind]
+      name = ('slice-%d.pentago' if kind=='sections' else 'sparse-%d.npy')%n
+      size = sizes[name] if name in sizes else os.stat('../data/edison/project/all/'+name).st_size
+      if kind=='sparse':
+        sparse_time.append(time)
+        sparse_size.append(size)
+      print('slice %d write %s bandwidth = %d / (%g s / %d) = %g GB/s'%(
+        n,kind,size,time,ranks,size/(time/ranks)/2**30))
+  read_nodes,read_time = 192,3383.3559 # From data/edison/project/restart-5/log
+  size = sizes['slice-17.pentago']
+  read_speed = size/read_time
+  print('slice 17 read bandwidth (%d nodes) = %d / %g s = %g GB/s'%(
+    read_nodes,size,read_time,read_speed/2**30))
+  print('  per node: measured = %g MB/s, theoretical peak = %g MB/s'%(
+    read_speed/read_nodes/2**20,168*2**30/5192/2**20))
+  if 'plot-io' in sys.argv:
+    import pylab
+    pylab.plot(sparse_size,asarray(sparse_time)/ranks,'o')
+    pylab.ylim(0,38e5/ranks)
+    pylab.xlabel('sparse-<n>.npy file size')
+    pylab.ylabel('write time (s)')
+    pylab.show()
+io()
+
+# Maximum memory
+def peak():
+  peak_memory = 0
+  for n in xrange(19,34):
+    def f(n):
+      return all_info.compression[n]*64*count_boards(n,2048)
+    peak_memory = max(peak_memory,f(n)+f(n+1))
+  print('\npeak memory = %g TB'%(peak_memory/2**40))
+peak()
+
+def uncompressed_io():
+  '''Estimate the total time Edison would take to do uncompressed I/O'''
+  data = 0
+  snappy_data = 0
+  for n in xrange(35+1):
+    d = 64*count_boards(n,2048)
+    data += d
+    snappy_data += d*all_info.compression.get(n,all_info.compression[17])
+  speed = 168*2**30
+  fraction = 2048/5192 
+  time = (1+4)*data/(fraction*speed)
+  snappy_time = (1+4)*snappy_data/(fraction*speed)
+  print('\nTotal I/O time estimates:')
+  print('I/O / data = 5 (1 write + 4 read)')
+  print('total data = %g TB (snappy %g TB, ratio %g)'%(data/2**40,snappy_data/2**40,snappy_data/data))
+  print('total I/O = %g TB (snappy %g TB)'%((1+4)*data/2**40,(1+4)*snappy_data/2**40))
+  print('Peak I/O bandwidth for all of Edison = %g GB/s'%(speed/2**30))
+  print('Peak I/O bandwidth for 2048/5192 of Edison (what I used) = %g GB/s'%(fraction*speed/2**30))
+  print('uncompressed I/O time estimate = %g hours (snappy %g hours)'%(time/3600,snappy_time/3600))
+uncompressed_io()
+
+def sse():
+  print('\nSSE vs. non-SSE speedup:')
+  def times(pattern):
+    return asarray([Info(p).times['all','compute'] for p in glob.glob(pattern)]) 
+  def speedup(lo,hi):
+    print('lo = %g +- %g, ratio %g'%(mean(lo),std(lo,ddof=1),std(lo,ddof=1)/mean(lo)))
+    print('hi = %g +- %g, ratio %g'%(mean(hi),std(hi,ddof=1),std(hi,ddof=1)/mean(hi)))
+    return min(hi)/min(lo)
+  sse   = times('../data/edison/project/small-[14]-sse/log')
+  nosse = times('../data/edison/project/small-[23]-nosse/log')
+  print('edison = %g'%speedup(sse,nosse))
+  sse   = times('../data/cayley/sse/small-sse-?/log')
+  nosse = times('../data/cayley/sse/small-nosse-?/log')
+  print('cayley = %g'%speedup(sse,nosse))
+sse()
+
+def idle():
+  for with_io in 1,0:
+    print('\nIdle vs. total time (%s I/O):'%('with' if with_io else 'without'))
+    idle = 0
+    total = 0
+    for n in xrange(17,35+1):
+      i = all_info.times[n,'cpu_idle']
+      t = sum(all_info.times.get((n,k),0) for k in '''cpu_idle compress snappy unsnappy compute filter copy
+                                                      schedule accumulate allocate_line wakeup compacting'''.split())
+      if not with_io:
+        w = sum(all_info.times.get((n,'write_'+k),0) for k in 'counts sections sparse'.split())
+        i -= 5*w
+        t -= 5*w
+      print('n %2d : %g / %g = %g'%(n,i,t,i/t))
+      idle += i
+      total += t
+    print('>=17 : %g / %g = %g'%(idle,total,idle/total))
+idle()
+
+def snappy():
+  snappy = 0
+  compute = 0
+  for n in xrange(19,35+1):
+    snappy += all_info.times[n,'snappy']+all_info.times.get((n,'unsnappy'),0)
+    compute += all_info.times[n,'compute']
+  total = snappy+compute
+  print('\nsnappy fraction = %g / %g = %g'%(snappy,total,snappy/total))
+snappy()
+
+def profile():
+  import pylab
+  names = [('idle due to write','write_sections write_counts write_sparse','y'),
+           ('idle','cpu_idle master_idle','r'),
+           ('lzma compress','compress','m'),
+           ('snappy compress','snappy','b'),
+           ('snappy uncompress','unsnappy','c'),
+           ('compute','compute','g'),
+           ('other','filter copy schedule mpi partition accumulate allocate_line wakeup compacting','k'),
+           ('ignore','mpi request_send response_send response_recv wait output_send output_recv total decompress','')]
+  for n,kind in all_info.times.keys():
+    for _,kinds,_ in names:
+      if kind in kinds:
+        break
+    else:
+      raise RuntimeError("missing kind '%s', n %s"%(kind,n))
+  ns = asarray(range(17,36)[::-1])
+  def time(kinds):
+    return asarray([sum(all_info.times.get((n,kind),0) for kind in kinds.split()) for n in ns])
+  write = time('write_sections write_counts write_sparse')
+  plots = []
+  labels = []
+  def run(plot,scale=1):
+    total = zeros(len(ns))
+    for label,kinds,color in names:
+      if label != 'ignore':
+        ts = time(kinds)
+        if label=='idle':
+          ts -= 5*write
+          assert all(ts>=0) 
+        elif 'write' in label:
+          ts = 5*write
+        if plot:
+          plots.append(pylab.bar(ns,scale*ts,bottom=scale*total,label=label,color=color,align='center'))
+          labels.append(label)
+        total += ts
+    return total.sum()
+  run(plot=1,scale=1/run(plot=0))
+  for L in plots,labels:
+    L[:2] = L[:2][::-1]
+  ax = pylab.axes()
+  pylab.xticks(ns,map(str,ns))
+  pylab.xlim(35+.65,17-.65)
+  pylab.ylim(0,.19)
+  pylab.legend(plots,labels,loc='upper left',prop={'size':10})
+  pylab.xlabel('slice (number of stones on the board)')
+  pylab.ylabel('fraction of total time')
+  ax.set_aspect(45)
+  pylab.savefig('profile.pdf',transparent=1,bbox_inches='tight',pad_inches=0,dpi=40)
+  pylab.show()
+if 'profile' in sys.argv:
+  profile()
+
+def load():
+  import pylab
+  ns = asarray(range(17,36)[::-1])
+  kinds = 'lines','line blocks','line nodes','blocks','block nodes'
+  for kind in kinds:
+    load = asarray([all_info.balance[n,kind] for n in ns])
+    pylab.plot(ns,load,label=kind)
+  ax = pylab.axes()
+  pylab.xticks(ns,map(str,ns))
+  pylab.xlim(34,17)
+  pylab.ylim(.9,2)
+  pylab.xlabel('slice (number of stones on the board)')
+  pylab.ylabel('max/min ratio')
+  pylab.legend(loc='upper center',prop={'size':10})
+  ax.set_aspect(5)
+  pylab.savefig('balance.pdf',transparent=1,bbox_inches='tight',pad_inches=0,dpi=80)
+  pylab.show()
+if 'load' in sys.argv:
+  load()
