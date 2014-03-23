@@ -1,0 +1,17 @@
+#PBS -q debug
+#PBS -l mppwidth=48
+#PBS -l walltime=00:20:00
+#PBS -N output-tiny-ht
+#PBS -j oe
+#PBS -V
+#PBS -l gres=gscratch1
+
+cd $PBS_O_WORKDIR
+export PENTAGO=/global/homes/g/girving/pentago
+
+aprun -n 16 -N 8 -j 2 $PENTAGO/build/native/release/bin/endgame-mpi \
+  --ranks 16 --threads 6 --save 0 --memory 3G --gather-limit 4 --line-limit 5 44444444 \
+  --dir data-tiny --randomize 17
+# 2 nodes
+
+# 1 node = 24 cores (x2 with hyperthreading via -j 2), 64 GB RAM
