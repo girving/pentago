@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+'''Generate a figure illustrating the organization of a section'''
+
+from __future__ import division,print_function,unicode_literals
+from contextlib import *
+from pentago import *
+from geode import *
+import sys
+import re
+
+# Utilities
+def sub(_s,**subs):
+  if not subs: return _s
+  return re.sub(r'(?:\{)?\b('+'|'.join(subs.keys())+r')\b(?:\})?',lambda m:str(subs[m.group(1)]),_s)
+
+indentation = 0
+@contextmanager
+def block(open,close):
+  global indentation
+  write(open)
+  indentation += 1
+  try:
+    yield
+  finally:
+    indentation -= 1
+    write(close)
+
+def write(_s='',**env):
+  for line in sub(_s,**env).split('\n'):
+    print('  '*(indentation*bool(line))+line)
+
+# Redirect stdout to exact-generated.h
+os.chdir(os.path.dirname(__file__))
+sys.stdout = open('section.tex','w')
+
+# Section info
+section = (2,3),(3,1)
+rmins = map(rotation_minimal_quadrants,section)
+grid = 6,3
+
+# Drawing parameters (copied from web/client.js)
+bar_size = .1
+spot_radius = .4
+
+# Draw the figure
+with block(r'\begin{tikzpicture}[scale=1.1]',r'\end{tikzpicture}'):
+  write(r'\definecolor{tan}{rgb}{.8235,.7059,.549}')
+  for s in 1/2,1/4,0:
+    with block(r'\begin{scope}[shift={(%g,%g)}]'%(s,s),r'\end{scope}'):
+      write(r'\fill[white] (0,0) rectangle (x,y);',x=grid[0],y=grid[1])
+      write(r'\draw[step=1] (0,0) grid (x,y);',x=grid[0],y=grid[1])
+  def dots(x,y,dx,dy):
+    for i in -1,0,1:
+      write(r'\node at (x,y) {$\cdot$};',x=x+i*dx/7,y=y+i*dy/7)
+  for a in 0,1:
+    rmin,reflections = rmins[a]
+    for i in xrange(grid[a]):
+      center = -ones(2)/2+(i+1)*(arange(2)==a)
+      if i < grid[a]-1:
+        write(r'\node at (x,y) {$i$};',x=center[0]-(a==1)/1.8,y=center[1]-(a==0)/1.8,i=i)
+        with block(r'\begin{scope}[shift={(%g,%g)},scale=1/9]'%tuple(center),r'\end{scope}'):
+          write(r'\fill[tan] (-s,-s) rectangle (s,s);',s=3+bar_size/2)
+          for b in 0,1:
+            write(r'\fill[darkgray] (-s,-t) rectangle (s,t);',s=(bar_size+6.2*b)/2,t=(bar_size+6.2*(1-b))/2)
+          for x in xrange(3):
+            for y in xrange(3):
+              color = {0:'tan',1:'black',2:'white'}[(rmin[i]//3**(3*x+y))%3]
+              write(r'\filldraw[draw=gray,fill=c,very thin] (x,y) circle (r);',
+                c=color,r=spot_radius,x=x-bar_size/2-2.5,y=y-bar_size/2-2.5+a*(bar_size+3))
+      else:
+        dots(center[0],center[1],1-a,a)
+  for i in xrange(grid[0]):
+    for j in xrange(grid[1]):
+      if i==grid[0]-1 or j==grid[1]-1:
+        dots(i+.5,j+.5,i==grid[0]-1,j==grid[1]-1)
+      else:
+        write(r'\node at (.5+i,.5+j) {$f_{{i}{j}}$};',i=i,j=j)

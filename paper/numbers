@@ -238,9 +238,25 @@ def load():
   import pylab
   ns = asarray(range(17,36)[::-1])
   kinds = 'lines','line blocks','line nodes','blocks','block nodes'
+  worst = 100*ones(37)
+  worst[ns] = 1
   for kind in kinds:
     load = asarray([all_info.balance[n,kind] for n in ns])
+    worst[ns] = maximum(worst[ns],load)
     pylab.plot(ns,load,label=kind)
+
+  print()
+  for lim in 1.1,1.2,1.3,1.4:
+    good, = nonzero(worst<lim)
+    lo,hi = min(good),max(good)
+    print('Load within %g for slices [%d,%d]'%(lim,lo,hi))
+    good = sum(all_info.walltime[n] for n in xrange(lo,hi+1))
+    total = sum(all_info.walltime[n] for n in xrange(19,36))
+    print('  wall fraction = %g s / %g s = %g'%(good,total,good/total))
+    good = sum(all_info.times[n,'compute'] for n in xrange(lo,hi+1))
+    total = sum(all_info.times[n,'compute'] for n in xrange(17,36))
+    print('  compute fraction = %g s / %g s = %g'%(good,total,good/total))
+
   ax = pylab.axes()
   pylab.xticks(ns,map(str,ns))
   pylab.xlim(34,17)

@@ -18,6 +18,7 @@
 
 \newcommand{\TODO}{{\color{red} TODO}}
 \newcommand{\Z}{\mathbb{Z}}
+\newcommand{\wrt}{w.\thinspace r.\thinspace t.\ }
 \DeclareMathOperator{\rmax}{rmax}
 
 \begin{document}
@@ -72,8 +73,17 @@ beginning of the game.
 \hspace{.1in}
 \includegraphics[width=.45\columnwidth]{move-4.pdf} \\
 \vspace{.1in}
-\includegraphics[width=.3\columnwidth]{move-legend.pdf}
+\begin{tikzpicture}
+  \definecolor{win} {rgb}{0,1,0};
+  \definecolor{tie} {rgb}{0,0,1};
+  \definecolor{loss}{rgb}{1,0,0};
+  \tikzstyle{kind}=[circle,draw=gray,inner sep=0pt,minimum size=15]
+  \node at (-2,0) [kind,label=below:win, fill=win] {};
+  \node at ( 0,0) [kind,label=below:tie, fill=tie] {};
+  \node at ( 2,0) [kind,label=below:loss,fill=loss] {};
+\end{tikzpicture}
 \end{center}
+\vspace{-.15in}
 \cprotect\caption{(Left) With perfect play, the first player wins with any opening move except the
 corners, which tie.  (Right) A more delicate position with black to play.
 The full strong solution can be explored at \url{http://perfect-pentago.net}.}
@@ -84,6 +94,7 @@ The full strong solution can be explored at \url{http://perfect-pentago.net}.}
 \begin{center}
 \includegraphics[width=\columnwidth]{counts.pdf}
 \end{center}
+\vspace{-.1in}
 \cprotect\caption{Counts of pentago positions vs.\ stones on the board, with symmetries removed.
 Run \verb+web/counts+ in the source repository to reproduce.}
 \label{counts}
@@ -113,32 +124,27 @@ $36 \cdot 8 = 288$ possible first moves including rotation and an average branch
 states.\cprotect\footnote{To reproduce the branching factor average, run \verb+bin/analyze branch+ in
 \url{https://github.com/girving/pentago}.  For the rest of the paper, only the command will be given.}
 To reduce the branching factor to a manageable level, our solver performs all computations in terms of
-``rotation abstracted positions'' consisting of all 256 ways to rotate the quadrants of a given board;
+\emph{rotation abstracted positions} consisting of all 256 ways to rotate the quadrants of a given board;
 this eliminates the factor of 8 due to rotation for an average branching factor of only $12.2$.  Operating
-on more than one board at a time lets us take full advantage of SSE acceleration, packing win-loss-tie values
-for 256 positions into 4 128-bit SSE registers.
+on more than one board at a time lets us take full advantage of SSE acceleration.
 
 Unfortunately, symmetry techniques alone are insufficient to solve pentago on commodity hardware.  The game has
 3,009,081,623,421,558 ($3 \times 10^{15}$) states with symmetries removed, all but $0.3\%$ of which are reachable
 with valid play;\cprotect\footnote{Run \verb+analyze counts+ and \verb+analyze reachable+, respectively.} the number of
 states over time is shown in \autoref{counts}.  To solve the game using retrograde analysis, we traverse all
-positions in reverse order of the number of stones, starting from the 35 stone ``slice'' (the 36th is computed
+positions in reverse order of the number of stones, starting from the 35 stone \emph{slice} (the 36th is computed
 on demand) and iteratively computing the $n$-stone slice from the $(n+1)$-stone slice up to the beginning of the game.
-This requires storing two adjacent slices at a time, requiring $213$ TB at peak before compression.  Preliminary
-experiments indicated this would compress to around $80-100$ TB using fast but weak compression \cite{snappy2014};
-this would fit into half of the NERSC Cray Hopper's $217$ TB, but only if minimal memory was wasted on
-communication buffers, working storage, etc.
+This requires storing two adjacent slices at a time, requiring $213$ TB at peak before compression.  Our initial
+target was to fit into half of the NERSC Cray Hopper's $217$ TB, which was plausible using fast but weak compression
+only if minimal memory was wasted communication buffers and working storage.
 
 In order to minimize working memory, our parallel solver grabs inputs from other processes immediately before
-they are used, overlapping a small number of work chunks to hide latency.  Since these chunks take a variable
-amount of time (see below), we were forced into a fully asynchronous communication
+they are used, overlapping a small number of work chunks to hide latency.  Since computing each chunk takes a variable
+amount of time (see below), we opted for a fully asynchronous communication
 pattern: when a process needs an input block, it sends a message to the owner of that block, and the owner
-replies asynchronously with the data.  Asynchronicity was a primary complicating factor during
-optimization of the code.
+replies asynchronously with the data.
 
-The solver was run exactly once at full scale, solving the game down to slice $17$ in $2.7$ hours on 2048
-nodes ($98304$ threads) of NERSC's Cray XC30 Edison, then timing out during I/O after writing slices
-$17$ and $18$ to disk.  Two smaller computations were performed to finish the results down to slice $0$, completing
+The solver was run exactly once at full scale, generating
 a $3.7$ TB database of perfect results with $0$ through $18$ stones and establishing that pentago is a win for
 the first player to move (\autoref{opening}).  The full strong solution can be explored online at
 \url{http://perfect-pentago.net}.
@@ -177,6 +183,10 @@ h_c(s) &= \begin{cases} f_c(s) - f_{\bar{c}}(s) & \mbox{if } f_c(s) \wedge f_{\b
 \begin{figure*}[ht!]
 \begin{center}
 \begin{tikzpicture}[scale=.7]
+% Show slices
+\usetikzlibrary[decorations.pathreplacing]
+\draw [decoration={brace,amplitude=7},decorate] (-13.5,4) -- node [above,yshift=6] {Slice $n+1$} (-6.5,4);
+\draw [decoration={brace,amplitude=7},decorate] (0,4)     -- node [above,yshift=6] {Slice $n$} (9,4);
 % Horizontal compute
 \begin{scope}[shift={(-5,0)}]
   \filldraw[draw=black,fill=red!10!white,rounded corners=10] (-.5-3.5,-.5) rectangle (4+5,3.5);
@@ -209,7 +219,7 @@ h_c(s) &= \begin{cases} f_c(s) - f_{\bar{c}}(s) & \mbox{if } f_c(s) \wedge f_{\b
   % Rotated line
   \fill[white] (0,0) rectangle (1,2.5);
   \fill[blue!30!white] (1,0) rectangle (2,2.5);
-  \draw[->,very thick] (2,1.25) -- node [above] {$\curvearrowright$} (3.5+.5,.5);
+  \draw[->,very thick] (2,1.25) -- node [above] {$\curvearrowright$} node [below,sloped] {rotate} (3.5+.5,.5);
   % Section
   \node at (2/2,3) {Gather};
   \draw[step=1] (0,0) grid (2,2.5);
@@ -268,43 +278,34 @@ are unique with symmetries removed, some input lines must be rotated before comp
 
 \section{Abstracting over rotations}
 
-The exact symmetry group of pentago is the 8-element dihedral group $D_4$ with 4 global reflections and
+The exact symmetry group of pentago is the 8 element dihedral group $D_4$ with 4 global reflections and
 4 global rotations.  Computing only one element from each $D_4$ equivalence class saves a factor of $8$,
-but does nothing for the large branching factor of the game.  Thus, we consider the ``local'' group of
-all 256 ways to rotate the four quadrants, which has structure $L = \Z_4 \times \Z_4 \times \Z_4 \times \Z_4$.
-Combined with the group of global symmetries, the full group of ``approximate symmetries'' is a semidirect product
+but does nothing for the large branching factor of the game.  Thus, we consider the \emph{local} group of
+all 256 ways to rotate the four quadrants, which has the abelian group structure
+$L = \Z_4 \times \Z_4 \times \Z_4 \times \Z_4$.
+Combined with the group of global symmetries, the full group of \emph{approximate symmetries} is a semidirect product
 $G = \Z_4^4 \rtimes D_4$ with $2048$ elements.
 
-Computing one board $b$ from each equivalence class of $G$ is not enough; we must compute a function
-$$f(b) : L \to \{-1,0,1\}$$
+Computing one board $b$ from each equivalence class \wrt $G$ is not enough; we must compute a function
+$$f_b : L \to \{-1,0,1\}$$
 mapping $g \in L$ to the result of the quadrant rotated board $gb$.  Each board is a win,
 loss, or tie, so there $3^{256}$ such functions.  To avoid ternary arithmetic we use 2 bits per value for
 uncompressed data: one bit for win vs. loss/tie and one for win/tie vs. loss.  Thus, for each board we have two
-functions $\Z_4^4 \to \{0,1\}$, each a $4 \times 4 \times 4 \times 4$ array of bits.
+functions $\Z_4^4 \to \{0,1\}$, each a $4 \times 4 \times 4 \times 4$ array of bits.  Each such function
+$L \to \{0,1\}$ is packed into a 256 bit table.
 
-Since quadrant rotations do not change the equivalence class of $G$, operating on these functions $f(b)$ removes
+Since quadrant rotations do not change the equivalence class \wrt $G$, operating on these functions $f_b$ removes
 the branching factor due to rotations.  In its place, we have the mixing operation
 \begin{align*}
-\rmax(f)(g) &= \max_{r \in R} f(g+r)
+\rmax &: \left(L \to \{0,1\}\right) \to \left(L \to \{0,1\}\right) \\
+\rmax&(f)(g) = \max_{r \in R} f(g+r)
 \end{align*}
-where each $r \in R$ rotates one quadrant left or right $90^\circ$.  By packing the function $f$ into
-4 128-bit SSE registers, $\rmax$ can be computed in about $152$ SSE instructions, or about $3/5$ths of an
-instruction per position since each function encodes $256$ positions.  Although bit-level representations
-of board state and evaluation are standard in computational games, we believe this is the first instance
-where values of many distinct positions are evaluated in parallel using bit twiddling.
-
-In addition to $\rmax$, two other SSE routines are needed to play rotation abstracted pentago.  First, given
-in the position of stones of one color, we must be able to compute the set of rotations $g \in L$ which produce
-five in a row; we use precomputed tables to reduce this to $190$ SSE instructions and $640$ bytes of
-(cache coherent) table lookup.  Second, since our equivalence class representative can change when we add
-a stone, we must be able to transform a function $f(b)$ into $f(gb)$ for any $g \in G$.  This amounts to
-cyclic shifts, dimension transpositions, and reflections of $4 \times 4 \times 4 \times 4$ bit tables;
-transforming one such table takes about $60$ to $200$ SSE instructions dependent on the particular $g \in G$.
-
-Measuring over the entire compute kernel (which excludes idle time, communication, and compression/decompression),
-our SSE routines achieve a $1.81\times$ speedup on Edison over 64-bit versions and a $2.25\times$ speedup on
-an Intel Core i7, compared to a naive speedup of $2$ since we operate on twice as many bits per
-instruction.\cprotect\footnote{See \verb+SSE vs. non-SSE speedup+ in \verb+paper/numbers+}
+where $R \subset L$ is the set of $90^\circ$ degree rotations left or right, and we use $+$ because the
+group $L$ is abelian.  In addition to $\rmax$, two other rotation abstracted routines are needed.
+First, given the position of stones of one color, we must be able to compute the set of rotations
+$g \in L$ which produce five in a row.  Second, our equivalence class representative \wrt $G$ can change
+when we add a stone, so we must be able to transform $f_b$ into $f_{gb}$ for any $g \in G$; this
+involves cyclic shifts, dimension transpositions, and reflections of $4 \times 4 \times 4 \times 4$ bit tables.
 
 Although the code required for these operations is complex, verifying their correctness was a
 straightforward process of checking group theoretic definitions against the much simpler routines
@@ -313,39 +314,67 @@ for speed without reducing confidence in the code.
 
 \section{Data layout and distribution}
 
-Given a board $b$, we must choose a unique representative $r(b)$ out of the equivalence class $Gb$.  This choice
-should be made such that adding a stone changes the representative choice in as a few ways as possible, so that
-we can distribute data over processes with minimal communication.  Concretely, since we have eliminated
-branching factor due to rotation, an average board has $12.2$ child boards which are needed as input; if $r(b)$
-was chosen arbitrarily, the representatives of the child equivalent classes might be located in $12.2$ unrelated
-processes on average.
+Given a board $b$, we must choose a unique representative out of the equivalence class $Gb$.  This choice
+should be made such that adding a stone changes the representative choice in as few ways as possible, so
+that the effective branching factor will be smaller once we take data layout into account.
+Concretely, since we have eliminated
+branching factor due to rotation, an average board has $12.2$ child boards which are needed as input; if
+representatives were chosen arbitrarily, the representatives of the child equivalent classes \wrt $G$
+might be located in up to $12.2$ processes depending on how data is distributed.
 
-Therefore, we partition all boards in a given slice (fixed number of stones) into ``sections'' defined by the
+\begin{figure}
+\begin{center}
+\input{section.tex}
+\end{center}
+\vspace{-.15in}
+\caption{Each section is a 4D array of functions $f_{abcd} : L \to \{-1,0,1\}$ (shown in 2.5D here).  Each dimension
+corresponds to all patterns of stones in one of the four quadrants with fixed counts of black and white
+stones, including only patterns lexicographically minimal under rotation.  For each $(a,b,c,d)$
+describing the four quadrants of a board, $f_{abcd}$ gives the loss/tie/win values for all 256 ways to rotate the
+four quadrants.  The order is chosen so that reflected pairs are adjacent so that
+reflection preserves the block structure.}
+\label{section}
+\end{figure}
+
+Therefore, we partition all boards in a given slice (fixed number of stones) into \emph{sections} defined by the
 numbers of stones of each color in the four quadrants, computing only sections whose counts are lexicographically
 minimal under $D_4$ symmetry.  Within a given section, we consider only boards whose quadrants are lexicographically
 minimal under per-quadrant rotations; each quadrant is independent under this requirement, so the section becomes
-a four dimensional rectangular array where each dimension defines the stones in one quadrant.  There are
-at most four quadrants to chose from when placing a stone (some may be full near the end of the game), so at most
-four child sections contribute to the results for a given parent.
+a four dimensional rectangular array where each dimension defines the stones in one quadrant.  We precompute an
+ordering of these rotation minimal quadrant states so that we can convert from a position in the four dimensional
+section array to a board state using table lookup.  The structure of one such section is shown in \autoref{section}.
+There are at most four quadrants to chose from when placing a stone (some may be full near the end of the game),
+so at most four child sections contribute to the results for a given parent.  In other words, we have reduced the
+effective branching factor from $12.2$ to $4$.
 
 Sections alone provide insufficiently fine parallelism (the largest is $1.8$ TB uncompressed), so we
 divide each 4D section array into $8 \times 8 \times 8 \times 8$ blocks and partition the blocks for all
-sections among the different processes.  When a stone is added in a quadrant,
-we move to a child section with dimensions different from parent only for the quadrant where the stone was added,
+sections among the different processes.  When a stone is added in a quadrant, we move to a child section with
+index layout different from the parent only for the quadrant where the stone was added
 since the other quadrants have the same pattern of stones.  Therefore, a single block in a parent section depends
-on inputs from one ``line'' of blocks in up to four child sections.  Since the different input lines for a block
+on inputs from one \emph{line} of blocks in up to four child sections.  Since the different input lines for a block
 correspond to moves in different quadrants, we can compute each line contribution separately on different processes
-and combine them with $\max$ on whichever process owns the output block.  The structure is illustrated
-for two dimensions in \autoref{lines}: the process responsible for a given line collects the input blocks that
-make up the child line, performs the computation, then scatters the result blocks to their owners to be merged
-together with $\max$.
+and combine them with $\max$ on whichever process owns the output block.
 
-Since our blocks have equal sides along each dimension and our quadrant positions are always minimal with respect
+The structure of the computation is illustrated in \autoref{lines}.  Say we want to compute an output block line
+in section $n$, which is a $k \times 1 \times 1 \times 1$ grid of blocks (possibly transposed) corresponding to
+an $8k \times 8 \times 8 \times 5$ grid of boards (block sizes may differ from $8$ at section boundaries).
+Our output block line depends on a single input block line in section $n+1$, which (possibly after rotation) is an
+$8k' \times 8 \times 8 \times 5$ grid of nodes.  The input and output block lines differ in size only along the
+long dimension, since the long dimension corresponds to the quadrant where we will place a stone.  When we
+compute index $(a,b,c,d)$ of the output line, we mix together several indices $(a',b,c,d)$ with different $a'$
+corresponding to the different places to put a stone in the lines' quadrant.  Since the map from
+$a$ to $a'$ is many to many, computing the entire block line on a single processor gives an effective
+branching factor of $4$ for communication cost even though the underlying branching factor is $12.2$.
+Once the block line is computed, its component blocks are scattered to their owners to be merged together
+via $\max$ with other contributions (each block needs up to four such block line contributions).
+
+Since our block structure is symmetric \wrt dimension and our quadrant positions are always minimal with respect
 to rotation, the block structure of sections is preserved when the board is rotated.  However, the ordering of
 quadrant states does change when a quadrant is reflected, since a lexicographically least quadrant may no longer
 be lexicographically least after reflection.  To maintain the block structure, we require even sized blocks
-(8 in our case) and order the quadrant positions so that reflected pairs occur next to each other in the same block.
-With this trick, the block structure is invariant to all symmetries.
+(8 in our case) and adjust our precomputed quadrant state ordering so that reflected pairs occur next to each
+other in the same block.  With this trick, the block structure is invariant to all symmetries.
 
 The relatively simple structure of sections, blocks, and rotation-abstracted values within blocks does have
 a cost: if a position or section is preserved by a symmetry it will be double counted in the data layout.
@@ -362,15 +391,15 @@ desires couple together the partition for all slices.  Over all slices, there ar
 996,084,744 block lines.\cprotect\footnote{Run \verb+analyze approx+.}  Thus, we have a graph partitioning
 problem with 4,650,087,137 nodes divided into 72 clusters, each cluster defining a load balancing constraint.
 Although existing graph partitioning codes such as ParMETIS\cite{schloegel2002parmetis} might be sufficient
-for our problem, we believed we had sufficient computation to hide communication latency and opted for a
+for our problem, we have sufficient computation to hide communication latency and opt for a
 simple randomized partitioning scheme instead.
 
-Consider all blocks and block lines in a given slice.  Since there are at most 8239 sections to a slice, and
+We partition each slice independently.  Since there are at most 8239 sections to a slice, and
 each section is a regular 4D grid of blocks, we can define an ordering of all block lines
 by arranging the sections back to back.  We choose a pseudorandom permutation of the ordered block
 lines and give each process a contiguous chunk of the scrambled ordering.  Each block is then randomly
 assigned to one of its four lines, and given to the process which owns that line.  In both cases, these choices
-can be made consistently with only an $O(1)$ size key shared between processes: we use the arbitrary size
+can be made consistently with only an $O(1)$ size random seed shared between processes: we use the arbitrary size
 cipher technique of \cite{black2002ciphers} for random access random permutations and the Threefry generator
 of \cite{salmon2011parallel} for conventional random numbers.  Since the cipher permutations are invertible,
 we can find the process owning a given block or block line in $O(1)$ time.
@@ -379,8 +408,9 @@ we can find the process owning a given block or block line in $O(1)$ time.
 \begin{center}
 \includegraphics[width=\columnwidth]{balance.pdf}
 \end{center}
-\cprotect\caption{Load balance for various quantities as a function of the number of stones on the board using
-deterministic pseudorandom partitioning.  The bulk of the computation occurs around slice $24$, where
+\vspace{-.1in}
+\cprotect\caption{Load balance ratio ($\max/\min$) for various quantities as a function of stones on the board using
+deterministic pseudorandom partitioning.  89\% of the computation occurs from slice $20$ to $28$, where
 all quantities balance to within 20\%.  Run \verb+paper/numbers load+ to reproduce.}
 \label{balance}
 \end{figure}
@@ -388,20 +418,20 @@ all quantities balance to within 20\%.  Run \verb+paper/numbers load+ to reprodu
 At scale, a pseudorandom partitioning scheme automatically balances any quantity where the central limit
 theorem applies.  In particular, though our scheme does not explicitly account for the different amounts of
 work required to compute different block lines, or the different sizes of blocks at the boundary of sections,
-there are enough blocks and block lines to load balance to within 10-20\% for all large slices and all
-relevant quantities (\autoref{balance}).
+there are enough blocks and block lines to keep the $\max/\min$ ratio to within 10-20\% for all large slices and
+all relevant quantities (\autoref{balance}).
 
 \subsection{Compression}
 
-Since our uncompressed memory usage would be at least $213$ TB, we use compress all data in memory until needed
+Since our uncompressed memory usage would be at least $213$ TB, we compress all data in memory until needed
 using the fast but weak compression library Snappy \cite{snappy2014}.  Most blocks are $256$ KB
 ($64 \cdot 8^4$ bytes) uncompressed, large enough compress each block separately without harming compression ratio.
 Despite its speed relative to stronger compression such as ZLIB or LZMA\cite{deutsch1996zlib,xz2014}, Snappy still consumed about 29\% of our
-compute time (ignoring I/O).\cprotect\footnote{See \verb+snappy fraction+ in \verb+paper/numbers+}  Stronger
-compression is therefore out of reach for in memory purposes, although we do use LZMA compression when writing
-out the much smaller final data set.
+compute time ignoring I/O.\cprotect\footnote{See \verb+snappy fraction+ in \verb+paper/numbers+}  Stronger
+compression is thus out of reach for in memory purposes, although we do use LZMA when writing
+out the smaller final data set.
 
-With compression the amount of memory required varies unpredictably, with two consequences.  First, repeatedly
+With compression the memory usage varies unpredictably, with two consequences.  First, repeatedly
 allocating and deallocating nonregular block sizes results in significant fragmentation.  During early testing on
 BlueGene, which has no virtual memory system, fragmentation caused the code to run out of memory much earlier
 than necessary.  We solved this with a manual compacting garbage collector for bulk data storage, which is
@@ -415,46 +445,10 @@ number of MPI nodes.
 
 \section{Asynchronous control flow}
 
-Within slice $n$, each process can compute its allocation of block lines in any order, since all inputs
-are from slice $n+1$ which has already been computed.  However, most of these inputs are stored on other
-processes, and due to memory limitations only a small fraction of them can be stored locally at any given time.
-Moreover, the time to compute a given block line varies with size, ruling out a lockstep
-communication/compute cycle.  Instead, we use an asynchronous control flow where each process sends
-requests for input data for at most five block lines at time, begins computing as soon as all inputs for a
-block line are in place, sends out output data when ready, and listens for incoming output data from other
-processes to be merged.
-
-We emphasize that asynchrony is needed only because of the memory constraint: if we had 4 times as much memory
-in order to store all inputs locally, we could split the computation into communication / compute epochs and
-use an embarrassingly parallel control flow during compute.
-
-We use a hybrid MPI/pthread model where each 6 thread process has 1 communication thread and 5 worker threads
-(with 8 processes per 48-hyperthread Edison node).
-A hybrid structure reduces the memory usage by allowing several threads to share the same temporary storage
-required when computing a block line.  The communication thread must simultaneously listen for
-incoming remote messages and completed tasks from the worker threads; this can be done with self-to-self MPI
-messages in environments which support \verb+MPI_THREAD_MULTIPLE+ but requires alternatively polling between
-\verb+MPI_Testsome+ and \verb+pthread_spin_trylock+ if only \verb+MPI_THREAD_FUNNELED+ is available.
-
-At the time the code was written, the MPI 3 standard was not yet available on the target machine, and the
-one sided communication primitives in MPI 2 were not sufficient for our communication
-pattern.\footnote{For more discussion, see \url{http://scicomp.stackexchange.com/questions/2846/simulating-the-mpi-isend-irecv-wait-model-with-one-sided-communication}.}
-Specifically, the MPI 2 one sided primitives provide no asynchronous way to know when a request completes; and
-our only synchronization points are between entire slices.  MPI 3 solves this problem:
-after an initial communication phase exchanging pointers to the required compressed slice $n+1$ blocks, all
-input requests during slice $n$ computation could be handled with \verb+MPI_Rget+\cite{mpi-3:2012}.
-Unfortunately, MPI 3 does
-not solve the reverse problem of output messages: when an output block arrives, any previous data for that
-block must be uncompressed, combined with the new data, and recompressed for storage.  \verb+MPI_Accumulate+ has
-no support for user defined operations, so output messages would still be limited to two sided communication.
-Finally, MPI 3 provides the useful \verb+MPI_Ibarrier+ primitive which is exactly what we need to know when
-all processes have finished computing and thus when the previous slice can be deallocated; since we use MPI 2
-we must simulate \verb+MPI_Ibarrier+ using a manual tree reduction.
-
 \begin{figure*}
 \begin{center}
 \begin{tikzpicture}
-  \node[anchor=south west,inner sep=0] (full) at (0,0) {\includegraphics[height=1.65in]{tiny-history.png}};
+  \node[anchor=south west,inner sep=0] (full) at (0,0) {\includegraphics[height=2.0in]{tiny-history.png}};
   \begin{scope}[x={(full.south east)},y={(full.north west)}]
     \foreach \i in {0,...,15}{
       \node at (0,\i/16+1/32) [left,scale=.5] {\i};
@@ -500,8 +494,8 @@ we must simulate \verb+MPI_Ibarrier+ using a manual tree reduction.
   \end{scope}
   % full sizes = 263.473 96
   % box = Box((230.03724159999999,0),(230.59953039999999,96))
-  \begin{scope}[shift={(9.5,0)}]
-    \node[anchor=south west,inner sep=0] (image) at (0,0) {\includegraphics[height=1.65in]{tiny-history-graph.png}};
+  \begin{scope}[shift={(11.5,0)}]
+    \node[anchor=south west,inner sep=0] (image) at (0,0) {\includegraphics[height=2.0in]{tiny-history-graph.png}};
     \begin{scope}[x={(image.south east)},y={(image.north west)}]
       \draw (0,0) rectangle (1,1);
       \draw (0.498646,0.536458) -- (0.428306,0.536458); \draw (0.428306,0.536458) -- (0.211131,0.505208); \draw (0.428306,0.536458) -- (0.339567,0.505208); \draw (0.428306,0.536458) -- (0.338751,0.505208); \draw (0.428306,0.536458) -- (0.210792,0.505208); \draw (0.428306,0.536458) -- (0.211169,0.505208); \draw (0.211169,0.505208) -- (0.18248,0.880208); \draw (0.18248,0.880208) -- (0.0833778,0.505208); \draw (0.0833778,0.505208) -- (0.0833333,0.505208); \draw (0.210792,0.505208) -- (0.128093,0.817708); \draw (0.128093,0.817708) -- (0.0833716,0.505208); \draw (0.0833716,0.505208) -- (0.0833333,0.505208); \draw (0.338751,0.505208) -- (0.121249,0.0677083); \draw (0.121249,0.0677083) -- (0.0833653,0.505208); \draw (0.0833653,0.505208) -- (0.0833333,0.505208); \draw (0.339567,0.505208) -- (0.143496,0.317708); \draw (0.143496,0.317708) -- (0.0833556,0.505208); \draw (0.0833556,0.505208) -- (0.0833333,0.505208); \draw (0.211131,0.505208) -- (0.182467,0.880208); \draw (0.182467,0.880208) -- (0.0833449,0.505208); \draw (0.0833449,0.505208) -- (0.0833333,0.505208); \draw (0.498646,0.536458) -- (0.658716,0.515625); \draw (0.658716,0.515625) -- (0.722719,0.505208); \draw (0.658716,0.515625) -- (0.722741,0.505208); \draw (0.658716,0.515625) -- (0.722758,0.505208); \draw (0.658716,0.515625) -- (0.722817,0.505208); \draw (0.658716,0.515625) -- (0.722873,0.505208); \draw (0.658716,0.515625) -- (0.722928,0.505208); \draw (0.658716,0.515625) -- (0.723026,0.505208); \draw (0.658716,0.515625) -- (0.723078,0.505208); \draw (0.658716,0.515625) -- (0.723085,0.505208); \draw (0.658716,0.515625) -- (0.723096,0.505208); \draw (0.658716,0.515625) -- (0.723151,0.505208); \draw (0.658716,0.515625) -- (0.723251,0.505208); \draw (0.658716,0.515625) -- (0.723351,0.505208); \draw (0.658716,0.515625) -- (0.723405,0.505208); \draw (0.658716,0.515625) -- (0.723461,0.505208); \draw (0.658716,0.515625) -- (0.723518,0.505208); \draw (0.658716,0.515625) -- (0.723526,0.505208); \draw (0.658716,0.515625) -- (0.723577,0.505208); \draw (0.658716,0.515625) -- (0.723631,0.505208); \draw (0.658716,0.515625) -- (0.723639,0.505208); \draw (0.723639,0.505208) -- (0.777085,0.880208); \draw (0.777085,0.880208) -- (0.826283,0.901042); \draw (0.723631,0.505208) -- (0.782422,0.380208); \draw (0.782422,0.380208) -- (0.8089,0.432292); \draw (0.723577,0.505208) -- (0.72372,0.505208); \draw (0.72372,0.505208) -- (0.789167,0.515625); \draw (0.723526,0.505208) -- (0.811573,0.942708); \draw (0.811573,0.942708) -- (0.863152,0.953125); \draw (0.723518,0.505208) -- (0.811551,0.442708); \draw (0.811551,0.442708) -- (0.884799,0.484375); \draw (0.723461,0.505208) -- (0.723717,0.505208); \draw (0.723717,0.505208) -- (0.792687,0.515625); \draw (0.723405,0.505208) -- (0.811528,0.442708); \draw (0.811528,0.442708) -- (0.888,0.484375); \draw (0.723351,0.505208) -- (0.723712,0.505208); \draw (0.723712,0.505208) -- (0.795999,0.515625); \draw (0.723251,0.505208) -- (0.723674,0.505208); \draw (0.723674,0.505208) -- (0.810391,0.536458); \draw (0.723151,0.505208) -- (0.7237,0.505208); \draw (0.7237,0.505208) -- (0.806281,0.515625); \draw (0.723096,0.505208) -- (0.811523,0.442708); \draw (0.811523,0.442708) -- (0.891369,0.484375); \draw (0.723085,0.505208) -- (0.782361,0.380208); \draw (0.782361,0.380208) -- (0.812741,0.432292); \draw (0.723078,0.505208) -- (0.774176,0.880208); \draw (0.774176,0.880208) -- (0.843946,0.890625); \draw (0.723026,0.505208) -- (0.723705,0.505208); \draw (0.723705,0.505208) -- (0.802709,0.515625); \draw (0.722928,0.505208) -- (0.723708,0.505208); \draw (0.723708,0.505208) -- (0.799383,0.515625); \draw (0.722873,0.505208) -- (0.780705,0.0677083); \draw (0.780705,0.0677083) -- (0.794775,0.119792); \draw (0.722817,0.505208) -- (0.723695,0.505208); \draw (0.723695,0.505208) -- (0.916667,0.515625); \draw (0.722758,0.505208) -- (0.761403,0.192708); \draw (0.761403,0.192708) -- (0.795137,0.203125); \draw (0.722741,0.505208) -- (0.732447,0.255208); \draw (0.732447,0.255208) -- (0.739917,0.296875); \draw (0.722719,0.505208) -- (0.811442,0.942708); \draw (0.811442,0.942708) -- (0.86977,0.994792);
@@ -514,11 +508,11 @@ we must simulate \verb+MPI_Ibarrier+ using a manual tree reduction.
       \node at (.5,-.1) [scale=.8] {Time (s)};
     \end{scope}
   \end{scope}
-  \draw plot [smooth,tension=1] coordinates { (fromleft) ($ .5*(fromleft) + .5*(toleft) + (0,.15) $) (toleft) };
+  \draw plot [smooth,tension=1] coordinates { (fromleft) ($ .5*(fromleft) + .5*(toleft) + (0,.12) $) (toleft) };
   \draw plot [smooth,tension=1] coordinates { (fromright) ($ .5*(fromright) + .5*(toright) + (0,.5) $) (toright) };
 \end{tikzpicture}
-\vspace{.4in}
 \end{center}
+\vspace{-.1in}
 \cprotect\caption{Images from a trace visualization tool used to diagnose performance problems in asynchronous
 pentago code.  (Left) The history of a 16 process, 96 thread run computing the section with four stones of
 each color in each quadrant.  Each process has one communication thread (mostly red for waiting) and five worker
@@ -530,7 +524,43 @@ other processes and compressed for storage.  To reproduce, run \verb+paper/histo
 \label{history}
 \end{figure*}
 
-The asynchronous control flow code was tricky to write but relatively straightforward to test for correctness,
+Within slice $n$, each process can compute its allocation of block lines in any order, since all inputs
+are from slice $n+1$ which has already been computed.  However, most of these inputs are stored on other
+processes, and due to memory limitations only a small fraction of them can be stored locally at any given time.
+Moreover, the time to compute a given block line varies with size, ruling out a lockstep
+communication/compute cycle.  Instead, we use an asynchronous control flow where each process sends
+requests for input data for at most five block lines at time, begins computing as soon as all inputs for a
+block line are in place, sends out output data when ready, and listens for incoming output data from other
+processes to be merged.
+
+We emphasize that asynchrony is needed only because of the memory constraint: if we had 4 times as much memory
+in order to store all inputs locally, we could split the computation into communication / compute epochs and
+use an embarrassingly parallel control flow during compute.
+
+We use a hybrid MPI/pthread model where each 6 thread process has 1 communication thread and 5 worker threads
+(with 8 processes per 48-hyperthread Edison node).
+A hybrid structure reduces the memory usage by allowing several threads to share the same temporary storage
+required when computing a block line.  The communication thread must simultaneously listen for
+incoming remote messages and completed tasks from the worker threads; this can be done with self-to-self MPI
+messages in environments which support \verb+MPI_THREAD_MULTIPLE+ but requires alternatively polling between
+\verb+MPI_Testsome+ and \verb+pthread_spin_trylock+ if only \verb+MPI_THREAD_FUNNELED+ is available.
+
+At the time the code was written, the MPI 3 standard was not yet available on the target machine, and the
+one sided communication primitives in MPI 2 were not sufficient for our communication
+pattern.\footnote{For more discussion, see \url{http://scicomp.stackexchange.com/questions/2846/simulating-the-mpi-isend-irecv-wait-model-with-one-sided-communication}.}
+Specifically, the MPI 2 one sided primitives provide no asynchronous way to know when a request completes; and
+our only synchronization points are between entire slices.  MPI 3 solves this problem:
+after an initial communication phase exchanging pointers to the required compressed slice $n+1$ blocks, all
+input requests during slice $n$ computation could be handled with \verb+MPI_Rget+\cite{mpi-3:2012}.
+Unfortunately, MPI 3 does
+not solve the reverse problem of output messages: when an output block arrives, any previous data for that
+block must be uncompressed, combined with the new data, and recompressed for storage.  \verb+MPI_Accumulate+ has
+no support for user defined operations, so output messages would still be limited to two sided communication.
+Finally, MPI 3 provides the useful \verb+MPI_Ibarrier+ primitive which is exactly what we need to know when
+all processes have finished computing and thus when the previous slice can be deallocated; since we use MPI 2
+we must simulate \verb+MPI_Ibarrier+ using a manual tree reduction.
+
+The asynchronous control flow code was tricky to write but relatively straightforward to debug,
 since most bugs manifested as deadlocks.  Each message and response is labeled with a unique global id or a
 (rank,local id) pair, so each deadlock was easy to eliminate by reading traces of events.  However, the performance
 characteristics of the code were harder to understand, since slow communication performance might be a result of
@@ -559,8 +589,9 @@ down to slice $0$, the start of the game.
 \begin{center}
 \includegraphics[width=\columnwidth]{profile.pdf}
 \end{center}
+\vspace{-.1in}
 \cprotect\caption{Time profile of the main production run, showing total worker thread time usage over
-all processes.  All game logic is contained in the ``compute'' (green) section; the other sections are
+all processes.  All game logic is contained in the \emph{compute} (green) section; the other sections are
 overhead due to load imbalance, non-hidden communication latency, compression/decompression, and I/O.
 Slices 17 and 18 include LZMA compression and final I/O.  During I/O, all workers and idle and the communication
 thread on each process is inside MPI/IO.}
@@ -593,6 +624,22 @@ bandwidth, a Snappy compressed out of core version of our code would take 4.0 ho
 I/O.\cprotect\footnote{See \verb+Total I/O time estimates+ in \verb+paper/numbers+.}  In contrast,
 the non-I/O portion of our main run took 1.8 hours, for a speedup of 2.25.  If peak I/O performance could
 not be achieved, or I/O and compute could not be fully overlapped, the speedup would be larger.
+
+The rotation abstracted compute kernel uses SSE to take advantage of instruction level parallelism, packing
+each 256-bit $L \to \{0,1\}$ function into two 128 bit SSE registers.  $\rmax$ can be computed for one such
+table in about $152$ SSE instructions, or about $3/5$ths of an instruction per position since each function
+encodes $256$ positions.  Similarly, computing which of the 256 quadrant rotations of a board give five in
+a row takes $190$ instructions and $640$ bytes of cache coherent table lookup, and transforming a
+function $f_b$ into $f_{gb}$ takes between $60$ and $200$ instructions dependent on the particular $g \in G$.
+Although bit-level representations of board state and evaluation are standard in computational games,
+we believe this is the first instance where values of many distinct positions are evaluated in parallel
+using bit twiddling.
+
+Measuring over the entire compute kernel (which excludes idle time, communication, and compression/decompression),
+our SSE routines achieve a $1.81\times$ speedup on Edison over 64-bit versions and a $2.25\times$ speedup on
+an Intel Core i7, compared to a naive speedup of $2$ since we operate on twice as many bits per
+instruction.\cprotect\footnote{See \verb+SSE vs. non-SSE speedup+ in \verb+paper/numbers+}  We are not sure what
+caused the superlinear speedup in the $2.25$ case; one possibility is reduced register pressure.
 
 \section{Correctness}
 
@@ -634,12 +681,12 @@ a first player win, especially if we require a strong solution with perfect play
 \section{Open source and data}
 
 All code for this project is open source, and is available online at \url{https://github.com/girving/pentago}.
-The \verb+data+ directory in the code repository includes the paper source and all log files used to generate
-timing and other numbers.  To regenerate any reported number from the data, run either
+The code repository includes the paper source and all log files used to generate timing and other numbers.
+To regenerate any reported number from the data, run either
 \verb+bin/analyze <command>+ or \verb+paper/numbers+; see the footnotes and figure captions for details.
 
-The 3.7 TB strong solution is hosted on Rackspace Cloud Files; for download instructions see
-the \url{https://github.com/girving/pentago/#data}.  We store small sparse sample and count files in
+The 3.7 TB strong solution is hosted on Rackspace Cloud Files; see the download instructions at
+\url{https://github.com/girving/pentago/#data}.  We store small sparse sample and count files in
 Numpy's \verb+.npy+ format \cite{kern2007npy}, and the main solution files in a custom \verb+.pentago+ format
 using the block structure described above with LZMA compression for each block.  The custom format is described
 at \url{https://github.com/girving/pentago/blob/master/pentago/data/supertensor.h}.  Both \verb+.npy+ and
@@ -678,7 +725,7 @@ processes as needed, performs computation, and scatters results to their destina
 The asynchronous control flow was a primary complicating factor during development and optimization of the
 code, and runs against several limitations of MPI including difficulties in synchronizing between MPI and threads,
 lack of support for asynchronous progress in existing implementations, poor one-sided communication in MPI 2
-(fixed in MPI 3 too late for use in this project), and lack of user defined operated in one-sided
+(fixed in MPI 3 too late for use in this project), and lack of user defined operations in one-sided
 \verb+MPI_Accumulate+.  Unfortunately, the latter would require both strong asynchronous progress and careful
 consideration of threading semantics.  Profiling tools were also a significant limitation, leading us to implement
 our own tracing and visualization tool to understand the flow of information across processes and between threads
@@ -694,7 +741,7 @@ Avoiding such overestimate without the I/O cost of checkpointing would require a
 The strong solution can be explored online at \url{http://perfect-pentago.net}, or downloaded from Rackspace
 for intensive uses.
 
-\section*{Acknowledgment}
+\section*{Acknowledgments}
 
 I am grateful to Jeff Hammond for valuable advice throughout the project, and to Jed Brown for numerous helpful
 suggestions including the initial suggestion that supercomputer time might be a possibility.

@@ -241,8 +241,13 @@ string show_board_rmins(const board_t board) {
                                show_quadrant_rmins(quadrant(board,2)));
 }
 
-static Array<const quadrant_t> rmin_slice_py(Vector<uint8_t,2> counts, int lo, int hi) {
+static Array<const quadrant_t> rmin_slice_py(const Vector<uint8_t,2> counts, const int lo, const int hi) {
   return safe_rmin_slice(counts,lo,hi).copy();
+}
+
+static Tuple<Array<const quadrant_t>,int> rotation_minimal_quadrants_py(const Vector<uint8_t,2> counts) {
+  const auto p = rotation_minimal_quadrants(counts);
+  return tuple(p.x.copy().const_(),p.y);
 }
 
 }
@@ -257,4 +262,5 @@ void wrap_section() {
   GEODE_FUNCTION(rmin_test)
   GEODE_FUNCTION(board_section)
   GEODE_FUNCTION_2(rmin_slice,rmin_slice_py)
+  GEODE_FUNCTION_2(rotation_minimal_quadrants,rotation_minimal_quadrants_py)
 }
