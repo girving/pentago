@@ -432,7 +432,7 @@ compression is thus out of reach for in memory purposes, although we do use LZMA
 out the smaller final data set.
 
 With compression the memory usage varies unpredictably, with two consequences.  First, repeatedly
-allocating and deallocating nonregular block sizes results in significant fragmentation.  During early testing on
+allocating and deallocating irregular block sizes results in significant fragmentation.  During early testing on
 BlueGene, which has no virtual memory system, fragmentation caused the code to run out of memory much earlier
 than necessary.  We solved this with a manual compacting garbage collector for bulk data storage, which is
 straightforward in our case due to the lack of pointers.  Second, estimates from slices near the end of the game
@@ -537,7 +537,7 @@ We emphasize that asynchrony is needed only because of the memory constraint: if
 in order to store all inputs locally, we could split the computation into communication / compute epochs and
 use an embarrassingly parallel control flow during compute.
 
-We use a hybrid MPI/pthread model where each 6 thread process has 1 communication thread and 5 worker threads
+We use a hybrid MPI/Pthread model where each 6 thread process has 1 communication thread and 5 worker threads
 (with 8 processes per 48-hyperthread Edison node).
 A hybrid structure reduces the memory usage by allowing several threads to share the same temporary storage
 required when computing a block line.  The communication thread must simultaneously listen for
