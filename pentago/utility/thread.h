@@ -37,7 +37,7 @@ enum time_kind_t {
   snappy_kind,
   unsnappy_kind,
   filter_kind,
-  copy_kind,
+  copy_kind, // Deprecated
   schedule_kind,
   wait_kind,
   mpi_kind,

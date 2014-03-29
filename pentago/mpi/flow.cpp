@@ -479,16 +479,14 @@ static void absorb_response(block_request_t* request, const int recv_size) {
 #endif
 
   // Copy data to dependent lines other than the first
-  if (lines>1) {
-    thread_time_t time(copy_kind,event);
+  if (lines>1)
     for (int i=1;i<lines;i++) {
-      const auto& line = request->dependent_lines[i];
+      const auto line = request->dependent_lines[i];
       const auto block_data = line->input_block_data(request->block);
       GEODE_ASSERT(block_data.size()==nodes+PENTAGO_MPI_COMPRESS);
       memcpy(block_data.data(),first_block_data.data(),sizeof(Vector<super_t,2>)*nodes);
       line->decrement_missing_input_blocks();
     }
-  }
 
   // Decrement here so that the line doesn't deallocate itself before we copy the data to other lines
   first_line->decrement_missing_input_blocks();
