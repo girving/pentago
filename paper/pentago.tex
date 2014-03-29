@@ -327,12 +327,12 @@ might be located in up to $12.2$ processes depending on how data is distributed.
 \input{section.tex}
 \end{center}
 \vspace{-.15in}
-\caption{Each section is a 4D array of functions $f_{abcd} : L \to \{-1,0,1\}$ (shown in 2.5D here).  Each dimension
+\caption{Each section is a 4D array of functions $f_{abcd} : L \to \{-1,0,1\}$.  Each dimension
 corresponds to all patterns of stones in one of the four quadrants with fixed counts of black and white
 stones, including only patterns lexicographically minimal under rotation.  For each $(a,b,c,d)$
 describing the four quadrants of a board, $f_{abcd}$ gives the loss/tie/win values for all 256 ways to rotate the
 four quadrants.  The order is chosen so that reflected pairs are adjacent so that
-reflection preserves the block structure.}
+reflection preserves the block structure.  The figure shows 2D slices of the full 4D array.}
 \label{section}
 \end{figure}
 
@@ -641,7 +641,7 @@ an Intel Core i7, compared to a naive speedup of $2$ since we operate on twice a
 instruction.\cprotect\footnote{See \verb+SSE vs. non-SSE speedup+ in \verb+paper/numbers+}  We are not sure what
 caused the superlinear speedup in the $2.25$ case; one possibility is reduced register pressure.
 
-\section{Correctness}
+\section{Correctness and fault detection}
 
 Since our goal is a database of perfect play, it is important to consider the possible sources of error in the
 computation.  We are interested only in the likelihood of undetected errors, since empirically the code ran

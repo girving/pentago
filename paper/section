@@ -74,4 +74,4 @@ with block(r'\begin{tikzpicture}[scale=1.1]',r'\end{tikzpicture}'):
       if i==grid[0]-1 or j==grid[1]-1:
         dots(i+.5,j+.5,i==grid[0]-1,j==grid[1]-1)
       else:
-        write(r'\node at (.5+i,.5+j) {$f_{{i}{j}}$};',i=i,j=j)
+        write(r'\node at (.5+i,.5+j) {$f_{{i}{j}cd}$};',i=i,j=j)
