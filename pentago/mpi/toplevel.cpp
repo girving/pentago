@@ -23,6 +23,7 @@
 #include <pentago/utility/aligned.h>
 #include <pentago/utility/debug.h>
 #include <pentago/utility/index.h>
+#include <pentago/utility/join.h>
 #include <pentago/utility/large.h>
 #include <pentago/utility/memory.h>
 #include <pentago/utility/thread.h>
@@ -79,23 +80,31 @@ static void report(MPI_Comm comm, const char* name) {
     cout << "memory "<<name<<": "<<memory_report(info)<<endl;
 }
 
-static void report_mpi_times(const MPI_Comm comm, RawArray<wall_time_t> times, const wall_time_t elapsed, const uint64_t local_outputs, const uint64_t local_inputs) {
+static void report_mpi_times(const MPI_Comm comm, const thread_times_t local, const wall_time_t elapsed,
+                             const uint64_t local_outputs, const uint64_t local_inputs) {
   const int rank = comm_rank(comm),
             ranks = comm_size(comm);
   if (per_rank_times && ranks>1) {
-    Array<wall_time_t,2> all_times(ranks,times.size(),false);
-    CHECK(MPI_Gather((int64_t*)times.data(),times.size(),datatype<int64_t>(),(int64_t*)all_times.data(),times.size(),datatype<int64_t>(),0,comm));
+    Array<wall_time_t,2> all_times(ranks,local.times.size(),false);
+    CHECK(MPI_Gather((int64_t*)local.times.data(),local.times.size(),datatype<int64_t>(),
+                     (int64_t*)all_times.data(),local.times.size(),datatype<int64_t>(),0,comm));
     if (!rank) {
       Log::Scope scope("per rank times");
       for (int r=0;r<ranks;r++)
         report_thread_times(all_times[r],format("%d",r));
     }
   }
-  CHECK(MPI_Reduce(rank?(int64_t*)times.data():MPI_IN_PLACE,(int64_t*)times.data(),times.size(),datatype<int64_t>(),MPI_SUM,0,comm));
+  const auto times = local.times.copy();
+  CHECK(MPI_Reduce(rank?(int64_t*)times.data():MPI_IN_PLACE,
+                   (int64_t*)times.data(),times.size(),datatype<int64_t>(),MPI_SUM,0,comm));
+  const auto papi = local.papi.copy();
+  cout << "papi.sizes() = "<<papi.sizes()<<endl;
+  CHECK(MPI_Reduce(rank?papi.data():MPI_IN_PLACE,papi.data(),papi.flat.size(),datatype<papi_t>(),MPI_SUM,0,comm));
   uint64_t counts[2] = {local_outputs,local_inputs};
   CHECK(MPI_Reduce(rank?counts:MPI_IN_PLACE,counts,2,datatype<uint64_t>(),MPI_SUM,0,comm));
   if (!rank) {
     report_thread_times(times);
+    report_papi_counts(papi);
     const double core_time = elapsed.seconds()*threads*comm_size(comm);
     const uint64_t outputs = counts[0],
                    inputs = counts[1];
@@ -402,6 +411,7 @@ int toplevel(int argc, char** argv) {
          << "\nendian = little"
 #endif
          << "\nhistory = "<<thread_history_enabled()
+         << "\npapi = "<<(papi_enabled() ? join(" ",papi_event_names()) : "<disabled>")
          << "\nwildcard recvs = "<<wildcard_recv_count
          << "\nmeaningless = "<<meaningless
          << "\nrandomize = "<<randomize

@@ -23,7 +23,6 @@ GEODE_DEFINE_ENUM(thread_type_t,GEODE_EXPORT)
 }
 namespace pentago {
 
-
 /****************** Configuration *****************/
 
 // Flip to enable history tracking
@@ -32,6 +31,10 @@ namespace pentago {
 // Whether to use blocking pthread locking or nonblocking spinlocks.
 // Use nonblocking mode (0) except for testing purposes.
 #define BLOCKING 0
+
+// Set to nonzero to enable PAPI support.  If on, the set of counters can be
+// controlled with the PENTAGO_PAPI environment variable.
+#define PAPI_MAX 0
 
 #if !GEODE_THREAD_SAFE
 #error "pentago requires thread_safe=1"
@@ -58,41 +61,152 @@ static bool is_master() {
     THROW(RuntimeError,"thread_pool_t: %s failed, %s",#exp,strerror(r_)); \
   })
 
+/****************** PAPI support ******************/
+
+static_assert(PAPI_MAX >= 0,"");
+
+#if PAPI_MAX
+#ifndef PENTAGO_PAPI
+#error "PAPI support not available"
+#endif
+}
+#include <papi.h>
+namespace pentago {
+#endif
+
+static bool papi_initialized = false;
+static int papi_count = 0;
+static int papi_events[PAPI_MAX];
+
+static string papi_event_name(const int event) {
+#if !PAPI_MAX
+  die("Compiled without PAPI support");
+#else
+  char name[PAPI_MAX_STR_LEN];
+  if (const int r = PAPI_event_code_to_name(event,name))
+    die("Failed to convert PAPI event %d to string: %s",event,PAPI_strerror(r));
+  return name;
+#endif
+}
+
+static void init_papi() {
+  if (papi_initialized)
+    return;
+  papi_initialized = true;
+#if PAPI_MAX
+  const int version = PAPI_library_init(PAPI_VER_CURRENT);
+  if (version != PAPI_VER_CURRENT)
+    die("PAPI_library_init failed: %s",
+        version>0 ? format("version mismatch: expected %d, got %d",PAPI_VER_CURRENT,version)
+                  : PAPI_strerror(version));
+  if (const int r = PAPI_thread_init(pthread_self))
+    die("PAPI_thread_init failed: %s",PAPI_strerror(r));
+#endif
+  const char* events = getenv("PENTAGO_PAPI");
+  if (!events)
+    return;
+#if !PAPI_MAX
+  die("PAPI events '%s' requested, but PAPI support was disabled at compile time",events);
+#else
+  const char* white = " \t\v\f\r\n";
+  string copy = events;
+  char *p = &copy[0], *save;
+  while (char* event = strtok_r(p,white,&save)) {
+    if (papi_count == PAPI_MAX)
+      die("Too many PAPI events requested, limit is %d, got %s",PAPI_MAX,events);
+    if (const int r = PAPI_event_name_to_code(event,&papi_events[papi_count]))
+      die("Can't parse PAPI event '%s': %s",event,PAPI_strerror(r));
+    papi_count++;
+    p = 0; // Prepare for next strtok_r call
+  }
+#endif
+}
+
+bool papi_enabled() {
+  return PAPI_MAX > 0;
+}
+
+vector<string> papi_event_names() {
+  GEODE_ASSERT(papi_initialized);
+  vector<string> names;
+  for (const int p : range(papi_count))
+    names.push_back(papi_event_name(papi_events[p]));
+  return names;
+}
+
+#if PAPI_MAX
+static int create_papi_eventset() {
+  GEODE_ASSERT(papi_initialized);
+  int set = PAPI_NULL;
+  if (!papi_count)
+    return set;
+  if (const int r = PAPI_create_eventset(&set))
+    die("Failed to create PAPI eventset: %s",PAPI_strerror(r));
+  for (const int i : range(papi_count)) {
+    const auto event = papi_events[i];
+    if (const int r = PAPI_add_event(set,event))
+      die("Failed to add event '%s' to eventset: %s",papi_event_name(event),PAPI_strerror(r));
+  }
+  return set;
+}
+#endif
+
 /****************** thread_time_t *****************/
+
+struct time_table_t;
 
 struct time_entry_t {
   wall_time_t total, local, start;
   event_t event;
+  GEODE_DEBUG_ONLY(time_table_t* thread;)
 #if HISTORY
   Array<history_t> history;
 #endif
+#if PAPI_MAX
+  int papi_eventset;
+  papi_t papi_total[PAPI_MAX], papi_local[PAPI_MAX];
+#endif
 
   time_entry_t()
-    : total(0), local(0), start(0), event(0) {}
+    : total(0), local(0), start(0), event(0) {
+#if PAPI_MAX
+    papi_eventset = create_papi_eventset();
+    memset(papi_total,0,sizeof(papi_total));
+    memset(papi_local,0,sizeof(papi_local));
+#endif
+  }
 };
 
 struct time_table_t {
   thread_type_t type;
   time_entry_t times[_time_kinds];
+  GEODE_DEBUG_ONLY(time_kind_t active_kind;)
+
+  time_table_t(thread_type_t type)
+    : type(type) {
+    GEODE_DEBUG_ONLY(
+      for (auto& entry : times)
+        entry.thread = this;
+      active_kind = (time_kind_t)-1;
+    )
+  }
 };
 vector<time_table_t*> time_tables;
 static spinlock_t time_lock;
 
 struct time_info_t {
   pthread_key_t key;
-  wall_time_t total_start, local_start;
+  wall_time_t local_start;
 
   time_info_t()
-    : total_start(0), local_start(0) {
+    : local_start(0) {
     pthread_key_create(&key,0);
   }
 
   void init_thread(thread_type_t type) {
     if (!pthread_getspecific(key)) {
       spin_t spin(time_lock);
-      auto table = new time_table_t;
-      table->type = type;
-      time_tables.push_back(table);
+      time_tables.push_back(new time_table_t(type));
       pthread_setspecific(key,time_tables.back());
     }
   }
@@ -117,6 +231,17 @@ thread_time_t::thread_time_t(time_kind_t kind, event_t event)
   : entry(&time_entry(kind)) {
   entry->start = wall_time();
   entry->event = event;
+  GEODE_DEBUG_ONLY(
+    auto& active = entry->thread->active_kind;
+    if (active != (time_kind_t)-1)
+      die("Tried to start time kind %d inside time kind %d",kind,active);
+    active = kind;
+  )
+#if PAPI_MAX
+  if (entry->papi_eventset != PAPI_NULL)
+    if (const int r = PAPI_start(entry->papi_eventset))
+      die("PAPI_start failed: eventset %d, %s",entry->papi_eventset,PAPI_strerror(r));
+#endif
 }
 
 thread_time_t::~thread_time_t() {
@@ -125,6 +250,16 @@ thread_time_t::~thread_time_t() {
 
 void thread_time_t::stop() {
   if (entry) {
+    GEODE_DEBUG_ONLY(entry->thread->active_kind = (time_kind_t)-1;)
+#if PAPI_MAX
+    if (entry->papi_eventset != PAPI_NULL) {
+      papi_t values[papi_count];
+      if (const int r = PAPI_stop(entry->papi_eventset,values))
+        die("PAPI_stop failed: %s",PAPI_strerror(r));
+      for (int p=0;p<papi_count;p++)
+        entry->papi_local[p] += values[p];
+    }
+#endif
     wall_time_t now = wall_time();
 #if HISTORY
     entry->history.append(history_t(entry->event,entry->start,now));
@@ -456,6 +591,7 @@ unit init_threads(int cpu_threads, int io_threads) {
   if (cpu_threads==-1 && io_threads==-1 && cpu_pool)
     return unit();
   GEODE_ASSERT(!cpu_pool && !io_pool);
+  init_papi();
   master = pthread_self();
   time_info.init_thread(MASTER);
   if (cpu_threads<0)
@@ -466,7 +602,7 @@ unit init_threads(int cpu_threads, int io_threads) {
     cpu_pool = new_<thread_pool_t>(CPU,cpu_threads,0);
   if (io_threads)
     io_pool = new_<thread_pool_t>(IO,io_threads,1000);
-  time_info.total_start = time_info.local_start = wall_time();
+  time_info.local_start = wall_time();
   return unit();
 }
 
@@ -557,12 +693,13 @@ void threads_wait_all_help() {
 
 /****************** time reports *****************/
 
-Array<wall_time_t> clear_thread_times() {
+thread_times_t clear_thread_times() {
   GEODE_ASSERT(is_master());
   threads_wait_all();
   spin_t spin(time_lock);
   wall_time_t now = wall_time();
-  Array<wall_time_t> result(_time_kinds);
+  Array<wall_time_t> times(_time_kinds);
+  Array<papi_t,2> papi(_time_kinds,papi_count);
   for (auto table : time_tables) {
     // Account for any active timers (which should all be idle)
     for (int k : range((int)master_missing_kind)) {
@@ -580,28 +717,42 @@ Array<wall_time_t> clear_thread_times() {
     for (int k : range((int)master_missing_kind))
       missing -= table->times[k].local;
     const int missing_kind = master_missing_kind+table->type;
-    result[missing_kind] += missing;
+    times[missing_kind] += missing;
     table->times[missing_kind].total += missing;
     // Clear local times
     for (int k : range((int)master_missing_kind)) {
       auto& entry = table->times[k];
-      result[k] += entry.local;
+      times[k] += entry.local;
       entry.total += entry.local;
       entry.local = wall_time_t(0);
+#if PAPI_MAX
+      for (const int c : range(papi_count)) {
+        auto& local = entry.papi_local[c];
+        entry.papi_total[c] += local;
+        papi(k,c) += local;
+        local = 0;
+      }
+#endif
     }
   }
   time_info.local_start = now;
-  return result;
+  return thread_times_t({times,papi});
 }
 
-Array<wall_time_t> total_thread_times() {
+thread_times_t total_thread_times() {
   clear_thread_times();
   spin_t spin(time_lock);
-  Array<wall_time_t> result(_time_kinds);
-  for (auto table : time_tables)
-    for (int k : range((int)_time_kinds))
-      result[k] += table->times[k].total;
-  return result;
+  Array<wall_time_t> times(_time_kinds);
+  Array<papi_t,2> papi(_time_kinds,papi_count);
+  for (const auto table : time_tables)
+    for (const int k : range((int)_time_kinds)) {
+      times[k] += table->times[k].total;
+#if PAPI_MAX
+      for (const int p : range(papi_count))
+        papi(k,p) += table->times[k].papi_total[p];
+#endif 
+    }
+  return thread_times_t({times,papi});
 }
 
 vector<const char*> time_kind_names() {
@@ -637,7 +788,7 @@ vector<const char*> time_kind_names() {
   FIELD(master_idle)
   FIELD(cpu_idle)
   FIELD(io_idle)
-  for (int k : range((int)master_missing_kind))
+  for (const int k : range((int)master_missing_kind))
     GEODE_ASSERT(names[k],format("missing name for kind %d",k));
   return names;
 }
@@ -648,7 +799,7 @@ void report_thread_times(RawArray<const wall_time_t> times, const string& name) 
 
   // Print times
   cout << "timing "<<name<<"\n";
-  for (int k : range((int)master_missing_kind))
+  for (const int k : range((int)master_missing_kind))
     if (times[k])
       cout << format("  %-20s %10.4f s\n",names[k],times[k].seconds());
   if (io_pool)
@@ -657,6 +808,27 @@ void report_thread_times(RawArray<const wall_time_t> times, const string& name) 
     cout << format("  missing: master %.4f, cpu %.4f\n",times[master_missing_kind].seconds(),times[cpu_missing_kind].seconds());
   cout << format("  total %.4f\n",times.sum().seconds());
   cout << flush;
+}
+
+void report_papi_counts(RawArray<const papi_t,2> papi) {
+  GEODE_ASSERT(papi.m==_time_kinds && papi.n==papi_count);
+#if PAPI_MAX
+  if (!papi_count)
+    return;
+  vector<const char*> names = time_kind_names();
+
+  // Print times
+  cout << format("%-22s","papi");
+  for (const int p : range(papi_count))
+    cout << format(" %14s",papi_event_name(papi_events[p]));
+  for (const int k : range((int)master_idle_kind))
+    if (!papi[k].contains_only(0)) {
+      cout << format("\n  %-20s",names[k]);
+      for (const int p : range(papi_count))
+        cout << format(" %14lld",papi(k,p));
+    }
+  cout << endl;
+#endif
 }
 
 bool thread_history_enabled() {
@@ -740,6 +912,10 @@ static void thread_pool_test() {
   }
 }
 
+static PyObject* to_python(const thread_times_t& info) {
+  return to_python(tuple(info.times,info.papi));
+}
+
 }
 using namespace pentago;
 
@@ -749,6 +925,7 @@ void wrap_thread() {
   GEODE_FUNCTION(clear_thread_times)
   GEODE_FUNCTION(total_thread_times)
   GEODE_FUNCTION(report_thread_times)
+  GEODE_FUNCTION(report_papi_counts)
   GEODE_FUNCTION(thread_history)
   GEODE_FUNCTION(time_kind_names)
 

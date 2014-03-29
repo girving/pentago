@@ -62,7 +62,7 @@ def test_supertensor():
             b = i,j,k,l
             block = reader.read_block(b)
             assert all(block==data[b])
-  report_thread_times(total_thread_times())
+  report_thread_times(total_thread_times()[0])
 
 if __name__=='__main__':
   test_supertensor()

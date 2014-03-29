@@ -8,7 +8,7 @@
 
 #include <pentago/utility/job.h>
 #include <pentago/utility/wall_time.h>
-#include <geode/array/Array.h>
+#include <geode/array/Array2d.h>
 #include <geode/python/Ptr.h>
 #include <geode/python/Object.h>
 #include <geode/python/ExceptionValue.h>
@@ -106,14 +106,28 @@ public:
 
 #endif
 
+// Documentation typedef for PAPI counters
+typedef long long papi_t;
+
+// Thread timing results include per-kind times and possibly PAPI performance counters
+struct thread_times_t {
+  Array<const wall_time_t> times;
+  Array<const papi_t,2> papi;
+};
+
+// PAPI information
+GEODE_EXPORT bool papi_enabled();
+GEODE_EXPORT vector<string> papi_event_names();
+
 // Extract local times and reset them to zero
-GEODE_EXPORT Array<wall_time_t> clear_thread_times();
+GEODE_EXPORT thread_times_t clear_thread_times();
 
 // Extract total thread times
-GEODE_EXPORT Array<wall_time_t> total_thread_times();
+GEODE_EXPORT thread_times_t total_thread_times();
 
-// Print a timing report
+// Print timing reports
 GEODE_EXPORT void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
+GEODE_EXPORT void report_papi_counts(RawArray<const papi_t,2> papi);
 
 } namespace geode {
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
