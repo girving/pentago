@@ -741,6 +741,22 @@ Avoiding such overestimate without the I/O cost of checkpointing would require a
 The strong solution can be explored online at \url{http://perfect-pentago.net}, or downloaded from Rackspace
 for intensive uses.
 
+Our computation shares many characteristics with other irregularly structured, data intensive HPC workloads.
+These characteristics include multiple levels of structure (slices, sections, block lines, blocks, boards,
+bits), memory restrictions, asynchronous control flow, reliance on integer performance (compression and game
+logic), and reliance on both fast compute and fast communication.  Multiple levels of structure are important
+in many applications (e.g., domains, pages, paragraphs, sentences, words for web search) and often warrant
+different parallelism strategies at different levels.  In addition to allowing larger problem sizes either
+in RAM or on-package RAM, the ability to operate near a memory limit improves performance for codes with
+imperfect parallel scaling and eases the scheduling problem for shared clusters, increasing both latency and
+bandwidth for users.  Asynchronous control flow adds flexibility which can be spent on memory constraints or
+irregular work chunk sizes (common with multiple levels of structure).  Poor integer performance ruled out
+BlueGene for our purposes, which is problematic even for floating point codes if compression is required.
+Finally, traditional Big Data applications often have less tightly coupled communication patterns such as
+MapReduce \cite{dean2008mapreduce}; our application is sufficiently latency-critical to obtain clear benefit
+from the faster network on Edison compared to Hopper, and serves as an intermediate example between traditional
+HPC and Big Data (see the Graph 500 benchmark suite for other examples \cite{murphy2010graph500}).
+
 \section*{Acknowledgments}
 
 I am grateful to Jeff Hammond for valuable advice throughout the project, and to Jed Brown for numerous helpful
