@@ -15,7 +15,6 @@ from geode.value import parser
 from geode.utility import tryfile
 from gui import *
 from OpenGL import GL
-import gzip
 import glob
 import sys
 import re
@@ -54,7 +53,7 @@ def directions():
     dirs.append(+1)
   return tuple(dirs)
 
-def read_history(dir):
+def read_all_history(dir):
   with Log.scope('read'):
     names = glob.glob(dir+'/history-r*')
     ranks = [None]*min(len(names),max_ranks())
@@ -65,19 +64,7 @@ def read_history(dir):
         raise RuntimeError('weird file: '+name)
       rank = int(m.group(1))
       if rank < len(ranks):
-        extension = m.group(2)
-        if not extension:
-          data = fromfile(name,dtype=int64)
-        elif extension == '.gz':
-          data = fromstring(gzip.open(name).read(),dtype=int64)
-        else:
-          raise RuntimeError('unknown extension %s'%extension)
-        data = data.reshape(-1,3)
-        if not (data[0][0]&0xffffffff): # Check for bad endianness
-          data = data.view(data.dtype.newbyteorder('<')).astype(data.dtype.newbyteorder('>')).view(int64)
-        threads,kinds,_ = data[0]
-        ranks[rank]
-        ranks[rank] = [[data[data[i][0]:data[i][1]] for kind in xrange(kinds) for i in (1+thread*kinds+kind,)] for thread in xrange(threads)]
+        ranks[rank] = read_history(name)
   return [thread for rank in ranks for thread in rank],len(ranks)
 
 def line_between_boxes(box0,box1):
@@ -92,7 +79,7 @@ def line_between_boxes(box0,box1):
 class HistoryScene(Scene):
   def __init__(self):
     # Read history
-    history,ranks = read_history(history_dir())
+    history,ranks = read_all_history(history_dir())
     threads = len(history)//ranks
     assert len(history)==threads*ranks
 

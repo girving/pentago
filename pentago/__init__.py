@@ -2,7 +2,9 @@ from __future__ import absolute_import
 
 from . import pentago_core
 from .pentago_core import *
-from numpy import asarray
+from numpy import asarray,fromstring,int64
+import gzip
+import os
 
 def large(n):
   s = str(n)
@@ -61,3 +63,29 @@ def show_board(board,brief=False):
 
 def show_side(side):
   return '\n'.join('abcdef'[5-y]+'  '+''.join('_0'[bool(side&1<<16*(x//3*2+y//3)+x%3*3+y%3)] for x in xrange(6)) for y in reversed(xrange(6))) + '\n\n   123456'
+
+def read_history(path):
+  '''Read history data for one rank'''
+  if 'history-r' not in os.path.basename(path):
+    raise RuntimeError('weird history file: %s'%path)
+  _,extension = os.path.splitext(path)
+  if not extension:
+    data = fromfile(path,dtype=int64)
+  elif extension == '.gz':
+    data = fromstring(gzip.open(path).read(),dtype=int64)
+  else:
+    raise RuntimeError('unknown extension %s'%extension)
+  data = data.reshape(-1,3)
+  if not (data[0][0]&0xffffffff): # Check for bad endianness
+    data = data.view(data.dtype.newbyteorder('<')).astype(data.dtype.newbyteorder('>')).view(int64)
+  threads,kinds,_ = data[0]
+
+  # Unpack thread and kind history
+  rank_history = []
+  for thread in xrange(threads):
+    thread_history = []
+    for kind in xrange(kinds):
+      lo,hi,_ = data[1+thread*kinds+kind]
+      thread_history.append(data[lo:hi])
+    rank_history.append(thread_history)
+  return rank_history

@@ -1,0 +1,388 @@
+endgame                                           
+  cpu thread pool: threads = 5, priority = 0
+  memory threads: virtual 289,202,176, resident 16,674,816, share 6,852,608, text 8,192, peak known 0, known 0, data 87,998,464
+  parameters                                      
+    command = /global/homes/g/girving/pentago/build/native/release/bin/endgame-mpi --ranks 16 --threads 6 --save 0 --memory 3G --gather-limit 4 --line-limit 5 --dir data-cache --randomize 17 44444444
+    ranks = 16
+    cores = 96
+    threads / rank = 6
+    section = 32-44444444
+    block size = 8
+    saved slices = 0
+    level = 26
+    memory limit = 3,221,225,472
+    gather limit = 4
+    line limit = 5
+    mode = optimized
+    funnel = 1
+    compress = 1
+    compress outputs = 0
+    timing = 1
+    sse = 1
+    endian = little
+    history = 0
+    papi = PAPI_TOT_INS PAPI_L1_DCM PAPI_L2_TCM PAPI_L3_TCM
+    wildcard recvs = 8
+    meaningless = 0
+    randomize = 17
+    tag ub = 4194303 (4194303 required)
+  END parameters                                    0.0003 s
+  simple partition                                  0.0001 s
+  memory base: virtual 292,696,064, resident 22,654,976, share 7,553,024, text 8,192, peak known 37, known 0, data 91,492,352
+  estimate                                        
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    random partition                                0.0000 s
+    heap size = 1420137799
+  END estimate                                      0.0076 s
+  slice 35                                        
+    random partition                                0.0000 s
+    load balance                                  
+      (peak 1.3G)
+      lines = 15 16 (1.067)
+      line blocks = 300 320 (1.067)
+      line nodes = 583680 906240 (1.553)
+      blocks = 300 320 (1.067)
+      block nodes = 583680 906240 (1.553)
+    END load balance                                0.0001 s
+    memory usage: store = 1,424,295,200, partitions = 544, blocks = 32,960, lines = 1216, total = 1,424,313,460, free = 1,801,045,216
+    line parallelism = 65
+    memory compute: virtual 1,711,026,176, resident 22,769,664, share 7,667,712, text 8,192, peak known 1,424,288,000, known 1,424,288,000, data 1,511,972,864
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                     1.4591 s
+    memory free: virtual 1,768,144,896, resident 94,674,944, share 8,241,152, text 8,192, peak known 1,460,257,024, known 1,424,288,000, data 1,569,091,584
+    freeze                                        
+      collection: free ratio = 0.985301
+    END freeze                                      0.0001 s
+    compression ratio = 0.366932 +- 0.0672949
+    write                                           0.2558 s
+    papi.sizes() = [33,4]
+    timing 
+      compress                 0.0266 s
+      decompress               0.0001 s
+      snappy                  23.4203 s
+      schedule                 0.0165 s
+      wait                    22.5118 s
+      mpi                      0.5474 s
+      partition                0.0025 s
+      compute                 39.4547 s
+      count                    3.5984 s
+      write_sections           7.4385 s
+      write_counts             0.0060 s
+      write_sparse             5.1623 s
+      allocate_line            0.0597 s
+      wakeup                   0.2839 s
+      output_send              0.1625 s
+      output_recv              0.2395 s
+      compacting               2.2411 s
+      master_idle              0.0022 s
+      cpu_idle               118.8646 s
+      missing: master 2.8699, cpu 7.3703
+      total 234.2787
+    papi                     PAPI_TOT_INS    PAPI_L1_DCM    PAPI_L2_TCM    PAPI_L3_TCM
+      compress                    1810360           3531           2947            611
+      decompress                    38657            971            650            198
+      snappy                  13575890600      144137652       12295335         596010
+      schedule                   22716495          92432          46272           9251
+      wait                    11545829774       19809134        1701741          95208
+      mpi                       102792059       15230907       14481554        6748967
+      partition                    438734          19309          12845            648
+      compute                 13144222555      116776115       35434867        1729350
+      count                    2374453244       13917755        1995574         818706
+      write_sections           4240120274        2420560         636969          57279
+      write_counts                 162074           7086           9012           1930
+      write_sparse             2783043035        1050380         231840          19732
+      allocate_line               1290021          47778          55208           3443
+      wakeup                      9030512          33507          39451          12303
+      output_send                56186008        7362178        6575969        3081432
+      output_recv                 9100373         371233         324441           6097
+      compacting                 78796297        5781546        2173199         117080
+    speeds
+      elapsed = 1.83229, output nodes = 12,577,280, input nodes = 0
+      speeds (nodes/second/core): output = 71502.4, input = 0, output+input = 71502.4
+      grand estimate = 105,205 core-hours
+  END slice 35                                      1.8606 s
+  slice 34                                        
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 125 125 (1)
+      line blocks = 2500 2500 (1)
+      line nodes = 6691840 7920640 (1.184)
+      blocks = 1222 1304 (1.067)
+      block nodes = 3246080 3983104 (1.227)
+    END load balance                                0.0002 s
+    memory usage: store = 1,424,324,768, partitions = 1128, blocks = 98,688, lines = 9500, total = 1,424,417,700, free = 1,800,941,292
+    line parallelism = 65
+    memory compute: virtual 1,768,144,896, resident 95,129,600, share 8,409,088, text 8,192, peak known 1,460,257,024, known 1,424,288,000, data 1,569,091,584
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                    14.9736 s
+    memory free: virtual 3,211,251,712, resident 250,482,688, share 10,215,424, text 8,192, peak known 1,465,511,744, known 1,424,288,000, data 1,640,308,736
+    freeze                                        
+      collection: free ratio = 0.943895
+    END freeze                                      0.0149 s
+    compression ratio = 0.326466 +- 0.0541761
+    write                                           0.2959 s
+    papi.sizes() = [33,4]
+    timing 
+      snappy                 178.7724 s
+      unsnappy                58.2903 s
+      schedule                 1.1191 s
+      wait                   225.3755 s
+      mpi                      2.6959 s
+      partition                0.0007 s
+      compute                480.2137 s
+      accumulate               5.7546 s
+      count                   14.9929 s
+      write_counts             0.0057 s
+      write_sparse             6.6173 s
+      allocate_line            0.3174 s
+      request_send             0.2906 s
+      response_send            1.5048 s
+      response_recv            1.7416 s
+      wakeup                   0.3710 s
+      output_send              3.3247 s
+      output_recv              2.5239 s
+      compacting              30.9666 s
+      master_idle              0.0014 s
+      cpu_idle               429.6483 s
+      missing: master 2.5542, cpu 39.1692
+      total 1486.2517
+    papi                     PAPI_TOT_INS    PAPI_L1_DCM    PAPI_L2_TCM    PAPI_L3_TCM
+      snappy                 119325352799     1166406134      107744857        8742900
+      unsnappy                46331173408      230732506       18173153        4461366
+      schedule                  203630733         897001         551394         201461
+      wait                   105887138541      301116017      102820661       28742759
+      mpi                       348082044       50434870       49575113       23356680
+      partition                     37858           1300           1702            102
+      compute                175250401627     1335185472      463375807      100460738
+      accumulate               1188624362      119629470       56049679       10613519
+      count                   11181154590       64816967        8232842         134488
+      write_counts                 144637           5869           8363           2704
+      write_sparse             3303058762         510576         243861          39232
+      allocate_line              11279243         491219         575423          71011
+      request_send               33826203        1861652        1615732         204357
+      response_send             649796712        5004536        5423127         919535
+      response_recv              50833090         731686         880950          47129
+      wakeup                      1293813         155466         216343          37737
+      output_send              1933997611       90749683       86048972       40769132
+      output_recv                44310542        2998477        2745886          63197
+      compacting                890694214      101854992       69431193       17395614
+    speeds
+      elapsed = 15.4554, output nodes = 59,187,200, input nodes = 12,577,280
+      speeds (nodes/second/core): output = 39891.1, input = 8476.86, output+input = 48368
+      grand estimate = 155,524 core-hours
+  END slice 34                                     15.4959 s
+  slice 33                                        
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 375 375 (1)
+      line blocks = 7500 7500 (1)
+      line nodes = 25497600 26726400 (1.048)
+      blocks = 2437 2563 (1.052)
+      block nodes = 8507392 9078784 (1.067)
+    END load balance                                0.0003 s
+    memory usage: store = 1,424,378,648, partitions = 1140, blocks = 328,040, lines = 28500, total = 1,424,736,328, free = 1,800,641,208
+    line parallelism = 65
+    memory compute: virtual 3,211,251,712, resident 250,482,688, share 10,215,424, text 8,192, peak known 1,465,511,744, known 1,424,288,000, data 1,640,308,736
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% 68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                    50.9802 s
+    memory free: virtual 3,600,969,728, resident 550,760,448, share 10,338,304, text 8,192, peak known 1,467,871,040, known 1,424,288,000, data 1,640,308,736
+    freeze                                        
+      collection: free ratio = 0.864621
+    END freeze                                      0.1685 s
+    compression ratio = 0.350782 +- 0.0522486
+    write                                           0.2686 s
+    papi.sizes() = [33,4]
+    timing 
+      snappy                 669.6282 s
+      unsnappy               251.8370 s
+      schedule                 3.3758 s
+      wait                   759.4261 s
+      mpi                      8.9569 s
+      partition                0.0007 s
+      compute               1848.2132 s
+      accumulate              24.3978 s
+      count                   34.4198 s
+      write_counts             0.0061 s
+      write_sparse             7.1258 s
+      allocate_line            0.6939 s
+      request_send             0.8618 s
+      response_send           11.7248 s
+      response_recv            4.5995 s
+      wakeup                   0.6682 s
+      output_send             13.6419 s
+      output_recv             10.2023 s
+      compacting              82.5610 s
+      master_idle              0.0013 s
+      cpu_idle              1065.7868 s
+      missing: master 5.5776, cpu 151.5069
+      total 4955.2134
+    papi                     PAPI_TOT_INS    PAPI_L1_DCM    PAPI_L2_TCM    PAPI_L3_TCM
+      snappy                 444576397589     4646219277      398714452       26340150
+      unsnappy               204520675208     1024898394       77324812       18836895
+      schedule                  758638359        3198670        1987092         883338
+      wait                   342780341015     1144669543      426197278      134029265
+      mpi                       391539777       60694377       60368653       25693384
+      partition                     28175           1245           1756            180
+      compute                660762819793     4808293997     1901188993      404109798
+      accumulate               5590081578      562440526      271309088       49791034
+      count                   26327684317      151792172       17987083         361172
+      write_counts                 148156           5853           8522           2508
+      write_sparse             3480828452         740665         256018          46654
+      allocate_line              33072053        1411974        1699828         216632
+      request_send              102918262        5807697        4968873         644443
+      response_send            6808479383       24904971       22290104        3729757
+      response_recv             129369236        2249006        2732444         144523
+      wakeup                      3926093         479678         672132         120453
+      output_send              7540465937      304985542      288595235      137122901
+      output_recv               276899866        9131634        8720450         205798
+      compacting               3236977431      346759262      237896168       52662228
+    speeds
+      elapsed = 51.5682, output nodes = 139,264,000, input nodes = 59,187,200
+      speeds (nodes/second/core): output = 28131.1, input = 11955.7, output+input = 40086.8
+      grand estimate = 187,653 core-hours
+  END slice 33                                     51.6160 s
+  slice 32                                        
+    random partition                                0.0000 s
+    load balance                                  
+      lines = 2000 2000 (1)
+      line blocks = 40000 40000 (1)
+      line nodes = 163840000 163840000 (1)
+      blocks = 9818 10114 (1.03)
+      block nodes = 40214528 41426944 (1.03)
+    END load balance                                0.0129 s
+    memory usage: store = 1,424,590,760, partitions = 1132, blocks = 786,768, lines = 152000, total = 1,425,530,660, free = 1,799,845,580
+    line parallelism = 65
+    memory compute: virtual 3,600,969,728, resident 550,760,448, share 10,338,304, text 8,192, peak known 1,467,871,040, known 1,424,288,000, data 1,640,308,736
+    compute                                       
+      1% 2% 3% 4% 5% 6% 7% 8% 9% 10% 11% 12% 13% 14% 15% 16% 17% 18% 19% 20% 21% 22% 23% 24% 25% 26% 27% 28% 29% 30% 31% 32% 33% 34% 35% 36% 37% 38% 39% 40% 41% 42% 43% 44% 45% 46% 47% 48% 49% 50% 51% 52% 53% 54% 55% 56% 57% 58% 59% 60% 61% 62% 63% 64% 65% 66% 67% collection: free ratio = 0.277732
+      68% 69% 70% 71% 72% 73% 74% 75% 76% 77% 78% 79% 80% 81% 82% 83% 84% 85% 86% 87% 88% 89% 90% 91% 92% 93% 94% 95% 96% 97% 98% 99% 100% 
+    END compute                                   292.5837 s
+    memory free: virtual 3,657,424,896, resident 1,602,236,416, share 10,346,496, text 8,192, peak known 1,491,464,000, known 1,424,288,000, data 1,696,763,904
+    freeze                                        
+      collection: free ratio = 0.456061
+    END freeze                                      0.8161 s
+    compression ratio = 0.29102 +- 0.0399798
+    write                                           0.3079 s
+    papi.sizes() = [33,4]
+    timing 
+      snappy                3866.3880 s
+      unsnappy              1736.2837 s
+      schedule                18.3064 s
+      wait                  4383.6744 s
+      mpi                     42.1993 s
+      partition                0.0006 s
+      compute              11420.9180 s
+      accumulate             174.5768 s
+      count                  188.0920 s
+      write_counts             0.0062 s
+      write_sparse            13.3564 s
+      allocate_line            3.1517 s
+      request_send             5.5510 s
+      response_send           71.0539 s
+      response_recv           26.0310 s
+      wakeup                   5.3966 s
+      output_send             62.6447 s
+      output_recv             57.7553 s
+      compacting             389.5213 s
+      master_idle              0.0013 s
+      cpu_idle              4827.2053 s
+      missing: master 24.5383, cpu 903.4649
+      total 28220.1171
+    papi                     PAPI_TOT_INS    PAPI_L1_DCM    PAPI_L2_TCM    PAPI_L3_TCM
+      snappy                2566338568184    25140662371     2355874653      144161490
+      unsnappy              1384217723293     7028218424      510372491      121707977
+      schedule                 4604334212       21877985       14815980        8411793
+      wait                  1991078778339     7244790781     2822034561      963290722
+      mpi                      1037079711      159600551      160891115       56124225
+      partition                     30510           1236           2012            207
+      compute               4004607387480    30495356151    11319063257     2778040784
+      accumulate              39438729845     3966947839     1958993386      349302103
+      count                  124007254555      710108628       77996797        1865229
+      write_counts                 147436           6154           9197           2658
+      write_sparse             6865566320         955436         392378          93363
+      allocate_line             163852518        5951771        7716832        1008156
+      request_send              561460563       31434920       26910830        3739222
+      response_send           45831305884      158306809      135867577       23967789
+      response_recv             746798975       12310131       15084287         855103
+      wakeup                     18251127        2506538        3393563         655035
+      output_send             33228055229     1660867574     1577370742      751399417
+      output_recv              1398033360       49042343       47607130        1177540
+      compacting              20359922324     2341577439     1746114357      441786646
+    speeds
+      elapsed = 293.915, output nodes = 655,360,000, input nodes = 139,264,000
+      speeds (nodes/second/core): output = 23226.6, input = 4935.66, output+input = 28162.3
+      grand estimate = 267,109 core-hours
+  END slice 32                                    293.9519 s
+  papi.sizes() = [33,4]
+  timing 
+    compress                 0.0266 s
+    decompress               0.0001 s
+    snappy                4738.2089 s
+    unsnappy              2046.4110 s
+    schedule                22.8178 s
+    wait                  5390.9878 s
+    mpi                     54.3995 s
+    partition                0.0045 s
+    compute              13788.7996 s
+    accumulate             204.7292 s
+    count                  241.1031 s
+    write_sections           7.4385 s
+    write_counts             0.0240 s
+    write_sparse            32.2617 s
+    allocate_line            4.2227 s
+    request_send             6.7034 s
+    response_send           84.2835 s
+    response_recv           32.3721 s
+    wakeup                   6.7197 s
+    output_send             79.7738 s
+    output_recv             70.7210 s
+    compacting             505.2900 s
+    master_idle              0.0065 s
+    cpu_idle              6442.1950 s
+    missing: master 35.6778, cpu 1101.5113
+    total 34896.6890
+  papi                     PAPI_TOT_INS    PAPI_L1_DCM    PAPI_L2_TCM    PAPI_L3_TCM
+    compress                    1810360           3531           2947            611
+    decompress                    38657            971            650            198
+    snappy                3143816209172    31097425434     2874629297      179840550
+    unsnappy              1635069571909     8283849324      605870456      145006238
+    schedule                 5589319799       26066088       17400738        9505843
+    wait                  2451292087669     8710385475     3352754241     1126157954
+    mpi                      1879493591      285960705      285316435      111923256
+    partition                    535277          23090          18315           1137
+    compute               4853764831455    36755611735    13719062924     3284340670
+    accumulate              46217435785     4649017835     2286352153      409706656
+    count                  163890546706      940635522      106212296        3179595
+    write_sections           4240120274        2420560         636969          57279
+    write_counts                 602303          24962          35094           9800
+    write_sparse            16432496569        3257057        1124097         198981
+    allocate_line             209493835        7902742       10047291        1299242
+    request_send              698205028       39104269       33495435        4588022
+    response_send           53289581979      188216316      163580808       28617081
+    response_recv             927001301       15290823       18697681        1046755
+    wakeup                     32501545        3175189        4321489         825528
+    output_send             42758704785     2063964977     1958590918      932372882
+    output_recv              1728344141       61543687       59397907        1452632
+    compacting              24566390266     2795973239     2055614917      511961568
+  speeds
+    elapsed = 362.771, output nodes = 866,388,480, input nodes = 211,028,480
+    speeds (nodes/second/core): output = 24877.6, input = 6059.5, output+input = 30937.1
+    grand estimate = 243,151 core-hours
+  memory final: virtual 3,657,424,896, resident 1,602,236,416, share 10,346,496, text 8,192, peak known 1,491,464,000, known 1,424,288,000, data 1,696,763,904
+END endgame                                       364.8615 s
+endgame                                           364.8615 s
+  parameters                                        0.0003 s
+  simple partition                                  0.0001 s
+  estimate                                          0.0076 s
+    random partition                                0.0001 s
+  slice                                           362.9244 s
+    random partition                                0.0001 s
+    load balance                                    0.0136 s
+    compute                                       359.9965 s
+    freeze                                          0.9997 s
+    write                                           1.1281 s
