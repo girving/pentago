@@ -152,7 +152,7 @@ the first player to move (\autoref{opening}).  The full strong solution can be e
 At $3.0 \times 10^{15}$ states, pentago is the largest divergent game computation by a factor of
 150 (vs.\ $2 \times 10^{13}$ for $9 \times 6$ Connect-Four), and the largest strongly solved game by a factor of
 660 (vs.\ $4.5 \times 10^{12}$ for $7 \times 6$ Connect-Four).  Among retrograde analyses used to solve games,
-it is the largest by state space by a factor of 77 (vs.\ $3.9 \times 10^{13}$ in the solution of Checkers.
+it is the largest by state space by a factor of 77 (vs.\ $3.9 \times 10^{13}$ in the solution of Checkers).
 However, it is not the largest endgame database over any game: the 7-piece Lomonosov Endgame Tablebases for
 chess are 140 TB in size, and were computed over six months at Moscow State's Lomonosov supercomputer
 \cite{makhnychev2012chess}.  Unfortunately, the technical details of the Lomonosov computation are unpublished,
@@ -289,7 +289,7 @@ $G = \Z_4^4 \rtimes D_4$ with $2048$ elements.
 Computing one board $b$ from each equivalence class \wrt $G$ is not enough; we must compute a function
 $$f_b : L \to \{-1,0,1\}$$
 mapping $g \in L$ to the result of the quadrant rotated board $gb$.  Each board is a win,
-loss, or tie, so there $3^{256}$ such functions.  To avoid ternary arithmetic we use 2 bits per value for
+loss, or tie, so there are $3^{256}$ such functions.  To avoid ternary arithmetic we use 2 bits per value for
 uncompressed data: one bit for win vs. loss/tie and one for win/tie vs. loss.  Thus, for each board we have two
 functions $\Z_4^4 \to \{0,1\}$, each a $4 \times 4 \times 4 \times 4$ array of bits.  Each such function
 $L \to \{0,1\}$ is packed into a 256 bit table.
@@ -309,7 +309,7 @@ involves cyclic shifts, dimension transpositions, and reflections of $4 \times 4
 
 Although the code required for these operations is complex, verifying their correctness was a
 straightforward process of checking group theoretic definitions against the much simpler routines
-operating on one board a time.  The ease of verification frees us to make the routines as complicated as required
+operating on one board at a time.  The ease of verification frees us to make the routines as complicated as required
 for speed without reducing confidence in the code.
 
 \section{Data layout and distribution}
@@ -425,7 +425,7 @@ all relevant quantities (\autoref{balance}).
 
 Since our uncompressed memory usage would be at least $213$ TB, we compress all data in memory until needed
 using the fast but weak compression library Snappy \cite{snappy2014}.  Most blocks are $256$ KB
-($64 \cdot 8^4$ bytes) uncompressed, large enough compress each block separately without harming compression ratio.
+($64 \cdot 8^4$ bytes) uncompressed, large enough to compress each block separately without harming compression ratio.
 Despite its speed relative to stronger compression such as ZLIB or LZMA\cite{deutsch1996zlib,xz2014}, Snappy still consumed about 29\% of our
 compute time ignoring I/O.\cprotect\footnote{See \verb+snappy fraction+ in \verb+paper/numbers+}  Stronger
 compression is thus out of reach for in memory purposes, although we do use LZMA when writing
@@ -571,7 +571,7 @@ knowledge of the information flow between inputs through compute to output; an e
 shown in \autoref{history}.  On NERSC's Cray XE6 Hopper, this visualization helped confirm that long idle periods
 were due to unexpectedly high latency, but was not sufficient to diagnose the underlying cause of the problem.
 Unfortunately, we still do not know the cause of this high latency.  Testing on the Argonne's BlueGene/Q Vesta
-was inconclusive since the code easily saturated BlueGene's poor integer performance.  On the newer Cray machine
+was inconclusive since the code easily saturated BlueGene's poor integer performance.  On the newer Cray
 Edison where we ran the final production run, the problem went away: the average worker thread was idle only
 16.4\% of the time with I/O excluded.\cprotect\footnote{See \verb+Idle vs. total time+ in
 \verb+paper/numbers+\label{idle}.}
@@ -593,7 +593,7 @@ down to slice $0$, the start of the game.
 \cprotect\caption{Time profile of the main production run, showing total worker thread time usage over
 all processes.  All game logic is contained in the \emph{compute} (green) section; the other sections are
 overhead due to load imbalance, non-hidden communication latency, compression/decompression, and I/O.
-Slices 17 and 18 include LZMA compression and final I/O.  During I/O, all workers and idle and the communication
+Slices 17 and 18 include LZMA compression and final I/O.  During I/O, all workers are idle and the communication
 thread on each process is inside MPI/IO.}
 \label{profile}
 \end{figure}
@@ -618,7 +618,7 @@ global scratch filesystem rather than the special scratch filesystem optimized f
 Since much of the complexity of our implementation derives from the memory constrained in core
 structure, it is important to estimate how much slower the computation would have been if run out of core.
 Edison's peak I/O bandwidth is 168 GB/s, or 66 GB/s on our 2048 out of 5192 nodes if bandwidth is shared
-proportionally.  An out of core implementation our algorithm would write each block once and read each block
+proportionally.  An out of core implementation of our algorithm would write each block once and read each block
 four times, for a total of 3.6 PB of I/O uncompressed or 0.94 PB with Snappy compression.  Thus, at peak I/O
 bandwidth, a Snappy compressed out of core version of our code would take 4.0 hours for
 I/O.\cprotect\footnote{See \verb+Total I/O time estimates+ in \verb+paper/numbers+.}  In contrast,
@@ -669,7 +669,7 @@ results of randomly chosen boards during each slice.  Large numbers of samples g
 validated against forward search for slices 20 and up.  Thus, any remaining software error in the parallel code
 must manifest only on a small set of positions.  We also write out win/loss/tie counts for each slice.
 Both sample and count files would be useful for cross-validation should someone reproduce the calculation
-in future.
+in the future.
 
 Unfortunately, the sample files are insufficient to detect rare software bugs or hardware failures, and indeed
 we know of no cheap method for detecting this kind of unlikely error without rerunning or rewriting the code.
