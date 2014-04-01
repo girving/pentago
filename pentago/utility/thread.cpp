@@ -145,7 +145,7 @@ static int create_papi_eventset() {
   for (const int i : range(papi_count)) {
     const auto event = papi_events[i];
     if (const int r = PAPI_add_event(set,event))
-      die("Failed to add event '%s' to eventset: %s",papi_event_name(event),PAPI_strerror(r));
+      die("Failed to add event '%s' (0x%x) to eventset: %s",papi_event_name(event),event,PAPI_strerror(r));
   }
   return set;
 }
