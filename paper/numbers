@@ -19,6 +19,7 @@ class Info(object):
     walltime = {}
     compression = {}
     balance = {}
+    papi = {}
     def re_find(pattern,lo,hi=len(lines)):
       pat = re.compile(pattern)
       for i in xrange(lo,hi):
@@ -32,7 +33,8 @@ class Info(object):
         continue # Skip over crash
       if slice=='all':
         hi,_ = re_find('  memory final: virtual',0)
-        lo = hi-32
+        lo,_ = re_find('  END slice %d\s+(\d+\.\d+) s$'%min(walltime.keys()),0)
+        lo += 1
       else:
         try:
           lo = lines.index('  slice %d'%slice)
@@ -44,22 +46,37 @@ class Info(object):
         for kind in 'lines','line blocks','line nodes','blocks','block nodes':
           _,m = re_find('^      %s = (\d+) (\d+) \((\d+\.?\d*|inf)\)$'%kind,load,load+7)
           balance[slice,kind] = float(m.group(3))
-      timing,_ = re_find('\s+timing$',lo,hi)
+      timing_lo,_ = re_find('\s+timing ?$',lo,hi)
       speeds,_ = re_find('\s+speeds$',lo,hi)
-      times[slice,'total'] = float(re.match('\s+total (\d+\.\d+)$',lines[speeds-1]).group(1))
+      try:
+        papi_lo,m = re_find('\s+papi\s+((?:PAPI_\w+\s*)+)$',lo,hi)
+        self.papi_events = m.group(1).split()
+        timing_hi = papi_lo
+        papi_hi = speeds
+      except RuntimeError:
+        papi_lo = None
+        timing_hi = speeds
+      times[slice,'total'] = float(re.match('\s+total (\d+\.\d+)$',lines[timing_hi-1]).group(1))
       if slice != 'all':
         m = re_find(r'^    compression ratio = (0\.\d+) \+- 0\.\d+$',lo,hi)[1]
-        compression[slice] = float(m.group(1))  
-      for i in xrange(timing+1,speeds-2):
+        compression[slice] = float(m.group(1))
+      for i in xrange(timing_lo+1,timing_hi-2):
         m = re.match(r'^\s+(\w+)\s+(\d+\.\d+) s$',lines[i])
         if not m:
           raise RuntimeError('weird time: %s'%lines[i])
         times[slice,bytes.decode(m.group(1))] = float(m.group(2))
+      if papi_lo is not None:
+        for i in xrange(papi_lo+1,papi_hi-1):
+          m = re.match(r'^\s+(\w+)((?:\s+\d+)+)$',lines[i])
+          if not m:
+            raise RuntimeError('weird papi: %s'%lines[i])
+          papi[slice,bytes.decode(m.group(1))] = map(int,m.group(2).split())
     # Remember
     self.times = times
     self.walltime = walltime
     self.compression = compression
     self.balance = balance
+    self.papi = papi
 
 # Parse timing information out of all-1 log
 all_info = Info('../data/edison/project/all-1/log')
@@ -124,7 +141,7 @@ def uncompressed_io():
     data += d
     snappy_data += d*all_info.compression.get(n,all_info.compression[17])
   speed = 168*2**30
-  fraction = 2048/5192 
+  fraction = 2048/5192
   time = (1+4)*data/(fraction*speed)
   snappy_time = (1+4)*snappy_data/(fraction*speed)
   print('\nTotal I/O time estimates:')
@@ -139,7 +156,7 @@ uncompressed_io()
 def sse():
   print('\nSSE vs. non-SSE speedup:')
   def times(pattern):
-    return asarray([Info(p).times['all','compute'] for p in glob.glob(pattern)]) 
+    return asarray([Info(p).times['all','compute'] for p in glob.glob(pattern)])
   def speedup(lo,hi):
     print('lo = %g +- %g, ratio %g'%(mean(lo),std(lo,ddof=1),std(lo,ddof=1)/mean(lo)))
     print('hi = %g +- %g, ratio %g'%(mean(hi),std(hi,ddof=1),std(hi,ddof=1)/mean(hi)))
@@ -210,7 +227,7 @@ def profile():
         ts = time(kinds)
         if label=='idle':
           ts -= 5*write
-          assert all(ts>=0) 
+          assert all(ts>=0)
         elif 'write' in label:
           ts = 5*write
         if plot:
@@ -228,7 +245,7 @@ def profile():
   pylab.legend(plots,labels,loc='upper left',prop={'size':10})
   pylab.xlabel('slice (number of stones on the board)')
   pylab.ylabel('fraction of total time')
-  ax.set_aspect(45)
+  ax.set_aspect(35)
   pylab.savefig('profile.pdf',transparent=1,bbox_inches='tight',pad_inches=0,dpi=40)
   pylab.show()
 if 'profile' in sys.argv:
@@ -269,3 +286,136 @@ def load():
   pylab.show()
 if 'load' in sys.argv:
   load()
+
+def messages(single=None):
+  # Parameters
+  dir = '../data/edison/project/tiny-1-history'
+  ranks_per_node = 8
+  ds = 1<<10
+  dt = .001
+
+  # Start logging
+  print()
+  Log.configure('message statistics',0,0,100)
+  Log.write('single = %s'%single)
+
+  # Grab compression ratios
+  with Log.scope('parse log'):
+    info = Info(dir+'/log')
+    compression = asarray([info.compression.get(n,nan) for n in xrange(36+1)])
+
+  # Read and sort history
+  with Log.scope('read history'):
+    history,ranks = read_all_history(dir)
+    threads_per_rank = len(history)//ranks
+    assert threads_per_rank==6
+  with Log.scope('sort history'):
+    def sort_by_events(events):
+      return events[argsort(events[:,0])] if len(events) else events
+    history = map(curry(map,sort_by_events),history)
+
+  # Plot message statistics
+  import pylab
+  from matplotlib.ticker import FormatStrFormatter
+  kinds = (request_send_kind,0),(response_send_kind,0),(output_send_kind,0),(output_send_kind,1)
+  for k,(source_kind,special) in enumerate(kinds):
+    if single and k != single[0]:
+      continue
+    with Log.scope('kind %s'%source_kind):
+      steps = 1
+      stats = message_statistics(history,ranks_per_node,threads_per_rank,source_kind,steps,compression)
+      for t,type in enumerate('same-rank same-node different'.split()):
+        if single and t != single[1]:
+          continue
+        with Log.scope(type):
+          if not single:
+            pylab.subplot(4,3,1+3*k+t)
+            pylab.title('%s, %s, steps %d'%(source_kind,type,steps))
+          Log.write('count = %d'%len(stats[type]))
+          sizes = stats[type][:,0]
+          times = stats[type][:,1]
+          if source_kind==request_send_kind and steps==1:
+            # Plot a 1D histogram since sizes = 8
+            assert all(sizes==8)
+            pylab.hist(times,weights=100/len(times)*ones_like(times),
+                       bins=32,range=(0,sort(times)[99*len(times)//100]))
+            pylab.xlabel('time (seconds)')
+            pylab.axes().yaxis.set_major_formatter(FormatStrFormatter('%d%%'))
+            if single:
+              name = {(0,2):'request-latency.pdf'}[tuple(single)]
+              pylab.axes().set_aspect(1/400)
+              pylab.savefig(name,transparent=1,bbox_inches='tight',pad_inches=0,dpi=40)
+          else:
+            sizes = sizes/1024
+            if special:
+              pylab.hist(times[sizes==256],bins=64)
+              pylab.xlabel('time (seconds)')
+            else:
+              if 1:
+                random.seed(183712)
+                I = sort(random.randint(0,len(sizes),size=1024)) if len(sizes) else []
+                pylab.plot(sizes[I],times[I],'.')
+              else:
+                # Make a 2D histogram
+                density,sizes,times = histogram2d(sizes,times,bins=32)
+                Log.write('sizes = %g %g (%d)'%(sizes[0],sizes[-1],len(sizes)))
+                Log.write('times = %g %g (%d)'%(times[0],times[-1],len(times)))
+                # Plot the histogram
+                if 1:
+                  pylab.imshow(density,interpolation='nearest',origin='low',aspect='auto',
+                               cmap='binary',
+                               extent=[sizes[0],sizes[-1],times[0],times[-1]])
+                else:
+                  pylab.pcolor(density,cmap='RdBu')
+                  pylab.xlim(sizes[0],sizes[-1])
+                  pylab.ylim(times[0],times[-1])
+              pylab.xlabel('size (KB)')
+              pylab.ylabel('time (seconds)')
+  pylab.show()
+if 'messages' in sys.argv:
+  i = sys.argv.index('messages')
+  if len(sys.argv) > i+1:
+    single = map(int,sys.argv[i+1].split(','))
+    assert len(single)==2
+  else:
+    single = None
+  messages(single)
+
+def papi():
+  Log.write('')
+  Log.configure('papi',0,0,100)
+  order = None
+  for name in 'papi-1-issue papi-5-issue-noht papi-2-loadstore papi-3-cache papi-4-branch'.split():
+    info = Info('../data/edison/project/%s/log'%name)
+    def index(name):
+      return info.papi_events.index(name) if name in info.papi_events else None
+    cache_miss = index('PAPI_L3_TCM')
+    instructions = index('PAPI_TOT_INS')
+    cycles = index('PAPI_TOT_CYC')
+    mispredict = index('PAPI_BR_MSP')
+    conditional = index('PAPI_BR_CN')
+    issue = 'PAPI_STL_ICY' in info.papi_events
+    if order is None:
+      order = [k for n,k in info.papi.keys() if n=='all']
+      order = sorted(order,key=lambda k:-info.papi['all',k][0])
+    lines = [[name]+info.papi_events
+             +['bandwidth (GB/s)']*(cache_miss is not None)
+             +['instructions/cycle']*(instructions is not None and cycles is not None)
+             +['misprediction rate']*(mispredict is not None and conditional is not None)]
+    for k in order:
+      line = ['  '+k]+list(map(large,info.papi['all',k]))
+      if cache_miss is not None:
+        line.append('%.3f'%(64/2**30*info.papi['all',k][cache_miss]/info.times['all',k]))
+      if instructions is not None and cycles is not None:
+        line.append('%.3f'%(info.papi['all',k][instructions]/info.papi['all',k][cycles]))
+      if mispredict and conditional:
+        line.append('%.3f'%(info.papi['all',k][mispredict]/info.papi['all',k][conditional]))
+      lines.append(line)
+    lengths = zeros(len(lines[0]))
+    for line in lines:
+      lengths = maximum(lengths,map(len,line))
+    for line in lines:
+      Log.write('  '.join('%%%s%ds'%('-'*(i==0),n)%s for i,(n,s) in enumerate(zip(lengths,line))))
+    Log.write('')
+if 'papi' in sys.argv:
+  papi()

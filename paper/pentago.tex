@@ -12,6 +12,7 @@
 \usepackage{amsfonts,amssymb,amsmath}
 \usepackage{tikz}
 \usetikzlibrary{calc}
+\usepackage{booktabs}
 \usepackage{footmisc}
 \usepackage{hyperref}
 \hypersetup{colorlinks=true,linkcolor=blue}
@@ -48,6 +49,7 @@ to interactively explore the strong solution.
 
 \IEEEpeerreviewmaketitle
 
+\vspace{-.05in}
 \section{Introduction}
 
 Computer play of combinatorial games such as chess, checkers, and go has been an active area of research
@@ -83,11 +85,12 @@ beginning of the game.
   \node at ( 2,0) [kind,label=below:loss,fill=loss] {};
 \end{tikzpicture}
 \end{center}
-\vspace{-.15in}
+\vspace{-.17in}
 \cprotect\caption{(Left) With perfect play, the first player wins with any opening move except the
 corners, which tie.  (Right) A more delicate position with black to play.
 The full strong solution can be explored at \url{http://perfect-pentago.net}.}
 \label{opening}
+\vspace{-.05in}
 \end{figure}
 
 \begin{figure}
@@ -98,6 +101,7 @@ The full strong solution can be explored at \url{http://perfect-pentago.net}.}
 \cprotect\caption{Counts of pentago positions vs.\ stones on the board, with symmetries removed.
 Run \verb+web/counts+ in the source repository to reproduce.}
 \label{counts}
+\vspace{-.1in}
 \end{figure}
 
 In contrast to convergent games, the number of positions in a divergent game increases with time
@@ -274,6 +278,7 @@ together into a complete line, and finally scattering the output blocks to their
 rectangle lies in a possibly different process.  Since we compute only those sections which
 are unique with symmetries removed, some input lines must be rotated before computation.}
 \label{lines}
+\vspace{-.1in}
 \end{figure*}
 
 \section{Abstracting over rotations}
@@ -334,6 +339,7 @@ describing the four quadrants of a board, $f_{abcd}$ gives the loss/tie/win valu
 four quadrants.  The order is chosen so that reflected pairs are adjacent so that
 reflection preserves the block structure.  The figure shows 2D slices of the full 4D array.}
 \label{section}
+\vspace{-.1in}
 \end{figure}
 
 Therefore, we partition all boards in a given slice (fixed number of stones) into \emph{sections} defined by the
@@ -413,6 +419,7 @@ we can find the process owning a given block or block line in $O(1)$ time.
 deterministic pseudorandom partitioning.  89\% of the computation occurs from slice $20$ to $28$, where
 all quantities balance to within 20\%.  Run \verb+paper/numbers load+ to reproduce.}
 \label{balance}
+\vspace{-.1in}
 \end{figure}
 
 At scale, a pseudorandom partitioning scheme automatically balances any quantity where the central limit
@@ -427,7 +434,7 @@ Since our uncompressed memory usage would be at least $213$ TB, we compress all 
 using the fast but weak compression library Snappy \cite{snappy2014}.  Most blocks are $256$ KB
 ($64 \cdot 8^4$ bytes) uncompressed, large enough to compress each block separately without harming compression ratio.
 Despite its speed relative to stronger compression such as ZLIB or LZMA\cite{deutsch1996zlib,xz2014}, Snappy still consumed about 29\% of our
-compute time ignoring I/O.\cprotect\footnote{See \verb+snappy fraction+ in \verb+paper/numbers+}  Stronger
+compute time ignoring I/O.\cprotect\footnote{See \verb+snappy fraction+ in \verb+paper/numbers+.}  Stronger
 compression is thus out of reach for in memory purposes, although we do use LZMA when writing
 out the smaller final data set.
 
@@ -512,9 +519,9 @@ number of MPI nodes.
   \draw plot [smooth,tension=1] coordinates { (fromright) ($ .5*(fromright) + .5*(toright) + (0,.5) $) (toright) };
 \end{tikzpicture}
 \end{center}
-\vspace{-.1in}
+\vspace{-.15in}
 \cprotect\caption{Images from a trace visualization tool used to diagnose performance problems in asynchronous
-pentago code.  (Left) The history of a 16 process, 96 thread run computing the section with four stones of
+code.  (Left) The history of a 16 process, 96 thread run computing the section with four stones of
 each color in each quadrant.  Each process has one communication thread (mostly red for waiting) and five worker
 threads performing computation, with colors showing the type of computation performed.  (Right) A zoom showing the
 information flow related to part of a block line computation.  At the leftmost point in the graph shown, the process
@@ -522,6 +529,7 @@ decides to compute a given block line, and sends out requests for input data to 
 Once all responses arrive, the computation begins.  When the computation finishes, the results are scattered to
 other processes and compressed for storage.  To reproduce, run \verb+paper/history+.}
 \label{history}
+\vspace{-.1in}
 \end{figure*}
 
 Within slice $n$, each process can compute its allocation of block lines in any order, since all inputs
@@ -560,19 +568,19 @@ Finally, MPI 3 provides the useful \verb+MPI_Ibarrier+ primitive which is exactl
 all processes have finished computing and thus when the previous slice can be deallocated; since we use MPI 2
 we must simulate \verb+MPI_Ibarrier+ using a manual tree reduction.
 
-The asynchronous control flow code was tricky to write but relatively straightforward to debug,
-since most bugs manifested as deadlocks.  Each message and response is labeled with a unique global id or a
-(rank,local id) pair, so each deadlock was easy to eliminate by reading traces of events.  However, the performance
-characteristics of the code were harder to understand, since slow communication performance might be a result of
-unrelated communication happening at the same time.  Existing general purpose profiling tools such as TAU
+The asynchronous control flow was tricky to write but straightforward to debug,
+since most bugs manifested as deadlocks.  Each message and response is labeled with a unique global id,
+so deadlocks were easy to eliminate by reading traces of events.  However, the performance
+characteristics of the code were harder to understand, since high latency might be a result of
+unrelated communication at the same time.  Existing profiling tools such as TAU
 \cite{shende2006tau} were insufficient for tracing the dependencies between asynchronous messages
-combined with control flow across threads.  Thus, we wrote a custom event history visualizer with
+combined with control flow across threads.  Thus, we wrote a custom trace visualizer with
 knowledge of the information flow between inputs through compute to output; an example visualization is
-shown in \autoref{history}.  On NERSC's Cray XE6 Hopper, this visualization helped confirm that long idle periods
-were due to unexpectedly high latency, but was not sufficient to diagnose the underlying cause of the problem.
-Unfortunately, we still do not know the cause of this high latency.  Testing on the Argonne's BlueGene/Q Vesta
+shown in \autoref{history}.  On NERSC's Cray XE6 Hopper, this tool confirmed that long idle periods
+were due to high latency, but was not sufficient to diagnose the underlying cause of the problem.
+Unfortunately, we still do not know the cause of this latency.  Testing on the Argonne's BlueGene/Q Vesta
 was inconclusive since the code easily saturated BlueGene's poor integer performance.  On the newer Cray
-Edison where we ran the final production run, the problem went away: the average worker thread was idle only
+Edison used for the final production run, the problem went away: worker threads were idle only
 16.4\% of the time with I/O excluded.\cprotect\footnote{See \verb+Idle vs. total time+ in
 \verb+paper/numbers+\label{idle}.}
 
@@ -596,6 +604,7 @@ overhead due to load imbalance, non-hidden communication latency, compression/de
 Slices 17 and 18 include LZMA compression and final I/O.  During I/O, all workers are idle and the communication
 thread on each process is inside MPI/IO.}
 \label{profile}
+\vspace{-.12in}
 \end{figure}
 
 The time profile of the computation is shown in \autoref{profile}.  Excluding I/O, only 16.4\% of the
@@ -606,45 +615,87 @@ the communication thread performed useful work.  Unfortunately, existing MPI imp
 implement performant asynchronous progress, even ignoring our need for active responses to messages
 (see \cite{squyres2012progress} for a good discussion).
 
-With I/O taken into account, our performance is further from optimal: 51.0\% of worker thread time is
-idle including I/O, with 34.6\% due entirely to I/O.  This is due to both very high latency when
+Including I/O, our performance is further from optimal: 51.0\% of worker thread time is
+idle, with 34.6\% due entirely to I/O.  This is due to both very high latency when
 writing small files during every slice (around 200 seconds independent of file size) and low bandwidth
-when writing file results in slices 17 and 18.  The high latency appears to have been a consequence of
-using \verb+MPI_File_write_ordered+ when writing small files, since MPICH and therefore Cray MPI
+when writing file results in slices 17 and 18.  The high latency was a consequence of
+using \verb+MPI_File_write_ordered+ when writing small files, since MPICH and thus Cray MPI
 implement this routine using shared files for synchronization rather than fast network collectives.
-Unfortunately, the low bandwidth is likely due to user error: we accidentally wrote results to NERSC's
-global scratch filesystem rather than the special scratch filesystem optimized for Edison.
+Unfortunately, the low bandwidth is likely user error: we accidentally wrote to NERSC's
+global scratch filesystem rather than the special filesystem optimized for Edison.
 
 Since much of the complexity of our implementation derives from the memory constrained in core
 structure, it is important to estimate how much slower the computation would have been if run out of core.
 Edison's peak I/O bandwidth is 168 GB/s, or 66 GB/s on our 2048 out of 5192 nodes if bandwidth is shared
-proportionally.  An out of core implementation of our algorithm would write each block once and read each block
+proportionally.  An out of core version of our algorithm would write each block once and read each block
 four times, for a total of 3.6 PB of I/O uncompressed or 0.94 PB with Snappy compression.  Thus, at peak I/O
 bandwidth, a Snappy compressed out of core version of our code would take 4.0 hours for
 I/O.\cprotect\footnote{See \verb+Total I/O time estimates+ in \verb+paper/numbers+.}  In contrast,
 the non-I/O portion of our main run took 1.8 hours, for a speedup of 2.25.  If peak I/O performance could
 not be achieved, or I/O and compute could not be fully overlapped, the speedup would be larger.
 
-The rotation abstracted compute kernel uses SSE to take advantage of instruction level parallelism, packing
+The rotation abstracted compute kernel uses SSE for instruction level parallelism, packing
 each 256-bit $L \to \{0,1\}$ function into two 128 bit SSE registers.  $\rmax$ can be computed for one such
-table in about $152$ SSE instructions, or about $3/5$ths of an instruction per position since each function
-encodes $256$ positions.  Similarly, computing which of the 256 quadrant rotations of a board give five in
+table in $152$ SSE instructions, or $3/5$ths of an instruction per position since each function
+encodes $256$ positions.  Computing which of the 256 quadrant rotations of a board give five in
 a row takes $190$ instructions and $640$ bytes of cache coherent table lookup, and transforming a
 function $f_b$ into $f_{gb}$ takes between $60$ and $200$ instructions dependent on the particular $g \in G$.
-Although bit-level representations of board state and evaluation are standard in computational games,
+Although bit-level representations of board state are standard in computational games,
 we believe this is the first instance where values of many distinct positions are evaluated in parallel
 using bit twiddling.
 
-Measuring over the entire compute kernel (which excludes idle time, communication, and compression/decompression),
+Measuring over the entire compute kernel (which excludes idle time, communication, and (de)compression),
 our SSE routines achieve a $1.81\times$ speedup on Edison over 64-bit versions and a $2.25\times$ speedup on
-an Intel Core i7, compared to a naive speedup of $2$ since we operate on twice as many bits per
-instruction.\cprotect\footnote{See \verb+SSE vs. non-SSE speedup+ in \verb+paper/numbers+}  We are not sure what
+an Intel Core i7, compared to a naive speedup of $2$ for twice as many bits per
+instruction.\cprotect\footnote{See \verb+SSE vs. non-SSE speedup+ in \verb+paper/numbers+.}  We are not sure what
 caused the superlinear speedup in the $2.25$ case; one possibility is reduced register pressure.
+
+\begin{figure}
+\begin{center}
+\includegraphics[width=\columnwidth]{request-latency.pdf}
+\end{center}
+\vspace{-.1in}
+\cprotect\caption{Latency for 8-byte request-for-input messages between different nodes in a 96-thread test run
+on Edison.  Around 20\% of the messages complete in under $10$ ms, but the tail is quite long.  To reproduce,
+run \verb+paper/numbers messages 0,2+.}
+\label{latency}
+\vspace{-.1in}
+\end{figure}
+
+Even on Edison's faster network, our typical message latency is still quite high as shown in \autoref{latency}.
+Here latency is measured from immediately before \verb+MPI_Isend+ to the time we start responding to the finished
+message when \verb+MPI_Testsome+ succeeds.  The large latencies may be due to interference between small messages
+and larger messages, as the communication thread processes different types of messages asynchronously.  Since
+the latency on Edison is low enough for our purposes, we have not investigated in detail.
+
+\begin{comment}
+\begin{table}
+\begin{center}
+\begin{tabular}{l|SSS}
+\toprule & {instructions/cycle} & {bandwidth (GB/s)} & {misprediction rate} \\
+compute  & 1.206 & 0.014 & 0.002 \\
+snappy   & 1.049 & 0.002 & 0.064 \\
+unsnappy & 1.394 & 0.004 & 0.070
+\end{tabular}
+\end{center}
+\cprotect\caption{Issue rate (instructions/cycle), bandwidth, and misprediction rate
+(mispredicted branches / conditional branches) for a 96-thread test run on Edison.
+To reproduce, run \verb+paper/numbers papi+.}
+\label{papi}
+\end{table}
+\end{comment}
+
+Within each node, we used the PAPI hardware counter library \cite{mucci1999papi} to measure instruction issue,
+cache misses, and branch mispredications.  The results show that our workload has minimal memory
+bandwidth requirements (under $15$ MB/s per core in performance critical sections), mispredicts branches mostly
+during Snappy (de)compression, and makes significant use of dual instruction issue only for the one out of five
+worker threads that share a core with the less active communication thread; if hyperthreading is turned off, the
+issue rate jumps from $1.21$ to $1.89$ instructions per cycle.\cprotect\footnote{Run \verb+paper/numbers papi+.}
 
 \section{Correctness and fault detection}
 
 Since our goal is a database of perfect play, it is important to consider the possible sources of error in the
-computation.  We are interested only in the likelihood of undetected errors, since empirically the code ran
+computation.  We are interested only in undetected errors, since empirically the code ran
 without crashing or failing an assertion.
 
 On the software side, we make heavy use of unit tests throughout the code, including simple tests
@@ -664,9 +715,9 @@ on an apparently successful run, since DRAM errors are far from uncorrelated eve
 However, we believe the probability is quite small, and in particular that undetected hardware errors are less
 likely than software errors.
 
-As a test on software errors when running the code at scale, we write out small sample files consisting of the
+As a test on software errors when running the code at scale, we write out small sample files with the
 results of randomly chosen boards during each slice.  Large numbers of samples generated by the main run were
-validated against forward search for slices 20 and up.  Thus, any remaining software error in the parallel code
+validated against forward search for slices 20 and up, so any remaining software errors in the parallel code
 must manifest only on a small set of positions.  We also write out win/loss/tie counts for each slice.
 Both sample and count files would be useful for cross-validation should someone reproduce the calculation
 in the future.
@@ -681,22 +732,22 @@ a first player win, especially if we require a strong solution with perfect play
 \section{Open source and data}
 
 All code for this project is open source, and is available online at \url{https://github.com/girving/pentago}.
-The code repository includes the paper source and all log files used to generate timing and other numbers.
+The repository includes the paper source and all log files used to generate timing and other numbers.
 To regenerate any reported number from the data, run either
-\verb+bin/analyze <command>+ or \verb+paper/numbers+; see the footnotes and figure captions for details.
+\verb+bin/analyze <command>+ or \verb+paper/numbers+; see the footnotes and figure captions.
 
 The 3.7 TB strong solution is hosted on Rackspace Cloud Files; see the download instructions at
 \url{https://github.com/girving/pentago/#data}.  We store small sparse sample and count files in
 Numpy's \verb+.npy+ format \cite{kern2007npy}, and the main solution files in a custom \verb+.pentago+ format
-using the block structure described above with LZMA compression for each block.  The custom format is described
+using the described block structure with LZMA compression per block.  The format is described
 at \url{https://github.com/girving/pentago/blob/master/pentago/data/supertensor.h}.  Both \verb+.npy+ and
 \verb+.pentago+ formats are easy to write in parallel using MPI I/O.
 
 The strong solution is useless without a convenient method for exploring the data, so we have built a website
 showing which moves win, lose, or tie from any position: \url{http://perfect-pentago.net}.  The frontend
-javascript uses a backend server at \url{http://backend.perfect-pentago.net:2048} to look up the value of
-positions.  Any position with 18 or fewer stones is looked up in the database, using an HTTP range request
-to download the compressed block containing the value.  As in the parallel algorithm, the children of a position
+Javascript uses a backend server at \url{http://backend.perfect-pentago.net:2048} to look up the value of
+positions.  Any position with 18 or fewer stones is fetched from the database using an HTTP range request
+to download the surrounding compressed block.  As in the parallel algorithm, the children of a position
 fall into at most four blocks; we cache the uncompressed blocks to take advantage of this locality.
 
 Positions with more than 18 stones fall outside the database and are recomputed from scratch using a specialized
@@ -704,21 +755,20 @@ serial retrograde solver.  Since there are at least 18 stones already on the boa
 configuration, this solver rotates the board only through the $\rmax$ function, avoiding the complexity of
 standardizing positions into rotation minimal configurations.  In addition, we use the fact that $\rmax$ flips
 the parity of the $\Z_4^4$ symmetry group to store half the required bits, reducing the storage per rotation
-abstracted position from 64 bytes to 32.  With these optimizations, evaluating all child values of a given 18
-stone position takes 16 seconds on a single 2.6 GHz Intel Xeon thread, fast enough for interactive use through
-the website.
+abstracted position from 64 bytes to 32.  With these optimizations, evaluating all child values of an 18
+stone position takes 16 seconds on a single 2.6 GHz Intel Xeon thread, fast enough for interactive use.
 
-Both remote lookups and from-scratch computation generate significant latency, so the backend server is written
-in Javascript using Node.js \cite{dahl2014nodejs} to allow asynchronous use by multiple clients.  The Javascript
-code handles asynchronous logic and I/O, but calls down to C++ for performance intensive computation.  The backend
+Both remote lookups and from-scratch computation have significant latency, so the backend server is written
+in Javascript using Node.js \cite{dahl2014nodejs} for asynchronous use by multiple clients.  The Javascript
+handles asynchronous logic and I/O, but calls down to C++ for performance intensive computation.  The backend
 server has a simple JSON API, and anyone wishing to develop their own frontend is welcome to query it directly.
 
 \section{Conclusion}
 
 We have strongly solved the board game pentago using retrograde analysis on 98304 threads of Edison, a
-Cray XC30 machine at NERSC.  Symmetry techniques are used to improve the branching factor of the game
+Cray XC30 machine at NERSC.  Symmetry techniques were used to improve the branching factor of the game
 and take advantage of SSE instruction level parallelism.  Unlike previous retrograde analysis, the computation
-was performed almost entirely in-core, writing results to disk only near the end.  To fit safely into available
+was almost entirely in-core, writing results to disk only near the end.  To fit safely into
 memory, we use a fully asynchronous communication structure where each process requests data from other
 processes as needed, performs computation, and scatters results to their destinations.
 
@@ -737,9 +787,6 @@ Compression was a requirement to fit into memory, but we were limited to the fas
 prevent compression from becoming a compute bottleneck.  Compression also makes memory usage difficult to
 predict in advance, causing us to overestimate memory requirements and use more Edison nodes than required.
 Avoiding such overestimate without the I/O cost of checkpointing would require a dynamic number of MPI nodes.
-
-The strong solution can be explored online at \url{http://perfect-pentago.net}, or downloaded from Rackspace
-for intensive uses.
 
 Our computation shares many characteristics with other irregularly structured, data intensive HPC workloads.
 These characteristics include multiple levels of structure (slices, sections, block lines, blocks, boards,

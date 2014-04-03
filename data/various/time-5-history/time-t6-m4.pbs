@@ -1,0 +1,10 @@
+#PBS -q debug
+#PBS -l mppwidth=96
+#PBS -l walltime=00:10:00
+#PBS -N output-time-t6-m4
+#PBS -j oe
+#PBS -V
+#PBS -l gres=scratch
+ 
+cd $PBS_O_WORKDIR
+aprun -n 16 -N 4 -d 6 -S 1 $OTHER/install/release/bin/endgame-mpi --ranks 16 --threads 6 --save 0 --memory 4G --gather-limit 4 --line-limit 5 --per-rank-times 44444444 --dir data-time-t6-m4

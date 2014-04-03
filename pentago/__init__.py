@@ -3,8 +3,10 @@ from __future__ import absolute_import
 from . import pentago_core
 from .pentago_core import *
 from numpy import asarray,fromstring,int64
+import glob
 import gzip
 import os
+import re
 
 def large(n):
   s = str(n)
@@ -64,7 +66,7 @@ def show_board(board,brief=False):
 def show_side(side):
   return '\n'.join('abcdef'[5-y]+'  '+''.join('_0'[bool(side&1<<16*(x//3*2+y//3)+x%3*3+y%3)] for x in xrange(6)) for y in reversed(xrange(6))) + '\n\n   123456'
 
-def read_history(path):
+def read_rank_history(path):
   '''Read history data for one rank'''
   if 'history-r' not in os.path.basename(path):
     raise RuntimeError('weird history file: %s'%path)
@@ -89,3 +91,17 @@ def read_history(path):
       thread_history.append(data[lo:hi])
     rank_history.append(thread_history)
   return rank_history
+
+def read_all_history(dir,max_ranks=1<<30):
+  '''Read the history for all ranks in a job'''
+  names = glob.glob(dir+'/history-r*')
+  ranks = [None]*min(len(names),max_ranks)
+  assert ranks
+  for name in names:
+    m = re.search(r'history-r(\d+)((?:\.gz)?)$',name)
+    if not m:
+      raise RuntimeError('weird file: '+name)
+    rank = int(m.group(1))
+    if rank < len(ranks):
+      ranks[rank] = read_rank_history(name)
+  return [thread for rank in ranks for thread in rank],len(ranks)

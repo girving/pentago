@@ -13,6 +13,7 @@
 #include <geode/math/constants.h>
 #include <geode/python/wrap.h>
 #include <geode/python/stl.h>
+#include <geode/structure/Hashtable.h>
 #include <geode/structure/Tuple.h>
 #include <geode/utility/curry.h>
 #include <geode/utility/openmp.h>
@@ -288,8 +289,75 @@ void check_dependencies(const vector<vector<Array<const history_t>>>& event_sort
   threads_wait_all();
 }
 
+// Collect message sizes and times, separating same-rank, same-node, and internode messages
+static Hashtable<string,Array<const Vector<float,2>>>
+message_statistics(const vector<vector<Array<const history_t>>>& event_sorted_history,
+                   const int ranks_per_node, const int threads_per_rank,
+                   const time_kind_t source_kind, const int steps, RawArray<const double> slice_compression_ratio) {
+  GEODE_ASSERT(ranks_per_node>=1);
+  GEODE_ASSERT(threads_per_rank>1);
+  GEODE_ASSERT(vec(request_send_kind,response_send_kind,output_send_kind).contains(source_kind));
+  const int ranks = CHECK_CAST_INT(event_sorted_history.size())/threads_per_rank;
+  GEODE_ASSERT((int)event_sorted_history.size()==ranks*threads_per_rank);
+  GEODE_ASSERT(slice_compression_ratio.size()==37);
+  GEODE_ASSERT(steps==1 || steps==2);
+
+  // Separate same-rank, same-node, and internode
+  Vector<Array<Vector<float,2>>,3> data;
+
+  // Traverse each message and place it in the appropriate bin
+  for (const int source_rank : range(ranks)) {
+    const int source_thread = source_rank*threads_per_rank;
+    for (const history_t& source : event_sorted_history[source_thread][source_kind]) {
+      auto deps = event_dependencies(event_sorted_history,1,source_thread,source_kind,source);
+      GEODE_ASSERT(deps.size()==1);
+      if (steps==2) {
+        GEODE_ASSERT(source_kind == request_send_kind);
+        deps = event_dependencies(event_sorted_history,1,deps[0].x,deps[0].y,deps[0].z);
+        GEODE_ASSERT(deps.size()==1);
+      }
+      const int target_thread = deps[0].x;
+      const int target_rank = target_thread/threads_per_rank;
+      GEODE_ASSERT(target_thread==target_rank*threads_per_rank);
+      const history_t& target = deps[0].z;
+
+      // Clamp message time to be nonnegative
+      const double time = max(0,target.start.seconds()-source.start.seconds());
+
+      // Estimate message size
+      double size;
+      if (source_kind == request_send_kind)
+        size = 8;
+      else {
+        const section_t section = parse_section(source.event);
+        const Vector<uint8_t,4> block = parse_block(source.event);
+        double compression_ratio = 1;
+        if (source_kind == response_send_kind) {
+          compression_ratio = slice_compression_ratio[section.sum()];
+          GEODE_ASSERT(0<compression_ratio && compression_ratio<1);
+        }
+        size = sizeof(Vector<super_t,2>)*block_shape(section.shape(),block).product()*compression_ratio;
+      }
+
+      // Add entry
+      const int type = source_rank==target_rank                               ? 0
+                     : source_rank/ranks_per_node==target_rank/ranks_per_node ? 1
+                                                                              : 2;
+      data[type].append(Vector<float,2>(size,time));
+    }
+  }
+
+  // Make a nice hashtable for Python
+  Hashtable<string,Array<const Vector<float,2>>> table;
+  table["same-rank"] = data[0];
+  table["same-node"] = data[1];
+  table["different"] = data[2];
+  return table;
+}
+
 // Compute rank-to-rank bandwidth estimates localized in time (dimensions: epoch,src,dst)
-Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>& event_sorted_history, const int threads, const double dt_seconds) {
+static Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>& event_sorted_history,
+                                          const int threads, const double dt_seconds) {
   Log::Scope scope("estimate bandwidth");
   GEODE_ASSERT(threads>1);
   const int ranks = CHECK_CAST_INT(event_sorted_history.size())/threads;
@@ -361,7 +429,7 @@ Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>&
   }
   cout << "max time travel = "<<1e-6*max_time_travel<<endl;
   cout << "bandwidth array stats:"<<endl;
-  const double sum = bandwidths.sum(); 
+  const double sum = bandwidths.sum();
   cout << "  sum = "<<sum<<endl;
   cout << "  average rank bandwidth = "<<sum/epochs/ranks<<endl;
   cout << "  average rank-to-rank bandwidth = "<<sum/epochs/sqr(ranks)<<endl;
@@ -380,4 +448,5 @@ void wrap_history() {
   GEODE_FUNCTION(event_dependencies)
   GEODE_FUNCTION(check_dependencies)
   GEODE_FUNCTION(estimate_bandwidth)
+  GEODE_FUNCTION(message_statistics)
 }

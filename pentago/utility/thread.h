@@ -31,6 +31,8 @@ struct time_entry_t;
  * store timing information in a simple array.
  */
 
+} namespace geode {
+
 enum time_kind_t {
   compress_kind,
   decompress_kind,
@@ -69,6 +71,8 @@ enum time_kind_t {
   // Count the number of kinds
   _time_kinds
 };
+
+} namespace pentago {
 
 // Convert time_kind_t to string
 GEODE_EXPORT vector<const char*> time_kind_names();

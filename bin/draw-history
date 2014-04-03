@@ -53,20 +53,6 @@ def directions():
     dirs.append(+1)
   return tuple(dirs)
 
-def read_all_history(dir):
-  with Log.scope('read'):
-    names = glob.glob(dir+'/history-r*')
-    ranks = [None]*min(len(names),max_ranks())
-    assert ranks
-    for name in names:
-      m = re.search(r'history-r(\d+)((?:\.gz)?)$',name)
-      if not m:
-        raise RuntimeError('weird file: '+name)
-      rank = int(m.group(1))
-      if rank < len(ranks):
-        ranks[rank] = read_history(name)
-  return [thread for rank in ranks for thread in rank],len(ranks)
-
 def line_between_boxes(box0,box1):
   if 0:
     x0 = box0.clamp(box1.center())
@@ -79,7 +65,8 @@ def line_between_boxes(box0,box1):
 class HistoryScene(Scene):
   def __init__(self):
     # Read history
-    history,ranks = read_all_history(history_dir())
+    with Log.scope('read'):
+      history,ranks = read_all_history(history_dir(),max_ranks=max_ranks())
     threads = len(history)//ranks
     assert len(history)==threads*ranks
 
