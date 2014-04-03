@@ -98,7 +98,6 @@ static void report_mpi_times(const MPI_Comm comm, const thread_times_t local, co
   CHECK(MPI_Reduce(rank?(int64_t*)times.data():MPI_IN_PLACE,
                    (int64_t*)times.data(),times.size(),datatype<int64_t>(),MPI_SUM,0,comm));
   const auto papi = local.papi.copy();
-  cout << "papi.sizes() = "<<papi.sizes()<<endl;
   CHECK(MPI_Reduce(rank?papi.data():MPI_IN_PLACE,papi.data(),papi.flat.size(),datatype<papi_t>(),MPI_SUM,0,comm));
   uint64_t counts[2] = {local_outputs,local_inputs};
   CHECK(MPI_Reduce(rank?counts:MPI_IN_PLACE,counts,2,datatype<uint64_t>(),MPI_SUM,0,comm));
