@@ -34,14 +34,14 @@
 We present a strong solution of the board game pentago, computed using exhaustive parallel
 retrograde analysis in 4 hours on 98304 ($3 \times 2^{15}$) threads of NERSC's Cray Edison.
 At $3.0 \times 10^{15}$ states, pentago is the largest divergent game solved to date by
-over two orders of magnitude, and the only example of a nontrivial divergent game solved
+two orders of magnitude, and the only example of a nontrivial divergent game solved
 using retrograde analysis.
-Unlike previous retrograde analyses, the pentago computation was performed entirely in-core,
+Unlike previous retrograde analyses, our computation was performed entirely in-core,
 writing only a small portion of the results to disk; an out-of-core implementation would
-have been much slower due to I/O.  Symmetry was used to reduce the branching factor
-to a manageable level and exploit instruction level SSE parallelism.  Despite a theoretically
-embarrassingly parallel control flow, asynchronous message passing was required to fit the
-computation into available RAM; we report on several consequences including latency problems
+have been much slower.  Symmetry was used to reduce branching factor
+and exploit instruction level parallelism.  Despite a theoretically
+embarrassingly parallel structure, asynchronous message passing was required to fit the
+computation into available RAM; causing latency problems
 on an older Cray machine.  All code and data for the project are
 open source, together with a website which combines database lookup and on-the-fly computation
 to interactively explore the strong solution.
@@ -49,7 +49,7 @@ to interactively explore the strong solution.
 
 \IEEEpeerreviewmaketitle
 
-\vspace{-.05in}
+\vspace{-.02in}
 \section{Introduction}
 
 Computer play of combinatorial games such as chess, checkers, and go has been an active area of research
@@ -85,12 +85,12 @@ beginning of the game.
   \node at ( 2,0) [kind,label=below:loss,fill=loss] {};
 \end{tikzpicture}
 \end{center}
-\vspace{-.17in}
+\vspace{-.14in}
 \cprotect\caption{(Left) With perfect play, the first player wins with any opening move except the
 corners, which tie.  (Right) A more delicate position with black to play.
 The full strong solution can be explored at \url{http://perfect-pentago.net}.}
 \label{opening}
-\vspace{-.05in}
+\vspace{-.04in}
 \end{figure}
 
 \begin{figure}
