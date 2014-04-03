@@ -171,7 +171,7 @@ struct time_entry_t {
   time_entry_t()
     : total(0), local(0), start(0), event(0) {
 #if PAPI_MAX
-    papi_eventset = create_papi_eventset();
+    papi_eventset = PAPI_NULL;
     memset(papi_total,0,sizeof(papi_total));
     memset(papi_local,0,sizeof(papi_local));
 #endif
@@ -190,6 +190,13 @@ struct time_table_t {
         entry.thread = this;
       active_kind = (time_kind_t)-1;
     )
+#if PAPI_MAX
+    // Create one eventset for the entire thread to avoid hitting the file descriptor limit
+    // For details, see https://lists.eecs.utk.edu/pipermail/ptools-perfapi/2014-April/003205.html.
+    const auto eventset = create_papi_eventset();
+    for (auto& time : times)
+      time.papi_eventset = eventset;
+#endif
   }
 };
 vector<time_table_t*> time_tables;
