@@ -1,7 +1,8 @@
-Import('env child external library install_or_link')
+Import('env child external library config_header install_or_link')
 import os
 
 external(env,'geode',default=1,required=1,libs=['geode'],headers=['geode/utility/config.h'])
+external(env,'zlib',libs=['z'],headers=['zlib.h'])
 external(env,'lzma',libs=['lzma'],headers=['lzma.h'],required=1)
 external(env,'snappy',libs=['snappy'],headers=['snappy.h'],required=1)
 external(env,'papi',libs=['papi'],headers=['papi.h'],flags=['PENTAGO_PAPI'])
@@ -15,4 +16,5 @@ install_or_link(env,os.path.join(env['prefix_include'],os.path.dirname(generated
 
 env = env.Clone(need_zlib=1,need_lzma=1,need_snappy=1,need_papi=1)
 env.Append(CPPPATH=['.'],CXXFLAGS='-Wno-invalid-offsetof')
+config_header(env,'config.h')
 library(env,'pentago_core',[],extra=['gen/tables.cpp'],skip=['mpi'])

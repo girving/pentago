@@ -14,7 +14,7 @@ namespace pentago {
 using std::cout;
 using std::endl;
 
-static inline uint8_t binary(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5, bool b6, bool b7) {
+GEODE_UNUSED static inline uint8_t binary(bool b0, bool b1, bool b2, bool b3, bool b4, bool b5, bool b6, bool b7) {
   return b0|b1<<1|b2<<2|b3<<3|b4<<4|b5<<5|b6<<6|b7<<7;
 }
 

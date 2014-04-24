@@ -1,5 +1,6 @@
 // Thread utilities
 
+#include <pentago/config.h>
 #include <pentago/utility/thread.h>
 #include <pentago/utility/convert.h>
 #include <pentago/utility/debug.h>

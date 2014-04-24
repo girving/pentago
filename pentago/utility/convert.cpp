@@ -1,4 +1,6 @@
 // Instantiate necessary python conversions
+
+#include <geode/config.h>
 #ifdef GEODE_PYTHON
 
 #include <pentago/utility/convert.h>

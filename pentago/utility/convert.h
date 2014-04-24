@@ -1,5 +1,7 @@
 // Instantiate necessary python conversions
 #pragma once
+
+#include <geode/config.h>
 #ifdef GEODE_PYTHON
 
 #include <geode/python/forward.h>

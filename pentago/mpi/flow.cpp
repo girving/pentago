@@ -419,8 +419,8 @@ void flow_t::wakeup(line_details_t* const line, const wakeup_block_t b) {
 #endif
 }
 
-static inline int wakeup_tag(int b)  { return b; }
-static inline int wakeup_tag(unit b) { return 0; }
+GEODE_UNUSED static inline int wakeup_tag(int b)  { return b; }
+GEODE_UNUSED static inline int wakeup_tag(unit b) { return 0; }
 
 // Register a wakeup callback for the communication thread
 void flow_t::post_wakeup(line_details_t& line, const wakeup_block_t b) {
