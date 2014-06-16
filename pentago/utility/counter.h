@@ -2,7 +2,6 @@
 #pragma once
 
 #include <geode/python/config.h>
-#include <geode/utility/safe_bool.h>
 namespace pentago {
 
 class counter_t {
@@ -18,8 +17,8 @@ public:
     return r;
   }
 
-  operator SafeBool<counter_t>::type() const {
-    return safe_bool<counter_t>(count!=0);
+  explicit operator bool() const {
+    return count!=0;
   }
 };
 

@@ -59,12 +59,12 @@ struct halfsuper_t {
   explicit halfsuper_t(__m128i x)
     : x(x) {}
 
-  operator SafeBool<halfsuper_t>::type() const {
-    return safe_bool<halfsuper_t>(_mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0);
+  explicit operator bool() const {
+    return _mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0;
   }
 
-  bool operator==(halfsuper_t h) const { return !(*this^h); }
-  bool operator!=(halfsuper_t h) const { return   *this^h ; }
+  bool operator==(halfsuper_t h) const { return    !(*this^h); }
+  bool operator!=(halfsuper_t h) const { return bool(*this^h); }
 
   halfsuper_t operator~() const { return halfsuper_t(~x); }
   halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(x|h.x); }

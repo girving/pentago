@@ -23,8 +23,6 @@
 #include <geode/math/sse.h>
 #include <geode/random/forward.h>
 #include <geode/vector/Vector.h>
-#include <geode/utility/safe_bool.h>
-#include <geode/utility/safe_bool.h>
 #include <boost/detail/endian.hpp>
 namespace pentago {
 
@@ -75,8 +73,8 @@ struct super_t {
     return super_t(_mm_set1_epi32(1),_mm_set1_epi32(0));
   }
 
-  operator SafeBool<super_t>::type() const {
-    return safe_bool<super_t>(_mm_movemask_epi8(~_mm_cmpeq_epi32(x|y,_mm_setzero_si128()))!=0);
+  explicit operator bool() const {
+    return _mm_movemask_epi8(~_mm_cmpeq_epi32(x|y,_mm_setzero_si128()))!=0;
   }
 
   super_t operator~() const {
@@ -146,8 +144,8 @@ struct super_t {
     return super_t(1,0,0,0);
   }
 
-  operator SafeBool<super_t>::type() const {
-    return safe_bool<super_t>(a||b||c||d);
+  explicit operator bool() const {
+    return a||b||c||d;
   }
 
   super_t operator~() const {
@@ -208,7 +206,7 @@ struct super_t {
   }
 
   bool operator!=(super_t s) const {
-    return *this^s;
+    return bool(*this^s);
   }
 
   // Do not use the following functions in performance critical code

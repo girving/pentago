@@ -1,7 +1,6 @@
 // Wall clock time
 #pragma once
 
-#include <geode/utility/safe_bool.h>
 #include <sys/time.h>
 namespace pentago {
 
@@ -18,8 +17,8 @@ struct wall_time_t {
     return 1e-6*us;
   }
 
-  operator SafeBool<wall_time_t>::type() const {
-    return safe_bool<wall_time_t>(us!=0);
+  explicit operator bool() const {
+    return us!=0;
   }
 
   wall_time_t& operator+=(wall_time_t t) {
