@@ -87,7 +87,7 @@ accumulating_block_store_t::accumulating_block_store_t(const block_partition_t& 
         sample_counts[block_info(*local_id).flat_id]++;
     }
   }
-  const_cast_(samples) = Nested<sample_t>(sample_counts,false);
+  const_cast_(samples) = Nested<sample_t>(sample_counts,uninit);
 
   // Prepare to collect random samples from each block.  Note that this duplicates the loop from above.
   for (const auto section : sections->sections) {

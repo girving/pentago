@@ -80,7 +80,7 @@ uint64_t random_partition_t::rank_count_lines(const int rank) const {
 
 Array<const line_t> random_partition_t::rank_lines(const int rank) const {
   const auto range = partition_loop(total_lines,ranks,rank);
-  Array<line_t> lines(range.size(),false);
+  Array<line_t> lines(range.size(),uninit);
   for (const int n : range)
     lines[n-range.lo] = nth_line(n);
   return lines;

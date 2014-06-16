@@ -16,7 +16,7 @@ const int filter = 1; // interleave filtering
 using namespace pentago::end;
 
 Array<const uint64_t> make_offsets(const sections_t& sections) {
-  Array<uint64_t> offsets(sections.sections.size()+1,false);
+  Array<uint64_t> offsets(sections.sections.size()+1,uninit);
   offsets[0] = 20+sizeof(uint32_t);
   for (const int i : range(sections.sections.size()))
     offsets[i+1] = offsets[i]+sizeof(compact_blob_t)*section_blocks(sections.sections[i]).product();
@@ -104,7 +104,7 @@ void write_supertensor_index(const string& name, const vector<Ref<const superten
   GEODE_ASSERT(ftell(file)==24);
   for (const auto section : sections->sections) {
     const auto reader = section_reader.get(section);
-    Array<compact_blob_t> blobs(reader->offset.flat.size(),false);
+    Array<compact_blob_t> blobs(reader->offset.flat.size(),uninit);
     for (const int i : range(blobs.size())) {
       const uint64_t offset = reader->offset.flat[i];
       blobs[i].offset[0] = uint32_t(offset);

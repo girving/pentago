@@ -58,7 +58,7 @@ Array<uint64_t> memory_info() {
     return Array<uint64_t>();
   const int page = getpagesize();
   const auto known = pentago::known();
-  Array<uint64_t> result(7,false);
+  Array<uint64_t> result(7,uninit);
   result[0] = page*size;
   result[1] = page*resident;
   result[2] = page*share;
@@ -84,7 +84,7 @@ Array<uint64_t> memory_info() {
   if (KERN_SUCCESS != task_info(mach_task_self(),MACH_TASK_BASIC_INFO,(task_info_t)&info,&count))
     return Array<uint64_t>();
   const auto known = pentago::known();
-  Array<uint64_t> result(5,false);
+  Array<uint64_t> result(5,uninit);
   result[0] = info.virtual_size;
   result[1] = info.resident_size_max;
   result[2] = known.y;

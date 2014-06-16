@@ -37,7 +37,7 @@ static void meaningless_helper(accumulating_block_store_t* const self, const loc
              rmin2 = safe_rmin_slice(info.section.counts[2],base[2]+range(shape[2])),
              rmin3 = safe_rmin_slice(info.section.counts[3],base[3]+range(shape[3]));
 #if PENTAGO_MPI_COMPRESS
-  const auto flat_data = large_buffer<Vector<super_t,2>>(shape.product(),false);
+  const auto flat_data = large_buffer<Vector<super_t,2>>(shape.product(),uninit);
 #else
   const auto flat_data = self->all_data.slice(info.nodes);
   GEODE_ASSERT(shape.product()==flat_data.size());

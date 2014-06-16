@@ -158,7 +158,7 @@ Tuple<board_t,symmetry_t> superstandardize(board_t board) {
 }
 
 static NdArray<board_t> superstandardize_py(NdArray<const board_t> boards) {
-  NdArray<board_t> standard(boards.shape,false);
+  NdArray<board_t> standard(boards.shape,uninit);
   for (int b=0;b<boards.flat.size();b++)
     standard.flat[b] = superstandardize(boards.flat[b]).x;
   return standard;

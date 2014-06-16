@@ -179,7 +179,7 @@ midsolve_loop(const board_t root, const bool parity, Hashtable<board_t,superinfo
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone:
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  Array<Vector<uint16_t,spots-k0>> cs1ps(sets1p.size(),false);
+  Array<Vector<uint16_t,spots-k0>> cs1ps(sets1p.size(),uninit);
   for (int s1p=0;s1p<sets1p.size();s1p++) {
     for (int j=0;j<spots-k0;j++) {
       cs1ps[s1p][j] = s1p;

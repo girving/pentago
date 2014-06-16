@@ -34,7 +34,7 @@ void check_board(board_t board) {
 
 static NdArray<board_t> pack_py(NdArray<const side_t> sides) {
   GEODE_ASSERT(sides.rank()>=1 && sides.shape.back()==2);
-  NdArray<board_t> boards(sides.shape.slice(0,sides.rank()-1).copy(),false);
+  NdArray<board_t> boards(sides.shape.slice(0,sides.rank()-1).copy(),uninit);
   for (int b=0;b<boards.flat.size();b++) {
     const side_t side0 = sides.flat[2*b],
                  side1 = sides.flat[2*b+1];
@@ -49,7 +49,7 @@ static NdArray<side_t> unpack_py(NdArray<const board_t> boards) {
     check_board(boards.flat[b]);
   Array<int> shape = boards.shape.copy(); 
   shape.append(2);
-  NdArray<side_t> sides(shape,false);
+  NdArray<side_t> sides(shape,uninit);
   for (int b=0;b<boards.flat.size();b++)
     for (int i=0;i<2;i++)
       sides.flat[2*b+i] = unpack(boards.flat[b],i);
@@ -58,7 +58,7 @@ static NdArray<side_t> unpack_py(NdArray<const board_t> boards) {
 
 Array<int,2> to_table(const board_t board) {
   check_board(board);
-  Array<int,2> table(6,6,false);
+  Array<int,2> table(6,6,uninit);
   for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
     const quadrant_t q = quadrant(board,2*qx+qy);
     const side_t s0 = unpack(q,0),
@@ -75,7 +75,7 @@ NdArray<int> to_tables(NdArray<const board_t> boards) {
   Array<int> shape = boards.shape.copy();
   shape.append(6);
   shape.append(6);
-  NdArray<int> tables(shape,false);
+  NdArray<int> tables(shape,uninit);
   for (int b=0;b<boards.flat.size();b++) {
     for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
       const quadrant_t q = quadrant(boards.flat[b],2*qx+qy);
@@ -92,7 +92,7 @@ static NdArray<board_t> from_table(NdArray<const int> tables) {
   GEODE_ASSERT(tables.rank()>=2);
   int r = tables.rank();
   GEODE_ASSERT(tables.shape[r-2]==6 && tables.shape[r-1]==6);
-  NdArray<board_t> boards(tables.shape.slice(0,r-2).copy(),false);
+  NdArray<board_t> boards(tables.shape.slice(0,r-2).copy(),uninit);
   for (int b=0;b<boards.flat.size();b++) {
     quadrant_t q[4];
     for (int qx=0;qx<2;qx++) for (int qy=0;qy<2;qy++) {
@@ -147,7 +147,7 @@ board_t standardize(board_t board) {
 }
 
 static NdArray<board_t> standardize_py(NdArray<const board_t> boards) {
-  NdArray<board_t> transformed(boards.shape,false);
+  NdArray<board_t> transformed(boards.shape,uninit);
   for (int b=0;b<boards.flat.size();b++)
     transformed.flat[b] = standardize(boards.flat[b]);
   return transformed;

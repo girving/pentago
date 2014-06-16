@@ -20,7 +20,7 @@ static Array<board_t> simple_moves(board_t board) {
                side1 = unpack(board,1);
   // const side_t moves[total] = {...};
   SIMPLE_MOVES(side0,side1)
-  Array<board_t> result(total,false);
+  Array<board_t> result(total,uninit);
   for (int i=0;i<total;i++)
     result[i] = pack(side1,moves[i]);
   return result;

@@ -54,7 +54,7 @@ unit init_supertable(int bits) {
   table_bits = bits;
   cout << "initializing supertable: bits = "<<bits
     <<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
-  table = Array<superentry_t>(1<<bits,false);
+  table = Array<superentry_t>(1<<bits,uninit);
   clear_supertable();
   return unit();
 }
@@ -190,7 +190,7 @@ static void supertable_test(int epochs) {
     int successful_lookups = 0;
 
     // Generate a bunch of random boards
-    Array<board_t> boards(count/8,false);
+    Array<board_t> boards(count/8,uninit);
     for (board_t& board : boards)
       board = random_board(random);
 

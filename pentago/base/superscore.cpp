@@ -99,7 +99,7 @@ super_t super_wins(side_t side) {
 // Written in C++ so that we can be more exhaustive without being annoyingly slow
 static void super_win_test(int steps) {
   // Determine the expected number of stones if we pick k stones with replacement
-  Array<double> expected(32,false);
+  Array<double> expected(32,uninit);
   for (int k=0;k<expected.size();k++)
     expected[k] = 36*(1-pow(1-1./36,k));
 
@@ -156,7 +156,7 @@ super_t random_super(Random& random) {
 }
 
 static NdArray<super_t> random_supers(const uint128_t key, Array<const int> shape) {
-  NdArray<super_t> supers(shape,false);
+  NdArray<super_t> supers(shape,uninit);
   for (const int i : range(supers.flat.size())) {
     const auto ab = threefry(key,2*i),
                cd = threefry(key,2*i+1);
@@ -229,7 +229,7 @@ uint8_t first(super_t s) {
 static NdArray<uint64_t> super_wins_py(NdArray<const board_t> sides) {
   Array<int> shape = sides.shape.copy();
   shape.append(4);
-  NdArray<uint64_t> wins(shape,false);
+  NdArray<uint64_t> wins(shape,uninit);
   super_t* w = (super_t*)wins.flat.data();
   for (int i=0;i<sides.flat.size();i++) {
     GEODE_ASSERT(!(sides.flat[i]&~side_mask));
@@ -246,7 +246,7 @@ static uint64_t super_popcount(NdArray<const super_t> data) {
 }
 
 static NdArray<int> super_popcounts(NdArray<const super_t> data) {
-  NdArray<int> counts(data.shape,false);
+  NdArray<int> counts(data.shape,uninit);
   for (int i=0;i<data.flat.size();i++)
     counts.flat[i] = popcount(data.flat[i]);
   return counts;

@@ -54,11 +54,13 @@ template<class TK,class T> static inline uint64_t memory_usage(const Hashtable<T
 // though mmap was dramatically improving fragmentation performance, but it turns out there
 // were other bugs causing massive extra allocation.  If we later decide that mmap is indeed
 // better, it'll be easy to flip the template alias.
-template<class T> static inline Array<T> large_buffer(int size, bool zero) {
+template<class T> static inline Array<T> large_buffer(const int size) {
   Array<T> buffer = aligned_buffer<T>(size);
-  if (zero)
-    memset(buffer.data(),0,sizeof(T)*size);
+  memset(buffer.data(),0,sizeof(T)*size);
   return buffer;
+}
+template<class T> static inline Array<T> large_buffer(const int size, Uninit) {
+  return aligned_buffer<T>(size);
 }
 
 // Extract memory usage information

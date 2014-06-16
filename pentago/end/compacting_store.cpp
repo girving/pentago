@@ -274,7 +274,7 @@ struct thrasher_t {
         }
       }
       // Generate a new random array xoring to 7
-      const Array<uint8_t> data(random->uniform<int>(1,2*alignment),false);
+      const Array<uint8_t> data(random->uniform<int>(1,2*alignment),uninit);
       {
         uint8_t s = 0;
         for (const int i : range(1,data.size()))

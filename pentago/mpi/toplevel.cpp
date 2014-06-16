@@ -85,7 +85,7 @@ static void report_mpi_times(const MPI_Comm comm, const thread_times_t local, co
   const int rank = comm_rank(comm),
             ranks = comm_size(comm);
   if (per_rank_times && ranks>1) {
-    Array<wall_time_t,2> all_times(ranks,local.times.size(),false);
+    Array<wall_time_t,2> all_times(ranks,local.times.size(),uninit);
     CHECK(MPI_Gather((int64_t*)local.times.data(),local.times.size(),datatype<int64_t>(),
                      (int64_t*)all_times.data(),local.times.size(),datatype<int64_t>(),0,comm));
     if (!rank) {
@@ -343,7 +343,7 @@ int toplevel(int argc, char** argv) {
 
   // Make sure the compression level is valid
   if (!rank) {
-    Array<uint8_t> data(37,false);
+    Array<uint8_t> data(37,uninit);
     for (int i=0;i<data.size();i++)
       data[i] = i;
     GEODE_ASSERT(decompress(compress(data,level,unevent),data.size(),unevent)==data);

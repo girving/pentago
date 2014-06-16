@@ -251,7 +251,7 @@ Array<const Vector<int,2>> simple_partition_t::partition_lines(RawArray<uint64_t
   }
 
   // Compute starts and update work
-  Array<Vector<int,2>> starts(ranks+1,false);
+  Array<Vector<int,2>> starts(ranks+1,uninit);
   bool success = fit<true>(work_nodes,work_penalties,lines,hi,starts);
   GEODE_ASSERT(success);
   GEODE_ASSERT(starts.back()==vec(lines.size(),0));

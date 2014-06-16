@@ -73,7 +73,7 @@ static void filter_and_compress_and_store(Tuple<spinlock_t,ProgressIndicator>* p
   {
     thread_time_t time(filter_kind,event);
 #if !PENTAGO_MPI_COMPRESS
-    filtered = large_buffer<Vector<super_t,2>>(data.size(),false);
+    filtered = large_buffer<Vector<super_t,2>>(data.size(),uninit);
 #endif
     if (!turn)
       for (int i=0;i<data.size();i++)
@@ -148,7 +148,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
   }
 
   // Compute local block offsets
-  Array<supertensor_blob_t> block_blobs(local_blocks+1,false);
+  Array<supertensor_blob_t> block_blobs(local_blocks+1,uninit);
   block_blobs[0].offset = header_size+previous;
   {
     thread_time_t time(write_sections_kind,event);
@@ -165,7 +165,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
   // Concatenate local data into a single buffer
   {
     thread_time_t time(write_sections_kind,event);
-    Array<uint8_t> buffer(int(local_size),false);
+    Array<uint8_t> buffer(int(local_size),uninit);
     int next = 0;
     for (auto& c : compressed) {
       memcpy(buffer.data()+next,c.data(),c.size());
@@ -214,7 +214,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
     CHECK(MPI_Type_commit(&block_blob_datatype));
 
     // Construct send buffer
-    const Nested<block_blob_t> send_buffer(send_counts,false);
+    const Nested<block_blob_t> send_buffer(send_counts,uninit);
     const auto remaining = send_counts.copy();
     for (const int b : range(local_blocks)) {
       const auto& info = *flat_info[b];
@@ -229,7 +229,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
     const Array<int> recv_counts(ranks);
     for (const int sid : section_range) {
       const auto section_blocks = pentago::mpi::section_blocks(sections[sid]);
-      Array<supertensor_blob_t,4> block_index(section_blocks,false);
+      Array<supertensor_blob_t,4> block_index(section_blocks,uninit);
       memset(block_index.data(),0,sizeof(supertensor_blob_t)*block_index.flat.size());
       block_indexes[sid-section_range.lo] = block_index;
       for (const int i : range(section_blocks.product())) {
@@ -239,7 +239,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
     }
 
     // Communicate
-    const Nested<block_blob_t> recv_buffer(recv_counts,false);
+    const Nested<block_blob_t> recv_buffer(recv_counts,uninit);
     CHECK(MPI_Alltoallv(send_buffer.flat.data(),send_counts.data(),send_buffer.offsets.const_cast_().data(),block_blob_datatype,
                         recv_buffer.flat.data(),recv_counts.data(),recv_buffer.offsets.const_cast_().data(),block_blob_datatype,comm));
     CHECK(MPI_Type_free(&block_blob_datatype));
@@ -278,7 +278,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
   const uint64_t local_block_index_start = block_index_start+previous_block_indexes_size;
 
   // Send all block index blobs to root
-  Array<supertensor_blob_t> index_blobs(sections.size(),false);
+  Array<supertensor_blob_t> index_blobs(sections.size(),uninit);
   memset(index_blobs.data(),0,sizeof(supertensor_blob_t)*sections.size());
   {
     uint64_t next_block_index_offset = local_block_index_start;
@@ -295,7 +295,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
     index_blobs = Array<supertensor_blob_t>();
 
   // Concatenate compressed block indexes into one buffer
-  Array<uint8_t> all_block_indexes(int(local_block_indexes_size),false);
+  Array<uint8_t> all_block_indexes(int(local_block_indexes_size),uninit);
   {
     int next_block_index = 0;
     for (const int sid : section_range) {
@@ -315,7 +315,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
 
   // On rank 0, write all section headers
   if (!rank) {
-    Array<uint8_t> headers(CHECK_CAST_INT(header_size),false);
+    Array<uint8_t> headers(CHECK_CAST_INT(header_size),uninit);
     size_t offset = 0;
     #define HEADER(pointer,size) \
       memcpy(headers.data()+offset,pointer,size); \
@@ -352,7 +352,7 @@ static Ref<const sections_t> read_section_list(const MPI_Comm comm, const vector
   int count = !rank ? sections->sections.size() : 0;
   CHECK(MPI_Bcast(&count,1,datatype<int>(),0,comm));
   GEODE_ASSERT(count);
-  const auto list = !rank ? sections->sections.const_cast_() : Array<section_t>(count,false);
+  const auto list = !rank ? sections->sections.const_cast_() : Array<section_t>(count,uninit);
   CHECK(MPI_Bcast(list.data(),CHECK_CAST_INT(memory_usage(list)),MPI_BYTE,0,comm));
   return !rank ? ref(sections) : new_<const sections_t>(list[0].sum(),list);
 }
@@ -386,7 +386,7 @@ static ReadSectionsStart read_sections_start(const MPI_Comm comm, const string& 
 
   // Tell all processors where their data comes from
   const auto local_blocks = partition->rank_blocks(rank);
-  Array<supertensor_blob_t> blobs(local_blocks.size(),false);
+  Array<supertensor_blob_t> blobs(local_blocks.size(),uninit);
   {
     Log::Scope scope("blob scatter");
     if (!rank) {
@@ -486,7 +486,7 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
     for (const int b : range(blobs.size()))
       threads_schedule(CPU,[=,&progress_lock,&progress](){
         const auto filtered = decompress(compressed[b],blobs[b].uncompressed_size,unevent);
-        const auto unfiltered = large_buffer<Vector<super_t,2>>(filtered.size()/sizeof(Vector<super_t,2>),false);
+        const auto unfiltered = large_buffer<Vector<super_t,2>>(filtered.size()/sizeof(Vector<super_t,2>),uninit);
         for (const int i : range(unfiltered.size())) {
           Vector<super_t,2> s;
           memcpy(&s,&filtered[sizeof(s)*i],sizeof(s));
@@ -589,7 +589,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
   }
 
   // Prepare data array
-  Array<Vector<uint64_t,4>> data(counts.size(),false);
+  Array<Vector<uint64_t,4>> data(counts.size(),uninit);
   const bool turn = sections.slice&1;
   for (int i=0;i<data.size();i++) {
     auto wins = counts[i].x, losses = counts[i].z-counts[i].y; // At this point, wins are for the player to move
@@ -599,7 +599,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
   }
 
   // Pack numpy buffer.  Endianness is handled in the numpy header.
-  Array<uint8_t> buffer(CHECK_CAST_INT(256+memory_usage(data)),false);
+  Array<uint8_t> buffer(CHECK_CAST_INT(256+memory_usage(data)),uninit);
   size_t data_size = fill_numpy_header(buffer,data);
   GEODE_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size());
   int header_size = buffer.size();

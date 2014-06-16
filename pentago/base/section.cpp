@@ -221,7 +221,7 @@ static void rmin_test() {
 static NdArray<section_t> board_section(NdArray<const board_t> boards) {
   for (const auto board : boards.flat)
     check_board(board);
-  NdArray<section_t> sections(boards.shape,false);
+  NdArray<section_t> sections(boards.shape,uninit);
   for (int i=0;i<boards.flat.size();i++)
     sections.flat[i] = count(boards.flat[i]);
   return sections;

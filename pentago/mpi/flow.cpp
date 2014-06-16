@@ -317,7 +317,7 @@ void flow_t::post_output_recv(Array<Vector<super_t,2>>* buffer) {
   PENTAGO_MPI_TRACE("post output recv");
   MPI_Request request;
   if (!buffer->size())
-    *buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size))+PENTAGO_MPI_COMPRESS_OUTPUTS,false);
+    *buffer = large_buffer<Vector<super_t,2>>(sqr(sqr(block_size))+PENTAGO_MPI_COMPRESS_OUTPUTS,uninit);
   GEODE_ASSERT(buffer->size()==sqr(sqr(block_size))+PENTAGO_MPI_COMPRESS_OUTPUTS);
   {
     thread_time_t time(mpi_kind,unevent);

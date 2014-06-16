@@ -198,8 +198,8 @@ void supertensor_reader_t::initialize(const string& path, const uint64_t header_
   to_little_endian_inplace(index.flat.const_cast_());
 
   // Compact block index
-  const Array<uint64_t,4> offset(index.shape,false);
-  const Array<uint32_t,4> compressed_size(index.shape,false);
+  const Array<uint64_t,4> offset(index.shape,uninit);
+  const Array<uint32_t,4> compressed_size(index.shape,uninit);
   for (const int i : range(index.flat.size())) {
     offset.flat[i] = index.flat[i].offset;
     compressed_size.flat[i] = CHECK_CAST_INT(index.flat[i].compressed_size);

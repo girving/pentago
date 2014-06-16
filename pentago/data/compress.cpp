@@ -42,14 +42,14 @@ Array<uint8_t> compress(RawArray<const uint8_t> data, int level, event_t event) 
   thread_time_t time(compress_kind,event);
   if (level<20) { // zlib
     size_t dest_size = compressBound(data.size());
-    Array<uint8_t> compressed(CHECK_CAST_INT(dest_size),false);
+    Array<uint8_t> compressed(CHECK_CAST_INT(dest_size),uninit);
     int z = compress2(compressed.data(),&dest_size,(uint8_t*)data.data(),data.size(),level);
     if (z!=Z_OK)
       THROW(IOError,"zlib failure in compress_and_write: %s",zlib_error(z));
     return compressed.slice_own(0,CHECK_CAST_INT(dest_size));
   } else { // lzma
     size_t dest_size = lzma_stream_buffer_bound(data.size());
-    Array<uint8_t> compressed(CHECK_CAST_INT(dest_size),false);
+    Array<uint8_t> compressed(CHECK_CAST_INT(dest_size),uninit);
     size_t pos = 0;
     lzma_ret r = lzma_easy_buffer_encode(level-20,LZMA_CHECK_CRC64,0,data.data(),data.size(),compressed.data(),&pos,dest_size);
     if (r!=LZMA_OK)

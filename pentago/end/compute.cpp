@@ -82,7 +82,7 @@ line_details_t::line_details_t(const line_data_t& pre, const wakeup_t& wakeup)
   , unsent_output_blocks(pre.line.length)
 
   // Allocate memory for both input and output in a single buffer
-  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks+PENTAGO_MPI_COMPRESS_OUTPUTS*pre.line.length,false))
+  , input(large_buffer<Vector<super_t,2>>(pre.input_shape.product()+pre.output_shape.product()+PENTAGO_MPI_COMPRESS*input_blocks+PENTAGO_MPI_COMPRESS_OUTPUTS*pre.line.length,uninit))
 
   // When computation is complete, call this function to wake up.
   , wakeup(wakeup)
