@@ -599,10 +599,11 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
   }
 
   // Pack numpy buffer.  Endianness is handled in the numpy header.
-  Array<uint8_t> buffer(CHECK_CAST_INT(256+memory_usage(data)),uninit);
-  size_t data_size = fill_numpy_header(buffer,data);
+  auto buffer_and_size = fill_numpy_header(data);
+  auto& buffer = buffer_and_size.x;
+  const auto data_size = buffer_and_size.y;
   GEODE_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size());
-  int header_size = buffer.size();
+  const int header_size = buffer.size();
   buffer.resize(CHECK_CAST_INT(header_size+data_size),false,true);
   memcpy(buffer.data()+header_size,data.data(),data_size);
 
@@ -667,7 +668,7 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, accumulat
   if (!rank) {
     // On the root, we have to write out the numpy header before our samples.
     RawArray<Vector<uint64_t,9>> all_samples(total_samples,0); // False array of all samples
-    fill_numpy_header(buffer,all_samples);
+    buffer = fill_numpy_header(all_samples).x;
   }
   // Pack samples into buffer
   int index = buffer.size();
