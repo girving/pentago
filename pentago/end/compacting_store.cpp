@@ -63,8 +63,10 @@ compacting_store_t::group_t::group_t(compacting_store_t& store, const int count)
     if (store.groups[0].size() && store.groups[1].size())
       die("compacting_store_t::group_t: no available groups");
     group = store.groups[0].size() ? 1 : 0;
-    store.groups[group].resize(count,false,false);
-    for (auto& array : store.groups[group]) {
+    auto& g = store.groups[group];
+    g.clear();
+    g.resize(count,uninit);
+    for (auto& array : g) {
       array.lock = spinlock_t();
       array.size = 0;
       array.frozen = false;

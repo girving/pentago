@@ -64,7 +64,7 @@ void read_and_uncompress(const read_file_t* fd, supertensor_blob_t blob, const f
   Array<uint8_t> compressed;
   {
     thread_time_t time(read_kind,unevent);
-    compressed.resize(int(blob.compressed_size),false,false);
+    compressed.resize(int(blob.compressed_size),uninit);
     if (const char* error = fd->pread(compressed,blob.offset))
       THROW(IOError,"read_and_uncompress pread failed: %s",error);
   }

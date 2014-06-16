@@ -443,7 +443,7 @@ Ref<const readable_block_store_t> read_sections(const MPI_Comm comm, const strin
   {
     Log::Scope scope("read data");
     const auto chunk = partition_loop(total_size,ranks,rank);
-    raw.resize(CHECK_CAST_INT(chunk.size()),false);
+    raw.resize(CHECK_CAST_INT(chunk.size()),uninit);
     MPI_File file;
     const int r = MPI_File_open(comm,(char*)filename.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&file);
     if (r != MPI_SUCCESS)
@@ -604,7 +604,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
   const auto data_size = buffer_and_size.y;
   GEODE_ASSERT(data_size==sizeof(Vector<uint64_t,4>)*data.size());
   const int header_size = buffer.size();
-  buffer.resize(CHECK_CAST_INT(header_size+data_size),false,true);
+  buffer.resize(CHECK_CAST_INT(header_size+data_size),uninit);
   memcpy(buffer.data()+header_size,data.data(),data_size);
 
   // Write file
@@ -672,7 +672,7 @@ void write_sparse_samples(const MPI_Comm comm, const string& filename, accumulat
   }
   // Pack samples into buffer
   int index = buffer.size();
-  buffer.resize(index+(1+8)*sizeof(uint64_t)*samples.size(),false,true);
+  buffer.resize(index+(1+8)*sizeof(uint64_t)*samples.size(),uninit);
   for (const sample_t& s : samples) {
     memcpy(&buffer[index],&s.board,sizeof(s.board));
     index += sizeof(s.board);
