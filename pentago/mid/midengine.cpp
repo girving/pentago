@@ -448,7 +448,7 @@ high_midsolve(const high_board_t& root, const vector<Ref<const high_board_t>>& b
   const auto rs = midsolve(root.board,root.middle,bs,workspace);
   Hashtable<Ref<const high_board_t>,int> results;
   for (auto r : rs)
-    results.set(new_<high_board_t>(r.key(),false),r.data());
+    results.set(new_<high_board_t>(r.x,false),r.y);
   return results;
 }
 
@@ -458,9 +458,9 @@ static void midsolve_internal_test(const board_t board, const bool parity) {
   const auto results = midsolve_internal(board,parity,workspace);
   GEODE_ASSERT(results.size()==37-slice); // Only mostly true due to superstandardization, but still useful to assert
   for (const auto& r : results) {
-    const auto rboard = r.key();
-    const bool turn = count_stones(r.key())&1;
-    const auto rs = r.data();
+    const auto rboard = r.x;
+    const bool turn = count_stones(r.x)&1;
+    const auto rs = r.y;
     GEODE_ASSERT(popcount(rs.known)==128);
     cout << format("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
                    slice,rboard,parity,popcount(rs.win),popcount(~rs.win&rs.notlose),popcount(~(rs.win|rs.notlose)))<<endl;

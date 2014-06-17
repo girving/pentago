@@ -91,7 +91,7 @@ Ref<accumulating_block_store_t> meaningless_block_store(const block_partition_t&
   // Replace data with meaninglessness
   memset(self->section_counts.data(),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
   for (const auto& info : self->block_infos)
-    threads_schedule(CPU,curry(meaningless_helper,&*self,info.key()));
+    threads_schedule(CPU,curry(meaningless_helper,&*self,info.x));
   threads_wait_all_help();
 
   // Freeze meaningless data and return
@@ -140,7 +140,7 @@ static void compare_blocks_with_sparse_samples(const readable_block_store_t& blo
 
   // Check all samples
   for (auto& samples : block_samples) {
-    const auto local_id = samples.key();
+    const auto local_id = samples.x;
     const bool turn = blocks.block_info(local_id).section.sum()&1;
 #if PENTAGO_MPI_COMPRESS
     const auto block_data = blocks.uncompress_and_get(local_id,unevent);
@@ -178,18 +178,18 @@ static void compare_blocks_with_supertensors(const readable_block_store_t& block
   for (int i=0;i<(int)readers.size();i++)
     reader_id.set(readers[i]->header.section,i);
   for (const auto& info : blocks.block_infos) {
-    const auto local_id = info.key();
-    const auto& reader = *readers[reader_id.get(info.data().section)];
+    const auto local_id = info.x;
+    const auto& reader = *readers[reader_id.get(info.y.section)];
 
     // Verify that all data matches
-    const auto read_data = reader.read_block(info.data().block).flat;
+    const auto read_data = reader.read_block(info.y.block).flat;
 #if PENTAGO_MPI_COMPRESS
     const auto good_data = blocks.uncompress_and_get_flat(local_id,unevent);
 #else
     const auto good_data = blocks.get_raw_flat(local_id);
 #endif
     GEODE_ASSERT(read_data.size()==good_data.size());
-    const bool turn = info.data().section.sum()&1;
+    const bool turn = info.y.section.sum()&1;
     for (int i=0;i<read_data.size();i++) {
       auto good = good_data[i];
       good.y = ~good.y;

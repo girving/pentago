@@ -149,8 +149,8 @@ void readable_block_store_t::print_compression_stats(const reduction_t<double,su
   uint64_t compressed_ = 0;
   double sqr_compressed = 0;
   for (auto& info : block_infos) {
-    const int flat_id = info.data().flat_id;
-    const int k = 64*block_shape(info.data().section.shape(),info.data().block).product();
+    const int flat_id = info.y.flat_id;
+    const int k = 64*block_shape(info.y.section.shape(),info.y.block).product();
     uncompressed_ += k;
     const int size = store.get_frozen(flat_id).size();
     compressed_ += size;

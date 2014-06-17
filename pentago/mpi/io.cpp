@@ -117,11 +117,11 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
   vector<Array<uint8_t>> compressed(local_blocks);
   auto progress = tuple(spinlock_t(),ProgressIndicator(local_blocks));
   for (const auto& info : blocks.block_infos) {
-    flat_info[info.data().flat_id] = &info.data();
+    flat_info[info.y.flat_id] = &info.y;
 #if PENTAGO_MPI_COMPRESS
-    threads_schedule(CPU,curry(filter_and_compress_and_store,&progress,&compressed[info.data().flat_id],&blocks,info.key(),level,turn));
+    threads_schedule(CPU,curry(filter_and_compress_and_store,&progress,&compressed[info.y.flat_id],&blocks,info.x,level,turn));
 #else
-    threads_schedule(CPU,curry(filter_and_compress_and_store,&progress,&compressed[info.data().flat_id],blocks.get_raw_flat(info.key),level,turn));
+    threads_schedule(CPU,curry(filter_and_compress_and_store,&progress,&compressed[info.y.flat_id],blocks.get_raw_flat(info.x),level,turn));
 #endif
   }
   threads_wait_all_help();

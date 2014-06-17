@@ -73,7 +73,7 @@ void partition_test(const partition_t& partition) {
   }
   GEODE_ASSERT(correct_lines.size()==all_lines.size());
   for (const auto& info : block_info)
-    simple->find_block(info.key().x,info.key().y); // Verify that the block is supposed to exist
+    simple->find_block(info.x.x,info.x.y); // Verify that the block is supposed to exist
   for (const auto& block : simple->rank_blocks(0))
     GEODE_ASSERT(block_info.contains(tuple(block.section,block.block)));
 }
