@@ -19,7 +19,7 @@ GEODE_DECLARE_VECTOR_CONVERSIONS(GEODE_EXPORT,3,uint64_t)
 GEODE_DECLARE_VECTOR_CONVERSIONS(GEODE_EXPORT,4,uint16_t)
 GEODE_DECLARE_VECTOR_CONVERSIONS(GEODE_EXPORT,4,Vector<uint8_t,2>)
 
-static inline PyObject* to_python(unit) {
+static inline PyObject* to_python(Unit) {
   Py_RETURN_NONE;
 }
 

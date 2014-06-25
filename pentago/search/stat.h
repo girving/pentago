@@ -25,8 +25,8 @@ extern uint64_t successful_lookups;
 STAT_DETAIL(extern uint64_t lookup_detail[37], successful_lookup_detail[37];)
 extern uint64_t distance_prunes;
 
-extern unit clear_stats();
-extern unit print_stats();
+extern Unit clear_stats();
+extern Unit print_stats();
 
 #define PRINT_STATS(bits) ({ STAT(if (!(total_expanded_nodes&((1<<bits)-1))) print_stats()); })
 

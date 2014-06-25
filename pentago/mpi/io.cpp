@@ -208,7 +208,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
 
     // Build an MPI datatype for block,blob pairs
     typedef Tuple<int,Vector<uint8_t,4>,supertensor_blob_t> block_blob_t; // section_id, block, blob
-    BOOST_STATIC_ASSERT(sizeof(block_blob_t)==8*sizeof(int));
+    static_assert(sizeof(block_blob_t)==8*sizeof(int),"");
     MPI_Datatype block_blob_datatype;
     CHECK(MPI_Type_contiguous(sizeof(block_blob_t)/sizeof(int),MPI_INT,&block_blob_datatype));
     CHECK(MPI_Type_commit(&block_blob_datatype));
@@ -616,7 +616,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
 
 // The 64 bit part of big endianness is handled by numpy, so we're left with everything up to 256 bits
 static inline void semiswap(Vector<super_t,2>& s) {
-#if defined(BOOST_BIG_ENDIAN)
+#if GEODE_ENDIAN == GEODE_BIG_ENDIAN
   swap(s.x.a,s.x.d);
   swap(s.x.b,s.x.c);
   swap(s.y.a,s.y.d);

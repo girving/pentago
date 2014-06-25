@@ -15,7 +15,6 @@
 #include <pentago/utility/counter.h>
 #include <pentago/utility/spinlock.h>
 #include <geode/array/Array4d.h>
-#include <boost/noncopyable.hpp>
 namespace pentago {
 namespace end {
 
@@ -45,7 +44,7 @@ struct line_data_t {
   ~line_data_t();
 };
 
-struct line_details_t : public boost::noncopyable {
+struct line_details_t : public Noncopyable {
   // Initial information
   const line_data_t pre;
   const event_t line_event;
@@ -81,7 +80,7 @@ struct line_details_t : public boost::noncopyable {
   const Array<Vector<super_t,2>> input, output;
 
   // When computation is complete, send a wakeup message here
-  typedef BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,int,unit) wakeup_block_t;
+  typedef mpl::if_c<PENTAGO_MPI_COMPRESS_OUTPUTS,int,Unit>::type wakeup_block_t;
   typedef function<void(line_details_t&,wakeup_block_t)> wakeup_t;
   const wakeup_t wakeup;
   const line_details_t* const self; // Buffer for wakeup message

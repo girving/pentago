@@ -10,16 +10,17 @@
 #pragma once
 
 #include <pentago/end/config.h>
-#include <boost/noncopyable.hpp>
+#include <geode/utility/forward.h>
 #include <mpi.h>
 namespace pentago {
 namespace mpi {
 
 class requests_t;
 struct ibarrier_countdown_t;
+using namespace geode;
 
 // Warning: ibarrier_t is *not* thread safe
-class ibarrier_t : public boost::noncopyable {
+class ibarrier_t : public Noncopyable {
   const MPI_Comm comm;
   const int tag;
 private:
@@ -56,7 +57,7 @@ private:
 };
 
 // When a count reaches zero, trigger an ibarrier.  ibarrier_countdown_t is *not* thread safe.
-struct ibarrier_countdown_t : public boost::noncopyable {
+struct ibarrier_countdown_t : public Noncopyable {
   ibarrier_t barrier;
 private:
   int count;

@@ -5,7 +5,6 @@
 
 #include <geode/array/Array.h>
 #include <geode/structure/Tuple.h>
-#include <boost/noncopyable.hpp>
 namespace pentago {
 
 using namespace geode;

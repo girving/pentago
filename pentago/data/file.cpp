@@ -48,7 +48,7 @@ public:
 
 struct read_function_t : public read_file_t {
   GEODE_NEW_FRIEND
-  typedef boost::function<Array<const uint8_t>(uint64_t,int)> pread_t;
+  typedef function<Array<const uint8_t>(uint64_t,int)> pread_t;
 
   const string name_;
   const pread_t pread_;

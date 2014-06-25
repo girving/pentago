@@ -30,7 +30,7 @@ struct sheaf_t {
   int lines; // shape.product()
   int line_offset;
 };
-BOOST_STATIC_ASSERT(sizeof(sheaf_t)==20);
+static_assert(sizeof(sheaf_t)==20,"");
 
 random_partition_t::random_partition_t(const uint128_t key, const int ranks, const sections_t& sections)
   : partition_t(ranks,sections)

@@ -362,7 +362,7 @@ template<bool slice_35> static void compute_microline(line_details_t* const line
 #else
     time.stop();
     thread_time_t time(wakeup_kind,line->line_event);
-    line->wakeup(*line,unit());
+    line->wakeup(*line,unit);
 #endif
     PENTAGO_MPI_TRACE("sent wakeup for %p: %s",line,str(pre.line));
   }

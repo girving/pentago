@@ -2,13 +2,12 @@
 #pragma once
 
 #include <geode/utility/type_traits.h>
+#include <geode/utility/forward.h>
 #ifdef __APPLE__
 #include <libkern/OSAtomic.h>
 #else
 #include <pthread.h>
 #endif
-#include <boost/noncopyable.hpp>
-#include <boost/mpl/assert.hpp>
 namespace pentago {
 
 using namespace geode;
@@ -89,7 +88,7 @@ struct spinlock_t {
 #endif
 
 // Convenience class to lock and unlock a spinlock
-struct spin_t : boost::noncopyable {
+struct spin_t : Noncopyable {
   spinlock_t& lock;
 
   spin_t(spinlock_t& lock)

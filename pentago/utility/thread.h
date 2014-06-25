@@ -13,15 +13,13 @@
 #include <geode/python/Object.h>
 #include <geode/python/ExceptionValue.h>
 #include <geode/structure/forward.h>
-#include <boost/noncopyable.hpp>
-#include <boost/function.hpp>
+#include <geode/utility/function.h>
 #include <pthread.h>
 #include <vector>
 namespace pentago {
 
 using namespace geode;
 using std::vector;
-using boost::function;
 struct time_entry_t;
 
 /* Our goals are to make timing (1) as fast as possible and (2) easy
@@ -91,7 +89,7 @@ const event_t ekind_mask        = event_t(7)<<61;
 
 #if PENTAGO_TIMING
 
-class thread_time_t : public boost::noncopyable {
+class thread_time_t : public Noncopyable {
   time_entry_t* entry;
 public:
   GEODE_EXPORT thread_time_t(time_kind_t kind, event_t event);
@@ -101,7 +99,7 @@ public:
 
 #else
 
-class thread_time_t : public boost::noncopyable {
+class thread_time_t : public Noncopyable {
 public:
   thread_time_t(time_kind_t kind, event_t event) {}
   ~thread_time_t() {}
@@ -139,7 +137,7 @@ enum thread_type_t { MASTER=0, CPU=1, IO=2 };
 GEODE_EXPORT thread_type_t thread_type();
 
 // Initialize thread pools
-GEODE_EXPORT unit init_threads(int cpu_threads, int io_threads);
+GEODE_EXPORT Unit init_threads(int cpu_threads, int io_threads);
 
 // Grab thread counts: cpu count, io count
 GEODE_EXPORT Vector<int,2> thread_counts();

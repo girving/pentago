@@ -5,15 +5,13 @@
 #include <pentago/utility/spinlock.h>
 #include <pentago/utility/job.h>
 #include <geode/array/Array.h>
-#include <boost/noncopyable.hpp>
-#include <boost/function.hpp>
+#include <geode/utility/function.h>
 #include <vector>
 #include <mpi.h>
 namespace pentago {
 namespace mpi {
 
 using namespace geode;
-using boost::function;
 using std::vector;
 
 /* Notes:
@@ -29,7 +27,7 @@ using std::vector;
  * 4. It is safe to add requests during the callbacks.
  */
 
-class requests_t : public boost::noncopyable {
+class requests_t : public Noncopyable {
   Array<MPI_Request> requests;
   vector<function<void(MPI_Status* status)>> callbacks;
   Array<bool> cancellables;

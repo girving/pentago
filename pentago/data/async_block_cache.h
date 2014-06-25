@@ -34,7 +34,7 @@ public:
   GEODE_EXPORT static block_t board_block(const high_board_t& board);
 
   GEODE_EXPORT bool contains(const block_t block) const;
-  GEODE_EXPORT unit set(const block_t block, RawArray<const uint8_t> compressed);
+  GEODE_EXPORT Unit set(const block_t block, RawArray<const uint8_t> compressed);
 
 private:
   int block_size() const;

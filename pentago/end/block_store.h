@@ -49,7 +49,7 @@ struct block_info_t {
   mutable uint8_t missing_dimensions; // Which incoming dimension contributions are needed to complete this block
   mutable spinlock_t lock; // Used by accumulate
 };
-BOOST_STATIC_ASSERT(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS);
+static_assert(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS,"");
 
 // A readable block store, not including counts and samples
 class readable_block_store_t : public Object {

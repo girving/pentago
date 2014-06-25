@@ -17,7 +17,6 @@
 namespace pentago {
 
 GEODE_DEFINE_TYPE(block_cache_t)
-using std::tr1::unordered_map;
 using std::make_pair;
 using Log::cout;
 using std::endl;

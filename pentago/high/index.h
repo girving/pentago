@@ -15,8 +15,8 @@
 
 #include <pentago/end/sections.h>
 #include <pentago/data/supertensor.h>
-#include <boost/detail/endian.hpp>
-#ifdef BOOST_LITTLE_ENDIAN
+#include <geode/utility/endian.h>
+#if GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
 namespace pentago {
 
 struct compact_blob_t {

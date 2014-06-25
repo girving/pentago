@@ -56,11 +56,8 @@
 #include <pentago/utility/thread.h>
 #include <pentago/utility/spinlock.h>
 #include <geode/array/Array4d.h>
-#include <boost/noncopyable.hpp>
-#include <boost/function.hpp>
+#include <geode/utility/function.h>
 namespace pentago {
-
-using boost::function;
 
 struct supertensor_blob_t {
   uint64_t uncompressed_size; // size of the uncompressed data block

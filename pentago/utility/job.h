@@ -13,12 +13,11 @@
 #include <geode/utility/debug.h>
 #include <geode/utility/SanitizeFunction.h>
 #include <geode/utility/Unique.h>
-#include <boost/noncopyable.hpp>
 namespace pentago {
 
 using namespace geode;
 
-struct job_base_t : public boost::noncopyable {
+struct job_base_t : public Noncopyable {
   virtual ~job_base_t() {}
   virtual void operator()() const = 0;
 };

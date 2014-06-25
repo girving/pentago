@@ -285,7 +285,7 @@ void thread_time_t::stop() {
 
 namespace {
 
-struct mutex_t : public boost::noncopyable {
+struct mutex_t : public Noncopyable {
   pthread_mutex_t mutex;
 
   mutex_t() {
@@ -297,7 +297,7 @@ struct mutex_t : public boost::noncopyable {
   }
 };
 
-struct lock_t : public boost::noncopyable {
+struct lock_t : public Noncopyable {
   mutex_t& mutex;
 
   lock_t(mutex_t& mutex)
@@ -311,7 +311,7 @@ struct lock_t : public boost::noncopyable {
 };
 
 #if BLOCKING
-struct cond_t : public boost::noncopyable {
+struct cond_t : public Noncopyable {
   mutex_t& mutex;
   pthread_cond_t cond;
 
@@ -596,9 +596,9 @@ Ptr<thread_pool_t> io_pool;
 
 }
 
-unit init_threads(int cpu_threads, int io_threads) {
+Unit init_threads(int cpu_threads, int io_threads) {
   if (cpu_threads==-1 && io_threads==-1 && cpu_pool)
-    return unit();
+    return unit;
   GEODE_ASSERT(!cpu_pool && !io_pool);
   init_papi();
   master = pthread_self();
@@ -612,7 +612,7 @@ unit init_threads(int cpu_threads, int io_threads) {
   if (io_threads)
     io_pool = new_<thread_pool_t>(IO,io_threads,1000);
   time_info.local_start = wall_time();
-  return unit();
+  return unit;
 }
 
 Vector<int,2> thread_counts() {
@@ -861,7 +861,7 @@ vector<vector<Array<const history_t>>> thread_history() {
 void write_thread_history(const string& filename) {
 #if HISTORY
   typedef Vector<int64_t,3> Elem;
-  BOOST_STATIC_ASSERT(sizeof(Elem)==sizeof(history_t));
+  static_assert(sizeof(Elem)==sizeof(history_t),"");
   const auto history = thread_history();
   if (!history.size())
     return;

@@ -22,8 +22,8 @@
 #include <geode/math/popcount.h>
 #include <geode/math/sse.h>
 #include <geode/random/forward.h>
+#include <geode/utility/endian.h>
 #include <geode/vector/Vector.h>
-#include <boost/detail/endian.hpp>
 namespace pentago {
 
 // Decide whether or not to use SSE
@@ -31,7 +31,7 @@ namespace pentago {
 #define PENTAGO_SSE 0
 #else
 #define PENTAGO_SSE 1
-#ifndef BOOST_LITTLE_ENDIAN
+#if GEODE_ENDIAN != GEODE_LITTLE_ENDIAN
 #error "SSE is supported only in little endian mode"
 #endif
 #endif
@@ -48,9 +48,9 @@ struct super_t {
 
 #if PENTAGO_SSE
   __m128i x,y; // Little endian order as asserted above.
-#elif defined(BOOST_LITTLE_ENDIAN)
+#elif GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
   uint64_t a,b,c,d; // Little endian order.  Use different names to avoid confusion
-#elif defined(BOOST_BIG_ENDIAN)
+#elif GEODE_ENDIAN == GEODE_BIG_ENDIAN
   uint64_t d,c,b,a; // Respect big endianness
 #endif
 
@@ -134,9 +134,9 @@ struct super_t {
 
   // Use little endian argument order unconditionally
   super_t(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
-#if defined(BOOST_LITTLE_ENDIAN)
+#if GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
     : a(a), b(b), c(c), d(d) {}
-#elif defined(BOOST_BIG_ENDIAN)
+#elif GEODE_ENDIAN == GEODE_BIG_ENDIAN
     : d(d), c(c), b(b), a(a) {}
 #endif
 

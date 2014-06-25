@@ -207,7 +207,7 @@ struct subcompare_t {
   Array<const Vector<super_t,2>,4> old_data;
 };
 
-struct compare_t : public boost::noncopyable {
+struct compare_t : public Noncopyable {
   const section_t section;
   const Ptr<const supertensor_reader_t> old_reader;
   vector<Array<Tuple<Vector<int,4>,Vector<super_t,2>>>> block_samples;

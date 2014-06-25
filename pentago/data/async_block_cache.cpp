@@ -40,13 +40,13 @@ bool async_block_cache_t::contains(const block_t block) const {
   return lru.get(block)!=0;
 }
 
-unit async_block_cache_t::set(const block_t block, RawArray<const uint8_t> compressed) {
+Unit async_block_cache_t::set(const block_t block, RawArray<const uint8_t> compressed) {
   const auto data = supertensor_index_t::unpack_block(block,compressed);
   free_memory -= memory_usage(data);
   while (free_memory < 0)
     free_memory += memory_usage(lru.drop().y);
   lru.add(block,data);
-  return unit();
+  return unit;
 }
 
 int async_block_cache_t::block_size() const {

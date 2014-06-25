@@ -81,7 +81,7 @@ section_t section_t::transform(uint8_t global) const {
 }
 
 template<int symmetries> Tuple<section_t,uint8_t> section_t::standardize() const {
-  BOOST_STATIC_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
+  static_assert(symmetries==1 || symmetries==4 || symmetries==8,"");
   section_t best = *this;
   uint8_t best_g = 0;
   for (int g=1;g<symmetries;g++) {

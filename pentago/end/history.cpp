@@ -134,7 +134,7 @@ string str_event(const event_t event) {
 
 static Array<Tuple<time_kind_t,event_t>> dependencies(const int direction, const time_kind_t kind, const event_t event) {
   GEODE_ASSERT(abs(direction)==1);
-  BOOST_STATIC_ASSERT(compress_kind==0); // Verify that -kind != kind for kinds we care about
+  static_assert(compress_kind==0,"Verify that -kind != kind for kinds we care about");
 
   // Parse event
   const section_t section = parse_section(event);

@@ -19,7 +19,6 @@
 #include <geode/utility/Hasher.h>
 #include <geode/utility/Log.h>
 #include <geode/utility/tr1.h>
-#include <boost/noncopyable.hpp>
 namespace pentago {
 namespace mpi {
 
@@ -48,7 +47,7 @@ static inline int request_response_tag(const Vector<int,2>* buffer) {
 }
 
 namespace {
-struct block_request_t : public boost::noncopyable {
+struct block_request_t : public Noncopyable {
   // The section is determined by the dependent line, so we don't need to store it
   const section_t section; // child section
   const Vector<uint8_t,4> block;
@@ -420,14 +419,14 @@ void flow_t::wakeup(line_details_t* const line, const wakeup_block_t b) {
 }
 
 GEODE_UNUSED static inline int wakeup_tag(int b)  { return b; }
-GEODE_UNUSED static inline int wakeup_tag(unit b) { return 0; }
+GEODE_UNUSED static inline int wakeup_tag(Unit b) { return 0; }
 
 // Register a wakeup callback for the communication thread
 void flow_t::post_wakeup(line_details_t& line, const wakeup_block_t b) {
 #if PENTAGO_MPI_FUNNEL
   requests.add_immediate(curry(&flow_t::wakeup,this,&line,b));
 #else
-  BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(long long int));
+  static_assert(sizeof(line_details_t*)==sizeof(long long int),"");
   // Send a pointer to ourselves to the communication thread
   MPI_Request request;
   CHECK(MPI_Isend((void*)&line.self,1,MPI_LONG_LONG_INT,0,wakeup_tag(b),comms.wakeup_comm,&request));
@@ -440,10 +439,14 @@ void flow_t::post_wakeup(line_details_t& line, const wakeup_block_t b) {
 #if !PENTAGO_MPI_FUNNEL
 // Process a wakeup message from a worker thread
 void flow_t::process_wakeup(MPI_Status* status) {
-  BOOST_STATIC_ASSERT(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int));
+  static_assert(sizeof(line_details_t*)==sizeof(uint64_t) && sizeof(uint64_t)==sizeof(long long int),"");
   GEODE_ASSERT(get_count(status,MPI_LONG_LONG_INT)==1);
   line_details_t* const line = (line_details_t*)wakeup_buffer;
-  wakeup(line,BOOST_PP_IF(PENTAGO_MPI_COMPRESS_OUTPUTS,status->MPI_TAG,unit()));
+#if PENTAGO_MPI_COMPRESS_OUTPUTS
+  wakeup(line,status->MPI_TAG);
+#else
+  wakeup(line,unit);
+#endif
   post_wakeup_recv();
 }
 #endif

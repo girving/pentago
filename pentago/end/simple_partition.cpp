@@ -46,7 +46,7 @@ struct chunk_t {
   uint64_t block_id; // Unique id of first block (others are indexed consecutively)
   uint64_t node_offset; // Total number of nodes in all blocks in lines before this
 };
-BOOST_STATIC_ASSERT(sizeof(chunk_t)==64);
+static_assert(sizeof(chunk_t)==64,"");
 
 simple_partition_t::simple_partition_t(const int ranks, const sections_t& sections, bool save_work)
   : partition_t(ranks,sections)

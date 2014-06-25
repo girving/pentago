@@ -34,7 +34,6 @@
 #include <geode/utility/curry.h>
 #include <geode/utility/Log.h>
 #include <geode/utility/process.h>
-#include <boost/detail/endian.hpp>
 #include <sys/resource.h>
 #include <getopt.h>
 #include <errno.h>
@@ -404,10 +403,12 @@ int toplevel(int argc, char** argv) {
          << "\ncompress outputs = "<<PENTAGO_MPI_COMPRESS_OUTPUTS
          << "\ntiming = "<<PENTAGO_TIMING
          << "\nsse = "<<PENTAGO_SSE
-#ifdef BOOST_BIG_ENDIAN
+#if GEODE_ENDIAN == GEODE_BIG_ENDIAN
          << "\nendian = big"
-#else
+#elif GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
          << "\nendian = little"
+#else
+         << "\nendian = unknown"
 #endif
          << "\nhistory = "<<thread_history_enabled()
          << "\npapi = "<<(papi_enabled() ? join(" ",papi_event_names()) : "<disabled>")

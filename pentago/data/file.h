@@ -4,7 +4,7 @@
 #include <pentago/utility/debug.h>
 #include <geode/array/Array.h>
 #include <geode/python/Object.h>
-#include <boost/function.hpp>
+#include <geode/utility/function.h>
 namespace pentago {
 
 // Abstract readable file
@@ -42,6 +42,6 @@ GEODE_EXPORT Ref<write_file_t> write_local_file(const string& path);
 
 // Read access via an arbitrary pread function.  Usage: data = pread(offset,size)
 GEODE_EXPORT Ref<const read_file_t> read_function(const string& name,
-                                                  const boost::function<Array<const uint8_t>(uint64_t,int)>& pread);
+                                                  const function<Array<const uint8_t>(uint64_t,int)>& pread);
 
 }

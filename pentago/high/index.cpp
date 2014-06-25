@@ -8,7 +8,8 @@
 #include <pentago/utility/index.h>
 #include <geode/python/Class.h>
 #include <geode/python/stl.h>
-#ifdef BOOST_LITTLE_ENDIAN
+#include <geode/utility/endian.h>
+#if GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
 namespace pentago {
 
 GEODE_DEFINE_TYPE(supertensor_index_t)
@@ -123,7 +124,7 @@ void write_supertensor_index(const string& name, const vector<Ref<const superten
 using namespace pentago;
 
 void wrap_index() {
-#ifdef BOOST_LITTLE_ENDIAN
+#if GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
   {
     typedef compact_blob_py Self;
     Class<Self>("compact_blob_t")

@@ -23,7 +23,7 @@ STAT_DETAIL(uint64_t lookup_detail[37], successful_lookup_detail[37];)
 uint64_t distance_prunes;
 double start_time;
 
-unit clear_stats() {
+Unit clear_stats() {
   total_expanded_nodes = 0;
   asarray(expanded_nodes).fill(0);
   total_lookups = 0;
@@ -34,10 +34,10 @@ unit clear_stats() {
   )
   distance_prunes = 0;
   start_time = get_time();
-  return unit();
+  return unit;
 }
 
-unit print_stats() {
+Unit print_stats() {
   double elapsed = get_time()-start_time;
   cout << "expanded nodes = "<<total_expanded_nodes<<" (";
   int found = 0;
@@ -70,7 +70,7 @@ unit print_stats() {
   if (distance_prunes) cout << ", distance prunes = "<<distance_prunes;
   cout << ", elapsed time = "<<elapsed<<" s";
   cout << ", speed = "<<uint64_t(total_expanded_nodes/elapsed)<<" nodes/s"<<endl;
-  return unit();
+  return unit;
 }
 
 #ifdef GEODE_PYTHON

@@ -46,7 +46,7 @@ template<class D,class S> static inline D mcast(const S& src) {
 static int table_bits = 0;
 static Array<superentry_t> table;
 
-unit init_supertable(int bits) {
+Unit init_supertable(int bits) {
   if (bits<1 || bits>30)
     THROW(ValueError,"expected 1<=bits<=30, got bits = %d",bits);
   if (64-bits>hash_bits)
@@ -56,13 +56,13 @@ unit init_supertable(int bits) {
     <<", size = "<<pow(2.,double(bits-20))*sizeof(superentry_t)<<"MB"<<endl;
   table = Array<superentry_t>(1<<bits,uninit);
   clear_supertable();
-  return unit();
+  return unit;
 }
 
-unit clear_supertable() {
+Unit clear_supertable() {
   memset(table.data(),0,sizeof(superentry_t)*table.size());
   TRACE(trace_restart());
-  return unit();
+  return unit;
 }
 
 int supertable_bits() {

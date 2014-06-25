@@ -14,7 +14,7 @@ using std::bad_alloc;
 
 namespace {
 
-struct aligned_buffer_t : public boost::noncopyable {
+struct aligned_buffer_t : public Noncopyable {
   GEODE_DECLARE_TYPE(GEODE_NO_EXPORT) // Declare pytype
   GEODE_PY_OBJECT_HEAD // Reference counter and pointer to type object
   size_t size; // Size of memory block
