@@ -2,6 +2,8 @@
 
 #include <pentago/utility/large.h>
 #include <geode/utility/format.h>
+#include <cstdlib>
+#include <cmath>
 namespace pentago {
 
 using std::abs;
