@@ -34,8 +34,7 @@ exports.add_options = function (options) {
 
 // Useful counters
 var stats = {
-  active_gets: 0,
-  crossed_chunks: 0
+  active_gets: 0
 }
 exports.stats = stats
 
@@ -120,37 +119,12 @@ exports.values = function (options,log) {
     })
   }
 
-  // Get a section of a slice file, possibly split into chunks due to size
+  // Get a section of a slice file.  This routine used to split requests
+  // across chunks manually, but that is no longer necessary now that
+  // Akamai fixed their bug.
   function block_get(slice,blob,cont) {
     var path = '/slice-'+slice+'.pentago'
-    if (slice <= 11) // Unchunked file, single request works
-      simple_get(path,blob,cont)
-    else {
-      var zeros = 1+(slice>13)+(slice>16)
-      var chunk_size = 5368709119
-      var chunk_get = function (c,cont) {
-        var lo = max(blob.offset-chunk_size*c,0)
-        var hi = min(blob.offset+blob.size-chunk_size*c,chunk_size)
-        simple_get(path+'.'+('000'+(c+1)).slice(-zeros),
-          {'offset': lo, 'size': hi-lo},
-          cont,true)
-      }
-      var c0 = floor(blob.offset/chunk_size)
-      var c1 = floor((blob.offset+blob.size-1)/chunk_size)
-      if (c0==c1) // Block contained in a single chunk
-        chunk_get(c0,cont)
-      else { // Block split between two chunks
-        log.info('blob crosses chunk boundary: %s, %j',path,blob)
-        stats.crossed_chunks++
-        var parts = ['','']
-        var next = function () {
-          if (parts[0].length && parts[1].length)
-            cont(Buffer.concat(parts))
-        }
-        chunk_get(c0,function (part) { parts[0] = part; next() })
-        chunk_get(c1,function (part) { parts[1] = part; next() })
-      }
-    }
+    simple_get(path,blob,cont)
   }
 
   // Lookup or compute the value or board and its children, then call cont(results) with a board -> value map.

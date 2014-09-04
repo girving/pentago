@@ -127,12 +127,8 @@ function test_values(cont) {
               for (var b in values)
                 if (!seen[b])
                   throw 'missed board '+b
-            if (!--gn) {
-              log.info('crossed chunks = %d',Values.stats.crossed_chunks)
-              if (!Values.stats.crossed_chunks)
-                throw 'no chunks crossed, the relevant code could be buggy'
+            if (!--gn)
               cont()
-            }
           }
         })
       }
@@ -196,7 +192,7 @@ if (process.argv.length > 2) {
   else if (cmd == 'slow')
     tests = [test_slow]
   else
-    throw "unknown command '"+slow+"'"
+    throw "unknown command '"+cmd+"'"
 }
 
 // Run all tests
