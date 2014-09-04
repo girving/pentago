@@ -12,7 +12,7 @@
 //   slow(7,function () {})
 
 module.exports = function (compute) {
-  var pending = {} // Map from input to callbacks to callbacks to call
+  var pending = {} // Map from input to list of callbacks to call
   return function (input,cont) {
     var name = ''+input
     if (name in pending)
