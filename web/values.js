@@ -127,6 +127,27 @@ exports.values = function (options,log) {
     simple_get(path,blob,cont)
   }
 
+  // Get a block if necessary, merging simultaneous requests
+  var pending_block = Pending(function (block,cont) {
+    if (cache.contains(block))
+      cont()
+    else {
+      // Compute slice
+      var slice = 0
+      for (var q=0;q<4;q++)
+        for (var s=0;s<2;s++)
+          slice += block[0][q][s]
+      // Grab block location
+      simple_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
+        // Grab block data
+        block_get(slice,indices[slice].block_location(blob),function (data) {
+          cache.set(block,data)
+          cont()
+        })
+      })
+    }
+  })
+
   // Lookup or compute the value or board and its children, then call cont(results) with a board -> value map.
   function values(board,cont) {
     // Collect the leaf boards whose values we need
@@ -159,34 +180,13 @@ exports.values = function (options,log) {
       cont(results)
     })
 
-    // Lookup a value in the database
+    // Look up a remote value, caching the block in the process
     function remote_request(board,cont) {
-      var block = cache.board_block(board)
-      var rest = function () {
+      pending_block(cache.board_block(board), function () {
         var v = board.value(cache)
         results[board.name()] = v
         cont(v)
-      }
-      if (cache.contains(block))
-        rest()
-      else if (block in cache_pending)
-        cache_pending[block].push(rest)
-      else {
-        // Add one pending callback
-        cache_pending[block] = [rest]
-        // Grab block location
-        var slice = board.count()
-        simple_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
-          // Grab block data
-          block_get(slice,indices[slice].block_location(blob),function (data) {
-            cache.set(block,data)
-            var pending = cache_pending[block]
-            delete cache_pending[block]
-            for (var i=0;i<pending.length;i++)
-              pending[i]()
-          })
-        })
-      }
+      })
     }
 
     // At this point, all needed values have been added to the requests list.
