@@ -192,4 +192,18 @@ you've gotten past this warning, you can download the data via
     wget $url/counts-<n>.npy
 
     # Download a slice file.  Replace <n> with the desired slice in [0,18]
-    wget $url/slice-<n>/pentago
+    wget $url/slice-<n>.pentago
+
+Slices 12 through 18 are chunked into 5GB-1B chunks on Rackspace, so if you have difficulty downloading
+them all at once you can do it one chunk at a time.  Chunks look like `slice-<n>.pentago.<chunk>`,
+where `<chunk>` is 1-based and zero padded.  Thus, all the chunks look like
+
+    12:  slice-12.pentago.1    to  slice-12.pentago.2
+    13:  slice-13.pentago.1    to  slice-13.pentago.8
+    14:  slice-14.pentago.01   to  slice-14.pentago.13
+    15:  slice-15.pentago.01   to  slice-15.pentago.55
+    16:  slice-16.pentago.01   to  slice-16.pentago.86
+    17:  slice-17.pentago.001  to  slice-17.pentago.275
+    18:  slice-18.pentago.001  to  slice-18.pentago.365
+
+Once you have all the chunks, just cat them together.
