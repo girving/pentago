@@ -3,7 +3,7 @@
 'use strict'
 var fs = require('fs')
 var Log = require('log')
-var http = require('http')
+var https = require('https')
 var time = require('time')
 var options = require('commander')
 var pentago = require('./pentago/build/Release/pentago')
@@ -26,8 +26,16 @@ var values = Values.values(options,log)
 // Usage information
 var usage = fs.readFileSync(__dirname+'/usage.txt')
 
+// Load certificate
+var slurp = fs.readFileSync
+var cert = {
+  ca: [slurp('ssl/chain-1.crt'),slurp('ssl/chain-2.crt')],
+  key: slurp('ssl/pentago.key'),
+  cert: slurp('ssl/pentago.crt')
+}
+
 // Create server
-var server = http.createServer(function (req,res) {
+var server = https.createServer(cert, function (req,res) {
   // Parse board
   try {
     var board = pentago.high_board_t(req.url.substr(1))
