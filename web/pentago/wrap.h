@@ -9,7 +9,7 @@
 #include <pentago/base/section.h>
 #include <pentago/high/index.h>
 #include <geode/python/Ptr.h>
-#include <geode/utility/Enumerate.h>
+#include <geode/utility/enumerate.h>
 #include <geode/utility/format.h>
 #include <geode/utility/mpl.h>
 #include <geode/utility/range.h>
