@@ -20,8 +20,16 @@
 namespace pentago {
 
 struct compact_blob_t {
-  uint32_t offset[2]; // Split into two to guarantee struct packing
+  Vector<uint32_t,2> packed_offset; // Split into two to guarantee struct packing
   uint32_t size; // compressed for blocks, uncompressed for blob information
+
+  uint64_t offset() const {
+    return packed_offset[0]|uint64_t(packed_offset[1])<<32;
+  }
+
+  void set_offset(const uint64_t offset) {
+    packed_offset = vec(uint32_t(offset),uint32_t(offset>>32));
+  }
 };
 static_assert(sizeof(compact_blob_t)==12,"struct packing failed");
 

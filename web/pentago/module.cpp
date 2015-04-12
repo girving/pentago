@@ -12,7 +12,7 @@ namespace node {
 using namespace pentago::end;
 
 static Ref<high_board_t> make_board(const Arguments& args) {
-  return args.Length() ? high_board_t::parse(*String::AsciiValue(args[0])) : new_<high_board_t>(0,false);
+  return args.Length() ? high_board_t::parse(*String::Utf8Value(args[0])) : new_<high_board_t>(0,false);
 }
 
 static Ref<sections_t> make_sections(const Arguments& args) {
@@ -30,9 +30,10 @@ static Ref<async_block_cache_t> make_async(const Arguments& args) {
 }
 
 static Ref<supertensor_index_t> make_index(const Arguments& args) {
+  Isolate* iso = args.GetIsolate();
   if (args.Length() < 1)
     throw TypeError(format("supertensor_index_t: expected one sections_t argument, got %d arguments",args.Length()));
-  return new_<supertensor_index_t>(from_js<const sections_t&>(args[0]));
+  return new_<supertensor_index_t>(from_js<const sections_t&>(iso,args[0]));
 }
 
 static void init(Handle<v8::Object> exports) {
