@@ -14,7 +14,7 @@ var sqrt = Math.sqrt
 var floor = Math.floor
 
 // Backend, with a bit of caching to avoid flicker on the back button
-var backend_url = 'http://backend.perfect-pentago.net:2048/'
+var backend_url = 'https://backend.perfect-pentago.net:2048/'
 var cache = LRU({max:2048})
 
 // Colors for each board value, taking care to be nice to colorblind folk.
@@ -376,7 +376,7 @@ function draw_values(svg) {
             cache.set(name,values[name])
           draw_values(svg)
         } else
-          set_error('Server request failed, http status = '+xh.status)
+          set_error('Server request failed, https status = '+xh.status)
       }
     }
     set_loading('Looking up '+board.count+' stone board...')

@@ -42,12 +42,12 @@
         Like chess and go, pentago is a two player, deterministic, perfect knowledge, zero sum game:
         there is no random or hidden state, and the goal of the two players is to make the other player lose (or
         at least tie).  Note that pentago is not related to go; it is much closer to
-        <a href="http://en.wikipedia.org/wiki/gomoku">gomoku</a>.
+        <a href="https://en.wikipedia.org/wiki/gomoku">gomoku</a>.
         </p><p>
         Unlike chess and go, pentago is small enough for a computer to play perfectly: with symmetries removed,
         there are a mere 3,009,081,623,421,558 (3e15) possible positions.  Thus, with the help of several hours
-        on 98304 threads of <a href="http://www.nersc.gov/users/computational-systems/edison">Edison</a>, a
-        Cray supercomputer at <a href="http://www.nersc.gov">NERSC</a>, pentago is now strongly solved.
+        on 98304 threads of <a href="https://www.nersc.gov/users/computational-systems/edison">Edison</a>, a
+        Cray supercomputer at <a href="https://www.nersc.gov">NERSC</a>, pentago is now strongly solved.
         "Strongly" means that perfect play is efficiently computable for any position.  For example,
         <a href="/#0">the first player wins</a>.
         </p><p>
@@ -84,7 +84,7 @@
         I will be writing up more details of the computation in paper form soon, but here is a brief summary.
         For background on the complexity of pentago and the applicability of a variety of solution algorithms,
         see Niklas Büscher's 2011 thesis,
-        <a href="http://www.ke.tu-darmstadt.de/lehre/arbeiten/bachelor/2011/Buescher_Niklas.pdf">"On Solving Pentago"</a>,
+        <a href="https://www.ke.tu-darmstadt.de/lehre/arbeiten/bachelor/2011/Buescher_Niklas.pdf">"On Solving Pentago"</a>,
         which analyzed the game but did not solve it.
         </p><p>
         As mentioned above, pentago has 3,009,081,623,421,558 (3e15) possible positions once symmetries
@@ -106,7 +106,7 @@
         at 36 stone positions and moving backwards through the game to the zero stone start.
         Around the peak at 24 stones, the computation requires 80 TB of RAM even with compression,
         and was therefore parallelized using MPI and run on 98304 threads of
-        <a href="http://www.nersc.gov/users/computational-systems/edison">Edison</a>,
+        <a href="https://www.nersc.gov/users/computational-systems/edison">Edison</a>,
         a Cray supercomputer at NERSC (the National Energy Research Supercomputing Center).  Positions with more
         than 18 stones were discarded after use, and those with 18 or fewer were written to disk using lzma
         compression to reduce down to 4 TB total.  The large scale computation took less than four hours, plus
@@ -124,7 +124,7 @@
         In addition to increasing the complexity, the requirement to only store a few inputs at a time turns an
         otherwise bandwidth-limited computation into a latency-limited one.  Indeed, the computation was
         significantly slower than expected on the older NERSC supercomputer
-        <a href="http://www.nersc.gov/users/computational-systems/hopper">Hopper</a> due to unexpectedly
+        <a href="https://www.nersc.gov/users/computational-systems/hopper">Hopper</a> due to unexpectedly
         high latency, possibly exacerbated by the asynchronous structure of the communication.
         </p><p>
         The above discussion applies to the full solve required to compute the 4 TB database, which this website
@@ -141,11 +141,11 @@
       <section id="server"><h2>Server setup</h2>
         <p>
         Hosting for the 4 TB data set, this website, and the backend servers that power it have been generously
-        donated by <a href="http://rackspace.com">Rackspace</a>.  The data is stored in a single
-        <a href="http://www.rackspace.com/cloud/files">Cloud Files</a> container.  When the backend server receives
-        a request for a position, it either looks up the result using http range requests into the compressed
+        donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a single
+        <a href="https://www.rackspace.com/cloud/files">Cloud Files</a> container.  When the backend server receives
+        a request for a position, it either looks up the result using https range requests into the compressed
         data set or computes it from scratch if there are 18 or more stones.  Both of these operations involve
-        significant delays, so the server is written in <a href="http://nodejs.org">node.js</a> for easy
+        significant delays, so the server is written in <a href="https://nodejs.org">node.js</a> for easy
         asynchronous control flow, using C++ internals exposed to node with a small custom binding layer.
         Data set lookups and caching are handled within the main node process, and new computations are farmed
         out to worker processes.  Since each compute worker requires 1 GB of RAM, the node.js master server
@@ -154,10 +154,10 @@
         workers.
         </p><p>
         The backend server is
-        <a href="http://backend.perfect-pentago.net:2048"> http://backend.perfect-pentago.net:2048</a>.  The
+        <a href="https://backend.perfect-pentago.net:2048">https://backend.perfect-pentago.net:2048</a>.  The
         API is fairly simple: give it the code for a pentago board and it replies with json containing the values
         of all child positions.  For example,
-        <a href="http://backend.perfect-pentago.net:2048/0">here is the start position</a>.  You are welcome
+        <a href="https://backend.perfect-pentago.net:2048/0">here is the start position</a>.  You are welcome
         to use the server directly for small numbers of queries, but please email me if you want to use it
         more intensively.  Since 18 stone positions and above are very compute intensive, it is the easiest
         thing in the world to DoS attack.
@@ -171,7 +171,7 @@
           <a href="https://github.com/girving/pentago">https://github.com/girving/pentago</a>
         </div><p>
         The data set is released into the public domain
-        (<a href="http://wiki.creativecommons.org/CC0_use_for_data">CC0</a>),
+        (<a href="https://wiki.creativecommons.org/CC0_use_for_data">CC0</a>),
         and can be downloaded directly from Rackspace; send me an email if you want links.
         </p>
       </section>
@@ -192,30 +192,30 @@
 
       <section id="thanks"><h2>Acknowledgements</h2>
         <p>
-        I am extremely grateful to Jeff Hammond and <a href="http://nersc.gov">NERSC</a> for both Edison time
+        I am extremely grateful to Jeff Hammond and <a href="https://nersc.gov">NERSC</a> for both Edison time
         and for valuable support and advice throughout the project, and to
-        <a href="http://www.anl.gov">Argonne National Lab</a> for small amounts of time on Blue Gene to help
+        <a href="https://www.anl.gov">Argonne National Lab</a> for small amounts of time on Blue Gene to help
         understand performance problems.  The project would not have been possible without this compute time.
         Jed Brown provided numerous helpful suggestions, in particular the initial suggestion that supercomputer
         time might be a possibility.  Thanks for helping me tilt at this rather strange windmill!
         </p><p>
         Hosting for the 4 TB data set and compute servers for this site were generously donated by
-        <a href="http://rackspace.com">Rackspace</a>; thanks especially to Jesse Noller at Rackspace for offering
+        <a href="https://rackspace.com">Rackspace</a>; thanks especially to Jesse Noller at Rackspace for offering
         to host this open source project!  Cloud storage may seem less shiny than supercomputer time, but is just
         as essential in order to make the results available to anyone curious.  Solving a game and forgetting the
         answer is no good!
         </p>
         <div class="logos">
-          <a href="http://nersc.gov"><img src="nersc-logo-small.png" height="60"></a>
-          <a href="http://rackspace.com"><img src="rackspace-logo.svg" height="60"></a>
+          <a href="https://nersc.gov"><img src="nersc-logo-small.png" height="60"></a>
+          <a href="https://rackspace.com"><img src="rackspace-logo.svg" height="60"></a>
         </div>
       </section>
 
       <section id="contact"><h2>Contact</h2>
         <p>
         For questions or comments, email <a href="mailto:irving@naml.us">Geoffrey Irving &lt;irving@naml.us&gt</a>.
-        My main research site and blog are at <a href="http://naml.us">http://naml.us</a> and
-        <a href="http://naml.us/blog">http://naml.us/blog</a>, respectively.  For bug reports, please use
+        My main research site and blog are at <a href="https://naml.us">https://naml.us</a> and
+        <a href="https://naml.us/blog">https://naml.us/blog</a>, respectively.  For bug reports, please use
         <a href="https://github.com/girving/pentago/issues">https://github.com/girving/pentago/issues</a>.
         </p>
       </section>
