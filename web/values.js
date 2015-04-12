@@ -2,7 +2,7 @@
 
 'use strict'
 var os = require('os')
-var http = require('http')
+var https = require('https')
 var time = require('time')
 var request = require('request')
 var LRU = require('lru-cache')
@@ -29,7 +29,7 @@ exports.add_options = function (options) {
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--ccache <size>','Size of compute cache (suffixes M/MB and G/GB are understood)',d.ccache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
-         .option('--max-sockets <n>','Maximum number of simultaneous http connections',parseInt,d.maxSockets)
+         .option('--max-sockets <n>','Maximum number of simultaneous https connections',parseInt,d.maxSockets)
 }
 
 // Useful counters
@@ -72,12 +72,12 @@ exports.values = function (options,log) {
   var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
   var cache = pentago.async_block_cache_t(cache_limit)
   var cache_pending = {} // Map from block to callbacks to call once block is available
-  var container = 'http://582aa28f4f000f497ad5-81c103f827ca6373fd889208ea864720.r52.cf5.rackcdn.com'
+  var container = 'https://b13bd9386883242c090c-81c103f827ca6373fd889208ea864720.ssl.cf5.rackcdn.com'
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
     throw 'invalid --max-sockets value '+opts.maxSockets
-  http.globalAgent.maxSockets = opts.maxSockets
+  https.globalAgent.maxSockets = opts.maxSockets
 
   // Initialize timing system
   pentago.init_threads(0,0)
@@ -111,7 +111,8 @@ exports.values = function (options,log) {
                    headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
     request(details,function (error,res,body) {
       if (error || res.statusCode != 206 || body.length != blob.size) {
-        log.error("http get failed: %s, status %d, length %d, error '%s'",name,res.statusCode,body.length,error)
+        log.error("https get failed: %s, status %d, length %d != %d, error '%s'",
+                  name,res.statusCode,body.length,blob.size,error)
         process.exit(1)
       }
       log.debug('range response %s, active %d',name,--stats.active_gets)
@@ -197,7 +198,7 @@ exports.values = function (options,log) {
         if (slice != requests[i].board.count())
           throw 'slice mismatch: '+slice+' != '+requests[i].board.count()
       // Asychronously request or compute all needed values
-      if (slice <= opts.maxSlice) // If the slice is in the database, make asynchronous http requests
+      if (slice <= opts.maxSlice) // If the slice is in the database, make asynchronous https requests
         for (var i=0;i<requests.length;i++)
           remote_request(requests[i].board,requests[i].cont)
       else { // Dispatch all requests to a single worker process to exploit coherence
