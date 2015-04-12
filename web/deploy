@@ -3,7 +3,6 @@
 
 from __future__ import division,print_function,unicode_literals,absolute_import
 import subprocess
-import pyrax
 import glob
 import os
 
@@ -11,17 +10,34 @@ import os
 os.chdir(os.path.dirname(__file__))
 subprocess.check_call(['make'])
 
-# Authenticate
-pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
-
-# Upload
-container = pyrax.cloudfiles.get_container('pentago-frontend')
-files = dict((f.name,f) for f in container.get_objects())
-for pattern in 'bundle.js *.html *.css *.png *.svg'.split():
+# Files to upload
+files = []
+for pattern in 'bundle.js *.html *.css *.png *.svg .htaccess'.split():
   for name in glob.glob(pattern):
     if name not in ('nersc-logo.png',):
-      if name in files and files[name].etag==pyrax.utils.get_checksum(name):
-        continue
-      print('upload %s'%name)
-      obj = container.upload_file(name,name)
-      obj.purge()
+      files.append(name)
+
+def mediatemple():
+  '''Deploy to mediatemple'''
+  subprocess.call(['scp']+files+['mt:domains/perfect-pentago.net/html'])
+
+def rackspace():
+  '''Deploy to rackspace.  Obsolete since CDN websites can't do SSL'''
+  assert False
+
+  # Authenticate
+  import pyrax
+  pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
+
+  # Upload
+  container = pyrax.cloudfiles.get_container('pentago-frontend')
+  existing = dict((f.name,f) for f in container.get_objects())
+  for name in files:
+    if name in existing and existing[name].etag==pyrax.utils.get_checksum(name):
+      continue
+    print('upload %s'%name)
+    obj = container.upload_file(name,name)
+    obj.purge()
+
+# Deploy
+mediatemple()
