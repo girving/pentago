@@ -33,7 +33,7 @@ public:
   ~random_partition_t();
 
   // Define partition_t interface
-  uint64_t memory_usage() const;
+  uint64_t memory_usage() const override;
   uint64_t rank_count_lines(const int rank) const override;
   Array<const line_t> rank_lines(const int rank) const override;
   Array<const local_block_t> rank_blocks(const int rank) const override;
