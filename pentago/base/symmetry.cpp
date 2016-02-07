@@ -288,14 +288,18 @@ super_t transform_super(symmetry_t s, super_t C) {
     x ^= t^_mm_slli_epi64(t,2*sh); })
   #define LOW_TRANSPOSE(i,j) ({ LOW_HALF_TRANSPOSE(C.x,i,j); LOW_HALF_TRANSPOSE(C.y,i,j); }) // 24 ops
 #else // No SSE
-  #define LOW_QUARTER_TRANSPOSE(x,i,j) ({ \
+  #define LOW_QUARTER_TRANSPOSE(x,i,j) ({ /* 12 ops */ \
     const int ii = 1<<2*i, jj = 1<<2*j, kk = 1<<2*(3-i-j), sh = jj-ii; \
     const uint64_t other = 1|BIT(kk)|BIT(2*kk)|BIT(3*kk); \
     auto t = (x^x>>sh)&(other*(BIT(ii)|BIT(3*ii)|BIT(ii+2*jj)|BIT(3*ii+2*jj))); \
     x ^= t^t<<sh; \
     t = (x^x>>2*sh)&(other*(BIT(2*ii)|BIT(3*ii)|BIT(2*ii+jj)|BIT(3*ii+jj))); \
     x ^= t^t<<2*sh; })
-  #define LOW_TRANSPOSE(i,j) ({ LOW_QUARTER_TRANSPOSE(C.a,i,j); LOW_QUARTER_TRANSPOSE(C.b,i,j); LOW_QUARTER_TRANSPOSE(C.c,i,j); LOW_QUARTER_TRANSPOSE(C.d,i,j); })
+  #define LOW_TRANSPOSE(i,j) ({ /* 48 ops */ \
+    LOW_QUARTER_TRANSPOSE(C.a,i,j); \
+    LOW_QUARTER_TRANSPOSE(C.b,i,j); \
+    LOW_QUARTER_TRANSPOSE(C.c,i,j); \
+    LOW_QUARTER_TRANSPOSE(C.d,i,j); })
 #endif
 
 #if PENTAGO_SSE
