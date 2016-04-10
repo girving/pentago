@@ -20,7 +20,15 @@ Mostly taken from http://agileand.me/content/deploying-play-application-rackspac
     sudo useradd -g pentago -d /var/pentago pentago
     sudo chown pentago:pentago pentago 
 
-3. Launch server
+3. Obtain ssl certificate:
+
+    cd /var/pentago
+    sudo su pentago
+    cd ssl
+    # https://www.namecheap.com/support/knowledgebase/article.aspx/9704/0/nodejs
+    openssl req -nodes -newkey rsa:4096 -keyout pentago.key -out pentago.csr
+
+4. Launch server
 
     sudo npm install -g forever 
     cd /var/pentago
