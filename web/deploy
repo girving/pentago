@@ -21,23 +21,5 @@ def mediatemple():
   '''Deploy to mediatemple'''
   subprocess.call(['scp']+files+['mt:domains/perfect-pentago.net/html'])
 
-def rackspace():
-  '''Deploy to rackspace.  Obsolete since CDN websites can't do SSL'''
-  assert False
-
-  # Authenticate
-  import pyrax
-  pyrax.set_credential_file(os.environ['HOME']+'/.pyrax.cfg')
-
-  # Upload
-  container = pyrax.cloudfiles.get_container('pentago-frontend')
-  existing = dict((f.name,f) for f in container.get_objects())
-  for name in files:
-    if name in existing and existing[name].etag==pyrax.utils.get_checksum(name):
-      continue
-    print('upload %s'%name)
-    obj = container.upload_file(name,name)
-    obj.purge()
-
 # Deploy
 mediatemple()

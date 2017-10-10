@@ -1,9 +1,11 @@
-all: bundle.js test board.css main.css
+all: test public
 
-bundle.js: client.js board.js
+public: public/bundle.js public/board.css public/main.css
+
+public/bundle.js: client.js board.js
 	browserify $< -o $@
 
-%.css: %.styl
+public/%.css: %.styl
 	node_modules/.bin/stylus --compress --use nib < $< > $@
 
 .PHONY: test clean
@@ -12,4 +14,4 @@ test:
 	node unit.js
 
 clean:
-	rm -f bundle.js board.css main.css
+	rm -f public/bundle.js public/board.css public/main.css

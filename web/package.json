@@ -4,14 +4,14 @@
   "description": "Perfect pentago move explorer",
   "author": "Geoffrey Irving <irving@naml.us>",
   "homepage": "https://github.com/girving/pentago",
-  "license": "BSD",
+  "license": "BSD-3-Clause",
   "main": "server.js",
-  "engines" : {
-    "node" : ">=0.12"
+  "engines": {
+    "node": ">=0.12"
   },
   "dependencies": {
-    "d3": "3.3.x",
     "commander": "2.1.x",
+    "d3": "^3.5.17",
     "log": "1.4.x",
     "lru-cache": "2.5.x",
     "mule": "0.1.x",

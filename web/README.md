@@ -1,6 +1,13 @@
 Pentago web server and client
 =============================
 
+## Client
+
+The client is hosted on Firebase.  To deploy:
+
+    cd pentago/web
+    firebase deploy
+
 ## Server setup
 
 Mostly taken from http://agileand.me/content/deploying-play-application-rackspace-cloud-vps.
