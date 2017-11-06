@@ -1,20 +1,20 @@
 // MPI related utilities
 #pragma once
 
-#include <pentago/end/config.h>
-#include <pentago/utility/thread.h>
-#include <pentago/base/section.h>
-#include <geode/utility/format.h>
-#include <geode/vector/Vector.h>
+#include "pentago/end/config.h"
+#include "pentago/utility/thread.h"
+#include "pentago/base/section.h"
+#include "pentago/utility/format.h"
+#include "pentago/utility/vector.h"
 #include <mpi.h>
 namespace pentago {
 namespace mpi {
 
-using namespace geode;
 using namespace pentago::end;
 using std::string;
 
-void GEODE_NORETURN(check_failed(const char* file, const char* function, int line, const char* call, int result));
+__attribute__((noreturn)) void check_failed(const char* file, const char* function, int line,
+                                            const char* call, int result);
 
 // Die if an MPI routine doesn't succeed
 #define CHECK(call) ({ \
@@ -33,7 +33,7 @@ MPI_Comm comm_dup(MPI_Comm comm);
 int get_count(MPI_Status* status, MPI_Datatype datatype);
 
 // Init and finalize
-struct mpi_world_t : public Noncopyable {
+struct mpi_world_t : public boost::noncopyable {
   mpi_world_t(int& argc, char**& argv);
   ~mpi_world_t();
 };

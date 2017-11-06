@@ -6,8 +6,7 @@
 // depths for different bits.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <geode/utility/config.h>
+#include "pentago/base/board.h"
 namespace pentago {
 
 // A score consists of two fields: depth and value.  The value field has two bits determining the
@@ -87,12 +86,16 @@ static inline int status(board_t board) {
 // ways that minimum can be achieved, assuming no rotations except possibly a single rotation right at
 // the end.  Returns ((6-min_distance)<<16)+count, so that a higher number means closer to a black win.
 // If winning is impossible, the return value is 0.
-extern int rotated_win_closeness(side_t black, side_t white) GEODE_CONST;
+int rotated_win_closeness(side_t black, side_t white) __attribute__((const));
 
 // Same as above, except allowing no rotations whatsoever.
-extern int unrotated_win_closeness(side_t black, side_t white) GEODE_CONST;
+int unrotated_win_closeness(side_t black, side_t white) __attribute__((const));
 
 // Same as above, but allow arbitrarily many rotations
-extern int arbitrarily_rotated_win_closeness(side_t black, side_t white) GEODE_CONST;
+int arbitrarily_rotated_win_closeness(side_t black, side_t white) __attribute__((const));
+
+// For python use: slow, and checks only one side
+int rotated_status(board_t board);
+int arbitrarily_rotated_status(board_t board);
 
 }

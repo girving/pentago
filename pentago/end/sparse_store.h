@@ -17,13 +17,13 @@
  * array at the same time.
  */
 
-#include <pentago/base/superscore.h>
-#include <pentago/utility/thread.h>
-#include <geode/array/Array.h>
+#include "pentago/base/superscore.h"
+#include "pentago/utility/thread.h"
+#include "pentago/utility/array.h"
 namespace pentago {
 namespace end {
 
-class sparse_store_t : public Noncopyable {
+class sparse_store_t : public boost::noncopyable {
   struct sizes_t {
     int size; // Current size of the array
     int peak_size; // Peak size

@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Remove zero bytes from a binary file (to test padding equivalence)."""
+
+import sys
+
+path, = sys.argv[1:]
+data = open(path, 'rb').read()
+data = data.replace(b'\x00', b'')
+sys.stdout.buffer.write(data)

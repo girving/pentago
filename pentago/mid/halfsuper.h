@@ -42,7 +42,7 @@
  * I.e., there is no difference.  That's extremely convenient.
  */
 
-#include <pentago/base/superscore.h>
+#include "pentago/base/superscore.h"
 #if PENTAGO_SSE // halfsuper implemented only in SSE mode for now
 namespace pentago {
 
@@ -88,7 +88,7 @@ struct halfsuper_t {
   static halfsuper_t singleton(uint8_t r) {
     const bool hi = r>>6&1;
     const auto chunk = uint64_t(1)<<(r&63);
-    return halfsuper_t(geode::pack(hi?0:chunk,hi?chunk:0));
+    return halfsuper_t(sse_pack(hi?0:chunk,hi?chunk:0));
   }
 
   static halfsuper_t singleton(int a, int b, int c, int d) {
@@ -97,16 +97,16 @@ struct halfsuper_t {
 };
 
 // Split a super_t into two halfsuper_t's
-GEODE_EXPORT Vector<halfsuper_t,2> split(const super_t s) GEODE_CONST;
+Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
 
 // Merge even and odd bits into a single super_t
-GEODE_EXPORT super_t merge(const halfsuper_t even, const halfsuper_t odd) GEODE_CONST;
+super_t merge(const halfsuper_t even, const halfsuper_t odd) __attribute__((const));
 
 // Both half of super_wins: (even,odd)
-GEODE_EXPORT Vector<halfsuper_t,2> halfsuper_wins(const side_t side) GEODE_CONST;
+Vector<halfsuper_t,2> halfsuper_wins(const side_t side) __attribute__((const));
 
 // Same as rmax for super_t, but twice as fast.  Flips parity.
-GEODE_CONST static inline halfsuper_t rmax(const halfsuper_t h) {
+__attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
   const __m128i x = h.x;
   // First (parity) quadrant
   const __m128i t0 = (x|_mm_srli_epi16(x,1))&_mm_set1_epi8(0x55),
@@ -125,9 +125,11 @@ GEODE_CONST static inline halfsuper_t rmax(const halfsuper_t h) {
   return halfsuper_t(y0|y1|y2|y3);
 }
 
-GEODE_EXPORT int popcount(halfsuper_t h);
+int popcount(halfsuper_t h);
 
-} namespace geode {
-template<> struct IsScalar<pentago::halfsuper_t> : public mpl::true_ {};
+// Visually show that halfsuper_t is the best we can do: the parity
+// configuration is the limit of rmax applied to a singleton.
+void view_rmax();
+
 }
 #endif

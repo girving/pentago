@@ -7,13 +7,14 @@
 // and in the resulting output data formats.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <geode/array/RawArray.h>
-#include <geode/vector/Vector.h>
-#include <geode/structure/Tuple.h>
+#include "pentago/base/board.h"
+#include "pentago/utility/array.h"
+#include "pentago/utility/range.h"
+#include "pentago/utility/vector.h"
 namespace pentago {
 
 using std::ostream;
+using std::tuple;
 
 // Count stones in a quadrant
 static inline Vector<uint8_t,2> count(quadrant_t q) {
@@ -21,12 +22,12 @@ static inline Vector<uint8_t,2> count(quadrant_t q) {
 }
 
 // All rotation minimal quadrants with the given numbers of stones, plus the number moved by reflections
-GEODE_EXPORT Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white);
-GEODE_EXPORT Tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,2> counts);
+tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(int black, int white);
+tuple<RawArray<const quadrant_t>,int> rotation_minimal_quadrants(Vector<uint8_t,2> counts);
 
 // Slices of rotation_minimal_quadrants
-GEODE_EXPORT RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int lo, int hi);
-GEODE_EXPORT RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, Range<int> range);
+RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, int lo, int hi);
+RawArray<const quadrant_t> safe_rmin_slice(Vector<uint8_t,2> counts, Range<int> range);
 
 struct section_t {
   Vector<Vector<uint8_t,2>,4> counts;
@@ -39,17 +40,17 @@ struct section_t {
   uint64_t sig() const {
     // This used to be a memcpy, but is now explicitly little endian for portability.
     // Ideally this would be merged with microsig below, but unfortunately it shows up in file formats.
-    return            counts[0].x     +((uint64_t)counts[0].y<<8)
-          +((uint64_t)counts[1].x<<16)+((uint64_t)counts[1].y<<24)
-          +((uint64_t)counts[2].x<<32)+((uint64_t)counts[2].y<<40)
-          +((uint64_t)counts[3].x<<48)+((uint64_t)counts[3].y<<56);
+    return            counts[0][0]     +((uint64_t)counts[0][1]<<8)
+          +((uint64_t)counts[1][0]<<16)+((uint64_t)counts[1][1]<<24)
+          +((uint64_t)counts[2][0]<<32)+((uint64_t)counts[2][1]<<40)
+          +((uint64_t)counts[3][0]<<48)+((uint64_t)counts[3][1]<<56);
   }
 
   uint32_t microsig() const {
-    return       counts[0].x     +((int)counts[0].y<<4)
-          +((int)counts[1].x<<8) +((int)counts[1].y<<12)
-          +((int)counts[2].x<<16)+((int)counts[2].y<<20)
-          +((int)counts[3].x<<24)+((int)counts[3].y<<28);
+    return       counts[0][0]     +((int)counts[0][1]<<4)
+          +((int)counts[1][0]<<8) +((int)counts[1][1]<<12)
+          +((int)counts[2][0]<<16)+((int)counts[2][1]<<20)
+          +((int)counts[3][0]<<24)+((int)counts[3][1]<<28);
   }
 
   bool operator==(const section_t& s) const {
@@ -69,7 +70,7 @@ struct section_t {
   }
 
   // Number of rotational minimal quadrants along each dimension
-  GEODE_EXPORT Vector<int,4> shape() const;
+  Vector<int,4> shape() const;
 
   // Total number of positions in section
   uint64_t size() const;
@@ -82,35 +83,53 @@ struct section_t {
     return Vector<int,4>(counts[0].sum(),counts[1].sum(),counts[2].sum(),counts[3].sum());
   }
 
-  GEODE_EXPORT bool valid() const;
-  GEODE_EXPORT section_t transform(uint8_t global) const;
-  GEODE_EXPORT section_t child(int quadrant) const;
-  GEODE_EXPORT section_t parent(int quadrant) const;
+  bool valid() const;
+  section_t transform(uint8_t global) const;
+  section_t child(int quadrant) const;
+  section_t parent(int quadrant) const;
 
   // Given s, find global symmetry g minimizing g(s) and return g(s),g
-  template<int symmetries> GEODE_EXPORT Tuple<section_t,uint8_t> standardize() const;
+  template<int symmetries> tuple<section_t,uint8_t> standardize() const;
 
   // Quadrant i is mapped to result[i].  Warnings: slower than necessary.
-  GEODE_EXPORT static Vector<int,4> quadrant_permutation(uint8_t symmetry);
+  static Vector<int,4> quadrant_permutation(uint8_t symmetry);
 };
 
-GEODE_EXPORT ostream& operator<<(ostream& output, section_t section);
-GEODE_EXPORT PyObject* to_python(const section_t& section);
-} namespace geode {
-template<> struct FromPython<pentago::section_t>{GEODE_EXPORT static pentago::section_t convert(PyObject* object);};
-template<> struct is_packed_pod<pentago::section_t>:public mpl::true_{}; // Make section_t hashable
-} namespace pentago {
+ostream& operator<<(ostream& output, section_t section);
 
 // Find the rotation minimizing the quadrant value, and return minimized_quadrant, rotation
-GEODE_EXPORT Tuple<quadrant_t,uint8_t> rotation_standardize_quadrant(quadrant_t q);
+tuple<quadrant_t,uint8_t> rotation_standardize_quadrant(quadrant_t q);
 
 // Generate a random board within the given section.  Warning: fairly slow.
-GEODE_EXPORT board_t random_board(Random& random, const section_t& section);
+board_t random_board(Random& random, const section_t& section);
 
 // Count stones in all quadrants
-GEODE_EXPORT section_t count(board_t board);
+section_t count(board_t board);
 
 // Show counts and rmin indices
-GEODE_EXPORT string show_board_rmins(const board_t board);
+string show_board_rmins(const board_t board);
 
+// Endian conversion is trivial for section_t
+static inline section_t endian_reverse(const section_t s) {
+  return s;
 }
+
+// For python exposure
+section_t standardize_section(section_t s, int symmetries);
+
+static inline size_t hash_value(const section_t& s) {
+  size_t h = 0;
+  for (const auto& x : s.counts)
+    for (const auto& y : x)
+      boost::hash_combine(h, y);
+  return h;
+}
+
+}  // namespace pentago
+namespace std {
+template<> struct hash<pentago::section_t> {
+  size_t operator()(const pentago::section_t& s) const {
+    return hash_value(s);
+  }
+};
+}  // namespace std

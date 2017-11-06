@@ -1,10 +1,13 @@
 // History-related utilities
 #pragma once
 
-#include <pentago/base/section.h>
-#include <pentago/utility/thread.h>
+#include "pentago/base/section.h"
+#include "pentago/utility/thread.h"
+#include <unordered_map>
 namespace pentago {
 namespace end {
+
+using std::unordered_map;
 
 static inline event_t block_event(section_t section, Vector<uint8_t,4> block) {
   return block_ekind
@@ -61,6 +64,24 @@ static inline event_t block_lines_event(section_t section, dimensions_t dimensio
 }
 
 string str_event(const event_t event);
+
+Vector<int,2> search_thread(const vector<Array<const history_t>>& thread, double time);
+
+vector<tuple<int,int,history_t>> event_dependencies(
+    const vector<vector<Array<const history_t>>>& event_sorted_history, const int direction,
+    const int thread, const int kind, const history_t source);
+
+void check_dependencies(const vector<vector<Array<const history_t>>>& event_sorted_history,
+                        const int direction);
+
+Array<double,3> estimate_bandwidth(const vector<vector<Array<const history_t>>>& event_sorted_history,
+                                   const int threads, const double dt_seconds);
+
+unordered_map<string,Array<const Vector<float,2>>>
+message_statistics(const vector<vector<Array<const history_t>>>& event_sorted_history,
+                   const int ranks_per_node, const int threads_per_rank,
+                   const time_kind_t source_kind, const int steps,
+                   RawArray<const double> slice_compression_ratio);
 
 }
 }

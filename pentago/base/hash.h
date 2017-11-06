@@ -1,7 +1,7 @@
 // 64-bit board hash
 #pragma once
 
-#include <pentago/base/board.h>
+#include "pentago/base/board.h"
 namespace pentago {
 
 static inline uint64_t hash_board(board_t key) {
@@ -17,6 +17,6 @@ static inline uint64_t hash_board(board_t key) {
 }
 
 // The inverse of hash_board (for testing and error reporting purposes)
-extern uint64_t inverse_hash_board(uint64_t key);
+uint64_t inverse_hash_board(uint64_t key);
 
 }

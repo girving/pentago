@@ -8,7 +8,7 @@ var request = require('request')
 var LRU = require('lru-cache')
 var WorkQueue = require('mule').WorkQueue
 var Pending = require('./pending')
-var pentago = require('./pentago/build/Release/pentago')
+var pentago = require('./build/Release/pentago')
 
 // Pull in math
 var min = Math.min

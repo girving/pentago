@@ -1,7 +1,6 @@
 // C++ version of Python's join
 #pragma once
 
-#include <geode/utility/config.h>
 #include <string>
 namespace pentago {
 

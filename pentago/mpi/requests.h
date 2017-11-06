@@ -1,18 +1,17 @@
 // A list of requests together with callbacks
 #pragma once
 
-#include <pentago/end/config.h>
-#include <pentago/utility/spinlock.h>
-#include <pentago/utility/job.h>
-#include <geode/array/Array.h>
-#include <geode/utility/function.h>
+#include "pentago/end/config.h"
+#include "pentago/utility/spinlock.h"
+#include "pentago/utility/array.h"
+#include <functional>
 #include <vector>
 #include <mpi.h>
 namespace pentago {
 namespace mpi {
 
-using namespace geode;
 using std::vector;
+using std::function;
 
 /* Notes:
  *
@@ -27,14 +26,14 @@ using std::vector;
  * 4. It is safe to add requests during the callbacks.
  */
 
-class requests_t : public Noncopyable {
-  Array<MPI_Request> requests;
+class requests_t : public boost::noncopyable {
+  vector<MPI_Request> requests;
   vector<function<void(MPI_Status* status)>> callbacks;
-  Array<bool> cancellables;
+  vector<bool> cancellables;
 #if PENTAGO_MPI_FUNNEL
   // List of callbacks registered by other threads for immediate call.
   spinlock_t immediate_lock;
-  vector<job_base_t*> immediates;
+  vector<function<void()>> immediates;
   volatile int immediate_count;
 #endif
 public:
@@ -64,10 +63,11 @@ public:
   void cancel_and_waitall();
 
 #if PENTAGO_MPI_FUNNEL
-  // Register a callback to be called from the communication thread.  This is thread safe and safe to call from any thread.
-  void add_immediate(job_t&& job) {
+  // Register a callback to be called from the communication thread.
+  // This is thread safe and safe to call from any thread.
+  void add_immediate(function<void()>&& f) {
     spin_t spin(immediate_lock);
-    immediates.push_back(job.release());
+    immediates.emplace_back(std::move(f));
     immediate_count++;
   }
 #endif

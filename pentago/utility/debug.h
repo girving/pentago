@@ -6,42 +6,55 @@
 // to MPI_Abort if any occur during parallel runs.
 #pragma once
 
-#include <geode/utility/debug.h>
-#include <geode/utility/format.h>
-#include <geode/utility/type_traits.h>
+#include <type_traits>
 #include <limits>
+#include "pentago/utility/exceptions.h"
+#include "pentago/utility/format.h"
 namespace pentago {
-
-using namespace geode;
 
 // Should we print?  Defaults to true.
 bool verbose();
-GEODE_EXPORT void set_verbose(bool verbose);
+void set_verbose(bool verbose);
 
-#define THROW(Error,...) \
+#define THROW(Error, ...) \
   (pentago::maybe_throw<Error>(__VA_ARGS__))
 
+typedef void (*error_callback_t)(const string&) __attribute__((noreturn));
+
 // If nonzero, this function is called instead of throwing an exception.
-GEODE_EXPORT extern ErrorCallback throw_callback;
+extern error_callback_t throw_callback;
 
 // If nonzero, die_helper calls this function to quit
-GEODE_EXPORT extern ErrorCallback die_callback;
+extern error_callback_t die_callback;
   
+// Break (for use in a debugger)
+void breakpoint();
+
 // Print a message and abort without formatting
-GEODE_EXPORT void GEODE_NORETURN(die_helper(const string& msg)) GEODE_COLD;
+void die_helper(const string& msg) __attribute__((noreturn, cold));
 
 // Print a message and abort
-template<class... Args> static inline void GEODE_NORETURN(die(const char* msg, const Args&... args)) GEODE_COLD;
-template<class... Args> static inline void                die(const char* msg, const Args&... args) {
-  die_helper(format(msg,args...));
+template<class... Args> static inline void __attribute__((noreturn, cold))
+die(const char* msg, const Args&... args) {
+  die_helper(format(msg, args...));
 }
+
+#define GEODE_ASSERT(condition, ...) \
+  ((condition) ? (void)0 : pentago::assertion_failed( \
+      __PRETTY_FUNCTION__, __FILE__, __LINE__, #condition, pentago::debug_message(__VA_ARGS__)))
+
+#ifdef NDEBUG
+# define GEODE_DEBUG_ONLY(...)
+#else
+# define GEODE_DEBUG_ONLY(...) __VA_ARGS__
+#endif
 
 // We'd use a template, but that fails for obscure reasons on clang 3.0 on Rackspace
 template<class T> static inline void assert_is_almost_uint64(const T n) {
   static_assert(sizeof(T)==8,"");
-  typedef typename remove_const<T>::type S;
-  static_assert(   is_same<S,unsigned long>::value
-                || is_same<S,unsigned long long>::value,"");
+  typedef std::remove_const_t<T> S;
+  static_assert(   std::is_same<S,unsigned long>::value
+                || std::is_same<S,unsigned long long>::value,"");
 }
 
 // Check and cast an integer to int
@@ -53,11 +66,25 @@ template<class T> static inline void assert_is_almost_uint64(const T n) {
 
 // Everything beyond here is internals
 
-template<class Error> GEODE_EXPORT void maybe_throw() __attribute__ ((noreturn));
-template<class Error> GEODE_EXPORT void maybe_throw(const char* msg) __attribute__ ((noreturn));
+template<class Error> void maybe_throw() __attribute__ ((noreturn, cold));
+template<class Error> void maybe_throw(const char* msg) __attribute__ ((noreturn, cold));
 
-template<class Error,class First,class... Rest> static inline void __attribute__ ((noreturn)) maybe_throw(const char* fmt, const First& first, const Rest&... rest) {
-  maybe_throw<Error>(format(fmt,first,rest...).c_str());
+template<class Error, class First, class... Rest> static inline void __attribute__ ((noreturn, cold))
+maybe_throw(const char* fmt, const First& first, const Rest&... rest) {
+  maybe_throw<Error>(format(fmt, first, rest...).c_str());
 }
+
+template<class Error> void __attribute__ ((noreturn, cold)) maybe_throw(const string& msg) {
+  maybe_throw<Error>(msg.c_str());
+}
+
+// Helper function to work around zero-variadic argument weirdness
+static inline const char* debug_message() { return 0; }
+static inline const char* debug_message(const char* message) { return message; }
+static inline const char* debug_message(const string& message) { return message.c_str(); }
+
+void __attribute__((noreturn, cold))
+assertion_failed(const char* function, const char* file, unsigned int line, const char* condition,
+                 const char* message);
 
 }

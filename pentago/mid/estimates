@@ -1,8 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
-from __future__ import print_function,absolute_import,unicode_literals,division
-from pentago import *
 from numpy import *
+from scipy.misc import comb
 
 '''
 The Plan:
@@ -60,15 +59,20 @@ better.  Complicated though, and there's a much easier way to save a factor
 of 2: use aggressive and passive modes.  Let's do it that way.
 '''
 
-def count(n,k):
-  return binom(n,k)*binom(k,k//2)
+def large(n):
+  s = str(n)
+  return ''.join((',' if i and i%3==0 else '')+c for i,c in enumerate(reversed(s)))[::-1]
+
+def count(n, k):
+  return int(comb(n,k)) * int(comb(k,k//2))
+
 def total(n):
-  return sum(count(n,k) for k in xrange(n+1))
+  return sum(count(n,k) for k in range(n+1))
 
 # Print everything
 for n in 18,:
   print('total %d = %s'%(n,large(total(n))))
-  for k in xrange(n+1):
+  for k in range(n+1):
     print('  count %2d = %10s'%(k,large(count(n,k))))
 
 bottleneck = count(18,11)+count(18,12)

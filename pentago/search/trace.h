@@ -6,9 +6,8 @@
 // it may or may not work at any given time.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <pentago/base/superscore.h>
-#include <geode/utility/config.h>
+#include "pentago/base/board.h"
+#include "pentago/base/superscore.h"
 namespace pentago {
 
 // Uncomment to enable tracing
@@ -25,7 +24,8 @@ namespace pentago {
 extern void trace_restart();
 
 // Record that the value of board is computed inconsistently
-extern void GEODE_NORETURN(trace_error(bool aggressive, int depth, board_t board, const char* context));
+__attribute__((noreturn)) void trace_error(bool aggressive, int depth, board_t board,
+                                           const char* context);
 
 #ifdef TRACING_ON
 
@@ -56,5 +56,8 @@ extern string subset(super_t s, RawArray<const uint8_t> w);
 
 #define TRACE_VERBOSE_START(depth,board) TRACE(const Array<const uint8_t> verbose = trace_verbose_start(depth,board); TraceVerbose ender(verbose.size()>0))
 #define TRACE_VERBOSE(...) TRACE(if (verbose.size()) std::cout << trace_verbose_prefix() << format(__VA_ARGS__) << std::endl)
+
+// Do a clean evaluation of each board involved in an error or dependency
+bool trace_learn();
 
 }

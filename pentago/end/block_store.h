@@ -6,15 +6,15 @@
 // each quadrant of board, and must be bitwise or'ed together before it is complete.
 #pragma once
 
-#include <pentago/end/partition.h>
-#include <pentago/end/reduction.h>
-#include <pentago/base/superscore.h>
-#include <pentago/end/config.h>
-#include <pentago/utility/counter.h>
-#include <pentago/utility/spinlock.h>
-#include <geode/array/Nested.h>
+#include "pentago/end/partition.h"
+#include "pentago/end/reduction.h"
+#include "pentago/base/superscore.h"
+#include "pentago/end/config.h"
+#include "pentago/utility/counter.h"
+#include "pentago/utility/spinlock.h"
+#include "pentago/utility/nested.h"
 #if PENTAGO_MPI_COMPRESS
-#include <pentago/end/compacting_store.h>
+#include "pentago/end/compacting_store.h"
 #endif
 namespace pentago {
 namespace end {
@@ -42,6 +42,8 @@ namespace end {
  * format does seem the best fit for the computation, so I'm still going to use it.
  */
 
+using std::make_shared;
+
 struct block_info_t {
   section_t section;
   Vector<uint8_t,4> block;
@@ -52,22 +54,21 @@ struct block_info_t {
 static_assert(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS,"");
 
 // A readable block store, not including counts and samples
-class readable_block_store_t : public Object {
+class readable_block_store_t : public boost::noncopyable {
 public:
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
-
-  const Ref<const sections_t> sections;
-  const Ref<const block_partition_t> partition;
+  const shared_ptr<const sections_t> sections;
+  const shared_ptr<const block_partition_t> partition;
   const int rank;
   const int total_nodes; // Total number of nodes
-  const Hashtable<local_id_t,block_info_t> block_infos; // Map from local id to information about each block we own
-  const Hashtable<Tuple<section_t,Vector<uint8_t,4>>,local_id_t> block_to_local_id; // Map from block to local id
+  const unordered_map<local_id_t,block_info_t> block_infos; // Local id to info about each block we own
+  const unordered_map<tuple<section_t,Vector<uint8_t,4>>,local_id_t, // Block to local id
+                      boost::hash<tuple<section_t,Vector<uint8_t,4>>>> block_to_local_id;
   const int required_contributions;
   compacting_store_t::group_t store; // Underlying data storage
 
-protected:
-  GEODE_EXPORT readable_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, compacting_store_t& store);
-public:
+  readable_block_store_t(const shared_ptr<const block_partition_t>& partition, const int rank,
+                         RawArray<const local_block_t> blocks,
+                         const shared_ptr<compacting_store_t>& store);
   ~readable_block_store_t();
 
   // Number of blocks
@@ -76,18 +77,18 @@ public:
   }
 
   // Compute memory usage ignoring the store
-  GEODE_EXPORT virtual uint64_t base_memory_usage() const;
+  virtual uint64_t base_memory_usage() const;
 
   // Print statistics about block compression.
-  GEODE_EXPORT void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
+  void print_compression_stats(const reduction_t<double,sum_op>& reduce_sum) const;
 
   // Verify that we own the given block
   void assert_contains(section_t section, Vector<uint8_t,4> block) const;
 
   // Generate events for the given local block
-  GEODE_EXPORT event_t local_block_event(local_id_t local_id) const;
-  GEODE_EXPORT event_t local_block_line_event(local_id_t local_id, uint8_t dimension) const;
-  GEODE_EXPORT event_t local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const;
+  event_t local_block_event(local_id_t local_id) const;
+  event_t local_block_line_event(local_id_t local_id, uint8_t dimension) const;
+  event_t local_block_lines_event(local_id_t local_id, dimensions_t dimensions) const;
 
   // Access the data for a completed block, either by (section,block) or local block id.
   // In uncompressed mode, these are O(1) and return views into all_data.  In compressed mode they must uncompress
@@ -97,8 +98,8 @@ public:
   // All uncompressed_and_get versions return views into a temporary, thread local buffer (the one used by local_fast_uncompress).
   RawArray<Vector<super_t,2>,4> uncompress_and_get(section_t section, Vector<uint8_t,4> block, event_t event) const;
   RawArray<Vector<super_t,2>,4> uncompress_and_get(local_id_t local_id, event_t event) const;
-  GEODE_EXPORT RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event) const;
-  GEODE_EXPORT RawArray<const uint8_t> get_compressed(local_id_t local_id) const;
+  RawArray<Vector<super_t,2>> uncompress_and_get_flat(local_id_t local_id, event_t event) const;
+  RawArray<const uint8_t> get_compressed(local_id_t local_id) const;
 #else
   RawArray<const Vector<super_t,2>,4> get_raw(section_t section, Vector<uint8_t,4> block) const;
   RawArray<const Vector<super_t,2>,4> get_raw(local_id_t local_id) const;
@@ -113,7 +114,6 @@ public:
 // Accumulating block store, including counts and samples
 class accumulating_block_store_t : public readable_block_store_t {
 public:
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
   typedef readable_block_store_t Base;
 
   const Array<Vector<uint64_t,3>> section_counts; // Win/(win-or-tie)/total counts for each section (player to move first)
@@ -128,40 +128,43 @@ public:
   };
   const Nested<sample_t> samples;
 
-protected:
-  GEODE_EXPORT accumulating_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, const int samples_per_section, compacting_store_t& store);
-public:
+  accumulating_block_store_t(const shared_ptr<const block_partition_t>& partition, const int rank,
+                             RawArray<const local_block_t> blocks, const int samples_per_section,
+                             const shared_ptr<compacting_store_t>& store);
   ~accumulating_block_store_t();
 
   // Compute memory usage ignoring the store
-  GEODE_EXPORT virtual uint64_t base_memory_usage() const;
+  virtual uint64_t base_memory_usage() const;
 
   // Accumulate new data into a block and count if the block is complete.  new_data is destroyed.  This function is thread safe.
-  GEODE_EXPORT void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
+  void accumulate(local_id_t local_id, uint8_t dimension, RawArray<Vector<super_t,2>> new_data);
 };
 
 // Nonaccumulating writable block store for use with restarts
 class restart_block_store_t : public readable_block_store_t {
 public:
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
   typedef readable_block_store_t Base;
 
-protected:
-  GEODE_EXPORT restart_block_store_t(const block_partition_t& partition, const int rank, RawArray<const local_block_t> blocks, compacting_store_t& store);
-public:
+  restart_block_store_t(const shared_ptr<const block_partition_t>& partition, const int rank,
+                        RawArray<const local_block_t> blocks,
+                        const shared_ptr<compacting_store_t>& store);
   ~restart_block_store_t();
 
   // Set completed block data.  new_data is destroyed.  This function is thread safe.
-  GEODE_EXPORT void set(local_id_t local_id, RawArray<Vector<super_t,2>> new_data);
+  void set(local_id_t local_id, RawArray<Vector<super_t,2>> new_data);
 };
 
 // Convenience factory routine
-static inline Ref<accumulating_block_store_t> make_block_store(const block_partition_t& partition, const int rank, const int samples_per_section, compacting_store_t& store) {
-  return new_<accumulating_block_store_t>(partition,rank,partition.rank_blocks(rank),samples_per_section,store);
+static inline shared_ptr<accumulating_block_store_t>
+make_block_store(const shared_ptr<const block_partition_t>& partition, const int rank,
+                 const int samples_per_section, const shared_ptr<compacting_store_t>& store) {
+  return make_shared<accumulating_block_store_t>(
+      partition, rank, partition->rank_blocks(rank), samples_per_section, store);
 }
 
 // The kernel of count_wins factored out for use elsewhere
-Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<uint8_t,4> block, RawArray<const Vector<super_t,2>> data);
+Vector<uint64_t,3> count_block_wins(const section_t section, const Vector<uint8_t,4> block,
+                                    RawArray<const Vector<super_t,2>> data);
 
 }
 }

@@ -1,10 +1,10 @@
 // Wrappers around MPI reductions to isolate MPI dependencies
 #pragma once
 
-#include <pentago/end/config.h>
-#include <pentago/end/reduction.h>
-#include <pentago/mpi/utility.h>
-#include <geode/utility/curry.h>
+#include "pentago/end/config.h"
+#include "pentago/end/reduction.h"
+#include "pentago/mpi/utility.h"
+#include "pentago/utility/curry.h"
 #include <mpi.h>
 namespace pentago {
 namespace mpi {

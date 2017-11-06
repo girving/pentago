@@ -10,14 +10,13 @@
 // The rest of this file consists of failed experiments.
 #pragma once
 
-#include <pentago/base/superscore.h>
-#include <geode/utility/CopyConst.h>
+#include "pentago/base/superscore.h"
 namespace pentago {
 
 // Most code should use these
 
-GEODE_EXPORT void interleave(RawArray<Vector<super_t,2>> data);
-GEODE_EXPORT void uninterleave(RawArray<Vector<super_t,2>> data);
+void interleave(RawArray<Vector<super_t,2>> data);
+void uninterleave(RawArray<Vector<super_t,2>> data);
 Array<uint8_t> compact(Array<Vector<super_t,2>> src);
 Array<Vector<super_t,2>> uncompact(Array<const uint8_t> src);
 void wavelet_transform(RawArray<Vector<super_t,2>,4> data);
@@ -28,7 +27,7 @@ void wavelet_untransform(RawArray<Vector<super_t,2>,4> data);
 #if PENTAGO_SSE // SSE versions
 
 static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
-  const __m128i mask32 = geode::pack<uint32_t>(-1,0,-1,0);
+  const __m128i mask32 = sse_pack<uint32_t>(-1,0,-1,0);
   #define EXPAND1(a) ({ \
     a = (a|_mm_slli_epi64(a,16))&_mm_set1_epi64x(0x0000ffff0000ffff); \
     a = (a|_mm_slli_epi64(a, 8))&_mm_set1_epi64x(0x00ff00ff00ff00ff); \
@@ -41,10 +40,10 @@ static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
     EXPAND1(a.x); \
     EXPAND1(a.y); \
     a; })
-  super_t s00 = EXPAND(s.x.x),
-          s01 = EXPAND(s.x.y),
-          s10 = EXPAND(s.y.x),
-          s11 = EXPAND(s.y.y);
+  super_t s00 = EXPAND(s[0].x),
+          s01 = EXPAND(s[0].y),
+          s10 = EXPAND(s[1].x),
+          s11 = EXPAND(s[1].y);
   return Vector<super_t,2>(super_t(s00.x|_mm_slli_epi64(s10.x,1),
                                    s00.y|_mm_slli_epi64(s10.y,1)),
                            super_t(s01.x|_mm_slli_epi64(s11.x,1),
@@ -67,10 +66,10 @@ static inline Vector<super_t,2> uninterleave_super(const Vector<super_t,2>& s) {
             bb = CONTRACT1(b); \
      _mm_shuffle_epi32(aa,LE_MM_SHUFFLE(0,2,1,3)) \
     |_mm_shuffle_epi32(bb,LE_MM_SHUFFLE(1,3,0,2)); })
-  return Vector<super_t,2>(super_t(CONTRACT(s.x.x,s.x.y),
-                                   CONTRACT(s.y.x,s.y.y)),
-                           super_t(CONTRACT(_mm_srli_epi64(s.x.x,1),_mm_srli_epi64(s.x.y,1)),
-                                   CONTRACT(_mm_srli_epi64(s.y.x,1),_mm_srli_epi64(s.y.y,1))));
+  return Vector<super_t,2>(super_t(CONTRACT(s[0].x,s[0].y),
+                                   CONTRACT(s[1].x,s[1].y)),
+                           super_t(CONTRACT(_mm_srli_epi64(s[0].x,1),_mm_srli_epi64(s[0].y,1)),
+                                   CONTRACT(_mm_srli_epi64(s[1].x,1),_mm_srli_epi64(s[1].y,1))));
   #undef CONTRACT1
   #undef CONTRACT
 }

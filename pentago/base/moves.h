@@ -5,9 +5,9 @@
 // See search/superengine.cpp for example usage.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <geode/math/integer_log.h>
-#include <geode/math/popcount.h>
+#include "pentago/base/board.h"
+#include "pentago/utility/integer_log.h"
+#include "pentago/utility/popcount.h"
 namespace pentago {
 
 // We declare the move listing code as a huge macro in order to use it in multiple functions while taking advantage of gcc's variable size arrays.
@@ -68,8 +68,12 @@ namespace pentago {
   side_t moves[total]; \
   for (int i=0;i<total;i++) { \
     side_t move = min_bit(_move_mask); \
-    moves[i] = side0|move; \
+    moves[i] = side0 | move; \
     _move_mask ^= move; \
   }
+
+// Simple versions for bindings
+Array<board_t> moves(board_t board);
+Array<board_t> simple_moves(board_t board);
 
 }

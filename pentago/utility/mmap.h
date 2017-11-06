@@ -3,28 +3,21 @@
 // Similar to aligned_buffer in aligned.h, but for particularly huge arrays.
 #pragma once
 
-#include <geode/array/Array.h>
-#include <geode/structure/Tuple.h>
+#include "pentago/utility/array.h"
+#include <memory>
 namespace pentago {
 
-using namespace geode;
+using std::shared_ptr;
 
-// Allocate a large buffer via mmap and return buffer and owner.
-GEODE_EXPORT Tuple<void*,PyObject*> mmap_buffer_helper(size_t size);
+// Allocate a large buffer via mmap
+shared_ptr<void> mmap_buffer_helper(size_t size);
 
 // Allocate a large buffer using mmap.  The data will be zero initialized.
-template<class T> static inline Array<T> mmap_buffer(int size) {
-  static_assert(has_trivial_destructor<T>::value,"");
-  auto buffer = mmap_buffer_helper(sizeof(T)*size);
-  Array<T> array(size,(T*)buffer.x,buffer.y);
-  GEODE_XDECREF(buffer.y);
-  return array;
+template<class T,int d> static inline Array<T,d> mmap_buffer(const Vector<int,d>& shape) {
+  const auto raw = mmap_buffer_helper(sizeof(T) * shape.product());
+  return Array<T,d>(shape, shared_ptr<T[]>(raw, static_cast<T*>(raw.get())));
 }
 
-// Same as above, but for Array<T,d>
-template<class T,int d> static inline Array<T,d> mmap_buffer(const Vector<int,d>& shape) {
-  Array<T> flat = mmap_buffer<T>(shape.product());
-  return Array<T,d>(shape,flat.data(),flat.borrow_owner());
-}
+Array<const uint8_t> mmap_file(const string& path);
 
 }

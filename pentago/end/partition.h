@@ -5,22 +5,17 @@
 // so that it can be computed independently and stored on all ranks.
 #pragma once
 
-#include <pentago/end/line.h>
-#include <pentago/end/sections.h>
-#include <geode/structure/Hashtable.h>
+#include "pentago/end/line.h"
+#include "pentago/end/sections.h"
 namespace pentago {
 namespace end {
 
 // Given a set of sections, distribute all blocks amongst a number of processors
-struct block_partition_t : public Object {
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
-
+struct block_partition_t : public boost::noncopyable {
   const int ranks;
-  const Ref<const sections_t> sections;
+  const shared_ptr<const sections_t> sections;
 
-protected:
-  block_partition_t(const int ranks, const sections_t& sections);
-public:
+  block_partition_t(const int ranks, const shared_ptr<const sections_t>& sections);
   virtual ~block_partition_t();
 
   // Estimate memory usage
@@ -34,20 +29,17 @@ public:
   virtual Vector<uint64_t,2> rank_counts(const int rank) const = 0;
 
   // Given a block, find its owner's rank and the local id on that rank
-  virtual Tuple<int,local_id_t> find_block(const section_t section, const Vector<uint8_t,4> block) const = 0;
+  virtual tuple<int,local_id_t> find_block(const section_t section, const Vector<uint8_t,4> block) const = 0;
 
   // Find the block with given rank and local id
-  virtual Tuple<section_t,Vector<uint8_t,4>> rank_block(const int rank, const local_id_t local_id) const = 0;
+  virtual tuple<section_t,Vector<uint8_t,4>> rank_block(const int rank, const local_id_t local_id) const = 0;
 };
 
 // Given a set of sections, distribute all lines amongst a number of processors
 struct partition_t : public block_partition_t {
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
   typedef block_partition_t Base;
 
-protected:
-  partition_t(const int ranks, const sections_t& sections);
-public:
+  partition_t(const int ranks, const shared_ptr<const sections_t>& sections);
   virtual ~partition_t();
 
   // Count lines belonging to a given rank
@@ -58,15 +50,12 @@ public:
 };
 
 // Create an empty partition, typically for sentinel use
-GEODE_EXPORT Ref<const partition_t> empty_partition(const int ranks, const int slice);
-
-// Test self consistency of a partition
-void partition_test(const partition_t& partition);
+shared_ptr<const partition_t> empty_partition(const int ranks, const int slice);
 
 // Create a dummy full partition_t around a block_partition_t, with no lines
-Ref<const partition_t> null_line_partition(const block_partition_t& partition);
+shared_ptr<const partition_t> null_line_partition(const shared_ptr<const block_partition_t>& partition);
 
-typedef function<Ref<partition_t>(int,const sections_t&)> partition_factory_t;
+typedef function<shared_ptr<partition_t>(int, const shared_ptr<const sections_t>&)> partition_factory_t;
 
 }
 }

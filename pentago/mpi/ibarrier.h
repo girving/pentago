@@ -9,18 +9,17 @@
 // they can safely deallocate the previous slice's data.
 #pragma once
 
-#include <pentago/end/config.h>
-#include <geode/utility/forward.h>
+#include "pentago/end/config.h"
+#include <boost/core/noncopyable.hpp>
 #include <mpi.h>
 namespace pentago {
 namespace mpi {
 
 class requests_t;
 struct ibarrier_countdown_t;
-using namespace geode;
 
 // Warning: ibarrier_t is *not* thread safe
-class ibarrier_t : public Noncopyable {
+class ibarrier_t : public boost::noncopyable {
   const MPI_Comm comm;
   const int tag;
 private:
@@ -57,7 +56,7 @@ private:
 };
 
 // When a count reaches zero, trigger an ibarrier.  ibarrier_countdown_t is *not* thread safe.
-struct ibarrier_countdown_t : public Noncopyable {
+struct ibarrier_countdown_t : public boost::noncopyable {
   ibarrier_t barrier;
 private:
   int count;

@@ -1,12 +1,5 @@
-config.py
-.sconsign.dblite
-build
-*.pyc
 .DS_Store
 section-*.pentago
 history-*.try
 sparse-*.try
-config.log
-.sconf_temp
-*.so
-pentago.egg-info
+/bazel-*

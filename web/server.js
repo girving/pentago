@@ -6,7 +6,7 @@ var Log = require('log')
 var https = require('https')
 var time = require('time')
 var options = require('commander')
-var pentago = require('./pentago/build/Release/pentago')
+var pentago = require('./build/Release/pentago')
 var Values = require('./values.js')
 
 // Parse options

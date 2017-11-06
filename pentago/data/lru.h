@@ -1,36 +1,42 @@
 // LRU cache
 #pragma once
 
-#include <pentago/utility/debug.h>
-#include <geode/structure/Tuple.h>
-#include <geode/utility/Hasher.h>
-#include <geode/utility/tr1.h>
+#include "pentago/utility/debug.h"
 #include <list>
+#include <unordered_map>
+#include <boost/functional/hash.hpp>
 namespace pentago {
 
+using std::get;
 using std::list;
+using std::make_tuple;
+using std::tuple;
+using std::unordered_map;
 
 template<class K,class V> class lru_t {
-  mutable list<Tuple<K,V>> order; // least to most recently used
-  unordered_map<K,typename list<Tuple<K,V>>::iterator,Hasher> table; // key to position in order
+  // Least to most recently used
+  mutable list<tuple<K,V>> order;
+
+  // Key to position in order
+  unordered_map<K,typename list<tuple<K,V>>::iterator,boost::hash<K>> table;
 public:
 
   void add(const K key, const V& value) {
-    table.insert(make_pair(key,order.insert(order.end(),tuple(key,value))));
+    table.insert(make_pair(key,order.insert(order.end(),make_tuple(key,value))));
   }
 
   const V* get(const K key) const {
     const auto it = table.find(key);
     if (it == table.end())
       return 0;
-    order.splice(order.end(),order,it->second); // Move element to back
-    return &it->second->y;
+    order.splice(order.end(), order, it->second); // Move element to back
+    return &std::get<1>(*it->second);
   }
 
-  Tuple<K,V> drop() {
+  tuple<K,V> drop() {
     GEODE_ASSERT(order.size());
     const auto r = order.front();
-    table.erase(r.x);
+    table.erase(std::get<0>(r));
     order.pop_front();
     return r;
   }

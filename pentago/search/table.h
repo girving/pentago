@@ -9,23 +9,27 @@
 // 2. Since our hash is bijective, we store only the high order bits of the hash to detect collisions.
 //    This is compatible with zero initialization since hash_board(board)!=0 for all valid boards.
 
-#include <pentago/base/board.h>
-#include <pentago/base/score.h>
+#include "pentago/base/board.h"
+#include "pentago/base/score.h"
 namespace pentago {
 
+using std::tuple;
+
 // Initialize a empty table with size 1<<bits entries
-extern void init_table(int bits);
+void init_table(int bits);
 
 // Different kinds of tables
 enum table_type_t {blank_table,normal_table,simple_table};
 
 // Freeze the table into the given type
-extern void set_table_type(table_type_t type);
+void set_table_type(table_type_t type);
 
 // Lookup an entry in the table, returning a depth 0 tie (score(0,1)) if nothing is found
-extern score_t lookup(board_t board);
+score_t lookup(board_t board);
 
 // Store a new entry
-extern void store(board_t board, score_t score);
+void store(board_t board, score_t score);
+
+tuple<Array<board_t>,Array<score_t>> read_table(int max_count, int min_depth);
 
 }

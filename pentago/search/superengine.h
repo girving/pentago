@@ -14,9 +14,9 @@
 // to prove that pentago is a tie within the first 17 moves.
 #pragma once
 
-#include <pentago/search/supertable.h>
-#include <pentago/base/score.h>
-#include <pentago/base/superscore.h>
+#include "pentago/search/supertable.h"
+#include "pentago/base/score.h"
+#include "pentago/base/superscore.h"
 #include <vector>
 namespace pentago {
 
@@ -31,7 +31,7 @@ void set_super_debug(bool on);
 
 // Set a block cache of precomputed "endgame" information.  Warning: This is
 // extremely slow per evaluation, so use only with very low depth.
-void set_block_cache(Ptr<const block_cache_t> cache);
+void set_block_cache(shared_ptr<const block_cache_t> cache);
 
 // Current knowledge about a board position.  This is computed during shallow evaluation and
 // passed down to super_evaluate_recurse if the node is expanded.  It also sucks up rather a
@@ -65,9 +65,9 @@ score_t super_evaluate(bool aggressive, int depth, const board_t board, const Ve
 // Evaluate the result of all possible rotations of a position
 super_t super_evaluate_all(bool aggressive, int depth, const board_t board);
 
-typedef Tuple<board_t,Tuple<int,int,int,int>> rotated_board_t;
+typedef tuple<board_t,Vector<int,4>> rotated_board_t;
 
 // Evaluate enough children to determine who wins, and return the results
-vector<Tuple<rotated_board_t,score_t>> super_evaluate_children(const bool aggressive, const int depth, const board_t board, const Vector<int,4> rotation);
+vector<tuple<rotated_board_t,score_t>> super_evaluate_children(const bool aggressive, const int depth, const board_t board, const Vector<int,4> rotation);
 
 }

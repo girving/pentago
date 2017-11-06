@@ -2,7 +2,7 @@
 // Unit tests
 
 'use strict'
-var pentago = require('./pentago/build/Release/pentago')
+var pentago = require('./build/Release/pentago')
 var board_t = require('./board.js').board_t
 var high_board_t = pentago.high_board_t
 var Values = require('./values.js')

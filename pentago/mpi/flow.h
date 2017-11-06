@@ -4,7 +4,7 @@
 // quite complicated due to the combination of fully asynchronous MPI+threads.
 #pragma once
 
-#include <pentago/end/block_store.h>
+#include "pentago/end/block_store.h"
 #include <mpi.h>
 namespace pentago {
 namespace end {
@@ -15,7 +15,7 @@ namespace mpi {
 using namespace pentago::end;
 
 // The various communications used by compute_lines, and their associated messages
-struct flow_comms_t : public Noncopyable {
+struct flow_comms_t : public boost::noncopyable {
   const int rank;
   MPI_Comm barrier_comm; // Barrier synchronization messages passed down to ibarrier_t.  Tag = barrier_tag, no data.
   MPI_Comm request_comm; // Requests for one of our local input blocks.  Tag = request_id, data = int dimensions, int response_tag.
@@ -43,7 +43,10 @@ const int barrier_tag = 1111; // No data
 //
 // The number of lines to speculate is controlled by (1) an arbitrary memory limit in bytes and
 // (2) a limit on the number of lines in communication at any given time.
-void compute_lines(const flow_comms_t& comms, const Ptr<const readable_block_store_t> input_blocks, accumulating_block_store_t& output_blocks, RawArray<const line_t> lines, const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
+void compute_lines(const flow_comms_t& comms,
+                   const shared_ptr<const readable_block_store_t> input_blocks,
+                   accumulating_block_store_t& output_blocks, RawArray<const line_t> lines,
+                   const uint64_t memory_limit, const int line_gather_limit, const int line_limit);
 
 }
 }

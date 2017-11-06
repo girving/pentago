@@ -31,49 +31,34 @@ I will be writing up additional details of the application in paper form soon.
 
 ### Dependencies
 
-The code is a mix of pure C++ (for MPI code), C++ routines exposed to Python,
-Python code for tests and interfaces, and Node.js for the backend server.  The
-direct dependencies are
+The code is C++, with node.js for the backend server.  The main dependencies are
 
-* [geode](https://github.com/otherlab/geode): The Otherlab computational geometry library
+* [bazel](https://bazel.build): Build system
 * [mpi](http://en.wikipedia.org/wiki/Message_Passing_Interface): OpenMPI, MPICH2, etc.
-* [zlib](http://zlib.net): Okay but slow lossless compression.
-* [xz](http://tukaani.org/xz): Good but slower lossless compression
-* [snappy](http://code.google.com/p/snappy): Fast but poor lossless compression
-* [node.js >= 0.10.x](http://nodejs.org): Asynchronous javascript framework
+* [node.js >= 8.9](http://nodejs.org): Asynchronous javascript framework
 
-Geode has a few additional indirect dependencies (python, numpy, boost).  Pentago
-uses only core utilities in geode such as arrays and python bindings, not any of
-the actual computational geometry.
+Bazel handles a few extra dependencies automatically (see `WORKSPACE` for details).
 
 ### Installation
 
-Install geode via the instructions at https://github.com/otherlab/geode.  On Debian/Ubuntu,
-the other direct dependencies can be installed via
+On Mac:
 
-    sudo apt-get install openmpi-bin libopenmpi-dev zlib1g-dev liblzma-dev libsnappy-dev
+    # Install dependencies
+    brew install bazel openmpi node
 
-You can then build and run the tests via
+    # Build and test C++
+    bazel test -c opt --copt=-march=native ...
 
-    cd pentago
-    scons -j 5
-    py.test
-
-If you need the node.js backend, make sure the pentago headers and libraries are
-globally installed via
-
-    sudo scons install
-
-Assuming you have node.js and npm installed (unfortunately apt-get produces very old
-versions of these for me), you can build and test the backend server with
-
-    cd web/pentago
-    node-gyp configure build --verbose
-    cd ..
+    # Build and test node.js server
+    cd web
     npm install
-    make
+    node unit.js all
 
-This will also build the frontend webpage: point your browser at `web/index.html`.
+    # Build frontend webpage
+    cd web
+    make public
+
+On Ubuntu: to be written once I have clean Bazel handling of MPI.
 
 ## Algorithm summary
 

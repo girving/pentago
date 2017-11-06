@@ -6,7 +6,19 @@ Pentago web server and client
 The client is hosted on Firebase.  To deploy:
 
     cd pentago/web
+    bazel build -c opt --copt=-march=native //pentago/{end,high,mid}/...
+    npm install
+    make public
     firebase deploy
+
+## Server build
+
+To build and test the `npm` extension module, do
+
+    cd pentago/web
+    bazel build -c opt --copt=-march=native //pentago/{end,high,mid}/...
+    npm install
+    node unit.js all
 
 ## Server setup
 

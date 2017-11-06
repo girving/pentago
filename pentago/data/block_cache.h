@@ -6,9 +6,8 @@
 // is also used by the web backend to manage cached portions of the data set.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <pentago/base/superscore.h>
-#include <geode/python/Object.h>
+#include "pentago/base/board.h"
+#include "pentago/base/superscore.h"
 #include <vector>
 namespace pentago {
 
@@ -16,17 +15,14 @@ struct section_t;
 struct supertensor_reader_t;
 using std::vector;
 
-struct GEODE_EXPORT block_cache_t : public Object {
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
-
-protected:
-  GEODE_EXPORT block_cache_t();
+struct block_cache_t {
 public:
-  GEODE_EXPORT ~block_cache_t();
+  block_cache_t();
+  virtual ~block_cache_t();
 
   // Warning: Very slow, use only inside low depth searches.  board has player 0 to move.
-  GEODE_EXPORT bool lookup(const bool aggressive, const board_t board, super_t& wins) const;
-  GEODE_EXPORT bool lookup(const bool aggressive, const side_t side0, const side_t side1, super_t& wins) const;
+  bool lookup(const bool aggressive, const board_t board, super_t& wins) const;
+  bool lookup(const bool aggressive, const side_t side0, const side_t side1, super_t& wins) const;
 
 private:
   virtual int block_size() const = 0;
@@ -36,9 +32,10 @@ private:
 };
 
 // An empty block cache
-GEODE_EXPORT Ref<const block_cache_t> empty_block_cache();
+shared_ptr<const block_cache_t> empty_block_cache();
 
 // Generate a block cache from one or more supertensor files
-GEODE_EXPORT Ref<const block_cache_t> reader_block_cache(const vector<Ref<const supertensor_reader_t>> readers, const uint64_t memory_limit);
+shared_ptr<const block_cache_t> reader_block_cache(
+    const vector<shared_ptr<const supertensor_reader_t>> readers, const uint64_t memory_limit);
 
 }

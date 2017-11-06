@@ -1,7 +1,7 @@
 // Wrappers around MPI reductions to isolate MPI dependencies
 #pragma once
 
-#include <geode/array/RawArray.h>
+#include "pentago/utility/array.h"
 namespace pentago {
 namespace end {
 

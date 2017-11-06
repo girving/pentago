@@ -50,13 +50,13 @@
  * 3 - Allow multiple sections in one file
  */
 
-#include <pentago/data/file.h>
-#include <pentago/base/superscore.h>
-#include <pentago/base/section.h>
-#include <pentago/utility/thread.h>
-#include <pentago/utility/spinlock.h>
-#include <geode/array/Array4d.h>
-#include <geode/utility/function.h>
+#include "pentago/data/file.h"
+#include "pentago/base/superscore.h"
+#include "pentago/base/section.h"
+#include "pentago/utility/thread.h"
+#include "pentago/utility/spinlock.h"
+#include "pentago/utility/array.h"
+#include <boost/endian/conversion.hpp>
 namespace pentago {
 
 struct supertensor_blob_t {
@@ -72,10 +72,10 @@ struct supertensor_blob_t {
 
 const int supertensor_magic_size = 20;
 extern const char single_supertensor_magic[21];
-GEODE_EXPORT extern const char multiple_supertensor_magic[21];
+extern const char multiple_supertensor_magic[21];
 
 struct supertensor_header_t {
-  static const int header_size = 85;
+  static constexpr int header_size = 85;
 
   Vector<char,20> magic; // = "pentago supertensor\n"
   uint32_t version; // see version history above
@@ -88,39 +88,38 @@ struct supertensor_header_t {
   uint32_t filter; // algorithm used to preprocess superscore data before compression (0 for none)
   supertensor_blob_t index; // size and location of the compressed block index
 
-  GEODE_EXPORT supertensor_header_t();
-  GEODE_EXPORT supertensor_header_t(section_t section, int block_size, int filter); // Initialize everything except for valid and index
+  supertensor_header_t();
+
+  // Initialize everything except for valid and index
+  supertensor_header_t(section_t section, int block_size, int filter);
 
   Vector<int,4> block_shape(Vector<uint8_t,4> block) const;
-  GEODE_EXPORT void pack(RawArray<uint8_t> buffer) const;
-  GEODE_EXPORT static supertensor_header_t unpack(RawArray<const uint8_t> buffer);
+  void pack(RawArray<uint8_t> buffer) const;
+  static supertensor_header_t unpack(RawArray<const uint8_t> buffer);
 };
 
-struct supertensor_reader_t : public Object {
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
-
-  const Ref<const read_file_t> fd;
+struct supertensor_reader_t : public boost::noncopyable {
+  const shared_ptr<const read_file_t> fd;
   const supertensor_header_t header;
 
   // To save memory, we drop the uncompressed_size since it is computable, and store compressed_size as a uint32_t
   const Array<const uint64_t,4> offset; // absolute offset of each block in the file
   const Array<const uint32_t,4> compressed_size_; // compressed size of each block
 
-private:
   supertensor_reader_t(const string& path, const thread_type_t io=IO);
-  supertensor_reader_t(const string& path, const read_file_t& fd, const uint64_t header_offset, const thread_type_t io=IO);
-  void initialize(const string& path, const uint64_t header_offset, const thread_type_t io);
-public:
+  supertensor_reader_t(const string& path, const shared_ptr<const read_file_t>& fd,
+                       const uint64_t header_offset, const thread_type_t io=IO);
   ~supertensor_reader_t();
 
   // Read a block of data from disk
-  GEODE_EXPORT Array<Vector<super_t,2>,4> read_block(Vector<uint8_t,4> block) const;
+  Array<Vector<super_t,2>,4> read_block(Vector<uint8_t,4> block) const;
 
   // Read a block eventually, and call a (thread safe) function once the read completes
-  GEODE_EXPORT void schedule_read_block(Vector<uint8_t,4> block, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;
+  typedef function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)> read_cont_t;
+  void schedule_read_block(Vector<uint8_t,4> block, const read_cont_t& cont) const;
 
   // Schedule several block reads together
-  void schedule_read_blocks(RawArray<const Vector<uint8_t,4>> blocks, const function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)>& cont) const;
+  void schedule_read_blocks(RawArray<const Vector<uint8_t,4>> blocks, const read_cont_t& cont) const;
 
   uint64_t compressed_size(Vector<uint8_t,4> block) const;
   uint64_t uncompressed_size(Vector<uint8_t,4> block) const;
@@ -134,23 +133,42 @@ public:
 
   // File offsets of each block
   Array<const uint64_t,4> block_offsets() const;
+
+ private:
+  void initialize(const string& path, const uint64_t header_offset, const thread_type_t io);
 };
 
-struct supertensor_writer_t : public Object {
-  GEODE_DECLARE_TYPE(GEODE_NO_EXPORT)
+// Locked allocation of space at the end of a file
+struct next_offset_t : public boost::noncopyable {
+ private:
+  mutable spinlock_t lock;
+  uint64_t offset;
+  const Array<const uint64_t> padding;
+ public:
+  next_offset_t(const uint64_t start, Array<const uint64_t> padding={})
+    : offset(start), padding(padding) {}
+
+  // Reserve a block of the given size at the end of the file
+  uint64_t reserve(const uint64_t size);
+};
+
+struct supertensor_writer_t : public boost::noncopyable {
   typedef supertensor_writer_t Self;
 
   const string path;
-  Ptr<write_file_t> fd;
+  shared_ptr<write_file_t> fd;
   supertensor_header_t header; // incomplete until finalize is called
   const int level; // zlib compression level
 private:
+  const uint64_t header_offset;
+  const shared_ptr<next_offset_t> next_offset;
   const Array<supertensor_blob_t,4> index;
-  uint64_t next_offset;
-  mutable spinlock_t offset_lock;
+public:
 
   supertensor_writer_t(const string& path, section_t section, int block_size, int filter, int level);
-public:
+  supertensor_writer_t(const string& path, const shared_ptr<write_file_t>& fd,
+                       const uint64_t header_offset, const shared_ptr<next_offset_t>& next_offset,
+                       section_t section, int block_size, int filter, int level);
   ~supertensor_writer_t();
 
   // Write a block of data to disk now, destroying it in the process.
@@ -172,13 +190,35 @@ private:
 };
 
 // Open one or more supertensors from a single file
-vector<Ref<const supertensor_reader_t>> open_supertensors(const string& path, const thread_type_t io=IO);
-vector<Ref<const supertensor_reader_t>> open_supertensors(const read_file_t& fd, const thread_type_t io=IO);
+vector<shared_ptr<const supertensor_reader_t>> open_supertensors(
+    const string& path, const thread_type_t io=IO);
+vector<shared_ptr<const supertensor_reader_t>> open_supertensors(
+    const shared_ptr<const read_file_t>& fd, const thread_type_t io=IO);
+
+// Write some supertensors to a single file
+vector<shared_ptr<supertensor_writer_t>> supertensor_writers(
+    const string& path, RawArray<const section_t> sections, const int block_size, const int filter,
+    const int level, Array<const uint64_t> padding={});
 
 // Determine the slice of a supertensor file.  Does not verify consistency.
 int supertensor_slice(const string& path);
 
 // Unfilter a filtered uncompressed block.  raw_data is destroyed.
 Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_data);
+
+// Endian conversion
+static inline supertensor_blob_t endian_reverse(supertensor_blob_t blob) {
+  using boost::endian::endian_reverse;
+  blob.uncompressed_size = endian_reverse(blob.uncompressed_size);
+  blob.compressed_size = endian_reverse(blob.compressed_size);
+  blob.offset = endian_reverse(blob.offset);
+  return blob;
+}
+
+// Routines for writing multiple supertensors
+uint64_t multiple_supertensor_header_size(const int sections);
+Array<uint8_t> multiple_supertensor_header(
+    RawArray<const section_t> sections, RawArray<const supertensor_blob_t> index_blobs,
+    const int block_size, const int filter);
 
 }

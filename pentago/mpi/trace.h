@@ -1,8 +1,8 @@
 // Tracing code for debugging purposes
 #pragma once
 
-#include <pentago/end/config.h>
-#include <geode/utility/format.h>
+#include "pentago/end/config.h"
+#include "pentago/utility/format.h"
 namespace pentago {
 namespace mpi {
 
@@ -14,6 +14,9 @@ void mpi_trace(const string& msg);
 #else
 #define PENTAGO_MPI_TRACE(...) ((void)0)
 #endif
+
+// Called from the mpi_world_t constructor
+void set_mpi_trace_rank(int rank);
 
 }
 }

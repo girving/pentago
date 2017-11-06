@@ -9,12 +9,13 @@
 // quadrant, the set of inputs for a given block line is exactly another block line.
 #pragma once
 
-#include <pentago/end/config.h>
-#include <pentago/end/line.h>
-#include <pentago/base/symmetry.h>
-#include <pentago/utility/counter.h>
-#include <pentago/utility/spinlock.h>
-#include <geode/array/Array4d.h>
+#include "pentago/end/config.h"
+#include "pentago/end/line.h"
+#include "pentago/base/symmetry.h"
+#include "pentago/utility/counter.h"
+#include "pentago/utility/spinlock.h"
+#include "pentago/utility/array.h"
+#include "pentago/utility/unit.h"
 namespace pentago {
 namespace end {
 
@@ -40,11 +41,11 @@ struct line_data_t {
   const Vector<int,4> output_shape;
   const uint64_t memory_usage;
 
-  GEODE_EXPORT line_data_t(const line_t& line);
+  line_data_t(const line_t& line);
   ~line_data_t();
 };
 
-struct line_details_t : public Noncopyable {
+struct line_details_t : public boost::noncopyable {
   // Initial information
   const line_data_t pre;
   const event_t line_event;
@@ -80,46 +81,46 @@ struct line_details_t : public Noncopyable {
   const Array<Vector<super_t,2>> input, output;
 
   // When computation is complete, send a wakeup message here
-  typedef mpl::if_c<PENTAGO_MPI_COMPRESS_OUTPUTS,int,Unit>::type wakeup_block_t;
+  typedef std::conditional_t<PENTAGO_MPI_COMPRESS_OUTPUTS,int,unit_t> wakeup_block_t;
   typedef function<void(line_details_t&,wakeup_block_t)> wakeup_t;
   const wakeup_t wakeup;
   const line_details_t* const self; // Buffer for wakeup message
 
-  GEODE_EXPORT line_details_t(const line_data_t& pre, const wakeup_t& wakeup);
-  GEODE_EXPORT ~line_details_t();
+  line_details_t(const line_data_t& pre, const wakeup_t& wakeup);
+  ~line_details_t();
 
   // Get the kth input block
-  GEODE_EXPORT Vector<uint8_t,4> input_block(int k) const;
+  Vector<uint8_t,4> input_block(int k) const;
 
   // Extract the data for the kth block of either the input or output array.
   // In compressed mode, input block data has an extra entry to account for possible expansion.
-  GEODE_EXPORT RawArray<Vector<super_t,2>> input_block_data(int k) const;
-  GEODE_EXPORT RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
+  RawArray<Vector<super_t,2>> input_block_data(int k) const;
+  RawArray<Vector<super_t,2>> input_block_data(Vector<uint8_t,4> block) const;
 #if PENTAGO_MPI_COMPRESS_OUTPUTS
   RawArray<const uint8_t> compressed_output_block_data(int k) const;
 private:
   friend void compress_output_block(line_details_t* const line, const int b);
-  GEODE_EXPORT RawArray<Vector<super_t,2>> output_block_data(int k) const;
+  RawArray<Vector<super_t,2>> output_block_data(int k) const;
 public:
 #else
-  GEODE_EXPORT RawArray<Vector<super_t,2>> output_block_data(int k) const;
+  RawArray<Vector<super_t,2>> output_block_data(int k) const;
 #endif
 
   // Call this whenever a new input response arrives, but possibly *before* the data has been moved into place.
   // Returns the number of messages remaining.  Used by flow.cpp to throttle the number of simultaneous line gathers.
   // Warning: *Not* thread safe, so call only from flow.cpp.
-  GEODE_EXPORT int decrement_input_responses();
+  int decrement_input_responses();
 
   // Call this whenever a new block is in place.  Used as a request callback for when MPI_Irecv's finish.
   // When the count hits zero, the line will be automatically schedule.
-  GEODE_EXPORT void decrement_missing_input_blocks();
+  void decrement_missing_input_blocks();
 
   // Decrement the number of unsent output blocks, and return the number remaining.
-  GEODE_EXPORT int decrement_unsent_output_blocks();
+  int decrement_unsent_output_blocks();
 };
 
 // Schedule a line computation (called once all input blocks are in place)
-GEODE_EXPORT void schedule_compute_line(line_details_t& line);
+void schedule_compute_line(line_details_t& line);
 
 }
 }

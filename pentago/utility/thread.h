@@ -6,19 +6,17 @@
 // threads managed using the routines below.
 #pragma once
 
-#include <pentago/utility/job.h>
-#include <pentago/utility/wall_time.h>
-#include <geode/array/Array2d.h>
-#include <geode/python/Ptr.h>
-#include <geode/python/Object.h>
-#include <geode/python/ExceptionValue.h>
-#include <geode/structure/forward.h>
-#include <geode/utility/function.h>
-#include <pthread.h>
+#include "pentago/utility/array.h"
+#include "pentago/utility/unit.h"
+#include "pentago/utility/wall_time.h"
+#include <boost/core/noncopyable.hpp>
+#include <functional>
+#include <string>
 #include <vector>
 namespace pentago {
 
-using namespace geode;
+using std::function;
+using std::string;
 using std::vector;
 struct time_entry_t;
 
@@ -28,8 +26,6 @@ struct time_entry_t;
  * enum for the kinds of operations which can be timed.  This lets us
  * store timing information in a simple array.
  */
-
-} namespace geode {
 
 enum time_kind_t {
   compress_kind,
@@ -70,10 +66,8 @@ enum time_kind_t {
   _time_kinds
 };
 
-} namespace pentago {
-
 // Convert time_kind_t to string
-GEODE_EXPORT vector<const char*> time_kind_names();
+vector<const char*> time_kind_names();
 
 // The top 3 bits are for the event kind
 typedef uint64_t event_t;
@@ -89,17 +83,17 @@ const event_t ekind_mask        = event_t(7)<<61;
 
 #if PENTAGO_TIMING
 
-class thread_time_t : public Noncopyable {
+class thread_time_t : boost::noncopyable {
   time_entry_t* entry;
 public:
-  GEODE_EXPORT thread_time_t(time_kind_t kind, event_t event);
-  GEODE_EXPORT ~thread_time_t();
-  GEODE_EXPORT void stop(); // Stop early
+  thread_time_t(time_kind_t kind, event_t event);
+  ~thread_time_t();
+  void stop(); // Stop early
 };
 
 #else
 
-class thread_time_t : public Noncopyable {
+class thread_time_t : boost::noncopyable {
 public:
   thread_time_t(time_kind_t kind, event_t event) {}
   ~thread_time_t() {}
@@ -118,38 +112,36 @@ struct thread_times_t {
 };
 
 // PAPI information
-GEODE_EXPORT bool papi_enabled();
-GEODE_EXPORT vector<string> papi_event_names();
+bool papi_enabled();
+vector<string> papi_event_names();
 
 // Extract local times and reset them to zero
-GEODE_EXPORT thread_times_t clear_thread_times();
+thread_times_t clear_thread_times();
 
 // Extract total thread times
-GEODE_EXPORT thread_times_t total_thread_times();
+thread_times_t total_thread_times();
 
 // Print timing reports
-GEODE_EXPORT void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
-GEODE_EXPORT void report_papi_counts(RawArray<const papi_t,2> papi);
+void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
+void report_papi_counts(RawArray<const papi_t,2> papi);
 
-} namespace geode {
 enum thread_type_t { MASTER=0, CPU=1, IO=2 };
-} namespace pentago {
-GEODE_EXPORT thread_type_t thread_type();
+thread_type_t thread_type();
 
 // Initialize thread pools
-GEODE_EXPORT Unit init_threads(int cpu_threads, int io_threads);
+unit_t init_threads(int cpu_threads, int io_threads);
 
 // Grab thread counts: cpu count, io count
-GEODE_EXPORT Vector<int,2> thread_counts();
+Vector<int,2> thread_counts();
 
 // Schedule a job.  Schedule at the back of the queue if !soon, or the front if soon.
-GEODE_EXPORT void threads_schedule(thread_type_t type, job_t&& f, bool soon=false);
+void threads_schedule(thread_type_t type, function<void()>&& f, bool soon=false);
 
 // Wait for all jobs to complete
-GEODE_EXPORT void threads_wait_all();
+void threads_wait_all();
 
 // Join the CPU thread pool until all jobs complete
-GEODE_EXPORT void threads_wait_all_help();
+void threads_wait_all_help();
 
 // A historical event
 struct history_t {
@@ -164,8 +156,8 @@ struct history_t {
 };
 
 // Operations on tracked history.  If history is untracked, these are trivial.
-GEODE_EXPORT bool thread_history_enabled();
-GEODE_EXPORT vector<vector<Array<const history_t>>> thread_history();
-GEODE_EXPORT void write_thread_history(const string& filename);
+bool thread_history_enabled();
+vector<vector<Array<const history_t>>> thread_history();
+void write_thread_history(const string& filename);
 
 }

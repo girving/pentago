@@ -6,9 +6,9 @@
 // basic unit of work in the endgame solver, as discussed in compute.h.
 #pragma once
 
-#include <pentago/end/history.h>
-#include <pentago/base/section.h>
-#include <pentago/utility/thread.h>
+#include "pentago/end/history.h"
+#include "pentago/base/section.h"
+#include "pentago/utility/thread.h"
 namespace pentago {
 namespace end {
 
@@ -20,7 +20,7 @@ struct line_t {
   
   Vector<uint8_t,4> block(int i) const { // ith block in block units
     GEODE_ASSERT((unsigned)i<=(unsigned)length);
-    return block_base.insert(i,dimension);
+    return block_base.insert(i, dimension);
   }
 
   event_t line_event() const {
@@ -52,8 +52,19 @@ struct local_block_t {
 
 ostream& operator<<(ostream& output, const line_t& line);
 
+template<class T,int d> static inline size_t hash_value(const Vector<T,d>& v) {
+  size_t h = 0;
+  for (const auto& x : v) boost::hash_combine(h, x);
+  return h;
+}
+
+static inline size_t hash_value(local_id_t i) { return i.id; }
+
 }
 }
-namespace geode {
-template<> struct is_packed_pod<pentago::end::local_id_t> : public mpl::true_ {};
-}
+
+namespace std {
+template<> struct hash<pentago::end::local_id_t> {
+  size_t operator()(pentago::end::local_id_t i) const { return i.id; }
+};
+}  // namespace std

@@ -1,16 +1,14 @@
 // Spin locks
 #pragma once
 
-#include <geode/utility/type_traits.h>
-#include <geode/utility/forward.h>
+#include <type_traits>
+#include <boost/core/noncopyable.hpp>
 #ifdef __APPLE__
-#include <libkern/OSAtomic.h>
+#include <os/lock.h>
 #else
 #include <pthread.h>
 #endif
 namespace pentago {
-
-using namespace geode;
 
 /* Important non-portability note:
  *
@@ -27,21 +25,21 @@ using namespace geode;
 #if defined(__APPLE__)
 
 struct spinlock_t {
-  OSSpinLock spinlock;
+  os_unfair_lock spinlock;
 
   spinlock_t()
-    : spinlock(0) {}
+    : spinlock(OS_UNFAIR_LOCK_INIT) {}
 
   void lock() {
-    OSSpinLockLock(&spinlock);
+    os_unfair_lock_lock(&spinlock);
   }
 
   bool trylock() {
-    return OSSpinLockTry(&spinlock);
+    return os_unfair_lock_trylock(&spinlock);
   }
 
   void unlock() {
-    OSSpinLockUnlock(&spinlock);
+    os_unfair_lock_unlock(&spinlock);
   }
 };
 
@@ -88,7 +86,7 @@ struct spinlock_t {
 #endif
 
 // Convenience class to lock and unlock a spinlock
-struct spin_t : Noncopyable {
+struct spin_t : boost::noncopyable {
   spinlock_t& lock;
 
   spin_t(spinlock_t& lock)

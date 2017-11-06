@@ -5,8 +5,8 @@
 // lzma provides a factor of ten, but is far slower.
 #pragma once
 
-#include <pentago/base/superscore.h>
-#include <pentago/utility/thread.h>
+#include "pentago/base/superscore.h"
+#include "pentago/utility/thread.h"
 namespace pentago {
 namespace end {
 
@@ -28,7 +28,7 @@ RawArray<uint8_t> local_fast_compress(RawArray<Vector<super_t,2>> uncompressed, 
 
 // Uncompress into a thread local buffer (the same buffer used by fast_uncompress).
 // The returned view is valid until the next call to either local_fast_compress or local_fast_uncompress.
-GEODE_EXPORT RawArray<Vector<super_t,2>> local_fast_uncompress(RawArray<const uint8_t> compressed, const event_t event);
+RawArray<Vector<super_t,2>> local_fast_uncompress(RawArray<const uint8_t> compressed, const event_t event);
 
 }
 }

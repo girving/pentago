@@ -8,12 +8,12 @@
 // In the comments below, x' is the inverse of x.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <pentago/base/superscore.h>
-#include <geode/structure/Tuple.h>
+#include "pentago/base/board.h"
+#include "pentago/base/superscore.h"
 namespace pentago {
 
 using std::ostream;
+using std::tuple;
 
 // A purely local symmetry
 struct local_symmetry_t {
@@ -75,10 +75,6 @@ struct symmetry_t {
   bool operator!=(symmetry_t s) const {
     return !(*this==s);
   }
-
-  friend int hash_reduce(symmetry_t s) {
-    return s.global<<8|s.local;
-  }
 };
 
 // Group product
@@ -103,8 +99,8 @@ inline symmetry_t operator*(local_symmetry_t a, symmetry_t b) {
 // A symmetry is a function s : X -> X, where X = Z_6^2 is the set of Pentago squares.
 // A side_t is a subset A of X, and a board_t is two such subsets.  These functions compute s(A).
 // For example, transform_board(symmetry_t(1,0),board) rotates the whole board left by 90 degrees.
-side_t transform_side(symmetry_t s, side_t side) GEODE_CONST;
-board_t transform_board(symmetry_t s, board_t board) GEODE_CONST;
+side_t transform_side(symmetry_t s, side_t side) __attribute__((const));
+board_t transform_board(symmetry_t s, board_t board) __attribute__((const));
 
 // Let B be the set of boards, and A \subset B a subset of boards invariant to global transforms
 // (b in A iff g(b) in A for g in D_4).  Define the super operator f : B -> 2^L by
@@ -115,15 +111,15 @@ board_t transform_board(symmetry_t s, board_t board) GEODE_CONST;
 //             iff g'xgy in C
 // Thus, we define
 //   s(C) = gy(C) = {x in L | g'xgy in C} = {gzy'g' | z in C}
-GEODE_EXPORT super_t transform_super(symmetry_t s, super_t super) GEODE_CONST;
+super_t transform_super(symmetry_t s, super_t super) __attribute__((const));
 
 // Given b, find s minimizing s(b), and return s(b),s
-Tuple<board_t,symmetry_t> superstandardize(board_t board) GEODE_CONST;
-Tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) GEODE_CONST;
+tuple<board_t,symmetry_t> superstandardize(board_t board) __attribute__((const));
+tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) __attribute__((const));
 
 // A meaningless function invariant to global board transformations.  Extremely slow.
-GEODE_EXPORT bool meaningless(board_t board, uint64_t salt=0) GEODE_CONST;
-GEODE_EXPORT super_t super_meaningless(board_t board, uint64_t salt=0) GEODE_CONST;
+bool meaningless(board_t board, uint64_t salt=0) __attribute__((const));
+super_t super_meaningless(board_t board, uint64_t salt=0) __attribute__((const));
 
 ostream& operator<<(ostream& output, symmetry_t s);
 ostream& operator<<(ostream& output, local_symmetry_t s);
@@ -145,4 +141,9 @@ struct symmetries_t {
 };
 extern const symmetries_t symmetries;
 
-}
+}  // namespace pentago
+namespace std {
+template<> struct hash<pentago::symmetry_t> {
+  auto operator()(pentago::symmetry_t s) const { return std::hash<int>()(s.global<<8 | s.local); }
+};
+}  // namespace std

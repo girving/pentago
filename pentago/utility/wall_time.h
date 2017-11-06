@@ -2,6 +2,7 @@
 #pragma once
 
 #include <sys/time.h>
+#include <cstdint>
 namespace pentago {
 
 struct wall_time_t {

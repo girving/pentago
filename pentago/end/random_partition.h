@@ -8,10 +8,10 @@
 // is quite a lot of work to spread out, this works quite well.
 #pragma once
 
-#include <pentago/end/partition.h>
-#include <pentago/end/line.h>
-#include <pentago/base/section.h>
-#include <geode/math/uint128.h>
+#include "pentago/end/partition.h"
+#include "pentago/end/line.h"
+#include "pentago/base/section.h"
+#include "pentago/utility/uint128.h"
 namespace pentago {
 namespace end {
 
@@ -19,17 +19,17 @@ struct sheaf_t;
 
 // Given a set of sections, distribute all lines and blocks amongst a number of processors
 struct random_partition_t : public partition_t {
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
   typedef partition_t Base;
 
   const uint128_t key; // Key for random number generation
   const int total_lines;
   const Array<const sheaf_t> sheafs; // One per section per dimension
-  const Hashtable<Tuple<section_t,uint8_t>,int> sheaf_id; // Map from section,dimension to sheaf index
+  // Map from section,dimension to sheaf index
+  const unordered_map<tuple<section_t,uint8_t>,int,boost::hash<tuple<section_t,uint8_t>>> sheaf_id;
 
-protected:
-  GEODE_EXPORT random_partition_t(const uint128_t key, const int ranks, const sections_t& sections);
 public:
+  random_partition_t(const uint128_t key, const int ranks,
+                     const shared_ptr<const sections_t>& sections);
   ~random_partition_t();
 
   // Define partition_t interface
@@ -38,8 +38,8 @@ public:
   Array<const line_t> rank_lines(const int rank) const override;
   Array<const local_block_t> rank_blocks(const int rank) const override;
   Vector<uint64_t,2> rank_counts(const int rank) const override; // Expensive, since it calls rank_blocks
-  Tuple<int,local_id_t> find_block(const section_t section, const Vector<uint8_t,4> block) const override;
-  Tuple<section_t,Vector<uint8_t,4>> rank_block(const int rank, const local_id_t local_id) const override;
+  tuple<int,local_id_t> find_block(const section_t section, const Vector<uint8_t,4> block) const override;
+  tuple<section_t,Vector<uint8_t,4>> rank_block(const int rank, const local_id_t local_id) const override;
 
 private:
 

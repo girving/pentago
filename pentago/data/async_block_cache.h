@@ -6,35 +6,35 @@
 // range requests.
 #pragma once
 
-#include <pentago/data/block_cache.h>
-#include <pentago/data/lru.h>
-#include <pentago/base/section.h>
-#include <pentago/base/symmetry.h>
-#include <pentago/end/config.h>
-#include <pentago/high/board.h>
-#include <geode/array/Array4d.h>
+#include "pentago/data/block_cache.h"
+#include "pentago/data/lru.h"
+#include "pentago/base/section.h"
+#include "pentago/base/symmetry.h"
+#include "pentago/end/config.h"
+#include "pentago/high/board.h"
+#include "pentago/utility/array.h"
+#include "pentago/utility/unit.h"
 namespace pentago {
 
 struct async_block_cache_t : public block_cache_t {
-  GEODE_NEW_FRIEND
   typedef block_cache_t Base;
-  typedef Tuple<section_t,Vector<uint8_t,4>> block_t;
+  typedef tuple<section_t,Vector<uint8_t,4>> block_t;
 
   const uint64_t memory_limit;
-  lru_t<block_t,geode::Array<const Vector<super_t,2>,4>> lru; // Maybe be an empty array, indicating pending
+  lru_t<block_t,Array<const Vector<super_t,2>,4>> lru; // Maybe be an empty array, indicating pending
   int64_t free_memory; // signed so it can go temporarily below zero
 
-protected:
-  GEODE_EXPORT async_block_cache_t(const uint64_t memory_limit);
 public:
+  async_block_cache_t(const uint64_t memory_limit);
   ~async_block_cache_t();
 
   // Look up the section and block containing a given board.
-  // Code copied from block_cache_t::lookup due to laziness.  The only difference is that the board isn't flipped.
-  GEODE_EXPORT static block_t board_block(const high_board_t& board);
+  // Code copied from block_cache_t::lookup due to laziness.
+  // The only difference is that the board isn't flipped.
+  static block_t board_block(const high_board_t& board);
 
-  GEODE_EXPORT bool contains(const block_t block) const;
-  GEODE_EXPORT Unit set(const block_t block, RawArray<const uint8_t> compressed);
+  bool contains(const block_t block) const;
+  unit_t set(const block_t block, RawArray<const uint8_t> compressed);
 
 private:
   int block_size() const;

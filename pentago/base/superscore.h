@@ -18,12 +18,11 @@
 // If you think the bit twiddling code in this file is complicated, look at base/symmetry.cpp.
 #pragma once
 
-#include <pentago/base/board.h>
-#include <geode/math/popcount.h>
-#include <geode/math/sse.h>
-#include <geode/random/forward.h>
-#include <geode/utility/endian.h>
-#include <geode/vector/Vector.h>
+#include "pentago/base/board.h"
+#include "pentago/utility/popcount.h"
+#include "pentago/utility/sse.h"
+#include "pentago/utility/vector.h"
+#include <boost/endian/conversion.hpp>
 namespace pentago {
 
 // Decide whether or not to use SSE
@@ -31,14 +30,12 @@ namespace pentago {
 #define PENTAGO_SSE 0
 #else
 #define PENTAGO_SSE 1
-#if GEODE_ENDIAN != GEODE_LITTLE_ENDIAN
+#ifdef BOOST_BIG_ENDIAN
 #error "SSE is supported only in little endian mode"
 #endif
 #endif
 
-using namespace geode;
 using std::ostream;
-using geode::popcount;
 
 struct zero {};
 
@@ -48,9 +45,9 @@ struct super_t {
 
 #if PENTAGO_SSE
   __m128i x,y; // Little endian order as asserted above.
-#elif GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
+#elif defined(BOOST_LITTLE_ENDIAN)
   uint64_t a,b,c,d; // Little endian order.  Use different names to avoid confusion
-#elif GEODE_ENDIAN == GEODE_BIG_ENDIAN
+#elif defined(BOOST_BIG_ENDIAN)
   uint64_t d,c,b,a; // Respect big endianness
 #endif
 
@@ -67,7 +64,7 @@ struct super_t {
     : x(x), y(y) {}
 
   super_t(uint64_t x0, uint64_t x1, uint64_t y0, uint64_t y1)
-    : x(geode::pack(x0,x1)), y(geode::pack(y0,y1)) {}
+    : x(sse_pack(x0,x1)), y(sse_pack(y0,y1)) {}
 
   static super_t identity() {
     return super_t(_mm_set1_epi32(1),_mm_set1_epi32(0));
@@ -134,9 +131,9 @@ struct super_t {
 
   // Use little endian argument order unconditionally
   super_t(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
-#if GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
+#if defined(BOOST_LITTLE_ENDIAN)
     : a(a), b(b), c(c), d(d) {}
-#elif GEODE_ENDIAN == GEODE_BIG_ENDIAN
+#elif defined(BOOST_BIG_ENDIAN)
     : d(d), c(c), b(b), a(a) {}
 #endif
 
@@ -211,12 +208,12 @@ struct super_t {
 
   // Do not use the following functions in performance critical code
 
-  bool operator()(int i0,int i1,int i2,int i3) const {
+  bool operator()(int i0, int i1, int i2, int i3) const {
     return (*this)((i0&3)+4*((i1&3)+4*((i2&3)+4*(i3&3))));
   }
 
   bool operator()(const Vector<int,4>& r) const {
-    return (*this)(r.x,r.y,r.z,r.w);
+    return (*this)(r[0], r[1], r[2], r[3]);
   }
 
   template<class I> bool operator[](const I& i) const {
@@ -229,12 +226,12 @@ struct super_t {
     return super_t(hi==0?chunk:0,hi==1?chunk:0,hi==2?chunk:0,hi==3?chunk:0);
   }
 
-  static super_t singleton(int i0,int i1,int i2,int i3) {
+  static super_t singleton(int i0, int i1, int i2, int i3) {
     return singleton((i0&3)+4*((i1&3)+4*((i2&3)+4*(i3&3))));
   }
 
   static super_t singleton(Vector<int,4> r) {
-    return singleton(r.x,r.y,r.z,r.w);
+    return singleton(r[0], r[1], r[2], r[3]);
   }
 };
 
@@ -259,22 +256,22 @@ struct superinfo_t {
 };
 
 // rmax(f)(a) = max_{b in R} f(a+b)
-static inline super_t rmax(super_t f) GEODE_CONST; // Definition below
+static inline super_t rmax(super_t f) __attribute__((const)); // Definition below
 
 // Given a single side, compute all rotations which yield five in a row
-GEODE_EXPORT super_t super_wins(side_t side) GEODE_CONST;
+super_t super_wins(side_t side) __attribute__((const));
 
 // Do not use in performance critical code
-GEODE_EXPORT extern const Vector<int,4> single_rotations[8];
+extern const Vector<int,4> single_rotations[8];
 
-GEODE_EXPORT uint8_t first(super_t s);
+uint8_t first(super_t s);
 
-GEODE_EXPORT super_t random_super(Random& random);
+super_t random_super(Random& random);
 
-GEODE_EXPORT ostream& operator<<(ostream& output, super_t s);
-GEODE_EXPORT ostream& operator<<(ostream& output, superinfo_t s);
+ostream& operator<<(ostream& output, super_t s);
+ostream& operator<<(ostream& output, superinfo_t s);
 
-GEODE_EXPORT int popcount(super_t s);
+int popcount(super_t s);
 
 #if PENTAGO_SSE // SSE version of rmax
 
@@ -326,8 +323,27 @@ static inline super_t rmax(const super_t f) {
                  FIRST_THREE(f.d)|f.c|f.a);
 }
 
+#endif  // PENTAGO_SSE
+
+#ifdef BOOST_BIG_ENDIAN
+static inline super_t endian_reverse(const super_t s) {
+  return super_t(flip_endian(s.d),
+                 flip_endian(s.c),
+                 flip_endian(s.b),
+                 flip_endian(s.a));
+}
+#else
+static inline super_t endian_reverse(const super_t s) {
+  die("Shouldn't be needed on little endian machines");
+}
 #endif
 
-} namespace geode {
-template<> struct IsScalar<pentago::super_t> : public mpl::true_ {};
+uint64_t super_popcount(NdArray<const super_t> data);
+NdArray<int> super_popcounts(NdArray<const super_t> data);
+Array<super_t> random_supers(const uint128_t key, const int size);
+
+template<int d> Array<super_t,d> random_supers(const uint128_t key, const Vector<int,d> shape) {
+  return random_supers(key, shape.product()).reshape_own(shape);
 }
+
+}  // namespace pentago

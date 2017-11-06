@@ -1,7 +1,7 @@
 // Pentago tree search worker process
 
 'use strict'
-var pentago = require('./pentago/build/Release/pentago')
+var pentago = require('./build/Release/pentago')
 
 // Allocate workspace
 var workspace = new Buffer(pentago.midsolve_workspace_memory_usage(18))

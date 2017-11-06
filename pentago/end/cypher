@@ -9,8 +9,8 @@
 # 2. Each block corresponds to exactly 4 lines.
 
 from __future__ import division
-from geode import *
 import scipy.stats
+from numpy import *
 
 ranks = 16384
 
@@ -21,24 +21,24 @@ def expected_maximum_of_iid_normals(n):
   #return sqrt(2)*((gamma-1)*Q(2-2/n)-gamma*Q(2-2/(e*n)))
   return sqrt(2*log(n)-log(4*pi*log(n)-2*pi*log(2*pi)))*(1+gamma/log(n))
 
-set_printoptions(linewidth=200)
+set_printoptions(linewidth=200, precision=3)
 
-Log.configure('cypher',0,0,100)
+print('cypher')
 for blocks in 104414087,500235319:
-  with Log.scope('blocks %d'%blocks):
-    blocks_per_rank = blocks//ranks
-    mean = 1/4
-    variance = blocks_per_rank*(1/4*sqr(1-mean)+3/4*sqr(0-mean))
-    mean_blocks = blocks_per_rank*mean
-    expected_max = expected_maximum_of_iid_normals(ranks)*sqrt(variance)
+  print('  blocks %d' % blocks)
+  blocks_per_rank = blocks//ranks
+  mean = 1/4
+  variance = blocks_per_rank*(1/4*square(1-mean)+3/4*square(0-mean))
+  mean_blocks = blocks_per_rank*mean
+  expected_max = expected_maximum_of_iid_normals(ranks)*sqrt(variance)
 
-    Log.write('mean blocks = %g'%mean_blocks)
-    Log.write('expected max = %g'%expected_max)
-    Log.write('max/min ratio = %g'%((mean_blocks+expected_max)/(mean_blocks-expected_max)))
+  print('    mean blocks = %g'%mean_blocks)
+  print('    expected max = %g'%expected_max)
+  print('    max/min ratio = %g'%((mean_blocks+expected_max)/(mean_blocks-expected_max)))
 
-    B = scipy.stats.binom(blocks_per_rank,1/4)
-    ratios = []
-    for _ in xrange(20):
-      counts = B.rvs(ranks)
-      ratios.append(counts.max()/counts.min())
-    Log.write('ratios = %s'%asarray(ratios))
+  B = scipy.stats.binom(blocks_per_rank,1/4)
+  ratios = []
+  for _ in xrange(20):
+    counts = B.rvs(ranks)
+    ratios.append(counts.max()/counts.min())
+  print('    ratios = %s'%asarray(ratios))

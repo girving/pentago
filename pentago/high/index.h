@@ -13,10 +13,11 @@
  * All data is little endian.
  */
 
-#include <pentago/end/sections.h>
-#include <pentago/data/supertensor.h>
-#include <geode/utility/endian.h>
-#if GEODE_ENDIAN == GEODE_LITTLE_ENDIAN
+#include "pentago/end/sections.h"
+#include "pentago/data/supertensor.h"
+#include <boost/core/noncopyable.hpp>
+#include <boost/endian/conversion.hpp>
+#ifdef BOOST_LITTLE_ENDIAN
 namespace pentago {
 
 struct compact_blob_t {
@@ -33,16 +34,14 @@ struct compact_blob_t {
 };
 static_assert(sizeof(compact_blob_t)==12,"struct packing failed");
 
-struct supertensor_index_t : public Object {
-  GEODE_DECLARE_TYPE(GEODE_EXPORT)
-  typedef Tuple<section_t,Vector<uint8_t,4>> block_t;
+struct supertensor_index_t : private boost::noncopyable {
+  typedef tuple<section_t,Vector<uint8_t,4>> block_t;
 
-  const Ref<const end::sections_t> sections;
+  const shared_ptr<const end::sections_t> sections;
   const Array<const uint64_t> section_offset;
 
-protected:
-  supertensor_index_t(const end::sections_t& sections);
 public:
+  supertensor_index_t(const shared_ptr<const end::sections_t>& sections);
   ~supertensor_index_t();
 
   string header() const;
@@ -55,7 +54,8 @@ public:
   static Array<Vector<super_t,2>,4> unpack_block(const block_t block, RawArray<const uint8_t> compressed);
 };
 
-void write_supertensor_index(const string& name, const vector<Ref<const supertensor_reader_t>>& readers);
+void write_supertensor_index(const string& name,
+                             const vector<shared_ptr<const supertensor_reader_t>>& readers);
 
-}
-#endif
+}  // namespace pentago
+#endif  // BOOST_LITTLE ENDIAN

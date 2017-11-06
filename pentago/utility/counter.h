@@ -1,24 +1,25 @@
 // Atomic thread safe counters
 #pragma once
 
-#include <geode/python/config.h>
+#include <atomic>
+#include <cassert>
 namespace pentago {
 
 class counter_t {
-  int count;
+  std::atomic<int> count;
 public:
 
-  counter_t(int count)
+  explicit counter_t(int count)
     : count(count) {} 
 
   int operator--() {
-    int r = fetch_and_add(&count,-1)-1;
+    const int r = count.fetch_sub(1) - 1;
     assert(r>=0);
     return r;
   }
 
   explicit operator bool() const {
-    return count!=0;
+    return count;
   }
 };
 
