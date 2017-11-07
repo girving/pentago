@@ -110,13 +110,19 @@ exports.values = function (options,log) {
                    encoding: null, // Binary mode
                    headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
     request(details,function (error,res,body) {
-      if (error || res.statusCode != 206 || body.length != blob.size) {
+      if (res && res.statusCode == 403) {
+        // Retry the request.  403 errors happen nondeterministically, possibly because
+        // of a Racekspace or Akamai bug.
+        log.warning("https get failed: %s, status %d, retrying",name,res.statusCode)
+        simple_get(path,blob,cont)
+      } else if (error || res.statusCode != 206 || body.length != blob.size) {
         log.error("https get failed: %s, status %d, length %d != %d, error '%s'",
                   name,res.statusCode,body.length,blob.size,error)
         process.exit(1)
+      } else {
+        log.debug('range response %s, active %d',name,--stats.active_gets)
+        cont(body)
       }
-      log.debug('range response %s, active %d',name,--stats.active_gets)
-      cont(body)
     })
   }
 
