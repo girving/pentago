@@ -12,7 +12,7 @@ from __future__ import division
 import os
 import sys
 import hashlib
-from numpy import *
+import numpy as np
 
 def cache(f):
   """Cache a nullary function call."""
@@ -42,7 +42,7 @@ def popcount(x):
 
 @cache
 def small_popcounts():
-  return asarray([popcount(i) for i in xrange(512)])
+  return np.asarray([popcount(i) for i in xrange(512)])
 
 def bits(x):
   if not x:
@@ -95,7 +95,7 @@ def win_patterns():
       for i in xrange(5):
         p |= bit(i+x,i+x,rotate=rotate)
       wins.append(p)
-  wins = asarray(wins)
+  wins = np.asarray(wins)
 
   # Check that 5 bits are set in each
   for w in wins:
@@ -112,7 +112,7 @@ def win_contributions():
   wins = win_patterns()
   # For each possible value of each quadrant, determine all the ways that quadrant can
   # contribute to victory.
-  table = zeros((4,512),dtype=int64)
+  table = np.zeros((4,512),dtype=np.int64)
   for qx in xrange(2):
     for qy in xrange(2):
       q = 2*qx+qy
@@ -131,7 +131,7 @@ def show_win_contributions():
 
 @cache
 def rotations():
-  table = zeros((512,2),dtype=int16)
+  table = np.zeros((512,2),dtype=np.int16)
   for v in xrange(512):
     left = 0
     right = 0
@@ -173,12 +173,12 @@ def unrotated_win_distances():
   # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
   # has 3 bits (for 0,1,2,3 or 4=infinity) plus an extra 0 bit to stop carries at runtime, so we
   # fit 16 patterns into each of 2 64-bit ints
-  table = zeros((4,3**9,2),int64) # indexed by quadrant,position,word
+  table = np.zeros((4,3**9,2),np.int64) # indexed by quadrant,position,word
   unpack_ = unpack()
   for i,pats in enumerate(patterns):
     for j,pat in enumerate(pats):
       for q in xrange(4):
-        b = arange(3**9)
+        b = np.arange(3**9)
         s0,s1 = unpack_[b].T
         qp = (pat>>16*q)&0x1ff
         d = if_(s1&qp,4,count[qp&~s0])
@@ -192,8 +192,8 @@ def arbitrarily_rotated_win_distances():
   patterns = win_patterns().reshape(2,16)
 
   # Precompute table of multistep rotations
-  rotate = empty((512,4),int16)
-  rotate[:,0] = arange(512)
+  rotate = np.empty((512,4),np.int16)
+  rotate[:,0] = np.arange(512)
   for i in xrange(3):
     rotate[:,i+1] = rotations()[rotate[:,i],0]
 
@@ -204,12 +204,12 @@ def arbitrarily_rotated_win_distances():
   # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
   # has 3 bits (for 0,1,2,3 or 4=infinity) plus an extra 0 bit to stop carries at runtime, so we
   # fit 16 patterns into each of 2 64-bit ints
-  table = zeros((4,3**9,2),int64) # indexed by quadrant,position,word
+  table = np.zeros((4,3**9,2),np.int64) # indexed by quadrant,position,word
   unpack_ = unpack()
   for i,pats in enumerate(patterns):
     for j,pat in enumerate(pats):
       for q in xrange(4):
-        b = arange(3**9)
+        b = np.arange(3**9)
         s0,s1 = unpack_[b].T
         s0 = rotate[s0,:]
         s1 = rotate[s1,:]
@@ -230,7 +230,7 @@ def rotated_win_distances():
       if pat&(0x1ff<<16*q):
         rotated_patterns.append((pat,q))
   assert len(rotated_patterns)==68
-  rotated_patterns = asarray(rotated_patterns,object).reshape(4,17,2)
+  rotated_patterns = np.asarray(rotated_patterns,object).reshape(4,17,2)
 
   # Precompute small popcounts
   count = small_popcounts()
@@ -238,26 +238,26 @@ def rotated_win_distances():
   # Generate a distance table giving the total number of moves required for player 0 (black) to
   # reach the pattern, or 4 for unreachable (a white stone is in the way).  Each pattern distance
   # has 3 bits (for 0,1,2,3 or 4=infinity), so we fit 17 patterns into each of 4 64-bit ints
-  table = zeros((4,3**9,4),int64) # indexed by quadrant,position,word
+  table = np.zeros((4,3**9,4),np.int64) # indexed by quadrant,position,word
   unpack_ = unpack()
   rotations_ = rotations()
   for i,pats in enumerate(rotated_patterns):
     for j,(pat,qr) in enumerate(pats):
       for q in xrange(4):
-        b = arange(3**9)
+        b = np.arange(3**9)
         s0,s1 = unpack_[b].T
         qp = (pat>>16*q)&0x1ff
         d = if_(s1&qp,4,count[qp&~s0])
         if q==qr:
           for r in 0,1:
-            d = minimum(d,if_(rotations_[s1,r]&qp,4,count[qp&~rotations_[s0,r]]))
+            d = np.minimum(d,if_(rotations_[s1,r]&qp,4,count[qp&~rotations_[s0,r]]))
         table[q,b,i] |= d<<3*j
   check(table,'6fc4ae84c574d330f38e3f07b37ece103fa80c45')
   return [('uint64_t','rotated_win_distances','0x%xL',table)]
 
 @cache
 def reflections():
-  table = zeros(512,dtype=int16)
+  table = np.zeros(512,dtype=np.int16)
   for v in xrange(512):
     r = 0
     for x in xrange(3):
@@ -278,7 +278,7 @@ a quadrant state in 16 bits using radix 3.  However, radix 3 is inconvenient for
 so we need lookup tables to go to and from packed form.'''
 @cache
 def pack():
-  pack = zeros(2**9,dtype=int16)
+  pack = np.zeros(2**9,dtype=np.int16)
   for v in xrange(512):
     pv = 0
     for i in xrange(9):
@@ -294,7 +294,7 @@ def show_pack():
 
 @cache
 def unpack():
-  unpack = zeros((3**9,2),dtype=int16)
+  unpack = np.zeros((3**9,2),dtype=np.int16)
   for v in xrange(3**9):
     vv = v
     p0,p1 = 0,0
@@ -314,7 +314,7 @@ def show_unpack():
   return [('uint16_t','unpack_table','0x%x',unpack())]
 
 # pack and unpack should be inverses
-assert all(pack()[unpack()[:,0]]+2*pack()[unpack()[:,1]]==arange(3**9))
+assert np.all(pack()[unpack()[:,0]]+2*pack()[unpack()[:,1]]==np.arange(3**9))
 
 @remember
 def moves():
@@ -330,9 +330,9 @@ def moves():
     assert len(mv)==9-popcount(filled)
     moves.append(mv)
   # Pack into a flat nested array
-  sizes = asarray(map(len,moves))
-  offsets = hstack([0,cumsum(sizes)])
-  flat = asarray([x for mv in moves for x in mv])
+  sizes = np.asarray(map(len,moves))
+  offsets = np.hstack([0,np.cumsum(sizes)])
+  flat = np.asarray([x for mv in moves for x in mv])
   assert len(flat)==offsets[-1]
   assert len(flat)<2**16
   check(offsets,'15b71d6e563787b098860ae0afb1d1aede6e91c2')
@@ -342,17 +342,17 @@ def moves():
 
 @remember
 def superwin_info():
-  all_rotations = empty((512,4),int16)
-  all_rotations[:,0] = arange(512)
+  all_rotations = np.empty((512,4),np.int16)
+  all_rotations[:,0] = np.arange(512)
   for i in xrange(3):
     all_rotations[:,i+1] = rotations()[all_rotations[:,i],0]
-  ways = win_patterns().view(int16).reshape(32,4)
+  ways = win_patterns().view(np.int16).reshape(32,4)
   if sys.byteorder=='big': # Fix order if necessary
     ways = ways[:,::-1]
   types = dict(map(reversed,enumerate('h v dl dh da'.split()))) # horizontal, vertical, diagonal lo/hi/assist
   patterns = 'v v - - | h - h - | - h - h | - - v v | dl - da dl | dh da - dh | da dl dl - | - dh dh da'
   patterns = [p.split() for p in patterns.split('|')]
-  info = zeros((4,512,5,4,4,4,4),bool) # Indexed by quadrants, quadrant state, superwin_info field, r0, r1, r2, r3
+  info = np.zeros((4,512,5,4,4,4,4),bool) # Indexed by quadrants, quadrant state, superwin_info field, r0, r1, r2, r3
   for pattern in patterns:
     debug = False # pattern=='- dh dh da'.split()
     if debug: b = [0,136,50,64]
@@ -360,7 +360,7 @@ def superwin_info():
     used   = [i for i in xrange(4) if pattern[i]!='-']
     unused = [i for i in xrange(4) if pattern[i]=='-']
     assert len(used) in (2,3)
-    ws = asarray([w for w in ways if all([bool(w[i])==(pattern[i]!='-') or pattern[i]=='da' for i in xrange(4)])])
+    ws = np.asarray([w for w in ways if np.all([bool(w[i])==(pattern[i]!='-') or pattern[i]=='da' for i in xrange(4)])])
     assert len(ws) in (6,3)
     assert len(ws)<=4**(4-len(used))
     for q in used:
@@ -377,45 +377,45 @@ def superwin_info():
         else:
           s[:,i//4,i%4] |= x[:,None,:,None,None,None,None]
         if 0 and debug:
-          changed = zip(*nonzero(info[q,b[q]]!=before[q,b[q]]))
+          changed = zip(*np.nonzero(info[q,b[q]]!=before[q,b[q]]))
           print '  changed = %d'%len(changed)
           for c in changed:
             print '  %s'%(c,)
   # Switch to r3, r2, r1, r0 major order to match super_t
-  info = info.astype(int8).swapaxes(-4,-1).swapaxes(-3,-2)
+  info = info.astype(np.int8).swapaxes(-4,-1).swapaxes(-3,-2)
   # packbits uses big endian bit order (on all platforms), so flip around to little endian before packing
-  info = packbits(info.reshape(-1,8)[:,::-1])
+  info = np.packbits(info.reshape(-1,8)[:,::-1])
   # Check hash before converting to final endianness
   check(info,'668eb0a940489f434f804d994698a4fc85f5b576')
   # Account for big endianness if necessary.  Note that the byte order for the entire 256 bit super_t is reversed
   if sys.byteorder=='big':
     info = info.reshape(-1,256//8)[:,::-1]
   # Interpret as 64 bit chunks
-  info = ascontiguousarray(info).view(uint64)
+  info = np.ascontiguousarray(info).view(np.uint64)
   return [('uint64_t','superwin_info','0x%xL',info)]
 
 @remember
 def commute_global_local_symmetries():
   # Represent the various symmetries as subgroups of S_{6*6}
-  n = arange(6)
-  identity = empty((6,6,2),int8)
+  n = np.arange(6)
+  identity = np.empty((6,6,2),np.int8)
   identity[:,:,0] = n.reshape(-1,1)
   identity[:,:,1] = n.reshape(1,-1)
   reflect = identity[n[::-1].reshape(1,-1),n[::-1].reshape(-1,1)]
-  assert all(reflect[0,0]==[5,5])
-  assert all(reflect[5,0]==[5,0])
+  assert np.all(reflect[0,0]==[5,5])
+  assert np.all(reflect[5,0]==[5,0])
   gr = identity[n[::-1].reshape(1,-1),n.reshape(-1,1)]
-  assert all(gr[0,0]==[5,0])
-  assert all(gr[5,0]==[5,5])
-  lr = asarray([identity.copy() for q in xrange(4)])
-  n = arange(3)
+  assert np.all(gr[0,0]==[5,0])
+  assert np.all(gr[5,0]==[5,5])
+  lr = np.asarray([identity.copy() for q in xrange(4)])
+  n = np.arange(3)
   for qx in 0,1:
     for qy in 0,1:
       q = 2*qx+qy
       lq = lr[q,3*qx:,3*qy:][:3,:3]
       lq[:] = lq[n[::-1].reshape(1,-1),n.reshape(-1,1)]
-      assert all(lr[q,3*qx,3*qy]==[3*qx+2,3*qy])
-      assert all(lr[q,3*qx+2,3*qy]==[3*qx+2,3*qy+2])
+      assert np.all(lr[q,3*qx,3*qy]==[3*qx+2,3*qy])
+      assert np.all(lr[q,3*qx+2,3*qy]==[3*qx+2,3*qy+2])
 
   # Flattten everything from S_{6*6} to S_36
   def flatten(p):
@@ -425,19 +425,19 @@ def commute_global_local_symmetries():
   gr = flatten(gr)
   lr = flatten(lr)
   for f in identity,reflect:
-    assert all(f[f]==identity)
+    assert np.all(f[f]==identity)
   for r in (gr,)+tuple(lr):
-    assert all(r[r[r[r]]]==identity)
+    assert np.all(r[r[r[r]]]==identity)
 
   # Construct local rotation group
   def powers(g):
-    p = empty((4,36),int)
+    p = np.empty((4,36),int)
     p[0] = identity
     for i in xrange(3):
       p[i+1] = g[p[i]]
     return p
-  plr = asarray(map(powers,lr))
-  local = empty((4,4,4,4,36),int)
+  plr = np.asarray(map(powers,lr))
+  local = np.empty((4,4,4,4,36),int)
   for i0 in xrange(4):
     for i1 in xrange(4):
       for i2 in xrange(4):
@@ -446,29 +446,29 @@ def commute_global_local_symmetries():
   local = local.reshape(256,36)
   # Verify commutativity
   prod = local[:,local]
-  assert all(prod==prod.swapaxes(0,1))
+  assert np.all(prod==prod.swapaxes(0,1))
 
   # Construct global rotation group
-  globe = empty((2,4,36),int)
+  globe = np.empty((2,4,36),int)
   globe[0] = powers(gr)
   for i in xrange(4):
     globe[1,i] = reflect[globe[0,i]]
   globe = globe.reshape(8,36)
-  inv_globe = empty_like(globe)
+  inv_globe = np.empty_like(globe)
   for i in xrange(8):
     inv_globe[i,globe[i]] = identity
 
   # Compute conjugations
   def inv(p):
-    ip = empty_like(p)
+    ip = np.empty_like(p)
     ip[p] = identity
     return ip
-  i = arange(8).reshape(-1,1)
-  j = arange(256).reshape(1,-1)
-  conjugations = asarray([inv(g)[local[:,g]] for g in globe])
+  i = np.arange(8).reshape(-1,1)
+  j = np.arange(256).reshape(1,-1)
+  conjugations = np.asarray([inv(g)[local[:,g]] for g in globe])
 
   # Generate lookup table
-  table = all(conjugations==local.reshape(-1,1,1,36),axis=-1).argmax(axis=0)
+  table = np.all(conjugations==local.reshape(-1,1,1,36),axis=-1).argmax(axis=0)
   assert table.shape==(8,256)
   check(table,'e051d034c07bfa79fa62273b05839aedf446d499')
   return [('uint8_t','commute_global_local_symmetries','%d',table)]
@@ -476,15 +476,15 @@ def commute_global_local_symmetries():
 @remember
 def superstandardize_table():
   # Given the relative rankings of the four quadrants, determine the global rotation that minimizes the board value
-  rotate = empty((4,4),int)
-  rotate[0] = arange(4)
+  rotate = np.empty((4,4),int)
+  rotate[0] = np.arange(4)
   rotate[1] = [2,0,3,1]
   rotate[2] = rotate[1,rotate[1]]
   rotate[3] = rotate[2,rotate[1]]
   def v(i):
-    shape = ones(5,int)
+    shape = np.ones(5,int)
     shape[i] = 4
-    return arange(4).reshape(*shape)
+    return np.arange(4).reshape(*shape)
   table = sum([v(i)*4**rotate[v(4),i] for i in xrange(4)]).argmin(axis=-1).T.ravel()
   check(table,'dd4f59fea3135a860e76ed397b8f1863b23cc17b')
   return [('uint8_t','superstandardize_table','%d',table)]
@@ -497,20 +497,20 @@ def rotation_minimal_quadrants():
   rotate = rotations()[:,0]
 
   # Find quadrants minimal w.r.t. rotations but not necessarily reflections
-  minq = arange(3**9)
+  minq = np.arange(3**9)
   s0,s1 = unpack_.T
   for r in 1,2,3:
     s0 = rotate[s0]
     s1 = rotate[s1]
-    minq = minimum(minq,pack_[s0]+2*pack_[s1])
-  all_rmins, = nonzero(minq==arange(3**9))
+    minq = np.minimum(minq,pack_[s0]+2*pack_[s1])
+  all_rmins, = np.nonzero(minq==np.arange(3**9))
 
   # Sort quadrants so that reflected versions are consecutive (after rotation minimizing), and all pairs come first
   s0,s1 = unpack_.T
   reflected = minq[pack_[reflect[s0]]+2*pack_[reflect[s1]]]
-  all_rmins = all_rmins[argsort(3**9*(all_rmins==reflected[all_rmins])+minimum(all_rmins,reflected[all_rmins]),kind='mergesort')]
+  all_rmins = all_rmins[np.argsort(3**9*(all_rmins==reflected[all_rmins])+np.minimum(all_rmins,reflected[all_rmins]),kind='mergesort')]
   def ordered(qs):
-    return all(reflected[qs]==qs[arange(len(qs))^(qs!=reflected[qs])])
+    return np.all(reflected[qs]==qs[np.arange(len(qs))^(qs!=reflected[qs])])
   assert ordered(all_rmins)
 
   # Partition quadrants by stone counts
@@ -518,36 +518,36 @@ def rotation_minimal_quadrants():
   b = small_popcounts()[s0]
   w = small_popcounts()[s1]
   i = ((b*(21-b))//2)+w
-  rmins = [all_rmins[nonzero(i==k)[0]] for k in xrange(10*(10+1)//2)]
+  rmins = [all_rmins[np.nonzero(i==k)[0]] for k in xrange(10*(10+1)//2)]
   assert sum(map(len,rmins))==len(all_rmins)
 
   # Count the number of elements in each bucket not fixed by reflection
-  moved = asarray([sum(reflected[r]!=r) for r in rmins])
-  assert all((moved&1)==0)
+  moved = np.asarray([sum(reflected[r]!=r) for r in rmins])
+  assert np.all((moved&1)==0)
   for r in rmins:
     assert ordered(r)
 
   # Compute inverse.  inverse[q] = 4*i+r if rmins[?][i] rotated left 90*r degrees is q
-  inverse = empty(3**9,int)
+  inverse = np.empty(3**9,int)
   inverse[:] = 4*3**9
   for r in rmins:
     s0,s1 = unpack_[r].T
     for i in xrange(4):
       r = pack_[s0]+2*pack_[s1]
-      inverse[r] = minimum(inverse[r],4*arange(len(r))+i)
+      inverse[r] = np.minimum(inverse[r],4*np.arange(len(r))+i)
       s0 = rotate[s0]
       s1 = rotate[s1]
-  assert all(inverse<420*4)
+  assert np.all(inverse<420*4)
 
   # Save as a nested array
-  offsets = cumsum(hstack([0,map(len,rmins)]))
-  flat = hstack(rmins)
+  offsets = np.cumsum(np.hstack([0,map(len,rmins)]))
+  flat = np.hstack(rmins)
   check(offsets,'7e450e73e0d54bd3591710e10f4aa76dbcbbd715')
   check(flat,'8f48bb94ad675de569b07cca98a2e930b06b45ac')
   check(inverse,'339369694f78d4a197db8dc41a1f41300ba4f46c')
   check(moved,'dce212878aaebbcd995a8a0308335972bd1d5ef7')
   return [('uint16_t','rotation_minimal_quadrants_offsets','%d',offsets)
-         ,('uint16_t','rotation_minimal_quadrants_flat','%d',hstack(rmins))
+         ,('uint16_t','rotation_minimal_quadrants_flat','%d',np.hstack(rmins))
          ,('uint16_t','rotation_minimal_quadrants_inverse','%d',inverse)
          ,('uint16_t','rotation_minimal_quadrants_reflect_moved','%d',moved)]
 
