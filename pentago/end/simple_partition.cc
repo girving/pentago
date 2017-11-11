@@ -120,7 +120,7 @@ simple_partition_t::simple_partition_t(const int ranks, const shared_ptr<const s
       }
     }
     // Record the first owner line corresponding to this section
-    GEODE_ASSERT(owner_lines.size()>old_owners);
+    GEODE_ASSERT(owner_lines.size() > size_t(old_owners));
     const_cast_(first_owner_line)[section] = old_owners;
   }
   // Fill in offset information for owner lines

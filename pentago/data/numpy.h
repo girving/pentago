@@ -53,7 +53,7 @@ template<class A> tuple<string,size_t> numpy_header(const A& data) {
 template<class A> void write_numpy(const string& filename, const A& data) {
   const auto [header, size] = numpy_header(data);
   const auto chars = char_view(data);
-  GEODE_ASSERT(size == chars.size());
+  GEODE_ASSERT(size == uint64_t(chars.size()));
 
   // Write npy file
   FILE* file = fopen(filename.c_str(), "wb");

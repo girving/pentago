@@ -125,7 +125,7 @@ TEST(super, group) {
         for (auto a : previous)
           if (generated_set.insert(g*a).second)
             generated.push_back(g*a);
-        if (previous.size()==generated.size())
+        if (previous.size() == int(generated.size()))
           break;
       }
     }
@@ -211,7 +211,7 @@ TEST(super, super_action) {
 
 TEST(super, count) {
   const vector<int> counts = {1,3,30,227,2013,13065,90641,493844,2746022,12420352,56322888};
-  for (int n = 0; n < counts.size(); n++) {
+  for (const int n : range(counts.size())) {
     const int count = counts[n];
     slog("n %d, correct %d, computed %d", n, count, count_boards(n, 2048));
     ASSERT_EQ(count_boards(n, 2048), count);

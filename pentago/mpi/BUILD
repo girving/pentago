@@ -4,7 +4,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 cc_library(
     name = "mpi",
     srcs = glob(["*.h", "*.cc"], exclude=["main.cc", "options.*", "trace.*", "*_test.cc"]),
-    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         ":options",
         "//pentago/base",
@@ -22,7 +22,7 @@ cc_library(
         "trace.h",
         "trace.cc"
     ],
-    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/end:config",
         "//pentago/utility",
@@ -33,7 +33,7 @@ cc_library(
     name = "options",
     srcs = ["options.cc"],
     hdrs = ["options.h"],
-    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/base",
         "//pentago/end:config",
@@ -44,7 +44,7 @@ cc_library(
 cc_binary(
     name = "endgame-mpi",
     srcs = ["main.cc"],
-    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         ":mpi",
     ],

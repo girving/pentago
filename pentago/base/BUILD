@@ -19,7 +19,7 @@ genrule(
 cc_library(
     name = "base",
     srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
-    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/utility",
     ],

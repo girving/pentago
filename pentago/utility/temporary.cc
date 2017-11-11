@@ -5,6 +5,7 @@
 #include "pentago/utility/format.h"
 #include "pentago/utility/exceptions.h"
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <ftw.h>
 namespace pentago {

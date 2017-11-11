@@ -24,6 +24,6 @@ cc_library(
         "snappy-c.h", 
     ],
     hdrs = ["snappy.h"],
-    copts = [],
+    copts = ["-Wno-sign-compare", "-fPIC"],
     includes = ["api"],
 )

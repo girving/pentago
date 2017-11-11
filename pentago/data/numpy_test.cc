@@ -1,20 +1,20 @@
 #include "pentago/data/numpy.h"
 #include "pentago/utility/temporary.h"
 #include "pentago/utility/log.h"
+#include "pentago/utility/mmap.h"
 #include "gtest/gtest.h"
 namespace pentago {
 namespace {
 
-template<class A> string python(const A& data) {
+using namespace std::string_literals;
+
+// We use regression tests so that tests don't depend on python+numpy
+template<class A> void regression(const A& data, const string& expected) {
   tempdir_t tmp("npy");
   const auto path = tmp.path + "/data.npy";
   write_numpy(path, data);
-  FILE* f = popen(format("python3 -c 'import numpy; print(numpy.load(\"%s\"))'", path).c_str(), "r");
-  GEODE_ASSERT(f);
-  char buffer[1024];
-  const int count = fread(buffer, 1, sizeof(buffer), f);
-  pclose(f);
-  return string(buffer, count);
+  const auto contents = mmap_file(path);
+  ASSERT_EQ(string(contents.begin(), contents.end()), expected);
 }
 
 template<class T, int d> void native(RawArray<const Vector<T,d>> data) {
@@ -27,18 +27,18 @@ template<class T, int d> void native(RawArray<const Vector<T,d>> data) {
 
 TEST(numpy, int) {
   const int i[] = {7, 5, -3};
-  ASSERT_EQ(python(asarray(i)), "[ 7  5 -3]\n");
+  regression(asarray(i), "\x93NUMPY\x1\0F\0{'descr': '<i4', 'fortran_order': False, 'shape': (3,), }            \n\a\0\0\0\x5\0\0\0\xFD\xff\xff\xff"s);
 }
 
 TEST(numpy, vec_float) {
   const Vector<float,2> f[] = {{7.2, -3}, {8.9, 17.17}};
-  ASSERT_EQ(python(asarray(f)), "[[  7.19999981  -3.        ]\n [  8.89999962  17.17000008]]\n");
+  regression(asarray(f), "\x93NUMPY\x1\0F\0{'descr': '<f4', 'fortran_order': False, 'shape': (2,2,), }          \nff\xE6@\0\0@\xC0"s+"ff\xE"s+"A)\\\x89"s+"A"s);
   native(asarray(f));
 }
 
 TEST(numpy, uint64) {
   const uint64_t u[] = {7237741304337476111u, 3652336030090419622u, 3374948756737560010u};
-  ASSERT_EQ(python(asarray(u)), "[7237741304337476111 3652336030090419622 3374948756737560010]\n");
+  regression(asarray(u), "\x93NUMPY\x1\0F\0{'descr': '<u8', 'fortran_order': False, 'shape': (3,), }            \n\xF*5}^\x9Fqd\xA6]\xE6\xB9"s+"D\xB4\xAF"s+"2\xCA\r}T\x3:\xD6."s);
 }
 
 }  // namespace

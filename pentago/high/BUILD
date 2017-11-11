@@ -4,7 +4,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 cc_library(
     name = "high",
     srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc"]),
-    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/base",
         "//pentago/data",

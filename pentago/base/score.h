@@ -94,7 +94,7 @@ int unrotated_win_closeness(side_t black, side_t white) __attribute__((const));
 // Same as above, but allow arbitrarily many rotations
 int arbitrarily_rotated_win_closeness(side_t black, side_t white) __attribute__((const));
 
-// For python use: slow, and checks only one side
+// Warning: slow, and checks only one side
 int rotated_status(board_t board);
 int arbitrarily_rotated_status(board_t board);
 

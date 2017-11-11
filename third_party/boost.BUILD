@@ -6,6 +6,6 @@ licenses(["restricted"])
 
 cc_library(
     name = "boost",
-    hdrs = glob(["boost/**/*.hpp"]),
+    hdrs = glob(["boost/**/*.hpp", "boost/**/*.h"]),
     includes = ["."],
 )

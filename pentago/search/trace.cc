@@ -171,14 +171,14 @@ bool trace_learn() {
   auto dependencies = pentago::dependencies;
 
   // Learn about each error and each dependency
-  int count = known.size();
+  const int count = known.size();
   for (auto error : errors)
     clean_evaluate(error.aggressive,error.depth,error.board);
   for (auto dep : dependencies)
     clean_evaluate(dep.aggressive,dep.depth,dep.board);
 
   // If we haven't learned anything new, evaluate the children of each error
-  if (count<known.size())
+  if (size_t(count) < known.size())
     return true;
   for (auto error : errors) {
     const bool aggressive = error.aggressive;
@@ -248,7 +248,7 @@ bool trace_learn() {
   }
  
   // If we still haven't learned anything new, any errors are immediate
-  if (count<known.size())
+  if (size_t(count) < known.size())
     return true;
   for (auto error : errors)
     slog("trace_learn: isolated error for depth %d, board %lld, aggressive %d", error.depth,

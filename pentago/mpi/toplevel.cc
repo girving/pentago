@@ -186,7 +186,7 @@ int toplevel(int argc, char** argv) {
       o.randomize ? partition_factory_t(curry(make_random_partition, o.randomize))
                   :                           make_simple_partition;
 
-  // Run a unit test if requested.  See test_mpi.py for the Python side of these tests.
+  // Run a unit test if requested.  See mpi_test.cc for invocation.
   if (o.test.size()) {
     if (o.test=="write-2" || o.test=="write-3" || o.test=="write-4") {
       check_directory(comm, o.dir);

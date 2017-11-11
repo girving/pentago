@@ -98,7 +98,7 @@ void toplevel(int argc, char** argv) {
       }
       struct stat st;
       GEODE_ASSERT(stat(o.input.c_str(), &st) == 0);
-      while (next < st.st_size)
+      while (next < uint64_t(st.st_size))
         padding.push_back(next++);
     }
     slog("padding = %d", padding.size());

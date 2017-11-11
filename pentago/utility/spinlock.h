@@ -53,7 +53,7 @@ struct spinlock_t {
 //
 // I've checked that both are safe to do with glibc, so we restrict to that for now.
 #ifdef __GLIBC__
-static_assert(is_same<volatile int,pthread_spinlock_t>::value,"");
+static_assert(std::is_same<volatile int,pthread_spinlock_t>::value,"");
 #else
 #error "I'm not sure if pthread_spin_destroy is a no-op on this system"
 #endif

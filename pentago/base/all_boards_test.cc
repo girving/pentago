@@ -63,7 +63,7 @@ void helper(const int symmetries) {
     slog("n = %d, count = %d, hash = %s", n, boards.size(), h);
     ASSERT_EQ(sizes[n], boards.size());
     ASSERT_EQ(hashes[n], h);
-    if (symmetries == 2048 && n < all_sizes.size()) {
+    if (symmetries == 2048 && size_t(n) < all_sizes.size()) {
       std::sort(boards.begin(), boards.end());
       ASSERT_EQ(boards.size(), count_boards(n, 2048));
       const unordered_set<board_t> boards_set(boards.begin(), boards.end());

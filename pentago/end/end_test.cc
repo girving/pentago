@@ -24,6 +24,7 @@ namespace {
 using std::get;
 using std::max;
 using std::min;
+using std::make_pair;
 using std::make_shared;
 using std::make_tuple;
 using std::unordered_set;
@@ -53,7 +54,7 @@ void partition_test(const partition_t& partition) {
       ASSERT_EQ(partition.rank_block(get<0>(info), get<1>(info)),
                 make_tuple(block.section, block.block));
       const bool unique = block_info.insert(
-          make_tuple(make_tuple(block.section, block.block), info)).second;
+          make_pair(make_tuple(block.section, block.block), info)).second;
       ASSERT_TRUE(unique);
       nodes += block_shape(block.section.shape(),block.block).product();
     }

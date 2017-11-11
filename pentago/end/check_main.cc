@@ -105,7 +105,7 @@ vector<string> glob(const string& pattern) {
   glob_t pglob;
   ::glob(pattern.c_str(), GLOB_TILDE | GLOB_BRACE, nullptr, &pglob);
   vector<string> results;
-  for (int i = 0; i < pglob.gl_pathc; i ++)
+  for (const auto i : range(pglob.gl_pathc))
     results.push_back(pglob.gl_pathv[i]);
   ::globfree(&pglob);
   return results;
@@ -263,10 +263,10 @@ void toplevel(int argc, char** argv) {
             expected_size += reader->total_size();
           const auto actual_size = mmap_file(slice_file).size();
           if (pad_io)
-            GEODE_ASSERT(expected_size <= actual_size);
+            GEODE_ASSERT(expected_size <= size_t(actual_size));
           else
-            GEODE_ASSERT(expected_size == actual_size);
-          GEODE_ASSERT(counts.size() == readers.size());
+            GEODE_ASSERT(expected_size == size_t(actual_size));
+          GEODE_ASSERT(size_t(counts.size()) == readers.size());
           unchecked.erase(slice_file);
 
           // Check each section and block

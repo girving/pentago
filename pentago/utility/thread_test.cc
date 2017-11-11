@@ -6,6 +6,7 @@
 #include "pentago/utility/threefry.h"
 #include "pentago/utility/uint128.h"
 #include "gtest/gtest.h"
+#include <mutex>
 namespace pentago {
 
 static void add_noise(Array<uint128_t> data, int key, std::mutex* mutex, spinlock_t* spinlock) {

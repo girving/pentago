@@ -228,12 +228,12 @@ public:
   }
 
   template<int d> RawArray<T,d> reshape(const Vector<int,d>& new_shape) const {
-    GEODE_ASSERT(safe_product(new_shape) == total_size());
+    GEODE_ASSERT(safe_product(new_shape) == size_t(total_size()));
     return RawArray<T,d>(new_shape, data());
   }
 
   template<int d> Array<T,d> reshape_own(const Vector<int,d>& new_shape) const {
-    GEODE_ASSERT(safe_product(new_shape) == total_size());
+    GEODE_ASSERT(safe_product(new_shape) == size_t(total_size()));
     return Array<T,d>(new_shape, data_);
   }
 

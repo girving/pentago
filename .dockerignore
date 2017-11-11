@@ -1,0 +1,11 @@
+bin
+data
+paper
+.git
+.DS_Store
+*.swp
+bazel-*
+web/build
+web/node_modules
+web/public
+web/*.png

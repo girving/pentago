@@ -27,7 +27,7 @@ struct superinfos_t {
 Array<uint8_t> midsolve_workspace(const int min_slice);
 
 // Determine workspace memory required for midsolve.
-// Use midsolve_workspace if you're in C++ or Python; this one is for Javascript.
+// Use midsolve_workspace if you're in C++; this one is for Javascript.
 uint64_t midsolve_workspace_memory_usage(const int min_slice);
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.

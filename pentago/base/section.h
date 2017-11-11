@@ -114,9 +114,6 @@ static inline section_t endian_reverse(const section_t s) {
   return s;
 }
 
-// For python exposure
-section_t standardize_section(section_t s, int symmetries);
-
 static inline size_t hash_value(const section_t& s) {
   size_t h = 0;
   for (const auto& x : s.counts)

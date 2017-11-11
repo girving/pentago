@@ -355,7 +355,7 @@ message_statistics(const vector<vector<Array<const history_t>>>& event_sorted_hi
     }
   }
 
-  // Make a nice hashtable for Python
+  // Make a nice hashtable
   unordered_map<string,Array<const Vector<float,2>>> table;
   table["same-rank"] = asarray(data[0]).copy();
   table["same-node"] = asarray(data[1]).copy();

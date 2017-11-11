@@ -1,4 +1,4 @@
-// C++ version of Python's join
+// Join a list of strings with a separator
 #pragma once
 
 #include <string>

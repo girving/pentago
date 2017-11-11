@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <mutex>
 #include <deque>
 #include <set>
 namespace pentago {

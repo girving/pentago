@@ -35,6 +35,7 @@ cc_library(
     copts = [
         "-Wno-shift-negative-value",
         "-Wno-implicit-function-declaration",
+        "-fPIC",
     ],
     includes = ["."],
 )

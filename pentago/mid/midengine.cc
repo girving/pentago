@@ -146,15 +146,14 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
   GEODE_ASSERT(memory_usage(input)+memory_usage(output)+memory_usage(all_wins1) <= uint64_t(workspace.size()));
 
   // List empty spots as bit indices into side_t
-  uint8_t empty[spots];
+  uint8_t empty[max(spots, 1)] = {0};
   {
-    memset(empty,0,sizeof(empty)); // Avoid uninitialization warnings
     const auto free = side_mask&~(black_root|white_root);
     int next = 0;
     for (int i=0;i<64;i++)
-      if (free&side_t(1)<<i)
+      if (free & side_t(1)<<i)
         empty[next++] = i;
-    GEODE_ASSERT(next==spots);
+    GEODE_ASSERT(next == spots);
   }
   #define set_side(count,set) ({ \
     const int c_ = (count); \

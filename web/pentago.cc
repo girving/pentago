@@ -357,16 +357,14 @@ invoke(const T& self, F T::*field, const Arguments& args, indices, const bool mu
 template<class T,class R,size_t... indices, class... Args> R
 invoke(const T& self, R (*method)(Args...), const Arguments& args, std::index_sequence<indices...>,
        const bool mutable_) {
-  Isolate* iso = args.GetIsolate();
-  return method(convert_item<indices,Args>(iso, args)...);
+  return method(convert_item<indices,Args>(args.GetIsolate(), args)...);
 }
 
 // Const methods
 template<class T,class R,size_t... indices,class... Args> R
 invoke(const T& self, R (T::*method)(Args...) const, const Arguments& args,
        std::index_sequence<indices...>, const bool mutable_) {
-  Isolate* iso = args.GetIsolate();
-  return (self.*method)(convert_item<indices,Args>(iso, args)...);
+  return (self.*method)(convert_item<indices,Args>(args.GetIsolate(), args)...);
 }
 
 // Nonconst methods
@@ -375,8 +373,7 @@ invoke(T& self, R (T::*method)(Args...), const Arguments& args, std::index_seque
        const bool mutable_) {
   if (!mutable_)
     throw TypeError(format("nonconst method called on immutable object of type %s", typeid(T).name()));
-  Isolate* iso = args.GetIsolate();
-  return (self.*method)(convert_item<indices,Args>(iso, args)...);
+  return (self.*method)(convert_item<indices,Args>(args.GetIsolate(), args)...);
 }
 
 template<class T,class M,M method> void wrapped_method(const Arguments& args) {

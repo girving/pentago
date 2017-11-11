@@ -105,12 +105,6 @@ Vector<int,4> section_t::quadrant_permutation(uint8_t symmetry) {
   return p;
 }
 
-// For python exposure
-section_t standardize_section(section_t s, int symmetries) {
-  GEODE_ASSERT(symmetries==1 || symmetries==4 || symmetries==8);
-  return symmetries==1 ? s : symmetries==4 ? get<0>(s.standardize<4>()) : get<0>(s.standardize<8>());
-}
-
 bool section_t::valid() const {
   for (int i=0;i<4;i++)
     if ((int)counts[i][0]+counts[i][1] > 9)

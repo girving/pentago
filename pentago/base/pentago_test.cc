@@ -91,9 +91,8 @@ void win_test(const string& rotations) {
     // In some cases, black can win by rotating the same quadrant in either direction.
     // Closeness computation counts this as a single "way", even though it is really two,
     // which may make it impossible to white to reduce closeness.
-    special = {3936710634889235564, 8924889845, 53214872776869257, 616430895238742070,
-               45599372358462108, 1194863002822977710, 3559298137047367680, 2485989107724386484,
-               1176595961439925315};
+    special = {235943663441818442, 1873265238045832091, 624876174878050559, 442760912264047034,
+               2770895871606338993, 2070016362776900435, 646831236234808145};
   } else if (rotations == "any") {
     status = arbitrarily_rotated_status;
     side_closeness = arbitrarily_rotated_win_closeness;
@@ -125,6 +124,7 @@ void win_test(const string& rotations) {
               break;
             }
           }
+          GEODE_ASSERT(found);
         } else {  // Black has too much freedom to rotate, so don't require a reduction in closeness
           board_t best = 0;
           const auto signature = [closeness](board_t b) {

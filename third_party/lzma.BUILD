@@ -16,6 +16,7 @@ cc_library(
     hdrs = ["liblzma/api/lzma.h"],
     includes = ["liblzma/api"],
     copts = [
+        "-fPIC",
         "-Wno-unused-function",
         "-include", "sysdefs.h",
         "-Iexternal/lzma/common",
@@ -90,9 +91,6 @@ cc_library(
         "-DMYTHREAD_POSIX=1",
         "-DPACKAGE_VERSION=\"5.2.3\"",
         "-DSTDC_HEADERS=1",
-        "-DTUKLIB_CPUCORES_SYSCTL=1",
-        "-DTUKLIB_FAST_UNALIGNED_ACCESS=1",
-        "-DTUKLIB_PHYSMEM_SYSCONF=1",
         "-D_GNU_SOURCE=1",
         "-DVERSION=\"5.2.3\"",
     ],
