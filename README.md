@@ -38,6 +38,7 @@ The code is C++, with node.js for the backend server.  The main dependencies are
 * [node.js >= 8.9](http://nodejs.org): Asynchronous javascript framework
 
 Bazel handles a few extra dependencies automatically (see `WORKSPACE` for details).
+For now, python and numpy are required for building.
 
 ### Installation
 
