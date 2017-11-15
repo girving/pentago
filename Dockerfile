@@ -39,9 +39,16 @@ RUN node unit.js
 
 # Switch to minimal node.js image, keeping only what we need (see https://hub.docker.com/_/node)
 FROM node:8.9.1-alpine
+
+# Fix timezone issues, as described in https://github.com/TooTallNate/node-time/issues/94
+RUN apk add --update tzdata
+ENV TZ America/Los_Angeles
+
+# Bring pentago node back up
 COPY --from=builder /pentago/web /pentago/web
 WORKDIR /pentago/web
 RUN node unit.js
 
-# All done!
-CMD node unit.js all
+# Serve!
+WORKDIR /var/pentago
+CMD node /pentago/web/server.js --pool 7

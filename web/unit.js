@@ -162,19 +162,23 @@ function test_slow (cont) {
         cont()
     })
 
-  /* Benchmarks:
-   *   cayley    28dec2013 - 1873 s
-   *     ''          ''    -  735 s - --bits 23)
-   *     ''          ''    -  288 s - --bits 24)
-   *   rackspace 29dec2013 -  465 s - --bits 24)
-   *   cayley     5jan2014 -   19 s - midsolve!
-   *   rackspace     ''    -   25 s - cool, not too much slower
-   *   cayley     5jan2014 -   12 s - transpose arrays in midsolve
-   *   rackspace     ''    -   16 s
+  /* Benchmarks (node unit.js slow):
+   *   cayley            28dec2013 - 1873   s
+   *     ''                  ''    -  735   s - --bits 23)
+   *     ''                  ''    -  288   s - --bits 24)
+   *   rackspace         29dec2013 -  465   s - --bits 24)
+   *   cayley             5jan2014 -   19   s - midsolve!
+   *   rackspace             ''    -   25   s - cool, not too much slower
+   *   cayley             5jan2014 -   12   s - transpose arrays in midsolve
+   *   rackspace             ''    -   16   s
+   *   emmy              14nov2017 -    9.7 s - MacBook, 1.2 GHz Intel Core m5
+   *   emmy+docker           ''    -   11.9 s
+   *   rackspace+docker      ''    -   19.0 s
    */
 
   /* Alternate hard positions:
-   *   3232499362891447332 - tie, and doesn't seem to get computed by server.  I need logging for compute processes.
+   *   3232499362891447332 - tie, and doesn't seem to get computed by server.
+   *                         I need logging for compute processes.
    */
 }
 

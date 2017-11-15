@@ -22,7 +22,7 @@ To build and test the `npm` extension module, do
 
 ## Server setup
 
-Mostly taken from http://agileand.me/content/deploying-play-application-rackspace-cloud-vps.
+This is obsolete: see the main `README.md` for the new Docker setup.
 
 1. Set up firewall
 

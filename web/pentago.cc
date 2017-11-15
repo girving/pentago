@@ -17,6 +17,7 @@ namespace {
 
 using namespace v8;
 using namespace pentago::end;
+using std::make_pair;
 using std::make_shared;
 using std::string;
 using std::unordered_map;
@@ -438,6 +439,30 @@ shared_ptr<supertensor_index_t> make_index(const Arguments& args) {
   return make_shared<supertensor_index_t>(from_js<const shared_ptr<const sections_t>>(iso, args[0]));
 }
 
+unordered_map<string,double> config() {
+  unordered_map<string,double> config;
+#define CONFIG(name) config.insert(make_pair(#name, name));
+  CONFIG(__SSE__)
+  CONFIG(PENTAGO_SSE)
+  CONFIG(PENTAGO_MPI_DEBUG)
+  CONFIG(PENTAGO_MPI_TRACING)
+  CONFIG(PENTAGO_MPI_COMPRESS)
+  CONFIG(PENTAGO_MPI_COMPRESS_OUTPUTS)
+  CONFIG(PENTAGO_MPI_FUNNEL)
+  CONFIG(block_size)
+  CONFIG(block_shift)
+  CONFIG(snappy_compression_estimate)
+#if PENTAGO_MPI_COMPRESS
+  CONFIG(compacting_store_heap_ratio)
+  CONFIG(compacting_store_min_free_ratio)
+#endif
+  CONFIG(snappy_filter)
+  CONFIG(wildcard_recv_count)
+  CONFIG(pad_io)
+#undef CONFIG
+  return config;
+}
+
 void init(Handle<v8::Object> exports) {
   {
     PN_CLASS(high_board_t, make_board)
@@ -466,6 +491,7 @@ void init(Handle<v8::Object> exports) {
   PN_FUNCTION(midsolve_workspace_memory_usage)
   PN_FUNCTION(high_midsolve)
   PN_FUNCTION(init_threads)
+  PN_FUNCTION(config)
 }
 
 }  // namespace

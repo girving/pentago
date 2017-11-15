@@ -20,6 +20,13 @@ var log = options.log ? new Log('debug',fs.createWriteStream(options.log,{flags:
 log.info('command = %s',process.argv.join(' '))
 log.info('port = %d',options.port)
 
+// Log pentago configuration
+log.info('config:')
+var config = pentago.config()
+Object.keys(config).sort().forEach(function (k) {
+  log.info('  %s = %s',k,config[k])
+})
+
 // Prepare for evaluation
 var values = Values.values(options,log)
 
