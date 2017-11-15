@@ -14,7 +14,7 @@ var sqrt = Math.sqrt
 var floor = Math.floor
 
 // Backend, with a bit of caching to avoid flicker on the back button
-var backend_url = 'https://backend.perfect-pentago.net:2048/'
+var backend_url = 'https://backend.perfect-pentago.net/'
 var cache = LRU({max:2048})
 
 // Colors for each board value, taking care to be nice to colorblind folk.
