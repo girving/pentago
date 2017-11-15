@@ -1,4 +1,4 @@
-Usage: http://backend.perfect-pentago.com/<board>
+Usage: https://backend.perfect-pentago.net/<board>
 
 If <board> describes a valid pentago position, compute or lookup the values
 of all children of <board> (valid moves starting at <board>) and return the
@@ -33,7 +33,7 @@ optimized tree search.  This is computationally expensive, so expect a delay.
 
 All code and data for this website is BSD-licensed open source.  For details see
 
-  http://perfect-pentago.net
+  https://perfect-pentago.net
   https://github.com/girving/pentago
 
 Feel free to use this backend server directly if you like, but please let me
