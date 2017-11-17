@@ -25,6 +25,12 @@ public:
     return static_cast<I>(threefry(seed, counter++));
   }
 
+  template<class F> F uniform() {  // in [0,1)
+    constexpr bool is_float = std::is_same<F, float>::value;
+    static_assert(is_float || std::is_same<F, double>::value);
+    return is_float ? F(0x1p-32) * bits<uint32_t>() : F(0x1p-64) * bits<uint64_t>();
+  }
+
   template<class I> I uniform(const I n) {  // in [0,n)
     return uniform(I(0), n);
   }

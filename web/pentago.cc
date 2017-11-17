@@ -54,10 +54,14 @@ PN_TYPE(async_block_cache_t)
           wrapped_method<Self,decltype(&Self::method),&Self::method>));
 
 // Wrap a free function
-#define PN_FUNCTION(name) { \
+#define PN_FUNCTION(name) \
+  PN_FUNCTION_2(name, name)
+
+// Wrap a free function with a different name
+#define PN_FUNCTION_2(name, function) { \
   Isolate* const iso = Isolate::GetCurrent(); \
   exports->Set(new_symbol(iso, #name), FunctionTemplate::New(iso, \
-    wrapped_function<decltype(&name),name>)->GetFunction()); }
+    wrapped_function<decltype(&function),function>)->GetFunction()); }
 
 // Utilities
 
@@ -482,6 +486,7 @@ void init(Handle<v8::Object> exports) {
     PN_METHOD(board_block)
     PN_METHOD(contains)
     PN_METHOD(set)
+    PN_FUNCTION_2(async_block_cache_set_flaky, async_block_cache_t::set_flaky)
   } {
     PN_CLASS(supertensor_index_t, make_index)
     PN_METHOD(blob_location)

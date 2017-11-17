@@ -18,6 +18,7 @@ cc_library(
 cc_tests(
     names = [
         "aligned_test",
+        "random_test",
         "thread_test",
     ],
     deps = [

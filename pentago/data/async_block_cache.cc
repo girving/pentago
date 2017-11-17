@@ -9,8 +9,7 @@ namespace pentago {
 typedef async_block_cache_t::block_t block_t;
 
 async_block_cache_t::async_block_cache_t(const uint64_t memory_limit)
-  : memory_limit(memory_limit)
-  , free_memory(memory_limit) {}
+  : free_memory(memory_limit) {}
 
 async_block_cache_t::~async_block_cache_t() {}
 
@@ -41,7 +40,16 @@ bool async_block_cache_t::contains(const block_t block) const {
   return lru.get(block)!=0;
 }
 
+static Random flake_random(173);
+static double flake_probability = 0;
+unit_t async_block_cache_t::set_flaky(const double p) {
+  flake_probability = p;
+  return unit;
+}
+
 unit_t async_block_cache_t::set(const block_t block, RawArray<const uint8_t> compressed) {
+  if (flake_probability && flake_random.uniform<double>() < flake_probability)
+    throw ValueError(format("flaking for unit test purposes (p = %g)", flake_probability));
   const auto data = supertensor_index_t::unpack_block(block,compressed);
   free_memory -= memory_usage(data);
   while (free_memory < 0)

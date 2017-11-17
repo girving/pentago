@@ -51,7 +51,8 @@ public:
   static compact_blob_t block_location(RawArray<const uint8_t> blob);
 
   // Decompress a compressed block
-  static Array<Vector<super_t,2>,4> unpack_block(const block_t block, RawArray<const uint8_t> compressed);
+  static Array<Vector<super_t,2>,4> unpack_block(const block_t block,
+                                                 RawArray<const uint8_t> compressed);
 };
 
 void write_supertensor_index(const string& name,

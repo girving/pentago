@@ -145,11 +145,19 @@ exports.values = function (options,log) {
           slice += block[0][q][s]
       // Grab block location
       simple_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
-        // Grab block data
-        block_get(slice,indices[slice].block_location(blob),function (data) {
-          cache.set(block,data)
-          cont()
-        })
+        // Grab block data, retrying if the data is corrupt
+        function try_get() {
+          block_get(slice,indices[slice].block_location(blob),function (data) {
+            try {
+              cache.set(block,data)
+            } catch (error) {
+              log.warning("corrupt block, retrying: slice %d, block [%s], error '%s'",slice,block,error)
+              return try_get()
+            }
+            cont()
+          })
+        }
+        try_get()
       })
     }
   })

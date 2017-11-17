@@ -20,7 +20,7 @@ struct async_block_cache_t : public block_cache_t {
   typedef block_cache_t Base;
   typedef tuple<section_t,Vector<uint8_t,4>> block_t;
 
-  const uint64_t memory_limit;
+private:
   lru_t<block_t,Array<const Vector<super_t,2>,4>> lru; // Maybe be an empty array, indicating pending
   int64_t free_memory; // signed so it can go temporarily below zero
 
@@ -35,6 +35,9 @@ public:
 
   bool contains(const block_t block) const;
   unit_t set(const block_t block, RawArray<const uint8_t> compressed);
+
+  // Make set flaky so that unit tests can test error paths
+  static unit_t set_flaky(const double flake_probability);
 
 private:
   int block_size() const;
