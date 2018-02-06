@@ -182,6 +182,11 @@ Email me if you have questions at <irving@naml.us>!
 
 ### Data
 
+**Update**: For some reason CDN bandwidth costs went above my open source limit, so I've temporarily
+disabled access to the data.  This is probably due to a bug in the server, and I'll hopefully open
+it back up once I find time to diagnose the bug.  If you want the data in the mean time, please email
+me.
+
 The computed data set of perfect pentago results up to slice 18 can be downloaded directly from
 Rackspace.  If you do download it and play around, I'd love to get an email, but you should feel
 no obligation to do so.  Also available are sparse sample files and win/losss/tie counts for all slices,
