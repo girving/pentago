@@ -10,13 +10,15 @@
     "node": ">=8.9"
   },
   "dependencies": {
-    "commander": "2.11.x",
+    "commander": "^2.14.0",
+    "concat-stream": "^1.6.0",
     "d3": "^3.5.17",
     "log": "1.4.x",
     "lru-cache": "4.1.x",
     "mule": "0.1.x",
     "nan": "^2.7.0",
     "nib": "1.1.x",
+    "pkgcloud": "^1.5.0",
     "request": "2.83.x",
     "stylus": "0.54.x",
     "time": "0.12.x"

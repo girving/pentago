@@ -8,6 +8,8 @@ var request = require('request')
 var LRU = require('lru-cache')
 var WorkQueue = require('mule').WorkQueue
 var Pending = require('./pending')
+var pkgcloud = require('pkgcloud')
+var concat = require('concat-stream')
 var pentago = require('./build/Release/pentago')
 
 // Pull in math
@@ -20,7 +22,9 @@ exports.defaults = {
   cache: '250M',
   ccache: '250M',
   maxSlice: 18,
-  maxSockets: 64
+  maxSockets: 64,
+  apiKey: '',
+  external: false
 }
 
 exports.add_options = function (options) {
@@ -30,6 +34,8 @@ exports.add_options = function (options) {
          .option('--ccache <size>','Size of compute cache (suffixes M/MB and G/GB are understood)',d.ccache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
          .option('--max-sockets <n>','Maximum number of simultaneous https connections',parseInt,d.maxSockets)
+         .option('--api-key <key>','Rackspace API key',d.apiKey)
+         .option('--external','Work outside of Rackspace')
 }
 
 // Useful counters
@@ -67,12 +73,24 @@ exports.values = function (options,log) {
   log.info('max slice = %d',opts.maxSlice)
   log.info('max sockets = %d',opts.maxSockets)
   log.info('compute pool = %d',opts.pool)
+  log.info('external = %d',opts.external)
 
   // Prepare for opening book lookups
   var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
   var cache = pentago.async_block_cache_t(cache_limit)
   var cache_pending = {} // Map from block to callbacks to call once block is available
-  var container = 'https://b13bd9386883242c090c-81c103f827ca6373fd889208ea864720.ssl.cf5.rackcdn.com'
+
+  // Prepare for Cloud Files access via pkgcloud
+  if (!opts.apiKey)
+    throw 'no --api-key specified'
+  var container = 'pentago-edison-all'
+  var client = pkgcloud.storage.createClient({
+    provider: 'rackspace',
+    username: 'pentago',
+    region: 'IAD',
+    apiKey: opts.apiKey,
+    useInternal: !opts.external
+  })
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
@@ -102,35 +120,41 @@ exports.values = function (options,log) {
       })
   })
 
-  // Get a section of a file, bailing on all errors
-  function simple_get(path,blob,cont) {
-    var name = path+', '+blob.offset+"+"+blob.size
-    log.debug('range request %s, active %d',name,stats.active_gets++)
-    var details = {url: container+path,
-                   encoding: null, // Binary mode
-                   headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}}
-    request(details,function (error,res,body) {
-      var status = res ? res.statusCode : -1
-      var length = body ? body.length : -1
-      if (error || status != 206 || length != blob.size) {
-        // Retry the request.  403 errors happen nondeterministically, possibly because
-        // of a Rackspace or Akamai bug.  Actually, retry for everything.
-        log.warning("https get failed, retrying: %s, status %d, length %d vs. %d, error '%s'",
-                    name,status,length,blob.size,error)
-        simple_get(path,blob,cont)
-      } else {
-        log.debug('range response %s, active %d',name,--stats.active_gets)
-        cont(body)
-      }
-    })
+  // Similar to client.auth, but correctly merges multiple simultaneous requests.
+  var auth_conts = []
+  function merge_auth (cont) {
+    var need = !auth_conts.length
+    auth_conts.push(cont)
+    if (need)
+      client.auth(function () {
+        var cs = auth_conts
+        auth_conts = []
+        for (var i=0;i<cs.length;i++)
+          cs[i]()
+      })
   }
 
-  // Get a section of a slice file.  This routine used to split requests
-  // across chunks manually, but that is no longer necessary now that
-  // Akamai fixed their bug.
-  function block_get(slice,blob,cont) {
-    var path = '/slice-'+slice+'.pentago'
-    simple_get(path,blob,cont)
+  // Get a section of a file
+  function range_get(object,blob,cont) {
+    var name = object+', '+blob.offset+"+"+blob.size
+    log.debug('range request %s, active %d',name,stats.active_gets++)
+    merge_auth(function () {
+      client.download({
+        container: container,
+        remote: object,
+        headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}
+      }, function (error,res) {
+        if (error)
+          log.error("range request failed: %s, error '%s'",name,error)
+      }).pipe(concat(function (body) {
+        if (body.length != blob.size)
+          log.error('range request failed: %s, got size %d != %d',body.length,blob.size)
+        else {
+          log.debug('range response %s, active %d',name,--stats.active_gets)
+          cont(body)
+        }
+      }))
+    })
   }
 
   // Get a block if necessary, merging simultaneous requests
@@ -144,10 +168,10 @@ exports.values = function (options,log) {
         for (var s=0;s<2;s++)
           slice += block[0][q][s]
       // Grab block location
-      simple_get('/slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
+      range_get('slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
         // Grab block data, retrying if the data is corrupt
         function try_get() {
-          block_get(slice,indices[slice].block_location(blob),function (data) {
+          range_get('slice-'+slice+'.pentago',indices[slice].block_location(blob),function (data) {
             try {
               cache.set(block,data)
             } catch (error) {

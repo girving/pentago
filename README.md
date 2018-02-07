@@ -68,17 +68,16 @@ backend server.  The server is managed via [Docker](https://www.docker.com), and
 currently hosted on [Rackspace](https://www.rackspace.com).  To run, do
 
     # Secrets
-    export KEY=<rackspace-api-key>
     export SSL=<path-to-ssl-certificate-directory>
 
     # Create a rackspace server via docker-machine
     docker-machine create --driver=rackspace --rackspace-username=pentago \
-      --rackspace-api-key=$KEY --rackspace-region=IAD \
+      --rackspace-api-key=`cat $SSL/api-key` --rackspace-region=IAD \
       --rackspace-flavor-id=general1-8 --engine-storage-driver=overlay pentago
     eval "$(docker-machine env pentago)"
 
     # Copy ssl keys to machine
-    rsync -avze 'docker-machine ssh pentago' $SSL :/var/pentago
+    rsync -avze 'docker-machine ssh pentago' $SSL/* :/var/pentago/ssl
 
     # Launch pentago container on the server
     cd ~/pentago

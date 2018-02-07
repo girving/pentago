@@ -1,5 +1,5 @@
 # Start off with ubuntu (https://hub.docker.com/_/ubuntu)
-FROM ubuntu:devel as builder
+FROM ubuntu:rolling as builder
 
 # Install node (https://nodejs.org/en/download/package-manager/#debian-and-ubuntu-based-linux-distributions)
 RUN apt-get update && apt-get install -y curl
@@ -51,4 +51,4 @@ RUN node unit.js
 
 # Serve!
 WORKDIR /var/pentago
-CMD node /pentago/web/server.js --pool 7
+CMD node /pentago/web/server.js --pool 7 --api-key `cat ssl/api-key`

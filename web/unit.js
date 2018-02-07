@@ -8,6 +8,7 @@ var high_board_t = pentago.high_board_t
 var Values = require('./values.js')
 var Pending = require('./pending.js')
 var Log = require('log')
+var options = require('commander')
 
 pentago.async_block_cache_set_flaky(0.1)
 
@@ -109,7 +110,7 @@ function test_values(cont) {
   }
 
   var log = new Log('debug')
-  var compute = Values.values({cache:'4M',bits:22},log) // Use a small cache to test replacement
+  var compute = Values.values(options,log) // Use a small cache to test replacement
   function epoch(which,cont) {
     var gn = which
     function test(path,values) {
@@ -187,12 +188,19 @@ function test_slow (cont) {
 var green = '\x1b[1;32m'
 var clear = '\x1b[00m'
 
+// Parse options
+Values.defaults.cache = '4M'  // Use a small cache to test replacement
+Values.defaults.bits = 22
+Values.defaults.external = true
+Values.add_options(options)
+options.parse(process.argv)
+
 // Register tests
 var tests = [test_moves,test_done,test_pending,test_str]
-if (process.argv.length > 2) {
-  if (process.argv.length > 3)
+if (options.args.length > 0) {
+  if (options.args.length > 1)
     throw 'expected 0 or 1 arguments'
-  var cmd = process.argv[2]
+  var cmd = options.args[0]
   if (cmd == 'all')
     tests.push(test_values)
   else if (cmd == 'slow')
