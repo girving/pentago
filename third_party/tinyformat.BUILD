@@ -7,4 +7,5 @@ cc_library(
     srcs = [
         "tinyformat.h",
     ],
+    includes = ["."],
 )

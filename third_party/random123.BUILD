@@ -12,4 +12,5 @@ cc_library(
         "include/Random123/features/sse.h",
         "include/Random123/threefry.h",
     ],
+    includes = ["include"],
 )

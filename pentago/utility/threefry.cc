@@ -1,6 +1,6 @@
 #define __STDC_CONSTANT_MACROS
 #include "pentago/utility/uint128.h"
-#include "external/random123/include/Random123/threefry.h"
+#include "Random123/threefry.h"
 namespace pentago {
 
 uint128_t threefry(uint128_t key, uint128_t ctr) {
