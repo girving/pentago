@@ -246,11 +246,29 @@ template<class T,int d> static inline size_t hash_value(const Vector<T,d>& v) {
   return h;
 }
 
+template<int i,class T,int d> static inline T& get(Vector<T,d>& v) {
+  static_assert(0 <= i && i < d);
+  return v.data()[i];
+}
+
+template<int i,class T,int d> static inline const T& get(const Vector<T,d>& v) {
+  static_assert(0 <= i && i < d);
+  return v.data()[i];
+}
+
 }  // namespace pentago
 namespace std {
 template<class T,int d> struct hash<pentago::Vector<T,d>> {
   size_t operator()(const pentago::Vector<T,d>& v) const {
     return hash_value(v);
   }
+};
+template<class T,int d> class tuple_size<pentago::Vector<T,d>> {
+ public:
+  constexpr static int value = d;
+};
+template<int i,class T,int d> class tuple_element<i,pentago::Vector<T,d>> {
+ public:
+  typedef T type;
 };
 }  // namespace std
