@@ -8,7 +8,9 @@
         '..',
         '../bazel-pentago',
         '../bazel-pentago/external/boost',
-        '../bazel-genfiles'
+        '../bazel-pentago/external/tinyformat',
+        '../bazel-genfiles',
+        "<!(node -e \"require('nan')\")"
       ],
       'libraries': [
         '../../bazel-bin/pentago/mid/libmid.a',

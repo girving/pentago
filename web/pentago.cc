@@ -1,6 +1,7 @@
 // Node.js bindings for a tiny bit of pentago
 
 #include <v8.h>
+#include <nan.h>
 #include <node.h>
 #include <node_buffer.h>
 #include <node_object_wrap.h>
@@ -97,20 +98,20 @@ to_js(Isolate* iso, T x) {
 }
 
 Handle<String> to_js(Isolate* iso, const char* x) {
-  return String::NewFromOneByte(iso, (const uint8_t*)x);
+  return String::NewFromOneByte(iso, (const uint8_t*)x, v8::NewStringType::kNormal).ToLocalChecked();
 }
 
 Handle<String> to_js(Isolate* iso, const string& x) {
-  return String::NewFromOneByte(iso, (const uint8_t*)x.c_str());
+  return String::NewFromOneByte(iso, (const uint8_t*)x.c_str(), v8::NewStringType::kNormal).ToLocalChecked();
 }
 
 template<class T> Handle<v8::Object> to_js(Isolate* iso, const shared_ptr<T>& x) {
   typedef std::remove_const_t<T> MT;
   GEODE_ASSERT(Wrapper<MT>::constructor, format("type %s has not been wrapped", typeid(T).name()));
   Wrapper<MT>::constructor_hack = std::const_pointer_cast<MT>(x);
-  const auto js = value(iso, *Wrapper<MT>::constructor)->NewInstance(0,0);
+  auto js = value(iso, *Wrapper<MT>::constructor)->NewInstance(Nan::GetCurrentContext(), 0, 0);
   Wrapper<MT>::constructor_hack.reset();
-  return js;
+  return js.ToLocalChecked();
 }
 
 template<class T> Handle<v8::Array> to_js(Isolate* iso, const vector<T>& xs);
@@ -333,7 +334,7 @@ Wrapper<T>::wrapped_constructor(const Arguments& args) {
     for (const int i : range(args.Length()))
       argv.push_back(args[i]);
     return args.GetReturnValue().Set(value(iso, *Wrapper<T>::constructor)->NewInstance(
-        argv.size(), &argv[0]));
+        Nan::GetCurrentContext(), argv.size(), &argv[0]).ToLocalChecked());
   }
 }
 

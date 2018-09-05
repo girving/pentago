@@ -7,7 +7,7 @@
   "license": "BSD-3-Clause",
   "main": "server.js",
   "engines": {
-    "node": ">=8.9"
+    "node": ">=10.9"
   },
   "dependencies": {
     "commander": "^2.14.0",
@@ -16,12 +16,12 @@
     "log": "1.4.x",
     "lru-cache": "4.1.x",
     "mule": "0.1.x",
-    "nan": "^2.7.0",
+    "nan": "^2.11.0",
     "nib": "1.1.x",
     "pkgcloud": "^1.5.0",
-    "request": "2.83.x",
+    "request": "^2.88.0",
     "stylus": "0.54.x",
-    "time": "0.12.x"
+    "time": "^0.12.0"
   },
   "keywords": [
     "pentago",
