@@ -8,7 +8,7 @@ symmetry helpers, etc.  These tables also show up in the file formats, since
 the ordering of boards within a section is defined by rotation_minimal_quadrants.
 '''
 
-from __future__ import division
+from __future__ import division, print_function
 import os
 import sys
 import hashlib
@@ -42,7 +42,7 @@ def popcount(x):
 
 @cache
 def small_popcounts():
-  return np.asarray([popcount(i) for i in xrange(512)])
+  return np.asarray([popcount(i) for i in range(512)])
 
 def bits(x):
   if not x:
@@ -56,7 +56,7 @@ def bits(x):
 def check(*args):
   '''Usage: check(arrays,expected)'''
   expected = args[-1]
-  data = ''.join(a.astype(a.dtype.newbyteorder('<')).tostring() for a in args[:-1])
+  data = b''.join(a.astype(a.dtype.newbyteorder('<')).tostring() for a in args[:-1])
   hash = hashlib.sha1(data).hexdigest()
   assert expected==hash, "hash mismatch: expected '%s', got '%s'"%(expected,hash)
 
@@ -83,16 +83,16 @@ def win_patterns():
   # Axis aligned 5 in a row
   for flip in 0,1:
     for x in 0,1:
-      for y in xrange(6):
+      for y in range(6):
         p = 0
-        for i in xrange(5):
+        for i in range(5):
           p |= bit(x+i,y,flip=flip)
         wins.append(p)
   # Centered diagonal 5 in a row
   for rotate in 0,1:
     for x in 0,1:
       p = 0
-      for i in xrange(5):
+      for i in range(5):
         p |= bit(i+x,i+x,rotate=rotate)
       wins.append(p)
   wins = np.asarray(wins)
@@ -113,11 +113,11 @@ def win_contributions():
   # For each possible value of each quadrant, determine all the ways that quadrant can
   # contribute to victory.
   table = np.zeros((4,512),dtype=np.int64)
-  for qx in xrange(2):
-    for qy in xrange(2):
+  for qx in range(2):
+    for qy in range(2):
       q = 2*qx+qy
       qb = 0x1ff<<16*q
-      for v in xrange(512):
+      for v in range(512):
         b = v<<16*q
         for i,w in enumerate(wins):
           if w&qb and not ~b&(w&qb):
@@ -132,11 +132,11 @@ def show_win_contributions():
 @cache
 def rotations():
   table = np.zeros((512,2),dtype=np.int16)
-  for v in xrange(512):
+  for v in range(512):
     left = 0
     right = 0
-    for x in xrange(3):
-      for y in xrange(3):
+    for x in range(3):
+      for y in range(3):
         if v&qbit(x,y):
           left |= qbit(2-y,x)
           right |= qbit(y,2-x)
@@ -177,7 +177,7 @@ def unrotated_win_distances():
   unpack_ = unpack()
   for i,pats in enumerate(patterns):
     for j,pat in enumerate(pats):
-      for q in xrange(4):
+      for q in range(4):
         b = np.arange(3**9)
         s0,s1 = unpack_[b].T
         qp = (pat>>16*q)&0x1ff
@@ -194,7 +194,7 @@ def arbitrarily_rotated_win_distances():
   # Precompute table of multistep rotations
   rotate = np.empty((512,4),np.int16)
   rotate[:,0] = np.arange(512)
-  for i in xrange(3):
+  for i in range(3):
     rotate[:,i+1] = rotations()[rotate[:,i],0]
 
   # Precompute small popcounts
@@ -208,7 +208,7 @@ def arbitrarily_rotated_win_distances():
   unpack_ = unpack()
   for i,pats in enumerate(patterns):
     for j,pat in enumerate(pats):
-      for q in xrange(4):
+      for q in range(4):
         b = np.arange(3**9)
         s0,s1 = unpack_[b].T
         s0 = rotate[s0,:]
@@ -226,7 +226,7 @@ def rotated_win_distances():
   assert len(patterns)==32
   rotated_patterns = [] # List of pattern,rotated_quadrant pairs
   for pat in patterns:
-    for q in xrange(4):
+    for q in range(4):
       if pat&(0x1ff<<16*q):
         rotated_patterns.append((pat,q))
   assert len(rotated_patterns)==68
@@ -243,7 +243,7 @@ def rotated_win_distances():
   rotations_ = rotations()
   for i,pats in enumerate(rotated_patterns):
     for j,(pat,qr) in enumerate(pats):
-      for q in xrange(4):
+      for q in range(4):
         b = np.arange(3**9)
         s0,s1 = unpack_[b].T
         qp = (pat>>16*q)&0x1ff
@@ -258,10 +258,10 @@ def rotated_win_distances():
 @cache
 def reflections():
   table = np.zeros(512,dtype=np.int16)
-  for v in xrange(512):
+  for v in range(512):
     r = 0
-    for x in xrange(3):
-      for y in xrange(3):
+    for x in range(3):
+      for y in range(3):
         if v&qbit(x,y):
           r |= qbit(2-y,2-x) # Reflect about x = y line
     assert popcount(v)==popcount(r)
@@ -279,9 +279,9 @@ so we need lookup tables to go to and from packed form.'''
 @cache
 def pack():
   pack = np.zeros(2**9,dtype=np.int16)
-  for v in xrange(512):
+  for v in range(512):
     pv = 0
-    for i in xrange(9):
+    for i in range(9):
       if v&2**i:
         pv += 3**i
     pack[v] = pv
@@ -295,10 +295,10 @@ def show_pack():
 @cache
 def unpack():
   unpack = np.zeros((3**9,2),dtype=np.int16)
-  for v in xrange(3**9):
+  for v in range(3**9):
     vv = v
     p0,p1 = 0,0
-    for i in xrange(9):
+    for i in range(9):
       c = vv%3
       if c==1:
         p0 += 2**i
@@ -320,20 +320,20 @@ assert np.all(pack()[unpack()[:,0]]+2*pack()[unpack()[:,1]]==np.arange(3**9))
 def moves():
   '''Given a quadrant, compute all possible moves by player 0 as a function of the set of filled spaces, stored as a nested array.'''
   moves = []
-  for filled in xrange(2**9):
+  for filled in range(2**9):
     mv = []
     free = ~filled
-    for i in xrange(9):
+    for i in range(9):
       b = 1<<i
       if free&b:
         mv.append(b)
     assert len(mv)==9-popcount(filled)
     moves.append(mv)
   # Pack into a flat nested array
-  sizes = np.asarray(map(len,moves))
-  offsets = np.hstack([0,np.cumsum(sizes)])
+  sizes = np.asarray(list(map(len,moves)))
+  offsets = np.hstack([0, np.cumsum(sizes)])
   flat = np.asarray([x for mv in moves for x in mv])
-  assert len(flat)==offsets[-1]
+  assert len(flat)==offsets[-1], 'len(flat) = %s != offsets[-1] = %s' % (len(flat), offsets[-1])
   assert len(flat)<2**16
   check(offsets,'15b71d6e563787b098860ae0afb1d1aede6e91c2')
   check(flat,'1aef3a03571fe13f0ab71173d79da107c65436e0')
@@ -344,7 +344,7 @@ def moves():
 def superwin_info():
   all_rotations = np.empty((512,4),np.int16)
   all_rotations[:,0] = np.arange(512)
-  for i in xrange(3):
+  for i in range(3):
     all_rotations[:,i+1] = rotations()[all_rotations[:,i],0]
   ways = win_patterns().view(np.int16).reshape(32,4)
   if sys.byteorder=='big': # Fix order if necessary
@@ -357,10 +357,10 @@ def superwin_info():
     debug = False # pattern=='- dh dh da'.split()
     if debug: b = [0,136,50,64]
     assert len(pattern)==4
-    used   = [i for i in xrange(4) if pattern[i]!='-']
-    unused = [i for i in xrange(4) if pattern[i]=='-']
+    used   = [i for i in range(4) if pattern[i]!='-']
+    unused = [i for i in range(4) if pattern[i]=='-']
     assert len(used) in (2,3)
-    ws = np.asarray([w for w in ways if np.all([bool(w[i])==(pattern[i]!='-') or pattern[i]=='da' for i in xrange(4)])])
+    ws = np.asarray([w for w in ways if np.all([bool(w[i])==(pattern[i]!='-') or pattern[i]=='da' for i in range(4)])])
     assert len(ws) in (6,3)
     assert len(ws)<=4**(4-len(used))
     for q in used:
@@ -370,7 +370,8 @@ def superwin_info():
           s = s.swapaxes(1+j,5+u)
         x = (all_rotations&w)==w
         if debug:
-          print 'pattern %s, q %d, i %d, w %d (%s), x[%d] %s'%(pattern,q,i,w,' '.join(str(i) for i in xrange(9) if w&1<<i),b[q],x[b[q]])
+          print('pattern %s, q %d, i %d, w %d (%s), x[%d] %s' % (
+                pattern,q,i,w,' '.join(str(i) for i in range(9) if w&1<<i),b[q],x[b[q]]))
           before = info.copy()
         if len(unused)==1:
           s[:,i] |= x[:,None,None,:,None,None,None,None]
@@ -378,9 +379,9 @@ def superwin_info():
           s[:,i//4,i%4] |= x[:,None,:,None,None,None,None]
         if 0 and debug:
           changed = zip(*np.nonzero(info[q,b[q]]!=before[q,b[q]]))
-          print '  changed = %d'%len(changed)
+          print('  changed = %d'%len(changed))
           for c in changed:
-            print '  %s'%(c,)
+            print('  %s'%(c,))
   # Switch to r3, r2, r1, r0 major order to match super_t
   info = info.astype(np.int8).swapaxes(-4,-1).swapaxes(-3,-2)
   # packbits uses big endian bit order (on all platforms), so flip around to little endian before packing
@@ -407,7 +408,7 @@ def commute_global_local_symmetries():
   gr = identity[n[::-1].reshape(1,-1),n.reshape(-1,1)]
   assert np.all(gr[0,0]==[5,0])
   assert np.all(gr[5,0]==[5,5])
-  lr = np.asarray([identity.copy() for q in xrange(4)])
+  lr = np.asarray([identity.copy() for q in range(4)])
   n = np.arange(3)
   for qx in 0,1:
     for qy in 0,1:
@@ -433,15 +434,15 @@ def commute_global_local_symmetries():
   def powers(g):
     p = np.empty((4,36),int)
     p[0] = identity
-    for i in xrange(3):
+    for i in range(3):
       p[i+1] = g[p[i]]
     return p
-  plr = np.asarray(map(powers,lr))
+  plr = np.asarray(list(map(powers,lr)))
   local = np.empty((4,4,4,4,36),int)
-  for i0 in xrange(4):
-    for i1 in xrange(4):
-      for i2 in xrange(4):
-        for i3 in xrange(4):
+  for i0 in range(4):
+    for i1 in range(4):
+      for i2 in range(4):
+        for i3 in range(4):
           local[i0,i1,i2,i3] = plr[0,i0,plr[1,i1,plr[2,i2,plr[3,i3]]]]
   local = local.reshape(256,36)
   # Verify commutativity
@@ -451,11 +452,11 @@ def commute_global_local_symmetries():
   # Construct global rotation group
   globe = np.empty((2,4,36),int)
   globe[0] = powers(gr)
-  for i in xrange(4):
+  for i in range(4):
     globe[1,i] = reflect[globe[0,i]]
   globe = globe.reshape(8,36)
   inv_globe = np.empty_like(globe)
-  for i in xrange(8):
+  for i in range(8):
     inv_globe[i,globe[i]] = identity
 
   # Compute conjugations
@@ -485,7 +486,7 @@ def superstandardize_table():
     shape = np.ones(5,int)
     shape[i] = 4
     return np.arange(4).reshape(*shape)
-  table = sum([v(i)*4**rotate[v(4),i] for i in xrange(4)]).argmin(axis=-1).T.ravel()
+  table = sum([v(i)*4**rotate[v(4),i] for i in range(4)]).argmin(axis=-1).T.ravel()
   check(table,'dd4f59fea3135a860e76ed397b8f1863b23cc17b')
   return [('uint8_t','superstandardize_table','%d',table)]
 
@@ -518,7 +519,7 @@ def rotation_minimal_quadrants():
   b = small_popcounts()[s0]
   w = small_popcounts()[s1]
   i = ((b*(21-b))//2)+w
-  rmins = [all_rmins[np.nonzero(i==k)[0]] for k in xrange(10*(10+1)//2)]
+  rmins = [all_rmins[np.nonzero(i==k)[0]] for k in range(10*(10+1)//2)]
   assert sum(map(len,rmins))==len(all_rmins)
 
   # Count the number of elements in each bucket not fixed by reflection
@@ -532,7 +533,7 @@ def rotation_minimal_quadrants():
   inverse[:] = 4*3**9
   for r in rmins:
     s0,s1 = unpack_[r].T
-    for i in xrange(4):
+    for i in range(4):
       r = pack_[s0]+2*pack_[s1]
       inverse[r] = np.minimum(inverse[r],4*np.arange(len(r))+i)
       s0 = rotate[s0]
@@ -540,7 +541,7 @@ def rotation_minimal_quadrants():
   assert np.all(inverse<420*4)
 
   # Save as a nested array
-  offsets = np.cumsum(np.hstack([0,map(len,rmins)]))
+  offsets = np.cumsum(np.hstack([0,list(map(len,rmins))]))
   flat = np.hstack(rmins)
   check(offsets,'7e450e73e0d54bd3591710e10f4aa76dbcbbd715')
   check(flat,'8f48bb94ad675de569b07cca98a2e930b06b45ac')
@@ -564,18 +565,18 @@ def save(h, cc, tables):
   note = '// Autogenerated by precompute: do not edit directly\n'
   for path in h, cc:
     file = open(path, 'w')
-    print>>file, note
+    print(note, file=file)
     if path.endswith('.h'):
-      print>>file, '#pragma once\n\n#include <cstdint>'
+      print('#pragma once\n\n#include <cstdint>', file=file)
     else:
-      print>>file, '#include "pentago/base/gen/tables.h"'
-    print>>file, 'namespace pentago {\n'
+      print('#include "pentago/base/gen/tables.h"', file=file)
+    print('namespace pentago {\n', file=file)
     for type,name,format,data in tables:
       if path.endswith('.h'):
-        print>>file, 'extern const %s %s%s;'%(type,name,cpp_sizes(data))
+        print('extern const %s %s%s;'%(type,name,cpp_sizes(data)), file=file)
       else:
-        print>>file, 'const %s %s%s = %s;'%(type,name,cpp_sizes(data),cpp_init(format,data))
-    print>>file, '\n}'
+        print('const %s %s%s = %s;'%(type,name,cpp_sizes(data),cpp_init(format,data)), file=file)
+    print('\n}', file=file)
 
 def main():
   h, cc = sys.argv[1:]
