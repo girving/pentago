@@ -69,7 +69,7 @@ public:
   readable_block_store_t(const shared_ptr<const block_partition_t>& partition, const int rank,
                          RawArray<const local_block_t> blocks,
                          const shared_ptr<compacting_store_t>& store);
-  ~readable_block_store_t();
+  virtual ~readable_block_store_t();
 
   // Number of blocks
   int total_blocks() const {
