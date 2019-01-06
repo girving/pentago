@@ -1,9 +1,13 @@
 package(default_visibility = ["//visibility:public"])
 load("//pentago:pentago.bzl", "cc_tests")
 
-py_binary(
+cc_binary(
     name = "precompute",
-    srcs = ["precompute.py"],
+    srcs = ["precompute.cc"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
+    deps = [
+        "//pentago/utility",
+    ],
 )
 
 genrule(
@@ -18,7 +22,7 @@ genrule(
 
 cc_library(
     name = "base",
-    srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
+    srcs = glob(["*.h", "*.cc"], exclude=["precompute.cc", "*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/utility",

@@ -44,4 +44,16 @@ public:
   }
 };
 
+template<class T> Nested<T> asnested(const vector<vector<T>>& vs) {
+  vector<int> lengths;
+  for (const auto& v : vs)
+    lengths.push_back(v.size());
+  Nested<T> nest(lengths);
+  int f = 0;
+  for (const auto& v : vs)
+    for (const auto& x : v)
+      nest.flat[f++] = x;
+  return nest;
+}
+
 }

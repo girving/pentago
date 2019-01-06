@@ -353,6 +353,8 @@ concat(RawArray<const T> x, RawArray<const T> y) {
   return xy;
 }
 
+template<class T,int d> static inline const Array<T,d>& asarray(const Array<T,d>& x) { return x; }
+template<class T,int d> static inline const RawArray<T,d>& asarray(const RawArray<T,d>& x) { return x; }
 template<class T> static inline RawArray<T> asarray(vector<T>& x) { return x; }
 template<class T> static inline RawArray<const T> asarray(const vector<T>& x) { return x; }
 template<class T,int d> static inline const RawArray<T> asarray(T (&x)[d]) { return RawArray<T>(d, x); }

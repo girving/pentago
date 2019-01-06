@@ -122,8 +122,10 @@ tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) {
   #define SIGNATURE(r) (PLACE(3*r,r)+4*(PLACE(1,r)+4*(PLACE(2,r)+4*PLACE(3-3*r,r))))
   const int r0 =    superstandardize_table[SIGNATURE(0)],
             r1 = 3&-superstandardize_table[SIGNATURE(1)];
-  const board_t b0 = quadrants(qmin[rotate_quadrants[r0][0]][0],qmin[rotate_quadrants[r0][1]][0],qmin[rotate_quadrants[r0][2]][0],qmin[rotate_quadrants[r0][3]][0]),
-                b1 = quadrants(qmin[rotate_quadrants[r1][3]][1],qmin[rotate_quadrants[r1][1]][1],qmin[rotate_quadrants[r1][2]][1],qmin[rotate_quadrants[r1][0]][1]),
+  const board_t b0 = quadrants(qmin[rotate_quadrants[r0][0]][0],qmin[rotate_quadrants[r0][1]][0],
+                               qmin[rotate_quadrants[r0][2]][0],qmin[rotate_quadrants[r0][3]][0]),
+                b1 = quadrants(qmin[rotate_quadrants[r1][3]][1],qmin[rotate_quadrants[r1][1]][1],
+                               qmin[rotate_quadrants[r1][2]][1],qmin[rotate_quadrants[r1][0]][1]),
                 bmin = min(b0,b1);
   const bool reflect = b1<b0;
   const int gr = reflect?r1:r0;

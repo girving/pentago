@@ -25,6 +25,12 @@ template<class T, int d> struct VectorBase {
   VectorBase(const T& x0, const T& x1, const T& x2) : data_{x0, x1, x2} { static_assert(d == 3); }
   VectorBase(const T& x0, const T& x1, const T& x2, const T& x3)
     : data_{x0, x1, x2, x3} { static_assert(d == 4); }
+  VectorBase(const T& x0, const T& x1, const T& x2, const T& x3, const T& x4)
+    : data_{x0, x1, x2, x3, x4} { static_assert(d == 5); }
+  VectorBase(const T& x0, const T& x1, const T& x2, const T& x3, const T& x4, const T& x5)
+    : data_{x0, x1, x2, x3, x4, x5} { static_assert(d == 6); }
+  VectorBase(const T& x0, const T& x1, const T& x2, const T& x3, const T& x4, const T& x5, const T& x6)
+    : data_{x0, x1, x2, x3, x4, x5, x6} { static_assert(d == 7); }
 
   T* data() { return data_; }
   const T* data() const { return data_; }
