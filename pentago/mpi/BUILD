@@ -12,7 +12,7 @@ cc_library(
         "//pentago/end:check_lib",
         "//pentago/search",
         "//pentago/utility",
-        "//third_party/mpi",
+        "@mpi//:mpi",
     ],
 )
 
@@ -59,7 +59,6 @@ cc_tests(
         "//pentago/end:check",
     ],
     deps = [
-        ":mpi",
         "//pentago/base",
         "//pentago/utility",
     ],

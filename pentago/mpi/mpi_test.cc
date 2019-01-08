@@ -29,11 +29,11 @@ void check(const string& dir, const string& options = "") {
 string mpirun() {
   if (nop)
     return "mpirun";
-  const string cmds[] = {"mpirun", "aprun"};
+  const string cmds[] = {"mpirun", "aprun", "/usr/local/bin/mpirun"};
   for (const auto& cmd : cmds)
     if (!system(format("/usr/bin/which %s >/dev/null 2>/dev/null", cmd).c_str()))
       return cmd;
-  throw OSError(format("No mpirun found, tried %s", join(" ", cmds)));
+  throw OSError(format("No mpirun found, tried %s", join(", ", cmds)));
 }
 
 // Write out meaningless data from MPI

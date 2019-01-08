@@ -2,6 +2,8 @@
 
 workspace(name = "pentago")
 
+load("//third_party:mpi.bzl", "mpi_repository")
+
 new_http_archive(
     name = "random123",
     urls = [
@@ -67,3 +69,5 @@ new_http_archive(
     strip_prefix = "boost_1_65_1",
     build_file = "//third_party:boost.BUILD",
 )
+
+mpi_repository(name = "mpi")
