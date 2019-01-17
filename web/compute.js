@@ -4,7 +4,7 @@
 var pentago = require('./build/Release/pentago')
 
 // Allocate workspace
-var workspace = new Buffer(pentago.midsolve_workspace_memory_usage(18))
+var workspace = Buffer.alloc(pentago.midsolve_workspace_memory_usage(18))
 
 // Process compute requests
 process.on('message',function (job) {

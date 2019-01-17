@@ -7,7 +7,7 @@
   "license": "BSD-3-Clause",
   "main": "server.js",
   "engines": {
-    "node": ">=10.9"
+    "node": ">=11.6.0"
   },
   "dependencies": {
     "commander": "^2.14.0",
@@ -16,9 +16,9 @@
     "log": "1.4.x",
     "lru-cache": "4.1.x",
     "mule": "0.1.x",
-    "nan": "^2.11.0",
+    "nan": "^2.12.1",
     "nib": "1.1.x",
-    "pkgcloud": "^1.5.0",
+    "pkgcloud": "^1.7.0",
     "request": "^2.88.0",
     "stylus": "0.54.x",
     "time": "^0.12.0"
