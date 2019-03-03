@@ -65,17 +65,4 @@ void print_stats() {
   slog(s);
 }
 
-#ifdef GEODE_PYTHON
-static unordered_map<string,Ref<> > stats() {
-  double time = get_time();
-  unordered_map<string,Ref<> > stats;
-  #define ST(stat) stats.insert(make_pair(string(#stat),steal_ref_check(to_python(stat))));
-  ST(total_lookups)
-  ST(successful_lookups)
-  ST(distance_prunes)
-  stats.insert(make_pair(string("nodes/second"),steal_ref_check(to_python(uint64_t(total_expanded_nodes/(time-start_time))))));
-  return stats;
-}
-#endif
-
 }
