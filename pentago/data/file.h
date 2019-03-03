@@ -8,6 +8,15 @@ namespace pentago {
 
 using std::function;
 
+// Does a file exist?
+bool exists(const string& path);
+
+// List the files in a directory
+vector<string> listdir(const string& path);
+
+// fnmatch-based glob
+vector<string> glob(const string& pattern);
+
 // Abstract readable file
 struct read_file_t : private boost::noncopyable {
 public:

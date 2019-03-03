@@ -1,12 +1,42 @@
 // Abstract interface to files, either local or in the cloud
 
 #include "pentago/data/file.h"
-#include <unistd.h>
-#include <fcntl.h>
+#include "pentago/utility/format.h"
+#include "pentago/utility/range.h"
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <fnmatch.h>
+#include <glob.h>
+#include <unistd.h>
 namespace pentago {
 
 using std::make_shared;
+
+bool exists(const string& path) {
+  return !access(path.c_str(), R_OK);
+}
+
+vector<string> listdir(const string& path) {
+  DIR* dir = opendir(path.c_str());
+  if (!dir)
+    throw IOError(format("can't list directory '%s': %s", path, strerror(errno)));
+  vector<string> paths;
+  while (const dirent* d = readdir(dir))
+    paths.push_back(d->d_name);
+  closedir(dir);
+  return paths;
+}
+
+vector<string> glob(const string& pattern) {
+  glob_t pglob;
+  ::glob(pattern.c_str(), GLOB_TILDE | GLOB_BRACE, nullptr, &pglob);
+  vector<string> results;
+  for (const auto i : range(pglob.gl_pathc))
+    results.push_back(pglob.gl_pathv[i]);
+  ::globfree(&pglob);
+  return results;
+}
 
 read_file_t::read_file_t() {}
 read_file_t::~read_file_t() {}

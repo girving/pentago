@@ -58,7 +58,8 @@ compact_blob_t supertensor_index_t::block_location(RawArray<const uint8_t> blob)
   return b;
 }
 
-Array<Vector<super_t,2>,4> supertensor_index_t::unpack_block(const block_t block, RawArray<const uint8_t> compressed) {
+Array<Vector<super_t,2>,4> supertensor_index_t::unpack_block(const block_t block,
+                                                             RawArray<const uint8_t> compressed) {
   const auto shape = block_shape(get<0>(block).shape(), get<1>(block));
   const auto data = decompress(compressed,sizeof(Vector<super_t,2>)*shape.product(),unevent);
   return unfilter(filter,shape,data);

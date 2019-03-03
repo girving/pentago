@@ -3,6 +3,7 @@
 #include "pentago/end/config.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/data/block_cache.h"
+#include "pentago/data/file.h"
 #include "pentago/data/numpy.h"
 #include "pentago/data/supertensor.h"
 #include "pentago/end/check.h"
@@ -23,10 +24,8 @@
 #include <unordered_set>
 #include <regex>
 #include <vector>
-#include <glob.h>
-#include <getopt.h>
 #include <fnmatch.h>
-#include <dirent.h>
+#include <getopt.h>
 
 namespace pentago {
 namespace end {
@@ -84,31 +83,6 @@ options_t parse_options(int argc, char** argv) {
   for (int i = optind; i < argc; i++)
     o.dirs.push_back(argv[i]);
   return o;
-}
-
-bool exists(const string& path) {
-  return !access(path.c_str(), R_OK);
-}
-
-vector<string> listdir(const string& path) {
-  DIR* dir = opendir(path.c_str());
-  if (!dir)
-    throw IOError(format("can't list directory '%s': %s", path, strerror(errno)));
-  vector<string> paths;
-  while (const dirent* d = readdir(dir))
-    paths.push_back(d->d_name);
-  closedir(dir);
-  return paths;
-}
-
-vector<string> glob(const string& pattern) {
-  glob_t pglob;
-  ::glob(pattern.c_str(), GLOB_TILDE | GLOB_BRACE, nullptr, &pglob);
-  vector<string> results;
-  for (const auto i : range(pglob.gl_pathc))
-    results.push_back(pglob.gl_pathv[i]);
-  ::globfree(&pglob);
-  return results;
 }
 
 void toplevel(int argc, char** argv) {

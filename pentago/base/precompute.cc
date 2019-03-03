@@ -819,6 +819,7 @@ int main(int argc, char** argv) {
     GEODE_ASSERT(endswith(h, "tables.h"));
     GEODE_ASSERT(endswith(cc, "tables.cc"));
     save(h, cc);
+    return 0;
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
     return 1;

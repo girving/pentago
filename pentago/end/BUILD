@@ -3,7 +3,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 
 cc_library(
     name = "end",
-    srcs = glob(["*.h", "*.cc"], exclude=["check*.*", "meaningless.cc", "*_test.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["check*.*", "meaningless.cc", "make-indices.cc", "*_test.cc"]),
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/base",
@@ -64,5 +64,15 @@ cc_binary(
         ":end",
         "//pentago/high",
         "//pentago/mpi:options",
+    ],
+)
+
+cc_binary(
+    name = "make-indices",
+    srcs = ["make-indices.cc"],
+    copts = ["-std=c++1z", "-Wall", "-Werror"],
+    deps = [
+        "//pentago/data",
+        "//pentago/high",
     ],
 )
