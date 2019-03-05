@@ -8,8 +8,7 @@ var request = require('request')
 var LRU = require('lru-cache')
 var WorkQueue = require('mule').WorkQueue
 var Pending = require('./pending')
-var pkgcloud = require('pkgcloud')
-var concat = require('concat-stream')
+var storage = require('./storage')
 var pentago = require('./build/Release/pentago')
 
 // Pull in math
@@ -84,13 +83,12 @@ exports.values = function (options,log) {
   if (!opts.apiKey)
     throw 'no --api-key specified'
   var container = 'pentago-edison-all'
-  var client = pkgcloud.storage.createClient({
-    provider: 'rackspace',
+  var download = storage.downloader({
     username: 'pentago',
     region: 'IAD',
     apiKey: opts.apiKey,
-    useInternal: !opts.external
-  })
+    useInternal: !opts.external,
+  }, stats, log)
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
@@ -120,41 +118,9 @@ exports.values = function (options,log) {
       })
   })
 
-  // Similar to client.auth, but correctly merges multiple simultaneous requests.
-  var auth_conts = []
-  function merge_auth (cont) {
-    var need = !auth_conts.length
-    auth_conts.push(cont)
-    if (need)
-      client.auth(function () {
-        var cs = auth_conts
-        auth_conts = []
-        for (var i=0;i<cs.length;i++)
-          cs[i]()
-      })
-  }
-
   // Get a section of a file
-  function range_get(object,blob,cont) {
-    var name = object+', '+blob.offset+"+"+blob.size
-    log.debug('range request %s, active %d',name,stats.active_gets++)
-    merge_auth(function () {
-      client.download({
-        container: container,
-        remote: object,
-        headers: {range: 'bytes='+blob.offset+'-'+(blob.offset+blob.size-1)}
-      }, function (error,res) {
-        if (error)
-          log.error("range request failed: %s, error '%s'",name,error)
-      }).pipe(concat(function (body) {
-        if (body.length != blob.size)
-          log.error('range request failed: %s, got size %d != %d',body.length,blob.size)
-        else {
-          log.debug('range response %s, active %d',name,--stats.active_gets)
-          cont(body)
-        }
-      }))
-    })
+  function range_get(object, blob, cont) {
+    download(container, object, blob.offset, blob.size, cont)
   }
 
   // Get a block if necessary, merging simultaneous requests
