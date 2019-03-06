@@ -2,7 +2,7 @@
 
 'use strict'
 const concat = require('concat-stream')
-const request = require('request')
+const https = require('https')
 
 const early_token_timeout = 1000 * 60 * 5  // 5 minutes in ms
 
@@ -15,6 +15,30 @@ function match_region(a, b) {
     return a.toLowerCase() === b.toLowerCase()
 }
 
+// Simple promise-based https request.  Options:
+//   uri: URL
+//   method: GET, POST, etc.
+//   headers: optional http headers
+//   body: optional body (already encoded if json)
+function request(options) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options.uri, options, res => {
+      if (res.statusCode >= 400) {
+        res.resume()
+        reject('https request failed, code ' + res.statusCode)
+      } else {
+        const data = []
+        res.on('data', chunk => data.push(chunk))
+        res.on('end', () => resolve(Buffer.concat(data)))
+      }
+    })
+    req.on('error', reject)
+    if (options.body)
+      req.write(options.body)
+    req.end()
+  })
+}
+
 exports.downloader = function (options, stats, log) {
   const region = options.region
   const username = options.username
@@ -24,56 +48,47 @@ exports.downloader = function (options, stats, log) {
   // Authorization.  We use a promised token so that simultaneous auth requests get merged,
   // and wipe the promise on expiration.
   let promised_token = null
-  function auth(callback) {
+  function auth() {
     // Launch a token request if necessary
     if (!promised_token)
-      promised_token = new Promise((resolve, reject) => {
-        // Request a new token
-        request({
-          uri: 'https://identity.api.rackspacecloud.com/v2.0/tokens',
-          method: 'POST',
-          strictSSL: true,
-          headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-          json: {auth: {'RAX-KSKEY:apiKeyCredentials': {username: username, apiKey: apiKey}}}
-        }, function (err, res, body) {
-          if (err) return reject(err)
-          if (res.statusCode >= 400) return reject('authentication failed: code ' + res.statusCode)
+      promised_token = request({
+        uri: 'https://identity.api.rackspacecloud.com/v2.0/tokens',
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+        body: JSON.stringify({auth: {'RAX-KSKEY:apiKeyCredentials': {username: username, apiKey: apiKey}}}),
+      }).then(body => {
+        const access = JSON.parse(body).access
 
-          // Build token
-          const token = body.access.token
-          if (!token || !token.id || !token.expires) return reject('Invalid token')
-          token.expires = new Date(token.expires)
+        // Build token
+        const token = access.token
+        if (!token || !token.id || !token.expires) throw Error('Invalid token')
+        token.expires = new Date(token.expires)
 
-          // Add service url
-          const service = body.access.serviceCatalog.find(service => service.type.toLowerCase() == 'object-store')
-          if (!service) return reject('Unable to find matching endpoint for requested service')
-          const endpoint = service.endpoints.find(endpoint => match_region(endpoint.region, region))
-          if (!endpoint) return reject('Unable to identify endpoint url')
-          token.service_url = useInternal && endpoint.internalURL ? endpoint.internalURL : endpoint.publicURL
+        // Add service url
+        const service = access.serviceCatalog.find(service => service.type.toLowerCase() == 'object-store')
+        if (!service) throw Error('Unable to find matching endpoint for requested service')
+        const endpoint = service.endpoints.find(endpoint => match_region(endpoint.region, region))
+        if (!endpoint) throw Error('Unable to identify endpoint url')
+        token.service_url = useInternal && endpoint.internalURL ? endpoint.internalURL : endpoint.publicURL
 
-          // Schedule the destruction of the promise
-          const timeout = token.expires.getTime() - new Date().getTime() - early_token_timeout
-          setTimeout(() => { promised_token = null }, timeout)
+        // Schedule the destruction of the promise
+        const timeout = token.expires.getTime() - new Date().getTime() - early_token_timeout
+        setTimeout(() => { promised_token = null }, timeout)
 
-          // All done!
-          resolve(token)
-        })
+        // All done!
+        return token
       })
-    // Add new callback
-    promised_token.then(callback)
+    return promised_token
   }
 
-  function download(options, callback) {
-    return new Promise((resolve, reject) =>
-      auth(token => {
-        const opts = {}
-        opts.method = 'GET'
-        opts.headers = options.headers
-        opts.headers['x-auth-token'] = token.id
-        opts.uri = token.service_url + '/' + options.container + '/' + options.path
-        request(opts, err => { if (err) reject(err) }).pipe(concat(resolve))
-      })
-    )
+  async function download(options) {
+    const token = await auth()
+    options.headers['x-auth-token'] = token.id
+    return request({
+      uri: token.service_url + '/' + options.container + '/' + options.path,
+      method: 'GET',
+      headers: options.headers,
+    })
   }
 
   function range_download(container, object, offset, size, cont) {

@@ -4,7 +4,6 @@
 var os = require('os')
 var https = require('https')
 var time = require('time')
-var request = require('request')
 var LRU = require('lru-cache')
 var WorkQueue = require('mule').WorkQueue
 var Pending = require('./pending')
