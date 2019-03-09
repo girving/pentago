@@ -410,25 +410,25 @@ unordered_map<board_t,superinfos_t> midsolve_internal(const board_t root, const 
 unordered_map<board_t,int> midsolve(const board_t root, const bool parity,
                                     const RawArray<const board_t> boards, RawArray<uint8_t> workspace) {
   // Compute
-  const auto supers = midsolve_internal(root,parity,workspace);
+  const auto supers = midsolve_internal(root, parity, workspace);
 
   // Extract results
   unordered_map<board_t,int> results;
   for (const auto board : boards) {
     // We can't superstandardize, since that can break parity.  Instead, we check all local rotations manually.
-    for (int i=0;i<256;i++) {
+    for (const int i : range(256)) {
       const local_symmetry_t s(i);
       const auto p = get_pointer(supers, transform_board(s,board));
       if (p) {
-        const superinfos_t r = transform_superinfos(s.inverse(),*p);
+        const superinfos_t r = transform_superinfos(s.inverse(), *p);
         if (r.known(0)) {
-          results.insert(make_pair(board,r.win(0)+r.notlose(0)-1));
+          results.insert(make_pair(board, r.win(0)+r.notlose(0)-1));
           goto found;
         }
       }
     }
     throw RuntimeError(format("midsolve failure: root %lld, parity %d, board %lld\n%s\n%s",
-      root,parity,board,str_board(root),str_board(board)));
+      root, parity, board, str_board(root), str_board(board)));
     found:;
   }
   return results;
@@ -443,7 +443,7 @@ high_midsolve(const high_board_t& root, RawArray<const high_board_t> boards,
     bs.push_back(b.board);
   }
   unordered_map<high_board_t,int> results;
-  for (auto [board, value] : midsolve(root.board, root. middle, bs, workspace))
+  for (const auto [board, value] : midsolve(root.board, root.middle, bs, workspace))
     results.insert(make_pair(high_board_t(board, false), value));
   return results;
 }

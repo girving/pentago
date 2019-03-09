@@ -50,11 +50,11 @@ unit_t async_block_cache_t::set_flaky(const double p) {
 unit_t async_block_cache_t::set(const block_t block, RawArray<const uint8_t> compressed) {
   if (flake_probability && flake_random.uniform<double>() < flake_probability)
     throw ValueError(format("flaking for unit test purposes (p = %g)", flake_probability));
-  const auto data = supertensor_index_t::unpack_block(block,compressed);
+  const auto data = supertensor_index_t::unpack_block(block, compressed);
   free_memory -= memory_usage(data);
   while (free_memory < 0)
     free_memory += memory_usage(get<1>(lru.drop()));
-  lru.add(block,data);
+  lru.add(block, data);
   return unit;
 }
 
@@ -72,10 +72,11 @@ super_t async_block_cache_t::extract(const bool turn, const bool aggressive, con
                : aggressive ? data[1] : ~data[0]; // White to move
 }
 
-RawArray<const Vector<super_t,2>,4> async_block_cache_t::load_block(const section_t section, const Vector<uint8_t,4> block) const {
+RawArray<const Vector<super_t,2>,4> async_block_cache_t::load_block(const section_t section,
+                                                                    const Vector<uint8_t,4> block) const {
   const auto p = lru.get(make_tuple(section, block));
   GEODE_ASSERT(p && p->total_size(), format("async_block_cache_t::load_block: section %s, block %s %s",
-                                            str(section),str(block),p?"pending":"missing"));
+                                            str(section), str(Vector<int,4>(block)), p ? "pending" : "missing"));
   return *p;
 }
 
