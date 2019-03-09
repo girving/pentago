@@ -33,7 +33,7 @@
             'OTHER_CPLUSPLUSFLAGS': ['-std=c++1z', '-Wno-deprecated-declarations'],
             'GCC_ENABLE_CPP_RTTI': 'YES',
             'GCC_ENABLE_CPP_EXCEPTIONS': 'YES',
-            'MACOSX_DEPLOYMENT_TARGET': '10.13',
+            'MACOSX_DEPLOYMENT_TARGET': '10.14',
           }
         }]
       ]

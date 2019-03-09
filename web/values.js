@@ -1,19 +1,18 @@
 // Asynchronous board value lookup and compute
 
 'use strict'
-var os = require('os')
-var https = require('https')
-var time = require('time')
-var LRU = require('lru-cache')
-var WorkQueue = require('mule').WorkQueue
-var Pending = require('./pending')
-var storage = require('./storage')
-var pentago = require('./build/Release/pentago')
+const os = require('os')
+const https = require('https')
+const LRU = require('lru-cache')
+const WorkQueue = require('mule').WorkQueue
+const Pending = require('./pending')
+const storage = require('./storage')
+const pentago = require('./build/Release/pentago')
 
 // Pull in math
-var min = Math.min
-var max = Math.max
-var floor = Math.floor
+const min = Math.min
+const max = Math.max
+const floor = Math.floor
 
 exports.defaults = {
   pool: os.cpus().length,
@@ -26,7 +25,7 @@ exports.defaults = {
 }
 
 exports.add_options = function (options) {
-  var d = exports.defaults
+  const d = exports.defaults
   options.option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--ccache <size>','Size of compute cache (suffixes M/MB and G/GB are understood)',d.ccache)
@@ -37,13 +36,13 @@ exports.add_options = function (options) {
 }
 
 // Useful counters
-var stats = {
+const stats = {
   active_gets: 0
 }
 exports.stats = stats
 
 function parseSize (s,name) {
-  var m = s.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
+  const m = s.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
   if (!m) {
     log.error("invalid %ssize '%s', expect something like 256M or 1G",name?name+' ':'',opts.cache)
     throw 'invalid '+(name?name+' ':'')+'size '+s
@@ -52,18 +51,18 @@ function parseSize (s,name) {
 }
 
 // Create an evaluation routine with calling convention
-//   values(board,cont)
+//   values(board) : Promise
 // The options are
 //   pool: Number of worker compute processes (defaults to cpu count)
 //   cache: Size of block cache (suffixes M/MB and G/GB are understood)
 //   maxSlice: Maximum slice available in database (for debugging use only)
 exports.values = function (options,log) {
   // Incorporate defaults
-  var opts = {}
-  for (var k in exports.defaults)
+  const opts = {}
+  for (const k in exports.defaults)
     opts[k] = options[k] || exports.defaults[k]
-  var cache_limit = parseSize(opts.cache,'--cache')
-  var ccache_limit = parseSize(opts.ccache,'--ccache')
+  const cache_limit = parseSize(opts.cache,'--cache')
+  const ccache_limit = parseSize(opts.ccache,'--ccache')
 
   // Print information
   log.info('cache memory limit = %d (%s)',cache_limit,opts.cache)
@@ -74,15 +73,16 @@ exports.values = function (options,log) {
   log.info('external = %d',opts.external)
 
   // Prepare for opening book lookups
-  var indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(pentago.supertensor_index_t)
-  var cache = pentago.async_block_cache_t(cache_limit)
-  var cache_pending = {} // Map from block to callbacks to call once block is available
+  const indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(
+      pentago.supertensor_index_t)
+  const cache = pentago.async_block_cache_t(cache_limit)
+  const cache_pending = {} // Map from block to callbacks to call once block is available
 
   // Prepare for Cloud Files access via pkgcloud
   if (!opts.apiKey)
     throw 'no --api-key specified'
-  var container = 'pentago-edison-all'
-  var download = storage.downloader({
+  const container = 'pentago-edison-all'
+  const download = storage.downloader({
     username: 'pentago',
     region: 'IAD',
     apiKey: opts.apiKey,
@@ -98,127 +98,113 @@ exports.values = function (options,log) {
   pentago.init_threads(0,0)
 
   // Prepare for computations
-  var pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
-  var compute_cache = LRU({
+  const pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
+  const compute_cache = LRU({
     max: floor(ccache_limit/1.2),
     length: function (s) { return s.length }
   })
   // Cache and don't simultaneously duplicate work. b = (root,boards),
   // where boards are to be evaluated and root is their nearest common ancestor.
-  var pending_compute = Pending(function (b,cont) {
-    var board = b[0]
-    var results = compute_cache.get(board)
+  const pending_compute = Pending(async b => {
+    const results = compute_cache.get(b.root)
     if (results)
-      cont(JSON.parse(results))
+      return JSON.parse(results)
     else
-      pool.enqueue(b,function (results) {
-        compute_cache.set(board,JSON.stringify(results))
-        cont(results)
-      })
+      return await new Promise((resolve, reject) =>
+        pool.enqueue(b, results => {
+          compute_cache.set(b.root, JSON.stringify(results))
+          resolve(results)
+        })
+      )
   })
 
   // Get a section of a file
-  function range_get(object, blob, cont) {
-    download(container, object, blob.offset, blob.size, cont)
+  function range_get(object, blob) {
+    return download(container, object, blob.offset, blob.size)
   }
 
   // Get a block if necessary, merging simultaneous requests
-  var pending_block = Pending(function (block,cont) {
+  const pending_block = Pending(async block => {
     if (cache.contains(block))
-      cont()
-    else {
-      // Compute slice
-      var slice = 0
-      for (var q=0;q<4;q++)
-        for (var s=0;s<2;s++)
-          slice += block[0][q][s]
-      // Grab block location
-      range_get('slice-'+slice+'.pentago.index',indices[slice].blob_location(block),function (blob) {
-        // Grab block data, retrying if the data is corrupt
-        function try_get() {
-          range_get('slice-'+slice+'.pentago',indices[slice].block_location(blob),function (data) {
-            try {
-              cache.set(block,data)
-            } catch (error) {
-              log.warning("corrupt block, retrying: slice %d, block [%s], error '%s'",slice,block,error)
-              return try_get()
-            }
-            cont()
-          })
-        }
-        try_get()
-      })
+      return
+
+    // Compute slice
+    let slice = 0
+    for (let q = 0; q < 4; q++)
+      for (let s = 0; s < 2; s++)
+        slice += block[0][q][s]
+
+    // Grab block location
+    const blob = await range_get('slice-'+slice+'.pentago.index', indices[slice].blob_location(block))
+
+    // Grab block data, retrying if the data is corrupt
+    for (;;) {
+      const data = await range_get('slice-'+slice+'.pentago', indices[slice].block_location(blob))
+      try {
+        cache.set(block, data)
+        return
+      } catch (error) {
+        log.warning("corrupt block, retrying: slice %d, block [%s], error '%s'", slice, block, error)
+      }
     }
   })
 
-  // Lookup or compute the value or board and its children, then call cont(results) with a board -> value map.
-  function values(board,cont) {
+  // Lookup or compute the value or board and its children, returning a promise of a board -> value map.
+  async function values(board) {
     // Collect the leaf boards whose values we need
-    var results = {}
-    var requests = []
-    function traverse(board,children,cont) {
-      if (board.done()) { // Done, so no lookup required
-        var v = board.immediate_value()
-        results[board.name()] = v
-        cont(v)
-      } else if (!children && !board.middle()) { // Request board
-        requests.push({'board':board,'cont':cont})
-      } else { // Traverse into children
-        var value = -1
-        var moves = board.moves()
-        var left = moves.length
-        var scale = board.middle() ? -1 : 1
-        for (var i=0;i<moves.length;i++) {
-          traverse(moves[i],false,function (v) {
-            value = max(value,scale*v)
-            if (!--left) {
-              results[board.name()] = value
-              cont(value)
-            }
-          })
-        }
+    const results = {}
+    const requests = []
+    async function traverse(board, children) {
+      if (board.done()) {  // Done, so no lookup required
+        const value = board.immediate_value()
+        results[board.name()] = value
+        return value
+      } else if (!children && !board.middle()) {  // Request board
+        return await new Promise((resolve, reject) => requests.push({board: board, resolve: resolve}))
+      } else {  // Traverse into children
+        let value = -1
+        const scale = board.middle() ? -1 : 1
+        for (const v of await Promise.all(board.moves().map(m => traverse(m, false))))
+          value = max(value, scale*v)
+        results[board.name()] = value
+        return value
       }
     }
-    traverse(board,true,function (v) {
-      cont(results)
-    })
+    const top = traverse(board, true)
 
-    // Look up a remote value, caching the block in the process
-    function remote_request(board,cont) {
-      pending_block(cache.board_block(board), function () {
-        var v = board.value(cache)
-        results[board.name()] = v
-        cont(v)
-      })
-    }
-
-    // At this point, all needed values have been added to the requests list.
     if (requests.length) {
-      // Verify that all requested have the same slice
-      var slice = requests[0].board.count()
-      for (var i=0;i<requests.length;i++)
-        if (slice != requests[i].board.count())
-          throw 'slice mismatch: '+slice+' != '+requests[i].board.count()
-      // Asychronously request or compute all needed values
-      if (slice <= opts.maxSlice) // If the slice is in the database, make asynchronous https requests
-        for (var i=0;i<requests.length;i++)
-          remote_request(requests[i].board,requests[i].cont)
-      else { // Dispatch all requests to a single worker process to exploit coherence
-        log.debug('computing board %s, slice %d',board.name(),board.count())
-        var boards = requests.map(function (r) { return r.board.name() })
-        pending_compute([board.name(),boards], function (res) {
-          var stime = res['time']
-          log.info('computed board %s, slice %d, time %s s',board.name(),board.count(),stime)
-          results['search-time'] = stime
-          for (var i=0;i<requests.length;i++) {
-            var name = requests[i].board.name()
-            var v = res[name]
-            results[name] = v
-            requests[i].cont(v)
-          }
+      // Verify that all requests have the same slice
+      const slice = requests[0].board.count()
+      requests.forEach(r => {
+        if (slice != r.board.count())
+          throw Error('slice mismatch: '+slice+' != '+r.board.count())
+      })
+
+      // If the slice is in the database, make asynchronous https requests
+      if (slice <= opts.maxSlice)
+       await Promise.all(requests.map(async ({board, resolve}) => {
+          // Look up a remote value, caching the block in the process
+          await pending_block(cache.board_block(board))
+          const value = board.value(cache)
+          results[board.name()] = value
+          resolve(value)
+        }))
+      else {  // Dispatch all requests to a single worker process to exploit coherence
+        log.debug('computing board %s, slice %d', board.name(), board.count())
+        const res = await pending_compute({root: board.name(), boards: requests.map(({board}) => board.name())})
+        const stime = res['time']
+        log.info('computed board %s, slice %d, time %s s', board.name(), board.count(), stime)
+        results['search-time'] = stime
+        requests.forEach(({board, resolve}) => {
+          const value = res[board.name()]
+          results[board.name()] = value
+          resolve(value)
         })
       }
     }
+
+    await top
+    return results
   }
   return values
 }

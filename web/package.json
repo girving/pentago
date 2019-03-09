@@ -11,15 +11,13 @@
   },
   "dependencies": {
     "commander": "^2.19.0",
-    "concat-stream": "^1.6.2",
     "d3": "^3.5.17",
     "log": "1.4.x",
     "lru-cache": "^4.1.5",
     "mule": "0.1.x",
     "nan": "^2.12.1",
     "nib": "1.1.x",
-    "stylus": "0.54.x",
-    "time": "^0.12.0"
+    "stylus": "0.54.x"
   },
   "keywords": [
     "pentago",

@@ -1,7 +1,6 @@
 // Minimal interface to Rackspace Cloud Files
 
 'use strict'
-const concat = require('concat-stream')
 const https = require('https')
 
 const early_token_timeout = 1000 * 60 * 5  // 5 minutes in ms
@@ -61,14 +60,14 @@ exports.downloader = function (options, stats, log) {
 
         // Build token
         const token = access.token
-        if (!token || !token.id || !token.expires) throw Error('Invalid token')
+        if (!token || !token.id || !token.expires) throw Error('rackspace auth: Invalid token')
         token.expires = new Date(token.expires)
 
         // Add service url
         const service = access.serviceCatalog.find(service => service.type.toLowerCase() == 'object-store')
-        if (!service) throw Error('Unable to find matching endpoint for requested service')
+        if (!service) throw Error('rackspace auth: Unable to find matching endpoint for requested service')
         const endpoint = service.endpoints.find(endpoint => match_region(endpoint.region, region))
-        if (!endpoint) throw Error('Unable to identify endpoint url')
+        if (!endpoint) throw Error('rackspace auth: Unable to identify endpoint url')
         token.service_url = useInternal && endpoint.internalURL ? endpoint.internalURL : endpoint.publicURL
 
         // Schedule the destruction of the promise
@@ -91,21 +90,25 @@ exports.downloader = function (options, stats, log) {
     })
   }
 
-  function range_download(container, object, offset, size, cont) {
+  async function range_download(container, object, offset, size) {
     const name = object + ', ' + offset + '+' + size
     log.debug('range request %s, active %d', name, stats.active_gets++)
-    download({
-      container: container,
-      path: object,
-      headers: {range: 'bytes=' + offset + '-' + (offset+size-1)}
-    }).then(body => {
-      if (body.length != size)
-        log.error('range request failed: %s, got size %d != %d', name, body.length, size)
-      else {
-        log.debug('range response %s, active %d', name, --stats.active_gets)
-        cont(body)
-      }
-    }).catch(error => log.error("range request failed: %s, error '%s'", name, error))
+    let body
+    try {
+      body = await download({
+        container: container,
+        path: object,
+        headers: {range: 'bytes=' + offset + '-' + (offset+size-1)}
+      })
+    } catch (e) {
+      throw Error('range request failed: ' + name + ", error '" + e.message + "'")
+    }
+    if (body.length != size)
+      throw Error('range request failed: ' + name + ', got size ' + body.length + ' != ' + size)
+    else {
+      log.debug('range response %s, active %d', name, --stats.active_gets)
+      return body
+    }
   }
   return range_download
 }

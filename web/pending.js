@@ -2,29 +2,28 @@
 
 'use strict'
 
-// The compute function should take two arguments: the input and a callback for the results. 
+// The compute function should take an input and return a value or promise
 // Example usage:
 //
-//   var slow = function(x,cont) { setTimeout(function () { console.log(2*x); cont(2*x) },1000) }
-//   slow = require('./pending')(slow)
+//   const pending = require('./pending')
+//
+//   const slow = pending(x => new Promise((resolve, reject) =>
+//       setTimeout(() => { console.log(2*x); resolve(2*x) },1000)))
 //   // The following prints 14 once 
-//   slow(7,function () {})
-//   slow(7,function () {})
+//   slow(7)
+//   slow(7)
 
-module.exports = function (compute) {
-  var pending = {} // Map from input to list of callbacks to call
-  return function (input,cont) {
-    var name = ''+input
-    if (name in pending)
-      pending[name].push(cont)
-    else {
-      pending[name] = [cont]
-      compute(input,function (results) {
-        var cs = pending[name]
-        delete pending[name]
-        for (var i=0;i<cs.length;i++)
-          cs[i](results)
-      })
+module.exports = compute => {
+  const pending = {}  // Map from input to promise
+  return input => {
+    const name = JSON.stringify(input)
+    if (name in pending) {
+      return pending[name]
+    } else {
+      const p = Promise.resolve(compute(input))
+      pending[name] = p
+      p.then(() => delete pending[name])
+      return p
     }
   }
 }

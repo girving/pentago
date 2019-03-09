@@ -18,6 +18,8 @@ namespace {
 
 using namespace v8;
 using namespace pentago::end;
+using std::cout;
+using std::endl;
 using std::make_pair;
 using std::make_shared;
 using std::string;
@@ -327,14 +329,18 @@ Wrapper<T>::wrapped_constructor(const Arguments& args) {
     }
     auto wrapper = new Wrapper<T>(self, mutable_);
     wrapper->Wrap(args.This());
-    return args.GetReturnValue().Set(args.This());
+    args.GetReturnValue().Set(args.This());
   } else {
     // Invoked as plain function, turn into construct call
     vector<Local<Value>> argv;
     for (const int i : range(args.Length()))
       argv.push_back(args[i]);
-    return args.GetReturnValue().Set(value(iso, *Wrapper<T>::constructor)->NewInstance(
-        Nan::GetCurrentContext(), argv.size(), &argv[0]).ToLocalChecked());
+    auto self = value(iso, *Wrapper<T>::constructor)->NewInstance(
+        Nan::GetCurrentContext(), argv.size(), &argv[0]);
+    if (self.IsEmpty())
+      args.GetReturnValue().Set(Undefined(iso));
+    else
+      args.GetReturnValue().Set(self.ToLocalChecked());
   }
 }
 
