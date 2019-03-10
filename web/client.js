@@ -80,7 +80,7 @@ function draw_base() {
     .style('visibility','hidden')
     .text(d => d)
   set_turnlabel = text => {
-    turnlabels.style('visibility',function (d) { return d==text ? 'visible' : 'hidden' })
+    turnlabels.style('visibility', d => d==text ? 'visible' : 'hidden')
   }
 
   // Draw footer

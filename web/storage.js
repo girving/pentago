@@ -38,7 +38,7 @@ function request(options) {
   })
 }
 
-exports.downloader = function (options, stats, log) {
+exports.downloader = (options, stats, log) => {
   const region = options.region
   const username = options.username
   const apiKey = options.apiKey

@@ -24,7 +24,7 @@ exports.defaults = {
   external: false
 }
 
-exports.add_options = function (options) {
+exports.add_options = options => {
   const d = exports.defaults
   options.option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
          .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
@@ -56,7 +56,7 @@ function parseSize (s,name) {
 //   pool: Number of worker compute processes (defaults to cpu count)
 //   cache: Size of block cache (suffixes M/MB and G/GB are understood)
 //   maxSlice: Maximum slice available in database (for debugging use only)
-exports.values = function (options,log) {
+exports.values = (options, log) => {
   // Incorporate defaults
   const opts = {}
   for (const k in exports.defaults)
@@ -101,7 +101,7 @@ exports.values = function (options,log) {
   const pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
   const compute_cache = LRU({
     max: floor(ccache_limit/1.2),
-    length: function (s) { return s.length }
+    length: s => s.length,
   })
   // Cache and don't simultaneously duplicate work. b = (root,boards),
   // where boards are to be evaluated and root is their nearest common ancestor.
