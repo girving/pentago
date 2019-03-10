@@ -19,12 +19,12 @@ function test_moves() {
   for (const name in moves) {
     const high = high_board_t(name)
     const board = new board_t(name)
-    const same = new board_t(board.quads,board.middle)
+    const same = new board_t(board.quads, board.middle)
     if (board.name != name || same.name != name || high.name() != name)
       throw Error('name inconsistency: name '+name+', same '+same.name+', high '+high.name())
     const correct = moves[name]
-    const computed = board.moves().map(function (b) { return b.name })
-    const high_computed = high.moves().map(function (b) { return b.name() })
+    const computed = board.moves().map(b => b.name)
+    const high_computed = high.moves().map(b => b.name())
     if (correct+'' != computed+'' || correct+'' != high_computed+'')
       throw Error('move computation failed: board '+name
         +'\n  correct '+correct.length+' = '+correct
