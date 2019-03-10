@@ -76,7 +76,8 @@ currently hosted on [Rackspace](https://www.rackspace.com).  To run, do
     eval "$(docker-machine env pentago)"
 
     # Copy ssl keys to machine
-    rsync -avze 'docker-machine ssh pentago' $SSL/* :/var/pentago/ssl
+    docker-machine ssh pentago -- mkdir -p /var/pentago/ssl
+    rsync -avze 'docker-machine ssh pentago' $SSL/{api-key,*.crt} :/var/pentago/ssl
 
     # Launch pentago container on the server
     cd ~/pentago

@@ -9,6 +9,9 @@ const Pending = require('./pending')
 const storage = require('./storage')
 const pentago = require('./build/Release/pentago')
 
+// Public version
+const version = '0.0.2'
+
 // Pull in math
 const min = Math.min
 const max = Math.max
@@ -65,12 +68,13 @@ exports.values = (options, log) => {
   const ccache_limit = parseSize(opts.ccache,'--ccache')
 
   // Print information
-  log.info('cache memory limit = %d (%s)',cache_limit,opts.cache)
-  log.info('compute cache memory limit = %d (%s)',ccache_limit,opts.ccache)
-  log.info('max slice = %d',opts.maxSlice)
-  log.info('max sockets = %d',opts.maxSockets)
-  log.info('compute pool = %d',opts.pool)
-  log.info('external = %d',opts.external)
+  log.info('cache memory limit = %d (%s)', cache_limit, opts.cache)
+  log.info('compute cache memory limit = %d (%s)', ccache_limit, opts.ccache)
+  log.info('max slice = %d', opts.maxSlice)
+  log.info('max sockets = %d', opts.maxSockets)
+  log.info('compute pool = %d', opts.pool)
+  log.info('external = %d', opts.external)
+  log.info('version = %s', version)
 
   // Prepare for opening book lookups
   const indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(
@@ -152,7 +156,7 @@ exports.values = (options, log) => {
   // Lookup or compute the value or board and its children, returning a promise of a board -> value map.
   async function values(board) {
     // Collect the leaf boards whose values we need
-    const results = {}
+    const results = {version: version}
     const requests = []
     async function traverse(board, children) {
       if (board.done()) {  // Done, so no lookup required

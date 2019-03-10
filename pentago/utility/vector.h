@@ -273,7 +273,7 @@ template<class T,int d> class tuple_size<pentago::Vector<T,d>> {
  public:
   constexpr static int value = d;
 };
-template<int i,class T,int d> class tuple_element<i,pentago::Vector<T,d>> {
+template<size_t i,class T,int d> class tuple_element<i,pentago::Vector<T,d>> {
  public:
   typedef T type;
 };

@@ -41,7 +41,7 @@ function listener(req, res) {
   let board, start
   try {
     board = pentago.high_board_t(req.url.substr(1))
-    log.info('request %s',board.name())
+    log.info('request %s', board.name())
     start = Date.now()
   } catch (e) {
     log.error('bad request %s',req.url)
@@ -69,7 +69,7 @@ const server = !options.https ? http.createServer(listener) : https.createServer
   ca: [fs.readFileSync('ssl/chain-1.crt'), fs.readFileSync('ssl/chain-2.crt')],
   key: fs.readFileSync('ssl/pentago.key'),
   cert: fs.readFileSync('ssl/pentago.crt')
-})
+}, listener)
 
 // Listen forever
 log.info('listening on port %d', options.port)

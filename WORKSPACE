@@ -2,9 +2,10 @@
 
 workspace(name = "pentago")
 
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//third_party:mpi.bzl", "mpi_repository")
 
-new_http_archive(
+http_archive(
     name = "random123",
     urls = [
         "https://github.com/girving/random123/archive/35ff9a55323e6de5d4284895f44721366e535e55.tar.gz",
@@ -14,7 +15,7 @@ new_http_archive(
     build_file = "//third_party:random123.BUILD",
 )
 
-new_http_archive(
+http_archive(
     name = "tinyformat",
     urls = [
         "https://github.com/c42f/tinyformat/archive/3a33bbf65442432277eee079e83d3e8fac51730c.tar.gz",
@@ -24,7 +25,7 @@ new_http_archive(
     build_file = "//third_party:tinyformat.BUILD",
 )
 
-new_http_archive(
+http_archive(
     name = "com_google_googletest",
     urls = [
         "https://github.com/google/googletest/archive/d175c8bf823e709d570772b038757fadf63bc632.tar.gz",
@@ -34,7 +35,7 @@ new_http_archive(
     build_file = "//third_party:googletest.BUILD",
 )
 
-new_http_archive(
+http_archive(
     name = "lzma",
     urls = [
         "https://tukaani.org/xz/xz-5.2.3.tar.gz",
@@ -46,7 +47,7 @@ new_http_archive(
     build_file = "//third_party:lzma.BUILD",
 )
 
-new_http_archive(
+http_archive(
     name = "snappy",
     urls = ["https://github.com/google/snappy/archive/1.1.7.tar.gz"],
     sha256 = "3dfa02e873ff51a11ee02b9ca391807f0c8ea0529a4924afa645fbf97163f9d4",
@@ -54,7 +55,7 @@ new_http_archive(
     build_file = "//third_party:snappy.BUILD",
 )
 
-new_http_archive(
+http_archive(
     name = "zlib",
     urls = ["https://www.zlib.net/zlib-1.2.11.tar.gz"],
     sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
@@ -62,7 +63,7 @@ new_http_archive(
     build_file = "//third_party:zlib.BUILD",
 )
 
-new_http_archive(
+http_archive(
     name = "boost",
     urls = ["https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.gz"],
     sha256 = "a13de2c8fbad635e6ba9c8f8714a0e6b4264b60a29b964b940a22554705b6b60",

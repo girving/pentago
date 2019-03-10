@@ -1,6 +1,6 @@
 {
   "name": "pentago-web",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Perfect pentago move explorer",
   "author": "Geoffrey Irving <irving@naml.us>",
   "homepage": "https://github.com/girving/pentago",
