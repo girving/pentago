@@ -1,21 +1,14 @@
 {
-  "name": "pentago-web",
+  "name": "pentago-web-client",
   "version": "0.0.2",
   "description": "Perfect pentago move explorer",
   "author": "Geoffrey Irving <irving@naml.us>",
   "homepage": "https://github.com/girving/pentago",
   "license": "BSD-3-Clause",
-  "main": "server.js",
-  "engines": {
-    "node": ">=11.6.0"
-  },
+  "main": "client.js",
   "dependencies": {
-    "commander": "^2.19.0",
     "d3": "^3.5.17",
-    "log": "1.4.x",
     "lru-cache": "^4.1.5",
-    "mule": "0.1.x",
-    "nan": "^2.12.1",
     "nib": "1.1.x",
     "stylus": "0.54.x"
   },

@@ -5,23 +5,23 @@
       'sources': ['pentago.cc'],
       'defines': [],
       'include_dirs': [
-        '..',
-        '../bazel-pentago',
-        '../bazel-pentago/external/boost',
-        '../bazel-pentago/external/tinyformat',
-        '../bazel-genfiles',
+        '../..',
+        '../../bazel-pentago',
+        '../../bazel-pentago/external/boost',
+        '../../bazel-pentago/external/tinyformat',
+        '../../bazel-genfiles',
         "<!(node -e \"require('nan')\")"
       ],
       'libraries': [
-        '../../bazel-bin/pentago/mid/libmid.a',
-        '../../bazel-bin/pentago/high/libhigh.a',
-        '../../bazel-bin/pentago/end/libend.a',
-        '../../bazel-bin/pentago/data/libasync.a',
-        '../../bazel-bin/pentago/data/libdata.a',
-        '../../bazel-bin/pentago/base/libbase.a',
-        '../../bazel-bin/pentago/utility/libutility.a',
-        '../../bazel-bin/external/lzma/liblzma.a',
-        '../../bazel-bin/external/zlib/libzlib.a'
+        '../../../bazel-bin/pentago/mid/libmid.a',
+        '../../../bazel-bin/pentago/high/libhigh.a',
+        '../../../bazel-bin/pentago/end/libend.a',
+        '../../../bazel-bin/pentago/data/libasync.a',
+        '../../../bazel-bin/pentago/data/libdata.a',
+        '../../../bazel-bin/pentago/base/libbase.a',
+        '../../../bazel-bin/pentago/utility/libutility.a',
+        '../../../bazel-bin/external/lzma/liblzma.a',
+        '../../../bazel-bin/external/zlib/libzlib.a'
       ],
       'conditions': [
         ['OS=="linux"', {

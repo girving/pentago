@@ -50,12 +50,12 @@ On Mac:
     bazel test -c opt --copt=-march=native ...
 
     # Build and test node.js server
-    cd web
+    cd web/server
     npm install
     node unit.js all
 
     # Build frontend webpage
-    cd web
+    cd web/client
     make public
 
 On Ubuntu: to be written once I have clean Bazel handling of MPI.

@@ -28,8 +28,8 @@ RUN bazel test -c opt --copt=-march=native utility/... base/... data/... end/...
     high/...  mid/... search/...
 
 # Set up node
-WORKDIR /pentago/web
-ADD web /pentago/web
+WORKDIR /pentago/web/server
+ADD web/server /pentago/web/server
 RUN npm install --unsafe-perm
 RUN node unit.js
 
@@ -37,10 +37,10 @@ RUN node unit.js
 FROM node:11-alpine
 
 # Bring pentago node back up
-COPY --from=builder /pentago/web /pentago/web
-WORKDIR /pentago/web
+COPY --from=builder /pentago/web/server /pentago/web/server
+WORKDIR /pentago/web/server
 RUN node unit.js
 
 # Serve!
 WORKDIR /var/pentago
-CMD node /pentago/web/server.js --pool 7 --api-key `cat ssl/api-key`
+CMD node /pentago/web/server/server.js --pool 7 --api-key `cat ssl/api-key`
