@@ -1,0 +1,91 @@
+#!/usr/bin/env node
+// Transfer files from Rackspace to Google
+
+'use strict'
+const crypto = require('crypto')
+const hashes = require('./hashes')
+const https = require('https')
+const Log = require('log')
+const options = require('commander')
+const rackspace = require('../server/storage')
+const {Storage} = require('@google-cloud/storage')
+
+// Command line options
+options.option('--gs-key <key>', 'Google Cloud key', '')
+options.option('--api-key <key>', 'Rackspace API key', '')
+options.option('--external', 'Work outside of Rackspace')
+options.option('--max-sockets <n>', 'Maximum number of simultaneous https connections', parseInt, 64)
+options.parse(process.argv)
+if (!options.apiKey)
+  throw Error('no --api-key specified')
+if (!options.gsKey)
+  throw Error('no --gs-key specified')
+if (!(0 < options.maxSockets && options.maxSockets <= 1024))
+  throw Error('invalid --max-sockets value ' + options.maxSockets)
+https.globalAgent.maxSockets = options.maxSockets
+
+// Prepare to download from Rackspace
+const log = new Log('debug')
+const stats = {active_gets: 0}      
+const container = 'pentago-edison-all'
+const download = rackspace.downloader({
+  username: 'pentago',
+  region: 'IAD',
+  apiKey: options.apiKey,
+  useInternal: !options.external,
+}, stats, log)
+
+// Prepare to upload to Google
+const storage = new Storage({keyFilename: options.gsKey})
+const bucket = storage.bucket('pentago')
+const chunk = 16 << 20  // 16M
+
+// Turn an event into a promise
+function once_promise(x, event) {
+  return new Promise((resolve, reject) => x.once(event, resolve))
+}
+
+// Upload one file
+async function upload(name) {
+  const file = bucket.file('edison/' + name)
+  if ((await file.exists())[0])
+    return
+  let total = 0
+  const stream = file.createWriteStream()
+  const hash = crypto.createHash('sha1')
+  let pause = Promise.resolve(null)
+  for (let i = 0;; i++) {
+    const data = await download({container: container, object: name,
+                                 offset: chunk*i, size: chunk, allow_truncate: true})
+    total += data.length
+    hash.update(data)
+    if (data.length < chunk) {
+      const h = hash.digest('hex')
+      if (hashes[name] && hashes[name] != h)
+        throw Error(name + ': expected sha1 ' + hashes[name] + ', got ' + h)
+      stream.end(data)
+      await once_promise(stream, 'finish')
+      console.log('uploaded ' + name + ': ' + total + ' bytes, sha1 ' + h)
+      break
+    } else {
+      await pause
+      if (!stream.write(data))
+        pause = once_promise(stream, 'drain')
+    }
+  }
+}
+
+// Try it out
+async function main() {
+  const uploads = []
+  for (let i = 0; i < 36; i++)
+    for (const kind of ['counts', 'sparse'])
+      uploads.push(upload(kind + '-' + i + '.npy'))
+  for (let i = 0; i <= 13; i++) {
+    const name = 'slice-' + i + '.pentago'
+    uploads.push(upload(name))
+    uploads.push(upload(name + '.index'))
+  }
+  await Promise.all(uploads)
+}
+main()

@@ -124,7 +124,7 @@ exports.values = (options, log) => {
 
   // Get a section of a file
   function range_get(object, blob) {
-    return download(container, object, blob.offset, blob.size)
+    return download({container: container, object: object, offset: blob.offset, size: blob.size})
   }
 
   // Get a block if necessary, merging simultaneous requests

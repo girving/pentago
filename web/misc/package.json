@@ -1,5 +1,5 @@
 {
-  "name": "pentago-web-server",
+  "name": "pentago-web-misc",
   "version": "0.0.2",
   "description": "Perfect pentago move explorer",
   "author": "Geoffrey Irving <irving@naml.us>",
@@ -10,11 +10,9 @@
     "node": ">=11.6.0"
   },
   "dependencies": {
+    "@google-cloud/storage": "^2.4.3",
     "commander": "^2.19.0",
-    "log": "1.4.x",
-    "lru-cache": "^4.1.5",
-    "mule": "0.1.x",
-    "nan": "^2.12.1"
+    "log": "^1.4.0"
   },
   "keywords": [
     "pentago",

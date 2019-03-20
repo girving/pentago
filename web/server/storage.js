@@ -14,14 +14,10 @@ function match_region(a, b) {
     return a.toLowerCase() === b.toLowerCase()
 }
 
-// Simple promise-based https request.  Options:
-//   uri: URL
-//   method: GET, POST, etc.
-//   headers: optional http headers
-//   body: optional body (already encoded if json)
+// Simple promise-based https request
 function request(options) {
   return new Promise((resolve, reject) => {
-    const req = https.request(options.uri, options, res => {
+    const req = https.request(options, res => {
       if (res.statusCode >= 400) {
         res.resume()
         reject('https request failed, code ' + res.statusCode)
@@ -51,7 +47,8 @@ exports.downloader = (options, stats, log) => {
     // Launch a token request if necessary
     if (!promised_token)
       promised_token = request({
-        uri: 'https://identity.api.rackspacecloud.com/v2.0/tokens',
+        host: 'identity.api.rackspacecloud.com',
+        path: '/v2.0/tokens',
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
         body: JSON.stringify({auth: {'RAX-KSKEY:apiKeyCredentials': {username: username, apiKey: apiKey}}}),
@@ -72,7 +69,7 @@ exports.downloader = (options, stats, log) => {
 
         // Schedule the destruction of the promise
         const timeout = token.expires.getTime() - new Date().getTime() - early_token_timeout
-        setTimeout(() => { promised_token = null }, timeout)
+        setTimeout(() => { promised_token = null }, timeout).unref()
 
         // All done!
         return token
@@ -82,15 +79,17 @@ exports.downloader = (options, stats, log) => {
 
   async function download(options) {
     const token = await auth()
+    const url = new URL(token.service_url)
     options.headers['x-auth-token'] = token.id
     return request({
-      uri: token.service_url + '/' + options.container + '/' + options.path,
+      host: url.hostname,
+      path: url.pathname + '/' + options.container + '/' + options.path,
       method: 'GET',
       headers: options.headers,
     })
   }
 
-  async function range_download(container, object, offset, size) {
+  async function range_download({container, object, offset, size, allow_truncate}) {
     const name = object + ', ' + offset + '+' + size
     log.debug('range request %s, active %d', name, stats.active_gets++)
     let body
@@ -101,11 +100,13 @@ exports.downloader = (options, stats, log) => {
         headers: {range: 'bytes=' + offset + '-' + (offset+size-1)}
       })
     } catch (e) {
-      throw Error('range request failed: ' + name + ", error '" + e.message + "'")
+      log.error('range request failed: ' + name + ", error '" + e.message + "'")
+      throw e
     }
-    if (body.length != size)
-      throw Error('range request failed: ' + name + ', got size ' + body.length + ' != ' + size)
-    else {
+    if (allow_truncate ? body.length > size : body.length != size) {
+      const op = allow_truncate ? ' > ' : ' != '
+      throw Error('range request failed: ' + name + ', got size ' + body.length + op + size)
+    } else {
       log.debug('range response %s, active %d', name, --stats.active_gets)
       return body
     }
