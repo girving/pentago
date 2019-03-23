@@ -25,7 +25,7 @@ struct sections_t : private boost::noncopyable {
   uint64_t memory_usage() const;
 };
 
-// Compute all sections that root depends, organized by slice.
+// Compute all sections that root depends on, organized by slice.
 // Only 35 slices are returned, since computing slice 36 is unnecessary.
 vector<shared_ptr<const sections_t>> descendent_sections(const section_t root, const int max_slice);
 
