@@ -2,15 +2,16 @@
 
 'use strict'
 const fs = require('fs')
-const Log = require('log')
 const http = require('http')
 const https = require('https')
+const Log = require('log')
 const options = require('commander')
 const pentago = require('./build/Release/pentago')
 const Values = require('./values.js')
 
 // Parse options
 options.option('-p,--port <p>', 'Port to listen on', s => parseInt(s), 2048)
+       .option('--green-port <p>', 'Greenlock HTTP port to listen on', s => parseInt(s), 2049)
        .option('--log <file>', 'Log file')
        .option('--no-https', 'Disable https (for testing only)')
 Values.add_options(options)
@@ -64,13 +65,25 @@ function listener(req, res) {
   })
 }
 
-// Create server
-const server = !options.https ? http.createServer(listener) : https.createServer({
-  ca: [fs.readFileSync('ssl/chain-1.crt'), fs.readFileSync('ssl/chain-2.crt')],
-  key: fs.readFileSync('ssl/pentago.key'),
-  cert: fs.readFileSync('ssl/pentago.crt')
-}, listener)
-
-// Listen forever
-log.info('listening on port %d', options.port)
-server.listen(options.port)
+// Create server and listen forever
+if (options.https) {
+  const greenlock = require('greenlock').create({
+    email: 'irving@naml.us',
+    approveDomains: ['backend.perfect-pentago.net'],
+    agreeTos: true,
+    configDir: 'acme',
+    communityMember: true,
+    securityUpdates: true,
+  })
+  const redir = require('redirect-https')()
+  const green = http.createServer(greenlock.middleware(redir))
+  log.info('greenlock listening on port %d', options.greenPort)
+  green.listen(options.greenPort)
+  const server = https.createServer(greenlock.tlsOptions, listener)
+  log.info('listening on port %d', options.port)
+  server.listen(options.port)
+} else {  // http
+  const server = http.createServer(listener)
+  log.info('listening on port %d', options.port)
+  server.listen(options.port)
+}

@@ -161,7 +161,7 @@ for *all* 18 stone positions; unlike the forward solver performance does not var
 board.  The code for the midgame engine is in `pentago/mid`.
 
 Together, the 4 TB data set and the midgame engine comprise a strong solution of pentago.
-Go to http://perfect-pentago.net to see the results.
+Go to https://perfect-pentago.net to see the results.
 
 ### Code structure
 

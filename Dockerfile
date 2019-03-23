@@ -24,8 +24,8 @@ RUN bazel build -c opt --copt=-march=native utility base data/... search end hig
 
 # Test pentago except for mpi
 WORKDIR /pentago/pentago
-RUN bazel test -c opt --copt=-march=native utility/... base/... data/... end/... \
-    high/...  mid/... search/...
+RUN bazel test -c opt --copt=-march=native --test_output=errors utility/... base/... \
+    data/... end/... high/...  mid/... search/...
 
 # Set up node
 WORKDIR /pentago/web/server
