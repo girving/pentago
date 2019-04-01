@@ -4,6 +4,7 @@ workspace(name = "pentago")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//third_party:mpi.bzl", "mpi_repository")
+load("//third_party:tensorflow.bzl", "tensorflow_repository")
 
 http_archive(
     name = "random123",
@@ -72,3 +73,4 @@ http_archive(
 )
 
 mpi_repository(name = "mpi")
+tensorflow_repository(name = "tensorflow")

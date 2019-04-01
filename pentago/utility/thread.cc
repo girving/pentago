@@ -506,9 +506,15 @@ void thread_pool_t::wait() {
 unique_ptr<thread_pool_t> cpu_pool;
 unique_ptr<thread_pool_t> io_pool;
 
+std::mutex& init_threads_mutex() {
+  static std::mutex m;
+  return m;
 }
 
+}  // namespace
+
 unit_t init_threads(int cpu_threads, int io_threads) {
+  lock_t lock(init_threads_mutex());
   if (cpu_threads!=-1 || io_threads!=-1 || !cpu_pool) {
     GEODE_ASSERT(!cpu_pool && !io_pool);
     init_papi();

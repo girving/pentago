@@ -4,10 +4,18 @@
 #include "pentago/utility/vector.h"
 namespace pentago {
 
+// Check index validity
+template<int d> static inline bool valid(const Vector<int,d>& shape, const Vector<int,d>& I) {
+  for (int i = 0; i < d; i++)
+    if (unsigned(I[i]) >= unsigned(shape[i]))
+      return false;
+  return true;
+}
+
 // Flatten a multidimensional index
 template<int d> static inline int index(const Vector<int,d>& shape, const Vector<int,d>& I) {
+  assert(valid(shape, I));
   if (d == 0) return 0;
-  GEODE_DEBUG_ONLY(for (int i = 0; i < d; i++) assert(I[i] < shape[i]);)
   int index = I[0];
   for (int i = 1; i < d; i++)
     index = index * shape[i] + I[i];

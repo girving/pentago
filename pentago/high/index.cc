@@ -41,9 +41,12 @@ string supertensor_index_t::header() const {
 }
 
 compact_blob_t supertensor_index_t::blob_location(const block_t block) const {
-  const uint64_t base = section_offset[check_get(sections->section_id, get<0>(block))];
-  const int i = index(section_blocks(get<0>(block)), Vector<int,4>(get<1>(block)));
-  const uint64_t offset = base+sizeof(compact_blob_t)*i;
+  const auto section = get<0>(block);
+  const auto shape = section_blocks(get<0>(block));
+  const auto I = Vector<int,4>(get<1>(block));
+  GEODE_ASSERT(valid(shape, I), format("section %s, shape %s, invalid block %s", section, shape, I));
+  const uint64_t base = section_offset[check_get(sections->section_id, section)];
+  const uint64_t offset = base+sizeof(compact_blob_t)*index(shape, I);
   compact_blob_t b;
   b.set_offset(offset);
   b.size = 12;
