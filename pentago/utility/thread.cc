@@ -193,7 +193,7 @@ struct time_info_t {
     if (!pthread_getspecific(key)) {
       spin_t spin(time_lock);
       time_tables.push_back(new time_table_t(type));
-      pthread_setspecific(key,time_tables.back());
+      pthread_setspecific(key, time_tables.back());
     }
   }
 };
@@ -201,7 +201,7 @@ static time_info_t time_info;
 
 thread_type_t thread_type() {
   auto table = (time_table_t*)pthread_getspecific(time_info.key);
-  GEODE_ASSERT(table);
+  GEODE_ASSERT(table, "threads not initialized");
   return table->type;
 }
 
@@ -209,7 +209,10 @@ thread_type_t thread_type() {
 
 static inline time_entry_t& time_entry(time_kind_t kind) {
   auto table = (time_table_t*)pthread_getspecific(time_info.key);
-  GEODE_ASSERT(table);
+  if (!table) {
+    time_info.init_thread(UNKNOWN);
+    table = (time_table_t*)pthread_getspecific(time_info.key);
+  }
   return table->times[kind];
 }
 

@@ -42,15 +42,38 @@ def show_board(board, *, indent='', sep=' '):
                    for line in board.T[::-1])
 
 
-_threes = 3**tf.range(9)
+_quad_threes = 3**tf.range(9)
+_board_threes = tf.reshape(tf.bitwise.left_shift(
+    3**tf.range(9, dtype=tf.int64), 16*tf.range(4, dtype=tf.int64)[:,None]), [-1])
 
 
 def unpack_quads(quads):
-  return tf.cast(quads[...,None], tf.int32) // _threes[(None,)*quads.shape.rank] % 3
+  return tf.cast(quads[...,None], tf.int32) // _quad_threes % 3
 
 
 def pack_quads(quads):
-  return tf.reduce_sum(tf.cast(quads * _threes, tf.uint16), axis=-1)
+  return tf.reduce_sum(tf.cast(quads * _quad_threes, tf.uint16), axis=-1)
+
+
+def unpack_boards(boards):
+  assert boards.dtype == tf.int64, boards.dtype
+  return tf.cast(boards[...,None] // _board_threes % 3, tf.int32)
+
+
+def pack_boards(boards):
+  assert boards.dtype == tf.int32
+  return tf.reduce_sum(tf.cast(boards, tf.int64) * _board_threes, axis=-1)
+
+
+def unpack_supers(supers):
+  """Unpack a bunch of shape [2,32] supers into shape [256] classes.  Classes 0,1,2 are white-win, tie, black-win."""
+  assert supers.dtype == tf.uint8
+  assert supers.shape[-2:] == (2,32)
+  supers = tf.cast(supers[...,None], tf.int32)
+  bits = tf.bitwise.bitwise_and(tf.bitwise.right_shift(supers, tf.range(8)), 1)
+  bits = tf.reshape(bits, tf.concat([tf.shape(bits)[:-2], [256]], axis=-1))
+  black, white = tf.unstack(bits, axis=-2)
+  return 1 + black - white
 
 
 def rotate_packed_quad(quad, r):

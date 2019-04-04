@@ -182,9 +182,7 @@ struct BlockInfo : public OpKernel {
 
 struct UnpackBlock : public OpKernel {
  public:
-  explicit UnpackBlock(OpKernelConstruction* c) : OpKernel(c) {
-    init_threads(0, 0);
-  }
+  explicit UnpackBlock(OpKernelConstruction* c) : OpKernel(c) {}
 
   void Compute(OpKernelContext* c) final {
     // Check input
@@ -205,10 +203,10 @@ struct UnpackBlock : public OpKernel {
       // Store as output
       const auto& shape = supers.shape();
       Tensor* supers_t;
-      OP_REQUIRES_OK(c, c->allocate_output(0, {shape[0], shape[1], shape[2], shape[3], 2, 4}, &supers_t));
-      auto flat = supers_t->flat<uint64_t>();
+      OP_REQUIRES_OK(c, c->allocate_output(0, {shape[0], shape[1], shape[2], shape[3], 2, 32}, &supers_t));
+      auto flat = supers_t->flat<uint8_t>();
       const auto bytes = sizeof(Vector<super_t,2>)*supers.total_size();
-      GEODE_ASSERT(sizeof(uint64_t)*flat.dimension(0) == bytes);
+      GEODE_ASSERT(flat.dimension(0) == bytes);
       memcpy(flat.data(), supers.data(), bytes);
     } catch (const std::exception& e) {
       OP_REQUIRES(c, false, errors::Internal(e.what()));
@@ -301,12 +299,12 @@ REGISTER(Pread)
 REGISTER(UnpackBlock)
     .Input("index: int32")
     .Input("data: string")
-    .Output("supers: uint64")
+    .Output("supers: uint8")
     .SetShapeFn([](shape_inference::InferenceContext* c) {
       shape_inference::ShapeHandle unused;
       for (const int i : range(2))
         TF_RETURN_IF_ERROR(c->WithRank(c->input(i), 0, &unused));
-      c->set_output(0, c->MakeShape({c->UnknownDim(), c->UnknownDim(), c->UnknownDim(), 2, 4}));
+      c->set_output(0, c->MakeShape({c->UnknownDim(), c->UnknownDim(), c->UnknownDim(), 2, 32}));
       return Status::OK();
     });
 

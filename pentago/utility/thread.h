@@ -125,7 +125,7 @@ thread_times_t total_thread_times();
 void report_thread_times(RawArray<const wall_time_t> times, const string& name="");
 void report_papi_counts(RawArray<const papi_t,2> papi);
 
-enum thread_type_t { MASTER=0, CPU=1, IO=2 };
+enum thread_type_t { MASTER=0, CPU=1, IO=2, UNKNOWN=3 };
 thread_type_t thread_type();
 
 // Initialize thread pools

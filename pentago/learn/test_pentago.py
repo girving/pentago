@@ -53,26 +53,26 @@ def test_small():
     print(f'counts[{top}] = {counts[top]}')
   totals = collections.defaultdict(int)
   np.random.seed(7)
-  def super_get(s, i0, i1, i2, i3):
-    return np.int32(s[i3] >> np.uint64(16*i2+4*i1+i0)) & 1
   def check_board(board, value):
-      correct = json.load(urllib.request.urlopen('https://backend.perfect-pentago.net/%d' % board))[str(board)]
-      board_values[board] = correct
-      assert value == correct, f'board {board}, I {I}, R {R}, value {value}, correct {correct}'
-      print(f'checked value({board}) = {value}')
+    correct = json.load(urllib.request.urlopen('https://backend.perfect-pentago.net/%d' % board))[str(board)]
+    board_values[board] = correct
+    assert value == correct, f'board {board}, I {I}, R {R}, value {value}, correct {correct}'
+    print(f'checked value({board}) = {value}')
   with concurrent.futures.ThreadPoolExecutor() as E:
     for n in range(counts[top]):
       slice, offset, size, *quads = pentago.block_info(indices, n)
-      supers = pentago.read_block(n, slice, offset, size).numpy()
+      supers = pentago.read_block(n, slice, offset, size)
       assert small_hash(supers) == super_hashes[n]
       totals[slice.numpy()] += 256*np.prod(supers.shape[:4])
+      supers = pentago.unpack_supers(supers).numpy()
+      supers = supers.reshape(supers.shape[:4] + (4,)*4)
       for _ in range(samples):
         I = tuple(np.random.randint(supers.shape[i]) for i in range(4))
-        R = np.random.randint(4, size=4)
-        black, white = supers[I]
-        value = (-1)**slice.numpy() * (super_get(black,*R) - super_get(white,*R))
-        board = np.sum([tf.cast(pentago.rotate_packed_quad(quads[i][I[i]], R[i]), tf.uint64).numpy() << np.uint64(16*i)
-                        for i in range(4)])
+        R = tuple(np.random.randint(4, size=4))
+        value = (-1)**slice.numpy() * (supers[I+R[::-1]] - 1)
+        board = np.sum([
+            tf.cast(pentago.rotate_packed_quad(quads[i][I[i]], R[i]), tf.uint64).numpy() << np.uint64(16*i)
+            for i in range(4)])
         if 1:
           assert board_values[board] == value
         else:
