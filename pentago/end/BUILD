@@ -3,12 +3,11 @@ load("//pentago:pentago.bzl", "cc_tests")
 
 cc_library(
     name = "end",
-    srcs = glob(["*.h", "*.cc"], exclude=["check*.*", "meaningless.cc", "make-indices.cc", "*_test.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["check*.*", "options.*", "meaningless.cc", "make-indices.cc", "*_test.cc"]),
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
     deps = [
         "//pentago/base",
         "//pentago/data",
-        "//pentago/mpi:trace",
         "//pentago/search",
         "//pentago/utility",
         "@snappy//:snappy",
@@ -55,6 +54,18 @@ cc_binary(
     ],
 )
 
+cc_library(
+    name = "options",
+    srcs = ["options.cc"],
+    hdrs = ["options.h"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
+    deps = [
+        ":config",
+        "//pentago/base",
+        "//pentago/utility",
+    ],
+)
+
 cc_binary(
     name = "check",
     srcs = ["check_main.cc"],
@@ -62,8 +73,8 @@ cc_binary(
     deps = [
         ":check_lib",
         ":end",
+        ":options",
         "//pentago/high",
-        "//pentago/mpi:options",
     ],
 )
 

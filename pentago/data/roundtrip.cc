@@ -2,7 +2,7 @@
 
 #include "pentago/data/supertensor.h"
 #include "pentago/end/config.h"
-#include "pentago/mpi/options.h"
+#include "pentago/end/options.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/thread.h"
 #include "pentago/utility/str.h"

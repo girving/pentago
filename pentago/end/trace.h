@@ -4,7 +4,7 @@
 #include "pentago/end/config.h"
 #include "pentago/utility/format.h"
 namespace pentago {
-namespace mpi {
+namespace end {
 
 using std::string;
 
@@ -18,5 +18,5 @@ void mpi_trace(const string& msg);
 // Called from the mpi_world_t constructor
 void set_mpi_trace_rank(int rank);
 
-}
-}
+}  // namespace end
+}  // namespace pentago

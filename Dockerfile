@@ -16,16 +16,21 @@ RUN bazel version  # Extract before loading pentago
 
 # Clone and build pentago
 WORKDIR /pentago/pentago
-ADD pentago /pentago/pentago
+ADD pentago/BUILD pentago/pentago.bzl /pentago/pentago/
+ADD pentago/utility /pentago/pentago/utility
+ADD pentago/base /pentago/pentago/base
+ADD pentago/data /pentago/pentago/data
+ADD pentago/search /pentago/pentago/search
+ADD pentago/end /pentago/pentago/end
+ADD pentago/high /pentago/pentago/high
+ADD pentago/mid /pentago/pentago/mid
 ADD third_party /pentago/third_party
 ADD WORKSPACE /pentago/
-RUN bazel build -c opt --copt=-march=native utility base data/... search end high mid \
-    @lzma//... @zlib//...
+RUN bazel build -c opt --copt=-march=native utility base data/... search end high mid @lzma//... @zlib//...
 
-# Test pentago except for mpi
+# Test pentago
 WORKDIR /pentago/pentago
-RUN bazel test -c opt --copt=-march=native --test_output=errors utility/... base/... \
-    data/... end/... high/...  mid/... search/...
+RUN bazel test -c opt --copt=-march=native --test_output=errors ...
 
 # Set up node
 WORKDIR /pentago/web/server

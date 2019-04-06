@@ -2,9 +2,9 @@
 
 #include "pentago/mpi/flow.h"
 #include "pentago/end/compute.h"
+#include "pentago/end/trace.h"
 #include "pentago/mpi/ibarrier.h"
 #include "pentago/mpi/requests.h"
-#include "pentago/mpi/trace.h"
 #include "pentago/mpi/utility.h"
 #include "pentago/end/fast_compress.h"
 #include "pentago/utility/thread.h"
@@ -526,5 +526,5 @@ void compute_lines(const flow_comms_t& comms,
   flow_t(comms,input_blocks,output_blocks,lines,memory_limit,line_gather_limit,line_limit);
 }
 
-}
-}
+}  // namespace mpi
+}  // namespace pentago

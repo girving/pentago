@@ -1,11 +1,11 @@
 // MPI command line options
 
-#include "pentago/mpi/options.h"
 #include "pentago/end/config.h"
+#include "pentago/end/options.h"
 #include "pentago/utility/log.h"
 #include <getopt.h>
 namespace pentago {
-namespace mpi {
+namespace end {
 
 using std::max;
 using namespace pentago::end;
@@ -160,5 +160,5 @@ options_t parse_options(int argc, char** argv, const int ranks, const int rank) 
   return o;
 }
 
-}
-}
+}  // namespace end
+}  // namespace pentago

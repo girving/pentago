@@ -1,7 +1,7 @@
 // MPI related utilities
 
 #include "pentago/mpi/utility.h"
-#include "pentago/mpi/trace.h"
+#include "pentago/end/trace.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/debug.h"
 namespace pentago {
@@ -97,5 +97,5 @@ mpi_world_t::~mpi_world_t() {
   CHECK(MPI_Finalize());
 }
 
-}
-}
+}  // namespace mpi
+}  // namespace pentago

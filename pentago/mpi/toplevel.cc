@@ -4,9 +4,7 @@
 #include "pentago/mpi/flow.h"
 #include "pentago/mpi/io.h"
 #include "pentago/mpi/reduction.h"
-#include "pentago/mpi/trace.h"
 #include "pentago/mpi/utility.h"
-#include "pentago/mpi/options.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/data/block_cache.h"
 #include "pentago/data/compress.h"
@@ -14,11 +12,13 @@
 #include "pentago/end/check.h"
 #include "pentago/end/config.h"
 #include "pentago/end/load_balance.h"
+#include "pentago/end/options.h"
 #include "pentago/end/partition.h"
 #include "pentago/end/predict.h"
 #include "pentago/end/random_partition.h"
 #include "pentago/end/simple_partition.h"
 #include "pentago/end/store_block_cache.h"
+#include "pentago/end/trace.h"
 #include "pentago/search/superengine.h"
 #include "pentago/search/supertable.h"
 #include "pentago/utility/aligned.h"
@@ -428,5 +428,5 @@ int toplevel(int argc, char** argv) {
   return 0;
 }
 
-}
-}
+}  // namespace mpi
+}  // namespace pentago

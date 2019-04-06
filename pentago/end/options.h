@@ -3,7 +3,7 @@
 
 #include "pentago/base/section.h"
 namespace pentago {
-namespace mpi {
+namespace end {
 
 struct options_t {
   int threads = 0;
@@ -45,5 +45,5 @@ options_t parse_options(int argc, char** argv, const int ranks = -1, const int r
     o.var = decltype(o.var)(n); \
     break; }
 
-}
-}
+}  // namespace end
+}  // namespace pentago

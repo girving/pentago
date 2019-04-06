@@ -46,6 +46,6 @@ cc_binary(
     copts = ["-std=c++1z", "-Wall", "-Werror"],
     deps = [
         ":data",
-        "//pentago/mpi:options",
+        "//pentago/end:options",
     ],
 )

@@ -3,7 +3,7 @@
 #include "pentago/end/compute.h"
 #include "pentago/end/blocks.h"
 #include "pentago/end/fast_compress.h"
-#include "pentago/mpi/trace.h"
+#include "pentago/end/trace.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/index.h"

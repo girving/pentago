@@ -1,9 +1,9 @@
 // Tracing code for debugging purposes
 
-#include "pentago/mpi/trace.h"
+#include "pentago/end/trace.h"
 #include "pentago/utility/spinlock.h"
 namespace pentago {
-namespace mpi {
+namespace end {
 
 static int rank = -1;
 
@@ -19,5 +19,5 @@ void mpi_trace(const string& msg) {
 
 #endif
 
-}
-}
+}  // namespace end
+}  // namespace pentago
