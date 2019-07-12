@@ -10,7 +10,7 @@
     "node": ">=11.6.0"
   },
   "dependencies": {
-    "@google-cloud/storage": "^2.4.3",
+    "@google-cloud/storage": "^3.0.2",
     "commander": "^2.19.0",
     "log": "^1.4.0"
   },
