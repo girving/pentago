@@ -87,14 +87,14 @@ static inline Vector<super_t,2> interleave_super(const Vector<super_t,2>& s) {
     _a; })
   #define LO(a) EXPAND(a)
   #define HI(a) EXPAND(a>>32)
-  return Vector<super_t,2>(super_t(LO(s.x.a)|LO(s.y.a)<<1,
-                                   HI(s.x.a)|HI(s.y.a)<<1,
-                                   LO(s.x.b)|LO(s.y.b)<<1,
-                                   HI(s.x.b)|HI(s.y.b)<<1),
-                           super_t(LO(s.x.c)|LO(s.y.c)<<1,
-                                   HI(s.x.c)|HI(s.y.c)<<1,
-                                   LO(s.x.d)|LO(s.y.d)<<1,
-                                   HI(s.x.d)|HI(s.y.d)<<1));
+  return Vector<super_t,2>(super_t(LO(s[0].a)|LO(s[1].a)<<1,
+                                   HI(s[0].a)|HI(s[1].a)<<1,
+                                   LO(s[0].b)|LO(s[1].b)<<1,
+                                   HI(s[0].b)|HI(s[1].b)<<1),
+                           super_t(LO(s[0].c)|LO(s[1].c)<<1,
+                                   HI(s[0].c)|HI(s[1].c)<<1,
+                                   LO(s[0].d)|LO(s[1].d)<<1,
+                                   HI(s[0].d)|HI(s[1].d)<<1));
   #undef EXPAND
   #undef HI
   #undef LO
@@ -110,14 +110,14 @@ static inline Vector<super_t,2> uninterleave_super(const Vector<super_t,2>& s) {
     _a = (_a|_a>>16) &0x00000000ffffffff; \
     _a; })
   #define MERGE(lo,hi) (CONTRACT(lo)|CONTRACT(hi)<<32)
-  return Vector<super_t,2>(super_t(MERGE(s.x.a,s.x.b),
-                                   MERGE(s.x.c,s.x.d),
-                                   MERGE(s.y.a,s.y.b),
-                                   MERGE(s.y.c,s.y.d)),
-                           super_t(MERGE(s.x.a>>1,s.x.b>>1),
-                                   MERGE(s.x.c>>1,s.x.d>>1),
-                                   MERGE(s.y.a>>1,s.y.b>>1),
-                                   MERGE(s.y.c>>1,s.y.d>>1)));
+  return Vector<super_t,2>(super_t(MERGE(s[0].a,s[0].b),
+                                   MERGE(s[0].c,s[0].d),
+                                   MERGE(s[1].a,s[1].b),
+                                   MERGE(s[1].c,s[1].d)),
+                           super_t(MERGE(s[0].a>>1,s[0].b>>1),
+                                   MERGE(s[0].c>>1,s[0].d>>1),
+                                   MERGE(s[1].a>>1,s[1].b>>1),
+                                   MERGE(s[1].c>>1,s[1].d>>1)));
   #undef CONTRACT
   #undef MERGE
 }
