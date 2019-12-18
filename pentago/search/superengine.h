@@ -57,7 +57,9 @@ template<> struct results_t<false> {
 // Evaluate a position for all important rotations, returning the set of rotations in which we win.
 // Note that a "win" for white includes ties.  The returned set of known rotations definitely includes
 // all important rotations, but may include others as well.
-template<bool remember> typename results_t<remember>::type super_evaluate_recurse(const bool aggressive, const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important);
+template<bool remember> typename results_t<remember>::type
+super_evaluate_recurse(const bool aggressive, const int depth, const side_t side0, const side_t side1,
+                       superdata_t data, const super_t important);
 
 // Driver for evaluation abstracted over rotations
 score_t super_evaluate(bool aggressive, int depth, const board_t board, const Vector<int,4> rotation);

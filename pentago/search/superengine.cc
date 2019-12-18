@@ -127,7 +127,10 @@ template<> struct results_t<true> {
 // Evaluate a position for all important rotations, returning the set of rotations in which we win.
 // Note that a "win" for white includes ties.  The returned set of known rotations definitely includes
 // all important rotations, but may include others as well.
-template<bool remember,bool aggressive,bool debug> static typename results_t<remember>::type super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important) {
+template<bool remember,bool aggressive,bool debug>
+__attribute__((noinline)) static typename results_t<remember>::type
+super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, superdata_t data,
+                       const super_t important) {
   STAT(total_expanded_nodes++);
   STAT(expanded_nodes[depth]++);
   PRINT_STATS(24);
@@ -139,11 +142,11 @@ template<bool remember,bool aggressive,bool debug> static typename results_t<rem
   GEODE_ASSERT(info.valid());
 
   // Be verbose if desired
-  TRACE_VERBOSE_START(depth,pack(side0,side1));
-  TRACE_VERBOSE("input %s %s",subset(info.known,verbose),subset(info.wins,verbose));
+  TRACE_VERBOSE_START(depth, pack(side0, side1));
+  TRACE_VERBOSE("input %s %s", subset(info.known, verbose), subset(info.wins, verbose));
 
   // Collect possible moves
-  SIMPLE_MOVES(side0,side1)
+  SIMPLE_MOVES(side0, side1)
   if (remember && !(side0|side1)) { // Handle starting moves specially
     // After taking rotations into account, there are only three unique starting moves
     total = 3;
@@ -193,7 +196,7 @@ template<bool remember,bool aggressive,bool debug> static typename results_t<rem
 
   {
     // Check how close we are to a black win, pretending that black gets to choose the rotation arbitrarily
-    int order[total]; // We'll sort moves in ascending order of this array
+    int order[36]; // We'll sort moves in ascending order of this array.  Can't be order[total] due to compiler bug.
     for (int i=total-1;i>=0;i--) {
       int closeness = aggressive?arbitrarily_rotated_win_closeness(moves[i],side1)
                                 :arbitrarily_rotated_win_closeness(side1,moves[i]);
@@ -262,8 +265,12 @@ template<bool remember,bool aggressive,bool debug> static typename results_t<rem
 template superinfo_t super_evaluate_recurse<false>(bool,int,side_t,side_t,superdata_t,super_t);
 
 // Use only from top level
-template<bool remember> typename results_t<remember>::type super_evaluate_recurse(const bool aggressive, const int depth, const side_t side0, const side_t side1, superdata_t data, const super_t important) {
-  #define CASE(a,d) if (aggressive==a && debug==d) return super_evaluate_recurse<remember,a,d>(depth,side0,side1,data,important);
+template<bool remember> typename results_t<remember>::type
+super_evaluate_recurse(const bool aggressive, const int depth, const side_t side0, const side_t side1,
+                       superdata_t data, const super_t important) {
+  #define CASE(a,d) \
+    if (aggressive==a && debug==d) \
+      return super_evaluate_recurse<remember,a,d>(depth, side0, side1, data, important);
   CASE(0,0) CASE(0,1) CASE(1,0) CASE(1,1)
   __builtin_unreachable();
 }
@@ -328,7 +335,8 @@ super_t super_evaluate_all(bool aggressive, int depth, const board_t board) {
 }
 
 // Evaluate enough children to determine who wins, and return the results
-vector<tuple<rotated_board_t,score_t>> super_evaluate_children(const bool aggressive, const int depth, const board_t board, const Vector<int,4> rotation) {
+vector<tuple<rotated_board_t,score_t>>
+super_evaluate_children(const bool aggressive, const int depth, const board_t board, const Vector<int,4> rotation) {
   // We can afford error detection here since recursion happens into a different function
   GEODE_ASSERT(supertable_bits()>=10);
   GEODE_ASSERT(depth>=1);

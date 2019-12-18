@@ -61,12 +61,12 @@ namespace pentago {
   COLLECT_MOVES(0) COLLECT_MOVES(1) COLLECT_MOVES(2) COLLECT_MOVES(3)
 
 // Same as MOVES, but ignores rotations and operates in unpacked mode
-#define SIMPLE_MOVES(side0,side1) \
+#define SIMPLE_MOVES(side0, side1) \
   side_t _move_mask = side_mask^(side0|side1); \
   int total = popcount(_move_mask); \
   /* Collect the list of possible moves.  Note that only side0 changes */ \
-  side_t moves[total]; \
-  for (int i=0;i<total;i++) { \
+  side_t moves[36]; /* We used to do moves[total] here, but hit miscompilation on Apple clang 11.0.0 */ \
+  for (int i = 0; i < total; i++) { \
     side_t move = min_bit(_move_mask); \
     moves[i] = side0 | move; \
     _move_mask ^= move; \
