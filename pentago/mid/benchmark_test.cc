@@ -23,6 +23,7 @@ namespace {
  *   5jan2014 - 10.3 s - transpose input and output arrays!
  *   21oct2017 - 9.5 s - bazel port
  *   2mar2019  - 6.3 s - tried again on poisson (MacBook Pro, 15-inch, 2017, 3.1 GHz Intel Core i7)
+ *   18dec2019 - 6.0 s - on wada (MacBook Pro, 13-inch, 2019, 2.5 GHz Quad-Core Intel Core i5)
  */
 
 TEST(mid, slow) {

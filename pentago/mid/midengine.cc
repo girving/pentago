@@ -31,8 +31,8 @@ static superinfos_t transform_superinfos(const symmetry_t s, const superinfos_t 
 typedef uint64_t set_t;
 
 template<int k> static inline void subsets_helper(vector<set_t>& all, const int n, const set_t high) {
-  for (int i=k-1;i<n;i++)
-    subsets_helper<k-1>(all,i,i|high<<5);
+  for (int i = k-1; i < n; i++)
+    subsets_helper<k-1>(all, i, i|high<<5);
 }
 template<> inline void subsets_helper<0>(vector<set_t>& all, const int n, const set_t high) {
   all.push_back(high);
@@ -51,7 +51,7 @@ static Array<const set_t> subsets(const int n, const int k) {
       #undef K
       default: GEODE_ASSERT(k<=9);
     }
-  GEODE_ASSERT(uint64_t(all.size())==choose(n,k));
+  GEODE_ASSERT(uint64_t(all.size()) == choose(n,k));
   return asarray(all).copy();
 }
 
@@ -83,16 +83,16 @@ static Array<const set_t> subsets(const int n, const int k) {
  */
 
 static int count(const int spots, const int more) {
-  return CHECK_CAST_INT(choose(spots,more)*choose(more,more/2));
+  return CHECK_CAST_INT(choose(spots, more) * choose(more, more/2));
 }
 
 static int bottleneck(const int spots) {
   const int slice = 36-spots;
-  int worst = count(spots,spots);
+  int worst = count(spots, spots);
   for (const int n : range(spots+1)) {
-    const int k0 = (slice+n)/2-(slice+(n&1))/2, // Player to move
+    const int k0 = (slice+n)/2 - (slice+(n&1))/2, // Player to move
               k1 = n-k0; // Other player
-    worst = max(worst, CHECK_CAST_INT(count(spots,n)+count(spots,n+1)+ceil_div(choose(spots,k1),2)));
+    worst = max(worst, CHECK_CAST_INT(count(spots, n) + count(spots, n+1) + ceil_div(choose(spots, k1), 2)));
   }
   return worst;
 }
@@ -109,7 +109,7 @@ uint64_t midsolve_workspace_memory_usage(const int min_slice) {
 
 static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end,
                                      const int nx, const int ny) {
-  RawArray<halfsupers_t> work(workspace.size()/sizeof(halfsupers_t),(halfsupers_t*)workspace.data());
+  RawArray<halfsupers_t> work(workspace.size()/sizeof(halfsupers_t), (halfsupers_t*)workspace.data());
   const auto flat = end ? work.slice(work.size()-nx*ny, work.size()) : work.slice(0,nx*ny);
   return flat.reshape(vec(nx, ny));
 }
@@ -126,65 +126,65 @@ template<int spots,int n> __attribute__((noinline)) static void
 midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,superinfos_t>& results,
               RawArray<uint8_t> workspace) {
   const int slice = 36-spots;
-  const auto black_root = unpack(root,0),
-             white_root = unpack(root,1);
+  const auto black_root = unpack(root, 0),
+             white_root = unpack(root, 1);
   const auto root0 = (slice+n)&1 ? white_root : black_root,
              root1 = (slice+n)&1 ? black_root : white_root;
-  const int k0 = (slice+n)/2-(slice+(n&1))/2, // Player to move
+  const int k0 = (slice+n)/2 - (slice+(n&1))/2, // Player to move
             k1 = n-k0; // Other player
-  const auto sets0 = subsets(spots,k0),
-             sets0p = subsets(spots-k1,k0),
-             sets1 = subsets(spots,k1),
-             sets1p = subsets(spots-k0,k1);
-  const int csets0_size = fast_choose(spots,k0+1),
-            csets1p_size = spots-k0 ? fast_choose(spots-k0-1,k1) : 0;
+  const auto sets0 = subsets(spots, k0),
+             sets0p = subsets(spots-k1, k0),
+             sets1 = subsets(spots, k1),
+             sets1p = subsets(spots-k0, k1);
+  const int csets0_size = fast_choose(spots, k0+1),
+            csets1p_size = spots-k0 ? fast_choose(spots-k0-1, k1) : 0;
   GEODE_ASSERT(!(uint64_t(workspace.data())&(sizeof(halfsupers_t)-1)));
-  const auto input = grab(workspace,n&1,csets0_size,csets1p_size).const_();
-  const auto output = grab(workspace,!(n&1),sets1.size(),sets0p.size());
-  const int all_wins_start = CHECK_CAST_INT(memory_usage(n&1?output.const_():input));
-  const RawArray<halfsuper_t> all_wins1(sets1.size(),(halfsuper_t*)(workspace.data()+all_wins_start));
-  GEODE_ASSERT(memory_usage(input)+memory_usage(output)+memory_usage(all_wins1) <= uint64_t(workspace.size()));
+  const auto input = grab(workspace, n&1, csets0_size, csets1p_size).const_();
+  const auto output = grab(workspace, !(n&1), sets1.size(), sets0p.size());
+  const int all_wins_start = CHECK_CAST_INT(memory_usage(n&1 ? output.const_() : input));
+  const RawArray<halfsuper_t> all_wins1(sets1.size(), (halfsuper_t*)(workspace.data()+all_wins_start));
+  GEODE_ASSERT(memory_usage(input) + memory_usage(output) + memory_usage(all_wins1) <= uint64_t(workspace.size()));
 
   // List empty spots as bit indices into side_t
   uint8_t empty[max(spots, 1)] = {0};
   {
     const auto free = side_mask&~(black_root|white_root);
     int next = 0;
-    for (int i=0;i<64;i++)
+    for (int i = 0; i < 64; i++)
       if (free & side_t(1)<<i)
         empty[next++] = i;
     GEODE_ASSERT(next == spots);
   }
-  #define set_side(count,set) ({ \
+  #define set_side(count, set) ({ \
     const int c_ = (count); \
     const set_t set_ = (set); \
     side_t s_ = 0; \
-    for (int i=0;i<c_;i++) \
+    for (int i = 0; i < c_; i++) \
       s_ |= side_t(1)<<empty[set_>>5*i&0x1f]; \
     s_; })
   MD(const auto str_set = [=](const int k0, const set_t set0, const int k1, const set_t set1, const bool flip) {
     string s(spots,'\0');
-    for (int i=0;i<k0;i++) s[set0>>5*i&0x1f] += flip ? 2 : 1;
-    for (int i=0;i<k1;i++) s[set1>>5*i&0x1f] += flip ? 1 : 2;
-    for (int i=0;i<spots;i++)
+    for (int i = 0; i < k0; i++) s[set0>>5*i&0x1f] += flip ? 2 : 1;
+    for (int i = 0; i < k1; i++) s[set1>>5*i&0x1f] += flip ? 1 : 2;
+    for (int i = 0; i < spots; i++)
       s[i] = uint8_t(s[i])<3 ? "_01"[int(s[i])] : 'x';
     return s;
   };)
 
   // Evaluate whether the other side wins for all possible sides
-  for (int s1=0;s1<sets1.size();s1++)
+  for (int s1 = 0; s1 < sets1.size(); s1++)
     all_wins1[s1] = halfsuper_wins(root1 | set_side(k1,sets1[s1]))[(n+parity)&1];
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone:
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  Array<Vector<uint16_t,spots-k0>> cs1ps(sets1p.size(),uninit);
-  for (int s1p=0;s1p<sets1p.size();s1p++) {
-    for (int j=0;j<spots-k0;j++) {
+  Array<Vector<uint16_t,spots-k0>> cs1ps(sets1p.size(), uninit);
+  for (int s1p = 0; s1p < sets1p.size(); s1p++) {
+    for (int j = 0; j < spots-k0; j++) {
       cs1ps[s1p][j] = s1p;
-      for (int a=0;a<k1;a++) {
+      for (int a = 0; a < k1; a++) {
         const int s1p_a = sets1p[s1p]>>5*a&0x1f;
         if (j<s1p_a)
-          cs1ps[s1p][j] += fast_choose(s1p_a-1,a+1)-fast_choose(s1p_a,a+1);
+          cs1ps[s1p][j] += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
       }
     }
   }
@@ -193,14 +193,14 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
   MD(Array<uint8_t,2> written(output.sizes()));
  
   // Iterate over set of stones of player to move
-  for (int s0=0;s0<sets0.size();s0++) {
+  for (int s0 = 0; s0 < sets0.size(); s0++) {
     // Construct side to move
     const set_t set0 = sets0[s0];
-    const side_t side0 = root0 | set_side(k0,set0);
+    const side_t side0 = root0 | set_side(k0, set0);
 
     // Make a mask of filled spots
     uint32_t filled0 = 0;
-    for (int i=0;i<k0;i++)
+    for (int i = 0; i < k0; i++)
       filled0 |= 1<<(set0>>5*i&0x1f);
 
     // Evaluate whether we win for side0 and all child sides
@@ -211,7 +211,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
     {
       const auto free = side_mask&~side0;
       int next = 0;
-      for (int i=0;i<spots;i++)
+      for (int i = 0; i < spots; i++)
         if (free&side_t(1)<<empty[i])
           empty1[next++] = i;
       GEODE_ASSERT(next==spots-k0);
@@ -219,7 +219,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
 
     // Precompute wins after we place s0's stones
     halfsuper_t child_wins0[spots-k0];
-    for (int i=0;i<spots-k0;i++)
+    for (int i = 0; i < spots-k0; i++)
       child_wins0[i] = halfsuper_wins(side0|side_t(1)<<empty[empty1[i]])[(n+parity)&1];
 
     /* What happens to indices when we add a stone?  We start with
@@ -262,33 +262,33 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
 
     // Precompute absolute indices after we place s0's stones
     uint16_t child_s0s[spots-k0];
-    for (int i=0;i<spots-k0;i++) {
+    for (int i = 0; i < spots-k0; i++) {
       const int j = empty1[i]-i;
-      child_s0s[i] = choose(empty1[i],j+1);
-      for (int a=0;a<k0;a++)
-        child_s0s[i] += choose(set0>>5*a&0x1f,a+(a>=j)+1);
+      child_s0s[i] = choose(empty1[i], j+1);
+      for (int a = 0; a < k0; a++)
+        child_s0s[i] += choose(set0>>5*a&0x1f, a+(a>=j)+1);
     }
 
     // Lookup table to convert s1p to s1
     uint16_t offset1[k1][spots-k0];
-    for (int i=0;i<k1;i++)
-      for (int q=0;q<spots-k0;q++)
-        offset1[i][q] = fast_choose(empty1[q],i+1);
+    for (int i = 0; i < k1; i++)
+      for (int q = 0; q < spots-k0; q++)
+        offset1[i][q] = fast_choose(empty1[q], i+1);
 
     // Lookup table to convert s0 to s0p
     uint16_t offset0[k1][spots-k0];
-    for (int a=0;a<k1;a++)
-      for (int q=0;q<spots-k0;q++) {
+    for (int a = 0; a < k1; a++)
+      for (int q = 0; q < spots-k0; q++) {
         offset0[a][q] = 0;
-        for (int i=empty1[q]-q;i<k0;i++) {
+        for (int i = empty1[q]-q; i < k0; i++) {
           const int v = set0>>5*i&0x1f;
           if (v>a)
-            offset0[a][q] += fast_choose(v-a-1,i+1)-fast_choose(v-a,i+1);
+            offset0[a][q] += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
         }
       }
 
     // Iterate over set of stones of other player
-    for (int s1p=0;s1p<sets1p.size();s1p++) {
+    for (int s1p = 0; s1p < sets1p.size(); s1p++) {
       const auto set1p = sets1p[s1p];
 
       // Convert indices
@@ -296,7 +296,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
       uint32_t filled1p = 0;
       uint16_t s1 = 0;
       uint16_t s0p = s0;
-      for (int i=0;i<k1;i++) {
+      for (int i = 0; i < k1; i++) {
         const int q = set1p>>5*i&0x1f;
         filled1 |= 1<<empty1[q];
         filled1p |= 1<<q;
@@ -306,7 +306,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
 
       // Print board
       MD({
-        const auto board = flip_board(pack(side0,root1|set_side(k1,sets1[s1])),(slice+n)&1);
+        const auto board = flip_board(pack(side0, root1|set_side(k1, sets1[s1])), (slice+n)&1);
         slog("\ncomputing slice %s+%d, k0 %d, k1 %d, fill %s, board %s, s0 %d, s0p %d, s1p %d, s1 %d",
              slice, n, k0, k1, str_set(k0,set0,k1,sets1[s1],(slice+n)&1),
              board, s0, s0p, s1p, s1);
@@ -316,7 +316,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
       halfsupers_t us;
       {
         us[0] = us[1] = halfsuper_t(0);
-        for (int i=0;i<spots-k0;i++)
+        for (int i = 0; i < spots-k0; i++)
           if (!(filled1p&1<<i)) {
             const int cs0 = child_s0s[i];
             const auto cwins = child_wins0[i];
@@ -325,14 +325,14 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
             us[1] |= cwins | child[1]; // not lose
             MD({
               const auto child_set0 = set0|side_t(empty1[i])<<5*k0;
-              const auto board = pack(root1|set_side(k1,sets1[s1]),root0|set_side(k0+1,child_set0));
+              const auto board = pack(root1|set_side(k1, sets1[s1]), root0|set_side(k0+1,child_set0));
               const auto flip = flip_board(board,(slice+n+1)&1);
               slog("child %s, board %s, set %s, s0 %d, s1 %d, cs0 %d, cs1p %s, input %s",
-                   str_set(k1,sets1[s1],k0+1,child_set0,(slice+n+1)&1), flip, child_set0,
+                   str_set(k1, sets1[s1], k0+1, child_set0, (slice+n+1)&1), flip, child_set0,
                    s0, s1, cs0, cs1ps[s1p][i], input.sizes());
               const bool p = (n+parity)&1;
-              GEODE_ASSERT(child.x==split(rmax(~super_evaluate_all(false,100,board)))[p]);
-              GEODE_ASSERT(child.y==split(rmax(~super_evaluate_all(true ,100,board)))[p]);
+              GEODE_ASSERT(child.x==split(rmax(~super_evaluate_all(false, 100, board)))[p]);
+              GEODE_ASSERT(child.y==split(rmax(~super_evaluate_all(true , 100, board)))[p]);
             })
           }
       }
@@ -361,9 +361,9 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
         const uint32_t filled_black = (slice+n)&1 ? filled1 : filled0,
                        filled_white = (slice+n)&1 ? filled0 : filled1;
         board_t board = root;
-        for (int i=0;i<spots;i++)
+        for (int i = 0; i < spots; i++)
           board += ((filled_black>>i&1)+2*(filled_white>>i&1))*pack(side_t(1)<<empty[i],side_t(0));
-        results.insert(make_pair(board,info));
+        results.insert(make_pair(board, info));
       }
 
       // Negate and apply rmax in preparation for the slice above
@@ -371,7 +371,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
       above[0] = rmax(~us[1]);
       above[1] = rmax(~us[0]);
       output(s1,s0p) = above;
-      MD(GEODE_ASSERT(!written(s1,s0p)++));
+      MD(GEODE_ASSERT(!written(s1, s0p)++));
     }
   }
 }
@@ -386,13 +386,13 @@ unordered_map<board_t,superinfos_t> midsolve_internal(const board_t root, const 
   // Make sure workspace will do
   const int align = int(sizeof(halfsupers_t)),
             fix = (align-(uint64_t(workspace.data())&(align-1)))&(align-1);
-  GEODE_ASSERT(workspace.size()>=fix);
-  const auto safe_workspace = workspace.slice(fix,workspace.size()-fix);
-  GEODE_ASSERT(safe_workspace.size()>=bottleneck(spots));
+  GEODE_ASSERT(workspace.size() >= fix);
+  const auto safe_workspace = workspace.slice(fix, workspace.size()-fix);
+  GEODE_ASSERT(safe_workspace.size() >= bottleneck(spots));
 
   // Compute all slices
   unordered_map<board_t,superinfos_t> results;
-  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root,parity,results,safe_workspace);
+  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root, parity, results, safe_workspace);
   #define S(s_) \
     case s_: { \
       const int s = (s_); \
