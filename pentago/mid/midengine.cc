@@ -10,7 +10,6 @@
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/memory.h"
-#if PENTAGO_SSE
 namespace pentago {
 
 using std::max;
@@ -449,4 +448,3 @@ high_midsolve(const high_board_t& root, RawArray<const high_board_t> boards,
 }
 
 }
-#endif

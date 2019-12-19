@@ -43,13 +43,19 @@
  */
 
 #include "pentago/base/superscore.h"
-#if PENTAGO_SSE // halfsuper implemented only in SSE mode for now
 namespace pentago {
 
 struct halfsuper_t {
+
+#if PENTAGO_SSE
   __m128i x;
+#else
+  uint64_t a, b;
+#endif
 
   halfsuper_t() = default;
+
+#if PENTAGO_SSE
 
   // Zero-only constructor
   halfsuper_t(zero*) {
@@ -63,9 +69,6 @@ struct halfsuper_t {
     return _mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0;
   }
 
-  bool operator==(halfsuper_t h) const { return    !(*this^h); }
-  bool operator!=(halfsuper_t h) const { return bool(*this^h); }
-
   halfsuper_t operator~() const { return halfsuper_t(~x); }
   halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(x|h.x); }
   halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(x&h.x); }
@@ -74,21 +77,59 @@ struct halfsuper_t {
   halfsuper_t operator&=(halfsuper_t h) { x &= h.x; return *this; }
   halfsuper_t operator^=(halfsuper_t h) { x ^= h.x; return *this; }
 
-  // Do not use the follow functions in performance critical code
+  // Do not use the following functions in performance critical code
 
   bool operator[](uint8_t r) const {
     // Periodic with period 128
     return _mm_movemask_epi8(_mm_slli_epi16(x,7-(r&7)))>>(r>>3&15)&1;
   }
 
-  bool operator()(int a, int b, int c, int d) const {
-    return operator[]((a&1)+2*(b&3)+8*(c&3)+32*(d&3));
-  }
-
   static halfsuper_t singleton(uint8_t r) {
     const bool hi = r>>6&1;
     const auto chunk = uint64_t(1)<<(r&63);
     return halfsuper_t(sse_pack(hi?0:chunk,hi?chunk:0));
+  }
+
+#else  // !PENTAGO_SSE
+
+  // Zero-only constructor
+  halfsuper_t(zero*) : a(0), b(0) {}
+
+  halfsuper_t(uint64_t a, uint64_t b) : a(a), b(b) {}
+
+  explicit operator bool() const {
+    return a || b;
+  }
+
+  halfsuper_t operator~() const { return halfsuper_t(~a, ~b); }
+  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(a|h.a, b|h.b); }
+  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(a&h.a, b&h.b); }
+  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(a^h.a, b^h.b); }
+  halfsuper_t operator|=(halfsuper_t h) { a |= h.a; b |= h.b; return *this; }
+  halfsuper_t operator&=(halfsuper_t h) { a &= h.a; b &= h.b; return *this; }
+  halfsuper_t operator^=(halfsuper_t h) { a ^= h.a; b ^= h.b; return *this; }
+
+  // Do not use the following functions in performance critical code
+
+  bool operator[](uint8_t r) const {
+    // Periodic with period 128
+    return ((r&64 ? b : a) >> (r&63)) & 1;
+  }
+
+  static halfsuper_t singleton(uint8_t r) {
+    const auto chunk = uint64_t(1)<<(r&63);
+    return r&64 ? halfsuper_t(0, chunk) : halfsuper_t(chunk, 0);
+  }
+
+#endif  // PENATGO_SSE.  SSE independent functions follow.
+
+  bool operator==(halfsuper_t h) const { return    !(*this^h); }
+  bool operator!=(halfsuper_t h) const { return bool(*this^h); }
+
+  // Do not use the following functions in performance critical code
+
+  bool operator()(int a, int b, int c, int d) const {
+    return operator[]((a&1)+2*(b&3)+8*(c&3)+32*(d&3));
   }
 
   static halfsuper_t singleton(int a, int b, int c, int d) {
@@ -107,6 +148,7 @@ Vector<halfsuper_t,2> halfsuper_wins(const side_t side) __attribute__((const));
 
 // Same as rmax for super_t, but twice as fast.  Flips parity.
 __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
+#if PENTAGO_SSE
   const __m128i x = h.x;
   // First (parity) quadrant
   const __m128i t0 = (x|_mm_srli_epi16(x,1))&_mm_set1_epi8(0x55),
@@ -123,6 +165,39 @@ __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
                    | _mm_shuffle_epi32(x,LE_MM_SHUFFLE(1,2,3,0));
   // Assemble
   return halfsuper_t(y0|y1|y2|y3);
+
+#else  // !PENTAGO_SSE
+
+  // First three quadrants
+  const auto lo = [](const uint64_t x) -> uint64_t {
+    const auto rep = [](const uint8_t x) -> uint64_t {
+      auto y = x | uint64_t(x) << 8;
+      y = y | y << 16;
+      return y | y << 32;
+    };
+
+    // First (parity) quadrant
+    const auto t = (x | x>>1) & rep(0b01010101);
+    const auto y0 = t | t << 1;
+    // Second and third quadrants
+    const auto y1 = (x << 2 & rep(0b11111100))
+                  | (x << 6 & rep(0b11000000))
+                  | (x >> 2 & rep(0b00111111))
+                  | (x >> 6 & rep(0b00000011));
+    const auto y2 = (x << 8  & 0xffffff00ffffff00)
+                  | (x << 24 & 0xff000000ff000000)
+                  | (x >> 8  & 0x00ffffff00ffffff)
+                  | (x >> 24 & 0x000000ff000000ff);
+    return y0 | y1 | y2;
+  };
+
+  const auto a = h.a, b = h.b;
+  // Forth quadrant
+  const auto y3 = a << 32 | a >> 32 | b << 32 | b >> 32;
+  // Assemble
+  return halfsuper_t(lo(a) | y3, lo(b) | y3);
+
+#endif  // PENTAGO_SSE
 }
 
 int popcount(halfsuper_t h);
@@ -132,4 +207,3 @@ int popcount(halfsuper_t h);
 void view_rmax();
 
 }
-#endif

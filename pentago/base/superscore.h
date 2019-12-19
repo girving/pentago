@@ -122,7 +122,7 @@ struct super_t {
     return popcount((uint16_t)_mm_movemask_epi8(p))&1;
   }
 
-#else // !defined(PENTAGO_SSE)
+#else // !PENTAGO_SSE
 
   // Zero-only constructor
   super_t(zero*) {
@@ -196,7 +196,7 @@ struct super_t {
     return popcount(a^b^c^d)&1;
   }
 
-#endif // defined(PENTAGO_SSE).  SSE independent functions follow.
+#endif // PENTAGO_SSE.  SSE independent functions follow.
 
   bool operator==(super_t s) const {
     return !(*this^s);

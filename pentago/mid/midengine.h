@@ -12,7 +12,6 @@
 #include "pentago/mid/halfsuper.h"
 #include "pentago/high/board.h"
 #include <unordered_map>
-#if PENTAGO_SSE
 namespace pentago {
 
 using std::unordered_map;
@@ -44,4 +43,3 @@ high_midsolve(const high_board_t& root, RawArray<const high_board_t> boards,
               RawArray<uint8_t> workspace);
 
 }
-#endif
