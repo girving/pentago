@@ -6,7 +6,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 cc_library(
     name = "utility",
     srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc"]),
-    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC"],
+    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     linkopts = ["-lpthread"],
     deps = [
         "@random123//:random123",

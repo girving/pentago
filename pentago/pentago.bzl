@@ -2,7 +2,7 @@
 
 def cc_tests(names, deps, data=[], size="medium"):
   deps = deps + ["@com_google_googletest//:gtest", "@com_google_googletest//:gtest_main"]
-  copts = ["-std=c++1z", "-Werror", "-Wsign-compare"]
+  copts = ["-std=c++1z", "-Werror", "-Wsign-compare", "-fno-stack-check"]
   linkopts = ["-Wno-unused-command-line-argument"]
   for name in names:
     native.cc_test(name=name, srcs=[name + ".cc"], copts=copts, linkopts=linkopts, deps=deps,
