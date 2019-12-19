@@ -196,7 +196,7 @@ super_evaluate_recurse(const int depth, const side_t side0, const side_t side1, 
 
   {
     // Check how close we are to a black win, pretending that black gets to choose the rotation arbitrarily
-    int order[36]; // We'll sort moves in ascending order of this array.  Can't be order[total] due to compiler bug.
+    int order[total]; // We'll sort moves in ascending order of this array
     for (int i=total-1;i>=0;i--) {
       int closeness = aggressive?arbitrarily_rotated_win_closeness(moves[i],side1)
                                 :arbitrarily_rotated_win_closeness(side1,moves[i]);

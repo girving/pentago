@@ -65,7 +65,7 @@ namespace pentago {
   side_t _move_mask = side_mask^(side0|side1); \
   int total = popcount(_move_mask); \
   /* Collect the list of possible moves.  Note that only side0 changes */ \
-  side_t moves[36]; /* We used to do moves[total] here, but hit miscompilation on Apple clang 11.0.0 */ \
+  side_t moves[total]; \
   for (int i = 0; i < total; i++) { \
     side_t move = min_bit(_move_mask); \
     moves[i] = side0 | move; \
