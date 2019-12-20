@@ -12,17 +12,13 @@ using std::max;
 
 high_board_t::high_board_t(const board_t board, const bool middle)
   : board(board)
-  , turn(0) // Filled in below
-  , middle(middle)
-  , grid(to_table(board)) {
+  , middle(middle) {
   // Check correctness
   check_board(board);
-  const side_t side0 = unpack(board,0),
-               side1 = unpack(board,1);
-  const int count0 = popcount(side0),
-            count1 = popcount(side1);
+  const int count0 = popcount(unpack(board,0)),
+            count1 = popcount(unpack(board,1));
   GEODE_ASSERT(count0+count1==count_stones(board));
-  const_cast_(turn) = count0-1==count1-middle;
+  const auto turn = this->turn();
   if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1) || (middle && !board))
     THROW(ValueError, "high_board_t: inconsistent board %lld, turn %d, middle %d, "
           "side counts %d %d", board, turn, middle, count0, count1);
@@ -40,8 +36,15 @@ bool high_board_t::done() const {
       || (!middle && count_stones(board)==36);
 }
 
+int high_board_t::turn() const {
+  const int count0 = popcount(unpack(board, 0)),
+            count1 = popcount(unpack(board, 1));
+  return count0 - 1 == count1 - middle;
+}
+
 vector<high_board_t> high_board_t::moves() const {
   vector<high_board_t> moves;
+  const auto grid = to_table(board);
   if (!middle) { // Place a stone
     for (const int x : range(6))
       for (const int y : range(6))
@@ -60,9 +63,9 @@ high_board_t high_board_t::place(const int x, const int y) const {
   GEODE_ASSERT(!middle);
   GEODE_ASSERT(0<=x && x<6);
   GEODE_ASSERT(0<=y && y<6);
-  GEODE_ASSERT(!grid(x,y));
+  GEODE_ASSERT(!to_table(board)(x,y));
   return high_board_t(
-    board+flip_board(pack(side_t(1<<(3*(x%3)+y%3))<<16*(2*(x/3)+(y/3)),side_t(0)),turn),
+    board+flip_board(pack(side_t(1<<(3*(x%3)+y%3))<<16*(2*(x/3)+(y/3)),side_t(0)),turn()),
     true);
 }
 
@@ -93,7 +96,7 @@ int high_board_t::immediate_value() const {
   const bool bw = won(unpack(board,0)),
              ww = won(unpack(board,1));
   if (bw || ww)
-    return bw && ww ? 0 : bw==!turn ? 1 : -1;
+    return bw && ww ? 0 : bw==!turn() ? 1 : -1;
   return 0;
 }
 
@@ -102,7 +105,7 @@ int high_board_t::value(const block_cache_t& cache) const {
     return immediate_value();
   else if (!middle) {
     // If we're not at a half move, look up the result
-    const auto flip = flip_board(board,turn);
+    const auto flip = flip_board(board, turn());
     return exact_lookup(true,flip,cache)+exact_lookup(false,flip,cache)-1;
   } else {
     int best = -1;
@@ -126,7 +129,7 @@ int high_board_t::value_check(const block_cache_t& cache) const {
     const int lookup = this->value(cache);
     if (value != lookup)
       THROW(AssertionError, "high_board_t.value_check: board %lld, turn %d, middle %d, computed %d != lookup %d",
-            board, turn, middle, value, lookup);
+            board, turn(), middle, value, lookup);
     return value;
   }
 }

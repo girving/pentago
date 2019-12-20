@@ -16,9 +16,7 @@ namespace pentago {
 
 struct high_board_t {
   const board_t board; // Board state: 0 for black (first player), 1 for white (second player)
-  const int turn; // Whose turn is it: 0 (black) or 1 (white)
   const bool middle; // Did we already place a stone?  I.e., are we halfway through the move?
-  const Array<const int,2> grid; // x-y major, 0-0 is lower left, values are 0-empty, 1-black, 2-white
 
   high_board_t(const board_t board, const bool middle);
   ~high_board_t();
@@ -28,6 +26,9 @@ struct high_board_t {
 
   // Is the game over?
   bool done() const;
+
+  // Whose turn is it: 0 (black) or 1 (white)
+  int turn() const;
 
   // Moves which follow this one.  Note that high level moves are "half" of a regular move:
   // there is one move to place a stone and one move to rotate it.
