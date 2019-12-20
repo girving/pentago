@@ -7,9 +7,18 @@
 #include <string>
 namespace pentago {
 
+#ifdef __EMSCRIPTEN__
+
+struct RuntimeError {};
+#define SIMPLE_EXCEPTION(Error, Base) struct Error {};
+
+#else
+
 using std::string;
 using std::type_info;
 using std::exception;
+
+typedef std::runtime_error RuntimeError;
 
 #define SIMPLE_EXCEPTION(Error, Base_) \
   struct Error : public Base_ { \
@@ -18,7 +27,7 @@ using std::exception;
     virtual ~Error() throw (); \
   };
 
-typedef std::runtime_error RuntimeError;
+#endif
 
 SIMPLE_EXCEPTION(IOError, RuntimeError)
 SIMPLE_EXCEPTION(OSError, RuntimeError)

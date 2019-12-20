@@ -17,7 +17,6 @@
 #include "pentago/utility/random.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/log.h"
-#include <boost/endian/conversion.hpp>
 #include <sys/stat.h>
 namespace pentago {
 namespace mpi {
@@ -596,7 +595,7 @@ void write_counts(const MPI_Comm comm, const string& filename, const accumulatin
 
 // The 64 bit part of big endianness is handled by numpy, so we're left with everything up to 256 bits
 static inline void semiswap(Vector<super_t,2>& s) {
-#ifdef BOOST_BIG_ENDIAN
+#ifdef PENTAGO_BIG_ENDIAN
   swap(s.x.a,s.x.d);
   swap(s.x.b,s.x.c);
   swap(s.y.a,s.y.d);

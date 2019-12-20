@@ -146,6 +146,7 @@ board_t random_board(Random& random, int n) {
   return pack(black,white);
 }
 
+#ifndef __EMSCRIPTEN__
 string str_board(board_t board) {
   string s;
   s += format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));
@@ -160,5 +161,6 @@ string str_board(board_t board) {
   }
   return s+"\n   123456";
 }
+#endif
 
 }

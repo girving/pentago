@@ -161,5 +161,28 @@ TEST(mid, half) {
   }
 }
 
+// Show that halfsuper_t is the best we can do: the parity
+// configuration is the limit of rmax applied to a singleton.
+TEST(mid, rmax_limit) {
+  // Compute limit configuration
+  auto s = super_t::singleton(0);
+  vector<super_t> seen;
+  for (int n=0;;n++) {
+    if (std::count(seen.begin(), seen.end(), s))
+      break;
+    if (0)
+      slog("n = %d\n%s\n", n, s);
+    seen.push_back(s);
+    s = rmax(s);
+  }
+
+  // Verify against parity
+  for (const int i0 : range(4))
+    for (const int i1 : range(4))
+      for (const int i2 : range(4))
+        for (const int i3 : range(4))
+          ASSERT_EQ(s(i0, i1, i2, i3), (i0 + i1 + i2 + i3) & 1);
+}
+
 }  // namespace
 }  // namespace pentago

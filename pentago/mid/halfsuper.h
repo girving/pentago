@@ -202,8 +202,4 @@ __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
 
 int popcount(halfsuper_t h);
 
-// Visually show that halfsuper_t is the best we can do: the parity
-// configuration is the limit of rmax applied to a singleton.
-void view_rmax();
-
 }

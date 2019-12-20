@@ -19,10 +19,10 @@
 #pragma once
 
 #include "pentago/base/board.h"
+#include "pentago/utility/endian.h"
 #include "pentago/utility/popcount.h"
 #include "pentago/utility/sse.h"
 #include "pentago/utility/vector.h"
-#include <boost/endian/conversion.hpp>
 namespace pentago {
 
 // Decide whether or not to use SSE
@@ -30,7 +30,7 @@ namespace pentago {
 #define PENTAGO_SSE 0
 #else
 #define PENTAGO_SSE 1
-#ifdef BOOST_BIG_ENDIAN
+#ifdef PENTAGO_BIG_ENDIAN
 #error "SSE is supported only in little endian mode"
 #endif
 #endif
@@ -45,9 +45,9 @@ struct super_t {
 
 #if PENTAGO_SSE
   __m128i x,y; // Little endian order as asserted above.
-#elif defined(BOOST_LITTLE_ENDIAN)
+#elif defined(PENTAGO_LITTLE_ENDIAN)
   uint64_t a,b,c,d; // Little endian order.  Use different names to avoid confusion
-#elif defined(BOOST_BIG_ENDIAN)
+#elif defined(PENTAGO_BIG_ENDIAN)
   uint64_t d,c,b,a; // Respect big endianness
 #endif
 
@@ -131,9 +131,9 @@ struct super_t {
 
   // Use little endian argument order unconditionally
   super_t(uint64_t a, uint64_t b, uint64_t c, uint64_t d)
-#if defined(BOOST_LITTLE_ENDIAN)
+#if defined(PENTAGO_LITTLE_ENDIAN)
     : a(a), b(b), c(c), d(d) {}
-#elif defined(BOOST_BIG_ENDIAN)
+#elif defined(PENTAGO_BIG_ENDIAN)
     : d(d), c(c), b(b), a(a) {}
 #endif
 
@@ -325,16 +325,12 @@ static inline super_t rmax(const super_t f) {
 
 #endif  // PENTAGO_SSE
 
-#ifdef BOOST_BIG_ENDIAN
+#ifdef PENTAGO_BIG_ENDIAN
 static inline super_t endian_reverse(const super_t s) {
   return super_t(flip_endian(s.d),
                  flip_endian(s.c),
                  flip_endian(s.b),
                  flip_endian(s.a));
-}
-#else
-static inline super_t endian_reverse(const super_t s) {
-  die("Shouldn't be needed on little endian machines");
 }
 #endif
 

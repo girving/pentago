@@ -3,23 +3,7 @@
 #include "pentago/mid/halfsuper.h"
 #include "pentago/data/filter.h" // For interleave and uninterleave
 #include "pentago/utility/array.h"
-#include "pentago/utility/random.h"
-#include "pentago/utility/log.h"
 namespace pentago {
-
-// Visually show that halfsuper_t is the best we can do: the parity
-// configuration is the limit of rmax applied to a singleton.
-void view_rmax() {
-  auto s = super_t::singleton(0);
-  vector<super_t> seen;
-  for (int n=0;;n++) {
-    if (std::count(seen.begin(), seen.end(), s))
-      break;
-    slog("n = %d\n%s\n", n, s);
-    seen.push_back(s);
-    s = rmax(s);
-  }
-}
 
 // Mask of even parity bits in a super_t, for use in split and merge
 static const uint64_t evens0 = 0xf0f00f0ff0f00f0f;

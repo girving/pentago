@@ -18,6 +18,7 @@ using std::unordered_set;
 
 const symmetries_t symmetries;
 
+#ifndef __EMSCRIPTEN__
 ostream& operator<<(ostream& output, symmetry_t s) {
   return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
@@ -25,6 +26,7 @@ ostream& operator<<(ostream& output, symmetry_t s) {
 ostream& operator<<(ostream& output, local_symmetry_t s) {
   return output<<format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
+#endif
 
 // rotate_quadrants[r][q] is the quadrant moved to q under rotation r
 static const uint8_t rotate_quadrants[4][4] = {{0,1,2,3},{1,3,0,2},{3,2,1,0},{2,0,3,1}};

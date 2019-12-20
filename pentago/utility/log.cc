@@ -1,6 +1,7 @@
 // Logs and scopes
 
 #include "pentago/utility/log.h"
+#include "pentago/utility/debug.h"
 #include "pentago/utility/spinlock.h"
 #include "pentago/utility/exceptions.h"
 namespace pentago {
@@ -19,7 +20,7 @@ void copy_log_to_file(const string& path) {
     fclose(log_file);
   log_file = fopen(path.c_str(), "w");
   if (!log_file)
-    throw IOError(format("Can't open '%s' for log output", path));
+    THROW(IOError, "Can't open '%s' for log output", path);
 }
 
 Scope::Scope(const string& name)

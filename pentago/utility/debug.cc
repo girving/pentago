@@ -24,8 +24,12 @@ void breakpoint() {
 
 void assertion_failed(const char* function, const char* file, unsigned int line,
                       const char* condition, const char* message) {
+#ifdef __EMSCRIPTEN__
+  const auto error = message ? message : condition;
+#else
   const string error = format("%s:%d:%s: %s, condition = %s", file, line, function,
                               message ? message : "Assertion failed", condition);
+#endif
   static const bool break_on_assert = getenv("GEODE_BREAK_ON_ASSERT") != 0;
   if (break_on_assert) {
     std::cout << std::flush;
@@ -47,21 +51,29 @@ void die_helper(const string& msg) {
 }
 
 namespace {
-template<class Error> struct error_name_t { static const char* name; };
+template<class Error> struct error_name_t { __attribute__((unused)) static const char* name; };
 }
 
 template<class Error> void __attribute__ ((noreturn)) maybe_throw() {
+#ifdef __EMSCRIPTEN__
+  throw std::runtime_error(error_name_t<Error>::name);
+#else
   if (throw_callback)
     throw_callback(error_name_t<Error>::name);
   else
     throw Error();
+#endif
 }
 
 template<class Error> void __attribute__ ((noreturn)) maybe_throw(const char* msg) {
+#ifdef __EMSCRIPTEN__
+  throw std::runtime_error(msg);
+#else
   if (throw_callback)
     throw_callback(format("%s: %s",error_name_t<Error>::name,msg));
   else
     throw Error(msg);
+#endif
 }
 
 #define REGISTER_BARE(Error) \

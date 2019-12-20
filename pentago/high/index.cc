@@ -6,7 +6,7 @@
 #include "pentago/data/supertensor.h"
 #include "pentago/utility/index.h"
 #include "pentago/utility/endian.h"
-#ifdef BOOST_LITTLE_ENDIAN
+#ifdef PENTAGO_LITTLE_ENDIAN
 namespace pentago {
 
 using namespace pentago::end;
@@ -108,4 +108,4 @@ void write_supertensor_index(const string& name,
 }
 
 }
-#endif  // BOOST_LITTLE_ENDIAN
+#endif  // PENTAGO_LITTLE_ENDIAN

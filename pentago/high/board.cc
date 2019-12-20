@@ -24,8 +24,8 @@ high_board_t::high_board_t(const board_t board, const bool middle)
   GEODE_ASSERT(count0+count1==count_stones(board));
   const_cast_(turn) = count0-1==count1-middle;
   if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1) || (middle && !board))
-    throw ValueError(format("high_board_t: inconsistent board %lld, turn %d, middle %d, "
-                            "side counts %d %d", board, turn, middle, count0, count1));
+    THROW(ValueError, "high_board_t: inconsistent board %lld, turn %d, middle %d, "
+          "side counts %d %d", board, turn, middle, count0, count1);
 }
 
 high_board_t::~high_board_t() {}
@@ -125,9 +125,8 @@ int high_board_t::value_check(const block_cache_t& cache) const {
       value = max(value, move.value(cache));
     const int lookup = this->value(cache);
     if (value != lookup)
-      throw AssertionError(format(
-          "high_board_t.value_check: board %lld, turn %d, middle %d, computed %d != lookup %d\n%s",
-          board, turn, middle, value, lookup, str_board(board)));
+      THROW(AssertionError, "high_board_t.value_check: board %lld, turn %d, middle %d, computed %d != lookup %d",
+            board, turn, middle, value, lookup);
     return value;
   }
 }
@@ -149,7 +148,10 @@ Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<co
 }
 
 string high_board_t::name() const {
-  return format("%d%s", board, middle ? "m" : "");
+  // Use snprintf to avoid tinyformat dependency under emscripten
+  char buffer[24];
+  snprintf(buffer, sizeof(buffer), "%llu%s", (unsigned long long)board, middle ? "m" : "");
+  return buffer;
 }
 
 ostream& operator<<(ostream& output, const high_board_t& board) {
@@ -168,7 +170,7 @@ high_board_t high_board_t::parse(const string& name) {
     if (left==0 || (left==1 && name.back()=='m'))
       return high_board_t(board, left==1);
   }
-  throw ValueError(format("high_board_t: invalid board name '%s'", name));
+  THROW(ValueError, "high_board_t: invalid board name '%s'", name);
 }
 
 }

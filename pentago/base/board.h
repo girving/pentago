@@ -106,7 +106,9 @@ static inline board_t flip_board(board_t board, bool turn = true) {
   return pack(unpack(board,turn),unpack(board,1-turn));
 }
 
+#ifndef __EMSCRIPTEN__
 string str_board(board_t board);
+#endif
 
 // Turn a board into a 6x6 grid: x-y major order, 0,0 is lower left, value 0 for empty or 2^k for player k
 Array<int,2> to_table(const board_t boards);

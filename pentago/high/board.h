@@ -12,7 +12,6 @@
 #include "pentago/base/board.h"
 #include "pentago/data/block_cache.h"
 #include "pentago/utility/array.h"
-#include <boost/core/noncopyable.hpp>
 namespace pentago {
 
 struct high_board_t {
@@ -67,10 +66,7 @@ struct high_board_t {
 namespace std {
 template<> struct hash<pentago::high_board_t> {
   size_t operator()(const pentago::high_board_t& b) const {
-    size_t h = 0;
-    boost::hash_combine(h, b.board);
-    boost::hash_combine(h, b.middle);
-    return h;
+    return hash<pentago::board_t>()(b.middle ? ~b.board : b.board);
   }
 };
 }  // namespace std

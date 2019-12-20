@@ -1,6 +1,6 @@
 // Wrapper around C++ exceptions so that we can turn them off during MPI
 //
-// The pentago code does not exceptions during correct use.  If we see an exception,
+// The pentago code does not throw during correct use.  If we see an exception,
 // something terrible has happened and the entire application should be killed.
 // This file implements wrappers that allow exceptions to be replaced with calls
 // to MPI_Abort if any occur during parallel runs.
@@ -11,6 +11,8 @@
 #include "pentago/utility/exceptions.h"
 #include "pentago/utility/format.h"
 namespace pentago {
+
+using std::string;
 
 // Should we print?  Defaults to true.
 bool verbose();
@@ -71,7 +73,11 @@ template<class Error> void maybe_throw(const char* msg) __attribute__ ((noreturn
 
 template<class Error, class First, class... Rest> static inline void __attribute__ ((noreturn, cold))
 maybe_throw(const char* fmt, const First& first, const Rest&... rest) {
+#ifdef __EMSCRIPTEN__
+  maybe_throw<Error>(fmt);  // Throw away arguments for now
+#else
   maybe_throw<Error>(format(fmt, first, rest...).c_str());
+#endif
 }
 
 template<class Error> void __attribute__ ((noreturn, cold)) maybe_throw(const string& msg) {

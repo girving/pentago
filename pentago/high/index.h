@@ -15,9 +15,9 @@
 
 #include "pentago/end/sections.h"
 #include "pentago/data/supertensor.h"
+#include "pentago/utility/endian.h"
 #include <boost/core/noncopyable.hpp>
-#include <boost/endian/conversion.hpp>
-#ifdef BOOST_LITTLE_ENDIAN
+#ifdef PENTAGO_LITTLE_ENDIAN
 namespace pentago {
 
 struct compact_blob_t {
@@ -59,4 +59,4 @@ void write_supertensor_index(const string& name,
                              const vector<shared_ptr<const supertensor_reader_t>>& readers);
 
 }  // namespace pentago
-#endif  // BOOST_LITTLE ENDIAN
+#endif  // PENTAGO_LITTLE ENDIAN
