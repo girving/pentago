@@ -7,7 +7,7 @@
 #include "pentago/end/block_store.h"
 #include "pentago/end/compute.h"
 #include "pentago/utility/debug.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 namespace pentago {
 namespace end {
 

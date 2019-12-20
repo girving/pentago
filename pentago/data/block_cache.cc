@@ -6,7 +6,7 @@
 #include "pentago/base/section.h"
 #include "pentago/base/symmetry.h"
 #include "pentago/utility/debug.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/large.h"
 #include "pentago/utility/const_cast.h"
 namespace pentago {

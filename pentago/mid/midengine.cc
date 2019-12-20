@@ -5,11 +5,10 @@
 #include "pentago/base/symmetry.h"
 #include "pentago/high/board.h"
 #include "pentago/search/superengine.h"
-#include "pentago/utility/aligned.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/debug.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 namespace pentago {
 
 using std::max;
@@ -98,7 +97,7 @@ static int bottleneck(const int spots) {
 
 Array<uint8_t> midsolve_workspace(const int min_slice) {
   // Allocate enough memory for 18 stones, which is the most we'll need
-  return char_view_own(aligned_buffer<halfsupers_t>(bottleneck(36-min_slice)));
+  return Array<uint8_t>(midsolve_workspace_memory_usage(min_slice));
 }
 
 uint64_t midsolve_workspace_memory_usage(const int min_slice) {

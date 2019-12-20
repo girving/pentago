@@ -3,7 +3,7 @@
 #include "pentago/end/sections.h"
 #include "pentago/end/blocks.h"
 #include "pentago/data/supertensor.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/sort.h"
 #include "pentago/utility/const_cast.h"
 #include <unordered_set>

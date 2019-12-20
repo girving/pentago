@@ -13,6 +13,7 @@
 #include "pentago/utility/endian.h"
 #include "pentago/utility/index.h"
 #include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/random.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/log.h"

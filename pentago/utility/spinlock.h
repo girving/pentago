@@ -43,6 +43,15 @@ struct spinlock_t {
   }
 };
 
+#elif defined(__EMSCRIPTEN__)
+
+// Single-threaded, so no locks
+struct spinlock_t {
+  void lock() {}
+  bool trylock() { return true; }
+  void unlock() {}
+};
+
 // Use pthreads if we have them.
 #elif defined(_POSIX_SPIN_LOCKS) && _POSIX_SPIN_LOCKS>0
 

@@ -160,10 +160,10 @@ ostream& operator<<(ostream& output, const high_board_t& board) {
 }
 
 high_board_t high_board_t::parse(const string& name) {
-  static_assert(sizeof(long) == 8);
+  static_assert(sizeof(long long) == 8);
   if (name.size() && isdigit(name[0]) && (isdigit(name.back()) || name.back()=='m')) {
     char* end;
-    const board_t board = strtol(name.c_str(), &end, 0);
+    const board_t board = strtoll(name.c_str(), &end, 0);
     const auto left = name.c_str()+name.size()-end;
     if (left==0 || (left==1 && name.back()=='m'))
       return high_board_t(board, left==1);

@@ -10,7 +10,7 @@
 #include "pentago/end/simple_partition.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/log.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/arange.h"

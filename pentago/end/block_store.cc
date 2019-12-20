@@ -7,7 +7,7 @@
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/index.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/random.h"
 #include "pentago/utility/const_cast.h"

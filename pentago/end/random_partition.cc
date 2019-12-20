@@ -5,7 +5,7 @@
 #include "pentago/utility/debug.h"
 #include "pentago/utility/index.h"
 #include "pentago/utility/log.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/permute.h"
 #include "pentago/utility/counter.h"
 #include "pentago/utility/const_cast.h"

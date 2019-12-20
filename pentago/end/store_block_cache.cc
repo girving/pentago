@@ -4,7 +4,7 @@
 #include "pentago/end/block_store.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/large.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/exceptions.h"
 namespace pentago {

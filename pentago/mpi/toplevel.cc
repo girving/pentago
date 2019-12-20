@@ -27,6 +27,7 @@
 #include "pentago/utility/join.h"
 #include "pentago/utility/large.h"
 #include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/thread.h"
 #include "pentago/utility/wall_time.h"
 #include "pentago/utility/array.h"

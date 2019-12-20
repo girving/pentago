@@ -2,7 +2,7 @@
 
 #include "pentago/data/async_block_cache.h"
 #include "pentago/high/index.h"
-#include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/str.h"
 namespace pentago {
 

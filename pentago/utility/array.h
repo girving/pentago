@@ -302,8 +302,8 @@ public:
   RawArray() : Base(Vector<int,d>(), 0) {}
   RawArray(int size, T* data) : Base(vec(size), data) {}
   RawArray(Vector<int,d> shape, T* data) : Base(shape, data) {}
-  RawArray(vector<value_type>& x) : RawArray(CHECK_CAST_INT(x.size()), x.data()) {}
-  RawArray(const vector<value_type>& x) : RawArray(CHECK_CAST_INT(x.size()), x.data()) {}
+  RawArray(vector<value_type>& x) : RawArray(CHECK_CAST_INT(uint64_t(x.size())), x.data()) {}
+  RawArray(const vector<value_type>& x) : RawArray(CHECK_CAST_INT(uint64_t(x.size())), x.data()) {}
 
   template<class S> RawArray(const Array<S,d>& array)
     : Base(array.shape(), array.data()) {}

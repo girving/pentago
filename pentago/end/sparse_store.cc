@@ -5,6 +5,7 @@
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include <sys/mman.h>
 #include <errno.h>
 namespace pentago {

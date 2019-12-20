@@ -11,6 +11,7 @@
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/large.h"
 #include "pentago/utility/memory.h"
+#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/const_cast.h"
 #include "pentago/utility/curry.h"
