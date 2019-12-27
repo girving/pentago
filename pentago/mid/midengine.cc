@@ -2,17 +2,18 @@
 
 #include "pentago/mid/midengine.h"
 #include "pentago/base/symmetry.h"
-#include "pentago/high/board.h"
-#include "pentago/search/superengine.h"
 #include "pentago/utility/ceil_div.h"
-#include "pentago/utility/char_view.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/memory_usage.h"
+#include "pentago/utility/wasm_alloc.h"
+#ifndef __wasm__
+#include "pentago/utility/log.h"
+#endif  // !__wasm__
 namespace pentago {
 
 using std::max;
 using std::min;
-using std::make_pair;
+using std::make_tuple;
 
 // Flip to enable debugging
 //#define MD(...) __VA_ARGS__
@@ -40,32 +41,43 @@ static inline uint64_t choose(const int n, const int k) {
   return fast_choose(n, min(k, n-k));
 }
 
-typedef uint64_t set_t;
-
-template<int k> static inline void subsets_helper(vector<set_t>& all, const int n, const set_t high) {
-  for (int i = k-1; i < n; i++)
-    subsets_helper<k-1>(all, i, i|high<<5);
-}
-template<> inline void subsets_helper<0>(vector<set_t>& all, const int n, const set_t high) {
-  all.push_back(high);
-}
-
 // All k-subsets of [0,n-1], packed into 64-bit ints with 5 bits for each entry.
 // I.e., the set {a < b < c} has value a|b<<5|c<<10.  We order sets in large-entry-major order;
-// the first 3-set of 10 is {0,1,2}, followed by {0,1,3}.
-static Array<const set_t> subsets(const int n, const int k) {
-  GEODE_ASSERT(0<=n && n<=18);
-  vector<set_t> all;
-  if (0<=k && k<=n)
-    switch (k) {
-      #define K(k) case k: subsets_helper<k>(all,n,0); break;
-      K(0) K(1) K(2) K(3) K(4) K(5) K(6) K(7) K(8) K(9)
-      #undef K
-      default: GEODE_ASSERT(k<=9);
+// the first 3-set of 10 is {0,1,2}, followed by {0,1,3}, {0,2,3}, ....
+void subsets(const int n, const int k, RawArray<set_t> sets) {
+  GEODE_ASSERT(0<=n && n<=18 && k<=9);
+  GEODE_ASSERT(sets.size() == choose(n, k));
+  if (!sets.size())
+    return;
+  const set_t sentinel = set_t(n)<<5*k;
+  set_t s = ((set_t(31*k-32)<<5*k) + 32) / 961;  // 0<<0 | 1<<5 | 2<<10 | ... | (k-1)<<5*(k-1)
+  int next = 0;
+  for (;;) {
+    sets[next++] = s;
+    const auto ss = s | sentinel;
+    for (int i = 0; i < k; i++) {
+      const int a = (ss>>5*i)&31;
+      const int b = (ss>>5*(i+1))&31;
+      if (a+1 < b) {
+        s ^= set_t(a^(a+1))<<5*i;
+        goto found;
+      } else
+        s ^= set_t(a^i)<<5*i;
     }
-  GEODE_ASSERT(uint64_t(all.size()) == choose(n,k));
-  return asarray(all).copy();
+    break;
+    found:;
+  }
+  GEODE_ASSERT(sets.size() == next);
 }
+
+// Allocate subsets on the stack
+#define ALLOCA_SUBSETS(name, n, k) \
+  const int name##_n_ = (n); \
+  const int name##_k_ = (k); \
+  const int name##_size_ = CHECK_CAST_INT(choose(name##_n_, name##_k_)); \
+  set_t name##_raw_[name##_size_]; \
+  const RawArray<const set_t> name(name##_size_, name##_raw_); \
+  subsets(name##_n_, name##_k_, name.const_cast_());
 
 /* In the code below, we will organized pairs of subsets of [0,n-1] into two dimensional arrays.
  * The first dimension records the player to move, the second the other player.  The first dimension
@@ -111,15 +123,17 @@ static int bottleneck(const int spots) {
   return worst;
 }
 
-Array<uint8_t> midsolve_workspace(const int min_slice) {
-  // Allocate enough memory for 18 stones, which is the most we'll need
-  return Array<uint8_t>(midsolve_workspace_memory_usage(min_slice));
-}
-
 uint64_t midsolve_workspace_memory_usage(const int min_slice) {
   // Add a bit so that we can fix alignment if it's wrong
   return sizeof(halfsupers_t)*(bottleneck(36-min_slice)+2);
 }
+
+#ifndef __wasm__
+Array<uint8_t> midsolve_workspace(const int min_slice) {
+  // Allocate enough memory for 18 stones, which is the most we'll need
+  return Array<uint8_t>(midsolve_workspace_memory_usage(min_slice));
+}
+#endif  // !__wasm__
 
 static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end,
                                      const int nx, const int ny) {
@@ -128,9 +142,8 @@ static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end
   return flat.reshape(vec(nx, ny));
 }
 
-template<int spots,int n> __attribute__((noinline)) static void
-midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,superinfos_t>& results,
-              RawArray<uint8_t> workspace) {
+static void midsolve_loop(const int spots, const int n, const board_t root, const bool parity,
+                          midsolve_internal_results_t& results, RawArray<uint8_t> workspace) {
   const int slice = 36-spots;
   const auto black_root = unpack(root, 0),
              white_root = unpack(root, 1);
@@ -138,10 +151,10 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
              root1 = (slice+n)&1 ? black_root : white_root;
   const int k0 = (slice+n)/2 - (slice+(n&1))/2, // Player to move
             k1 = n-k0; // Other player
-  const auto sets0 = subsets(spots, k0),
-             sets0p = subsets(spots-k1, k0),
-             sets1 = subsets(spots, k1),
-             sets1p = subsets(spots-k0, k1);
+  ALLOCA_SUBSETS(sets0, spots, k0);
+  ALLOCA_SUBSETS(sets0p, spots-k1, k0);
+  ALLOCA_SUBSETS(sets1, spots, k1);
+  ALLOCA_SUBSETS(sets1p, spots-k0, k1);
   const int csets0_size = fast_choose(spots, k0+1),
             csets1p_size = spots-k0 ? fast_choose(spots-k0-1, k1) : 0;
   GEODE_ASSERT(!(uint64_t(workspace.data())&(sizeof(halfsupers_t)-1)));
@@ -152,7 +165,8 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
   GEODE_ASSERT(memory_usage(input) + memory_usage(output) + memory_usage(all_wins1) <= uint64_t(workspace.size()));
 
   // List empty spots as bit indices into side_t
-  uint8_t empty[max(spots, 1)] = {0};
+  uint8_t empty[max(spots, 1)];
+  memset(empty, 0, sizeof(empty));
   {
     const auto free = side_mask&~(black_root|white_root);
     int next = 0;
@@ -183,7 +197,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone:
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  Array<Vector<uint16_t,spots-k0>> cs1ps(sets1p.size(), uninit);
+  uint16_t cs1ps[sets1p.size()][spots-k0];
   for (int s1p = 0; s1p < sets1p.size(); s1p++) {
     for (int j = 0; j < spots-k0; j++) {
       cs1ps[s1p][j] = s1p;
@@ -197,7 +211,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
 
   // Make sure each output entry is written only once
   MD(Array<uint8_t,2> written(output.sizes()));
- 
+
   // Iterate over set of stones of player to move
   for (int s0 = 0; s0 < sets0.size(); s0++) {
     // Construct side to move
@@ -369,7 +383,7 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
         board_t board = root;
         for (int i = 0; i < spots; i++)
           board += ((filled_black>>i&1)+2*(filled_white>>i&1))*pack(side_t(1)<<empty[i],side_t(0));
-        results.insert(make_pair(board, info));
+        results.append(make_tuple(board, info));
       }
 
       // Negate and apply rmax in preparation for the slice above
@@ -382,9 +396,9 @@ midsolve_loop(const board_t root, const bool parity, unordered_map<board_t,super
   }
 }
 
-unordered_map<board_t,superinfos_t> midsolve_internal(const board_t root, const bool parity,
-                                                      RawArray<uint8_t> workspace) {
-  high_board_t(root,false); // Verify that we have a consistent board
+midsolve_internal_results_t
+midsolve_internal(const board_t root, const bool parity, RawArray<uint8_t> workspace) {
+  check_board(root);
   const int slice = count_stones(root);
   GEODE_ASSERT(18<=slice && slice<=36);
   const int spots = 36-slice;
@@ -397,60 +411,66 @@ unordered_map<board_t,superinfos_t> midsolve_internal(const board_t root, const 
   GEODE_ASSERT(safe_workspace.size() >= bottleneck(spots));
 
   // Compute all slices
-  unordered_map<board_t,superinfos_t> results;
-  #define N(n) case n: midsolve_loop<s,n<=s?n:0>(root, parity, results, safe_workspace);
-  #define S(s_) \
-    case s_: { \
-      const int s = (s_); \
-      switch (s) { \
-        N(18) N(17) N(16) N(15) N(14) N(13) N(12) N(11) N(10) N(9) N(8) N(7) N(6) N(5) N(4) N(3) N(2) N(1) N(0) \
-      } \
-      break; \
-    }
-  switch (spots) {
-    S(0) S(1) S(2) S(3) S(4) S(5) S(6) S(7) S(8) S(9) S(10) S(11) S(12) S(13) S(14) S(15) S(16) S(17) S(18)
-  }
+  midsolve_internal_results_t results;
+  for (int n = spots; n >= 0; n--)
+    midsolve_loop(spots, n, root, parity, results, safe_workspace);
   return results;
 }
 
-unordered_map<board_t,int> midsolve(const board_t root, const bool parity,
-                                    const RawArray<const board_t> boards, RawArray<uint8_t> workspace) {
-  // Compute
-  const auto supers = midsolve_internal(root, parity, workspace);
-
-  // Extract results
-  unordered_map<board_t,int> results;
-  for (const auto board : boards) {
+static int traverse(const high_board_t board, const bool children, const midsolve_internal_results_t& supers,
+                    midsolve_results_t& results) {
+  int value;
+  if (board.done()) { // Done, so no lookup required
+    value = board.immediate_value();
+  } else if (!children && !board.middle()) {  // Extract value from supers
     // We can't superstandardize, since that can break parity.  Instead, we check all local rotations manually.
     for (const int i : range(256)) {
       const local_symmetry_t s(i);
-      const auto p = get_pointer(supers, transform_board(s,board));
-      if (p) {
-        const superinfos_t r = transform_superinfos(s.inverse(), *p);
+      const auto sboard = transform_board(s, board.board());
+      const auto it = std::find_if(supers.begin(), supers.end(), [=](const auto& p) { return get<0>(p) == sboard; });
+      if (it != supers.end()) {
+        const superinfos_t r = transform_superinfos(s.inverse(), get<1>(*it));
         if (r.known(0)) {
-          results.insert(make_pair(board, r.win(0)+r.notlose(0)-1));
+          value = r.win(0) + r.notlose(0) - 1;
           goto found;
         }
       }
     }
-    THROW(RuntimeError, "midsolve failure: root %lld, parity %d, board %lld", root, parity, board);
+    THROW(RuntimeError, "traverse failure: board %s", board.name());
     found:;
+  } else {  // Traverse into children
+    value = -1;
+    const int scale = board.middle() ? -1 : 1;
+    for (const auto move : board.moves())
+      value = max(value, scale * traverse(move, false, supers, results));
   }
+
+  // Store and return value
+  results.append(make_tuple(board, value));
+  return value;
+}
+
+midsolve_results_t midsolve(const high_board_t board, RawArray<uint8_t> workspace) {
+  // Compute
+  const auto supers = midsolve_internal(board.board(), board.middle(), workspace);
+
+  // Extract all available boards
+  midsolve_results_t results;
+  traverse(board, true, supers, results);
   return results;
 }
 
-unordered_map<high_board_t,int>
-high_midsolve(const high_board_t& root, RawArray<const high_board_t> boards,
-              RawArray<uint8_t> workspace) {
-  vector<board_t> bs;
-  for (auto b : boards) {
-    GEODE_ASSERT(!b.middle);
-    bs.push_back(b.board);
-  }
-  unordered_map<high_board_t,int> results;
-  for (const auto [board, value] : midsolve(root.board, root.middle, bs, workspace))
-    results.insert(make_pair(high_board_t(board, false), value));
-  return results;
+// WebAssembly interface
+#ifdef __wasm__
+WASM_EXPORT int midsolve_results_limit() {
+  return midsolve_results_t::limit;
 }
+
+WASM_EXPORT void wasm_midsolve(const high_board_t* board, midsolve_results_t* results) {
+  GEODE_ASSERT(board && results);
+  const auto workspace = wasm_buffer<uint8_t>(midsolve_workspace_memory_usage(board->count()));
+  *results = midsolve(*board, workspace);
+}
+#endif  // __wasm__
 
 }

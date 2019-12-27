@@ -12,7 +12,6 @@
 #include "pentago/base/superscore.h"
 namespace pentago {
 
-using std::ostream;
 using std::tuple;
 
 // A purely local symmetry
@@ -121,9 +120,11 @@ tuple<board_t,symmetry_t> superstandardize(side_t side0, side_t side1) __attribu
 bool meaningless(board_t board, uint64_t salt=0) __attribute__((const));
 super_t super_meaningless(board_t board, uint64_t salt=0) __attribute__((const));
 
-ostream& operator<<(ostream& output, symmetry_t s);
-ostream& operator<<(ostream& output, local_symmetry_t s);
+#ifndef __wasm__
+std::ostream& operator<<(std::ostream& output, symmetry_t s);
+std::ostream& operator<<(std::ostream& output, local_symmetry_t s);
 symmetry_t random_symmetry(Random& random);
+#endif  // !__wasm__
 
 // Convenient enumeration of all symmetries
 struct symmetries_t {

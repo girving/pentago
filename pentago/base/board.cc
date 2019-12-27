@@ -4,17 +4,15 @@
 #include "pentago/utility/debug.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/popcount.h"
-#include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/format.h"
-#include <cmath>
-#include <vector>
+#ifndef __wasm__
+#include "pentago/utility/random.h"
+#endif
 namespace pentago {
 
 using std::min;
-using std::pow;
 using std::swap;
-using std::vector;
 
 bool black_to_move(board_t board) {
   check_board(board);
@@ -28,46 +26,9 @@ bool black_to_move(board_t board) {
 
 void check_board(board_t board) {
   #define CHECK(q) \
-    if (!(quadrant(board,q)<(int)pow(3.,9.))) \
+    if (!(quadrant(board,q) < 19683)) \
       THROW(ValueError,"quadrant %d has invalid value %d",q,quadrant(board,q));
   CHECK(0) CHECK(1) CHECK(2) CHECK(3)
-}
-
-Array<int,2> to_table(const board_t board) {
-  check_board(board);
-  Array<int,2> table(6, 6, uninit);
-  for (const int qx : range(2)) {
-    for (const int qy : range(2)) {
-      const quadrant_t q = quadrant(board, 2*qx+qy);
-      const side_t s0 = unpack(q,0),
-                   s1 = unpack(q,1);
-      for (const int x : range(3))
-        for (const int y : range(3))
-          table(3*qx+x, 3*qy+y) = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1);
-    }
-  }
-  return table;
-}
-
-board_t from_table(RawArray<const int,2> table) {
-  GEODE_ASSERT(table.shape() == vec(6,6));
-  quadrant_t q[4];
-  for (const int qx : range(2)) {
-    for (const int qy : range(2)) {
-      quadrant_t s0 = 0, s1 = 0;
-      for (const int x : range(3)) {
-        for (const int y : range(3)) {
-          const quadrant_t bit = 1<<(3*x+y);
-          switch (table(3*qx+x, 3*qy+y)) {
-            case 1: s0 |= bit; break;
-            case 2: s1 |= bit; break;
-          }
-        }
-      }
-      q[2*qx+qy] = pack(s0, s1);
-    }
-  }
-  return quadrants(q[0], q[1], q[2], q[3]);
 }
 
 static inline board_t pack(const Vector<Vector<quadrant_t,2>,4>& sides) {
@@ -103,6 +64,44 @@ board_t standardize(board_t board) {
     sides[3] = prev[2];
   }
   return RawArray<board_t>(8,transformed).min();
+}
+
+#ifndef __wasm__
+Array<int,2> to_table(const board_t board) {
+  check_board(board);
+  Array<int,2> table(6, 6, uninit);
+  for (const int qx : range(2)) {
+    for (const int qy : range(2)) {
+      const quadrant_t q = quadrant(board, 2*qx+qy);
+      const side_t s0 = unpack(q,0),
+                   s1 = unpack(q,1);
+      for (const int x : range(3))
+        for (const int y : range(3))
+          table(3*qx+x, 3*qy+y) = ((s0>>(3*x+y))&1)+2*((s1>>(3*x+y))&1);
+    }
+  }
+  return table;
+}
+
+board_t from_table(RawArray<const int,2> table) {
+  GEODE_ASSERT(table.shape() == vec(6,6));
+  quadrant_t q[4];
+  for (const int qx : range(2)) {
+    for (const int qy : range(2)) {
+      quadrant_t s0 = 0, s1 = 0;
+      for (const int x : range(3)) {
+        for (const int y : range(3)) {
+          const quadrant_t bit = 1<<(3*x+y);
+          switch (table(3*qx+x, 3*qy+y)) {
+            case 1: s0 |= bit; break;
+            case 2: s1 |= bit; break;
+          }
+        }
+      }
+      q[2*qx+qy] = pack(s0, s1);
+    }
+  }
+  return quadrants(q[0], q[1], q[2], q[3]);
 }
 
 side_t random_side(Random& random) {
@@ -146,7 +145,6 @@ board_t random_board(Random& random, int n) {
   return pack(black,white);
 }
 
-#ifndef __EMSCRIPTEN__
 string str_board(board_t board) {
   string s;
   s += format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));
@@ -161,6 +159,6 @@ string str_board(board_t board) {
   }
   return s+"\n   123456";
 }
-#endif
+#endif  // !__wasm__
 
 }

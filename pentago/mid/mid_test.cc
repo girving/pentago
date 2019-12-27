@@ -1,4 +1,5 @@
 #include "pentago/base/board.h"
+#include "pentago/base/count.h"
 #include "pentago/mid/midengine.h"
 #include "pentago/search/superengine.h"
 #include "pentago/search/supertable.h"
@@ -61,25 +62,28 @@ TEST(mid, mid) {
   const auto workspace = midsolve_workspace(30);
   const auto empty = empty_block_cache();
   for (const int slice : range(30, 35+1)) {
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 8192; i++) {
       const auto root = random_board_at_slice(random, slice);
       for (const bool middle : {false, true}) {
         const high_board_t high(root, middle);
-        unordered_set<high_board_t> moves;
-        if (middle)
-          for (const auto& m : high.moves())
-            moves.insert(m);
-        else
-          for (const auto& a : high.moves())
-            for (const auto& b : a.moves())
-              moves.insert(b);
-        vector<board_t> boards;
-        for (const auto& m : moves)
-          boards.push_back(m.board);
-        const auto values = midsolve(root, middle, boards, workspace);
-        ASSERT_EQ(values.size(), moves.size());
-        for (const auto& m : moves)
-          ASSERT_EQ(check_get(values, m.board), m.value(*empty));
+        unordered_set<high_board_t> boards = {high};
+        if (!high.done()) {
+          if (middle)
+            for (const auto& m : high.moves())
+              boards.insert(m);
+          else
+            for (const auto& a : high.moves())
+              for (const auto& b : a.moves())
+                boards.insert(b);
+        }
+        const auto values = midsolve(high, workspace);
+        ASSERT_EQ(values.size(), boards.size());
+        for (const auto& b : boards) {
+          const auto it = std::find_if(values.begin(), values.end(),
+                                       [=](const auto& x) { return get<0>(x) == b; });
+          ASSERT_NE(it, values.end());
+          ASSERT_EQ(get<1>(*it), b.value(*empty));
+        }
       }
     }
   }
@@ -182,6 +186,39 @@ TEST(mid, rmax_limit) {
       for (const int i2 : range(4))
         for (const int i3 : range(4))
           ASSERT_EQ(s(i0, i1, i2, i3), (i0 + i1 + i2 + i3) & 1);
+}
+
+TEST(mid, subsets) {
+  for (const int n : range(18+1)) {
+    for (const int k : range(4)) {
+      const Array<set_t> sets(choose(n, k));
+      subsets(n, k, sets);
+      int a = 0;
+      switch (k) {
+        case 0:
+          ASSERT_EQ(sets[a++], 0);
+          break;
+        case 1:
+          for (const int i : range(n))
+            ASSERT_EQ(sets[a++], i);
+          break;
+        case 2:
+          for (const int i0 : range(n))
+            for (const int i1 : range(n))
+              if (i0 > i1)
+                ASSERT_EQ(sets[a++], i1|i0<<5);
+          break;
+        case 3:
+          for (const int i0 : range(n))
+            for (const int i1 : range(n))
+              for (const int i2 : range(n))
+                if (i0 > i1 && i1 > i2)
+                  ASSERT_EQ(sets[a++], i2|i1<<5|i0<<10);
+          break;
+      }
+      ASSERT_EQ(sets.size(), a);
+    }
+  }
 }
 
 }  // namespace

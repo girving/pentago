@@ -6,6 +6,9 @@ Pentago web server and client
 The client is hosted on Firebase.  To deploy:
 
     cd pentago/web/client
+    brew install llvm
+    bazel build //pentago/base/...
+    ./build-wasm
     npm install
     make public
     firebase deploy

@@ -1,8 +1,10 @@
 // SSE helper routines
 #pragma once
 
-#include <iostream>
 #include <type_traits>
+#ifndef __wasm__
+#include <iostream>
+#endif
 #if defined(__SSE__)
 #include <xmmintrin.h>
 #include <emmintrin.h>
@@ -38,11 +40,13 @@ template<> inline __m128i sse_pack<uint64_t>(uint64_t x0, uint64_t x1) {
 
 template<class D,class S> static inline D expand(S x);
 
+#ifndef __wasm__
 static inline std::ostream& operator<<(std::ostream& os, __m128i a) {
   int x[4];
   *(__m128i*)x = a;
   return os<<'['<<x[0]<<','<<x[1]<<','<<x[2]<<','<<x[3]<<']';
 }
+#endif  // !__wasm__
 
 static inline void transpose(__m128i& i0, __m128i& i1, __m128i& i2, __m128i& i3) {
   __m128 f0 = _mm_castsi128_ps(i0),

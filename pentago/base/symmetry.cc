@@ -4,9 +4,10 @@
 #include "pentago/base/hash.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/integer_log.h"
-#include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
-#include <unordered_set>
+#ifndef __wasm__
+#include "pentago/utility/random.h"
+#endif
 namespace pentago {
 
 using std::get;
@@ -14,19 +15,8 @@ using std::make_tuple;
 using std::min;
 using std::swap;
 using std::tuple;
-using std::unordered_set;
 
 const symmetries_t symmetries;
-
-#ifndef __EMSCRIPTEN__
-ostream& operator<<(ostream& output, symmetry_t s) {
-  return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
-}
-
-ostream& operator<<(ostream& output, local_symmetry_t s) {
-  return output<<format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
-}
-#endif
 
 // rotate_quadrants[r][q] is the quadrant moved to q under rotation r
 static const uint8_t rotate_quadrants[4][4] = {{0,1,2,3},{1,3,0,2},{3,2,1,0},{2,0,3,1}};
@@ -85,11 +75,6 @@ board_t transform_board(symmetry_t s, board_t board) {
     }
   }
   return quadrants(pack(qr[0][0],qr[0][1]),pack(qr[1][0],qr[1][1]),pack(qr[2][0],qr[2][1]),pack(qr[3][0],qr[3][1]));
-}
-
-symmetry_t random_symmetry(Random& random) {
-  const int g = random.uniform<int>(0,symmetries.size());
-  return symmetry_t(g>>8,g&255);
 }
 
 tuple<board_t,symmetry_t> superstandardize(board_t board) {
@@ -332,5 +317,20 @@ super_t super_meaningless(const board_t board, const uint64_t salt) {
       result |= super_t::singleton(r);
   return result;
 }
+
+#ifndef __wasm__
+symmetry_t random_symmetry(Random& random) {
+  const int g = random.uniform<int>(0,symmetries.size());
+  return symmetry_t(g>>8,g&255);
+}
+
+ostream& operator<<(ostream& output, symmetry_t s) {
+  return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
+}
+
+ostream& operator<<(ostream& output, local_symmetry_t s) {
+  return output<<format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
+}
+#endif  // !__wasm__
 
 }

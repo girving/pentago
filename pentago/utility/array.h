@@ -1,23 +1,27 @@
 // Shareable, multidimensional arrays
 #pragma once
 
-#include <iostream>
 #include <memory>
 #include <type_traits>
-#include <vector>
 #include "pentago/utility/debug.h"
 #include "pentago/utility/index.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/vector.h"
+#ifndef __wasm__
+#include <iostream>
+#include <vector>
+#endif
 namespace pentago {
 
+#ifndef __wasm__
 using std::default_delete;
-using std::numeric_limits;
 using std::ostream;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::vector;
 template<class T, int d=1> class Array;
+#endif  // !__wasm__
+using std::numeric_limits;
 template<class T, int d=1> class RawArray;
 template<class T> class NdArray;
 
@@ -26,7 +30,9 @@ struct Uninit {};
 constexpr static Uninit uninit = Uninit();
 
 template<class T> static inline T* get_pointer(T* p) { return p; }
+#ifndef __wasm__
 template<class T> static inline T* get_pointer(const shared_ptr<T>& p) { return p.get(); }
+#endif  // !__wasm__
 
 template<class Shape> class ArraySizes {
   struct Unusable {};
@@ -47,7 +53,9 @@ template<class Shape> class ArraySizes {
 template<int d> class ArraySizes<Vector<int,d>> {
  public:
   template<class T> using RawArray = pentago::RawArray<T,d>;
+#ifndef __wasm__
   template<class T> using Array = pentago::Array<T,d>;
+#endif  // !__wasm__
 
   typedef Vector<int,d> Shape;
   constexpr static int rank() { return d; }
@@ -222,14 +230,18 @@ public:
     return slice(range.lo, range.hi);
   }
 
-  Array<T> slice_own(int start, int end) const {
-    assert(0 <= start && start <= end && end <= size());
-    return Array<T>(vec(end - start), shared_ptr<T>(data_, data() + start));
-  }
-
   template<int d> RawArray<T,d> reshape(const Vector<int,d>& new_shape) const {
     GEODE_ASSERT(safe_product(new_shape) == size_t(total_size()));
     return RawArray<T,d>(new_shape, data());
+  }
+
+  // Return a non-owning array for use in threaded code where reference counting is slow
+  auto raw() const { return typename Base::template RawArray<T>(shape_, data()); }
+
+#ifndef __wasm__
+  Array<T> slice_own(int start, int end) const {
+    assert(0 <= start && start <= end && end <= size());
+    return Array<T>(vec(end - start), shared_ptr<T>(data_, data() + start));
   }
 
   template<int d> Array<T,d> reshape_own(const Vector<int,d>& new_shape) const {
@@ -237,16 +249,15 @@ public:
     return Array<T,d>(new_shape, data_);
   }
 
-  // Return a non-owning array for use in threaded code where reference counting is slow
-  auto raw() const { return typename Base::template RawArray<T>(shape_, data()); }
-
   typename Base::template Array<value_type> copy() const {
     typename Base::template Array<value_type> copy(Base::shape_, uninit);
     std::copy(data(), data() + total_size(), copy.data());
     return copy;
   }
+#endif  // !__wasm__
 };
 
+#ifndef __wasm__
 template<class T, int d> class Array : public ArrayBase<T,Vector<int,d>,shared_ptr<T>> {
   typedef ArrayBase<T,Vector<int,d>,shared_ptr<T>> Base;
   struct Unusable {};
@@ -292,6 +303,7 @@ public:
     return *reinterpret_cast<const Array<value_type,d>*>(this);
   }
 };
+#endif  // !__wasm__
 
 template<class T, int d> class RawArray : public ArrayBase<T,Vector<int,d>,T*> {
   typedef ArrayBase<T,Vector<int,d>,T*> Base;
@@ -302,11 +314,14 @@ public:
   RawArray() : Base(Vector<int,d>(), 0) {}
   RawArray(int size, T* data) : Base(vec(size), data) {}
   RawArray(Vector<int,d> shape, T* data) : Base(shape, data) {}
+
+#ifndef __wasm__
   RawArray(vector<value_type>& x) : RawArray(CHECK_CAST_INT(uint64_t(x.size())), x.data()) {}
   RawArray(const vector<value_type>& x) : RawArray(CHECK_CAST_INT(uint64_t(x.size())), x.data()) {}
 
   template<class S> RawArray(const Array<S,d>& array)
     : Base(array.shape(), array.data()) {}
+#endif  // !__wasm__
 
   RawArray(const RawArray<std::conditional_t<std::is_const<T>::value,
                                              std::remove_const_t<T>, Unusable>,d>& nonconst)
@@ -316,14 +331,21 @@ public:
     return *reinterpret_cast<const RawArray<const value_type,d>*>(this);
   }
 
+  const RawArray<value_type,d>& const_cast_() const {
+    return *reinterpret_cast<const RawArray<value_type,d>*>(this);
+  }
+
+#ifndef __wasm__
   using Base::copy;
 
   void copy(RawArray<const value_type> other) const {
     GEODE_ASSERT(Base::shape_ == other.shape());
     std::copy(other.data(), other.data() + other.total_size(), Base::data_);
   }
+#endif  // !__wasm__
 };
 
+#ifndef __wasm__
 template<class T> class NdArray : public ArrayBase<T,Array<const int>,shared_ptr<T>> {
   typedef ArrayBase<T,Array<const int>,shared_ptr<T>> Base;
   struct Unusable {};
@@ -354,9 +376,11 @@ concat(RawArray<const T> x, RawArray<const T> y) {
 }
 
 template<class T,int d> static inline const Array<T,d>& asarray(const Array<T,d>& x) { return x; }
-template<class T,int d> static inline const RawArray<T,d>& asarray(const RawArray<T,d>& x) { return x; }
 template<class T> static inline RawArray<T> asarray(vector<T>& x) { return x; }
 template<class T> static inline RawArray<const T> asarray(const vector<T>& x) { return x; }
+#endif  // !__wasm__
+
+template<class T,int d> static inline const RawArray<T,d>& asarray(const RawArray<T,d>& x) { return x; }
 template<class T,int d> static inline const RawArray<T> asarray(T (&x)[d]) { return RawArray<T>(d, x); }
 template<class T,int d> static inline const RawArray<T> asarray(Vector<T,d>& v) {
   return RawArray<T>(d, v.begin());
@@ -365,9 +389,11 @@ template<class T,int d> static inline const RawArray<const T> asarray(const Vect
   return RawArray<const T>(d, v.begin());
 }
 
+#ifndef __wasm__
 template<class T, class A> inline void extend(vector<T>& dst, const A& src) {
   dst.insert(dst.end(), src.begin(), src.end());
 }
+#endif
 template<class C, class T> inline bool contains(const C& container, const T& x) {
   return container.find(x) != container.end();
 }
@@ -381,6 +407,7 @@ template<class C, class T> inline auto get_pointer(C& container, const T& x) {
   return it == container.end() ? nullptr : &it->second;
 }
 
+#ifndef __wasm__
 template<class A> void array_stream_helper(ostream& out, const A& a, const int dim, const int offset) {
   if (dim == a.rank()) {
     out << a.data()[offset];
@@ -399,5 +426,6 @@ template<class T,class S,class D> ostream& operator<<(ostream& out, const ArrayB
   array_stream_helper(out, a, 0, 0);
   return out;
 }
+#endif  // !__wasm__
 
 }

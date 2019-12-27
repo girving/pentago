@@ -11,10 +11,11 @@
 
 #include "pentago/mid/halfsuper.h"
 #include "pentago/high/board.h"
-#include <unordered_map>
+#include "pentago/utility/pile.h"
+#include <tuple>
 namespace pentago {
 
-using std::unordered_map;
+using std::tuple;
 
 // (win,notlose)
 typedef Vector<halfsuper_t,2> halfsupers_t;
@@ -22,24 +23,26 @@ struct superinfos_t {
   super_t known, win, notlose;
 };
 
-// Allocate enough memory for midsolves with at least the given number of stones
-Array<uint8_t> midsolve_workspace(const int min_slice);
+// A k-subsets of [0,n-1], packed into 64-bit ints with 5 bits for each entry.
+typedef uint64_t set_t;
+void subsets(const int n, const int k, RawArray<set_t> sets);
 
 // Determine workspace memory required for midsolve.
 // Use midsolve_workspace if you're in C++; this one is for Javascript.
 uint64_t midsolve_workspace_memory_usage(const int min_slice);
 
+#ifndef __wasm__
+// Allocate enough memory for midsolves with at least the given number of stones
+Array<uint8_t> midsolve_workspace(const int min_slice);
+#endif  // !__wasm__
+
+typedef pile<tuple<high_board_t,int>,1+18+8*18> midsolve_results_t;
+typedef pile<tuple<board_t,superinfos_t>,1+18> midsolve_internal_results_t;
+
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
-unordered_map<board_t,superinfos_t> midsolve_internal(const board_t root, const bool parity,
-                                                      RawArray<uint8_t> workspace);
+midsolve_internal_results_t midsolve_internal(const board_t root, const bool parity, RawArray<uint8_t> workspace);
 
-// Compute the values of the given boards, which must be children of a single board
-unordered_map<board_t,int> midsolve(const board_t root, const bool parity,
-                                    const RawArray<const board_t> boards, RawArray<uint8_t> workspace);
-
-// High level version of midsolve
-unordered_map<high_board_t,int>
-high_midsolve(const high_board_t& root, RawArray<const high_board_t> boards,
-              RawArray<uint8_t> workspace);
+// Compute the values of a board, its children, and possibly children's children (if !board.middle)
+midsolve_results_t midsolve(const high_board_t board, RawArray<uint8_t> workspace);
 
 }

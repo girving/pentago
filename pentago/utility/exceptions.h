@@ -1,18 +1,20 @@
 // Python-like exceptions
 #pragma once
 
+#ifndef __wasm__
 #include <exception>
 #include <stdexcept>
 #include <typeinfo>
 #include <string>
+#endif
 namespace pentago {
 
-#ifdef __EMSCRIPTEN__
+#ifdef __wasm__
 
 struct RuntimeError {};
 #define SIMPLE_EXCEPTION(Error, Base) struct Error {};
 
-#else
+#else  // if !__wasm__
 
 using std::string;
 using std::type_info;
@@ -27,7 +29,7 @@ typedef std::runtime_error RuntimeError;
     virtual ~Error() throw (); \
   };
 
-#endif
+#endif  // !__wasm__
 
 SIMPLE_EXCEPTION(IOError, RuntimeError)
 SIMPLE_EXCEPTION(OSError, RuntimeError)

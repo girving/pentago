@@ -17,10 +17,12 @@ namespace pentago {
 
 void interleave(RawArray<Vector<super_t,2>> data);
 void uninterleave(RawArray<Vector<super_t,2>> data);
+#ifndef __wasm__
 Array<uint8_t> compact(Array<Vector<super_t,2>> src);
 Array<Vector<super_t,2>> uncompact(Array<const uint8_t> src);
 void wavelet_transform(RawArray<Vector<super_t,2>,4> data);
 void wavelet_untransform(RawArray<Vector<super_t,2>,4> data);
+#endif  // !__wasm__
 
 // For inline use in loops elsewhere, here are the interleave primitives
 

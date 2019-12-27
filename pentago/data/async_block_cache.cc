@@ -13,10 +13,10 @@ async_block_cache_t::async_block_cache_t(const uint64_t memory_limit)
 
 async_block_cache_t::~async_block_cache_t() {}
 
-block_t async_block_cache_t::board_block(const high_board_t& board) {
-  GEODE_ASSERT(!board.middle);
+block_t async_block_cache_t::board_block(const high_board_t board) {
+  GEODE_ASSERT(!board.middle());
   // Account for global symmetries
-  const auto flip_board = board.board; // Unlike block_cache_t::lookup, we don't need to flip the board
+  const auto flip_board = board.board();  // Unlike block_cache_t::lookup, we don't need to flip the board
   const auto section = count(flip_board).standardize<8>();
 
   // More global symmetries

@@ -43,7 +43,7 @@ struct spinlock_t {
   }
 };
 
-#elif defined(__EMSCRIPTEN__)
+#elif defined(__wasm__)
 
 // Single-threaded, so no locks
 struct spinlock_t {

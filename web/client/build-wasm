@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -e
+cd "$(dirname "$0")"/../..
+
+/usr/local/opt/llvm/bin/clang -o web/client/public/mid.wasm --target=wasm32 \
+  -ffreestanding -nostdlib -std=c++1z \
+  -fvisibility=hidden -Wl,--no-entry \
+  -Wl,--export={wasm_malloc,wasm_midsolve,midsolve_results_limit,sqr_test,sum_test,die_test} \
+  -Wl,--allow-undefined \
+  -O3 -flto -Wl,--lto-O3 \
+  -mno-exception-handling \
+  -Wall -Werror -fcolor-diagnostics -Wl,-error-limit=0 \
+  -Wl,--stack-first -Wl,-z,stack-size=$[2 << 20] -Wl,--initial-memory=0 \
+  -Wl,--export=__heap_base \
+  -isystem third_party/freestanding -I. -Ibazel-genfiles \
+  pentago/mid/{halfsuper,midengine,js_test}.cc \
+  bazel-bin/pentago/base/gen/tables.cc \
+  pentago/base/{board,superscore,symmetry}.cc \
+  pentago/high/board.cc \
+  pentago/utility/wasm_alloc.cc \
+  third_party/freestanding/cstring.cc
+
+chmod -x web/client/public/mid.wasm

@@ -4,6 +4,7 @@
 const d3 = require('d3')
 const LRU = require('lru-cache')
 const board_t = require('./board.js').board_t
+const mid_async = require('./mid_async.js')
 
 // Pull in math stuff
 const pi = Math.PI
@@ -359,27 +360,27 @@ function draw_values(svg) {
 
   // If we don't have them, look them up
   if (missing) {
-    const xh = new XMLHttpRequest()
     const start = Date.now()
-    xh.onreadystatechange = () => {
-      if (xh.readyState==4) {
-        if (xh.status==200) {
-          const values = JSON.parse(xh.responseText)
-          const elapsed = (Date.now()-start)/1000
-          let s = 'Received '+board.count+' stone board<br>elapsed = '+elapsed+' s'
-          if ('search-time' in values)
-            s += ', tree search = '+values['search-time']+' s'
-          set_status(s)
-          for (const name in values)
-            cache.set(name,values[name])
-          draw_values(svg)
-        } else
-          set_error('Server request failed, https status = '+xh.status)
+    function absorb(op, values) {
+      const elapsed = (Date.now() - start) / 1000
+      set_status(op + ' ' + board.count + ' stone board<br>elapsed = ' + elapsed + ' s')
+      for (const [name, value] of Object.entries(values)) {
+        cache.set(name, value)
       }
+      draw_values(svg)
     }
-    set_loading('Looking up '+board.count+' stone board...')
-    xh.open('GET',backend_url+board.name,true)
-    xh.send()
+    if (board.count <= 17) {  // Look up via server
+      set_loading('Looking up '+board.count+' stone board...')
+      fetch(backend_url + board.name).then(async res => {
+        if (res.ok)
+          absorb('Received', await res.json())
+        else
+          set_error('Server request failed, https status = ' + res.status)
+      })
+    } else {  // Compute locally via WebAssembly
+      set_loading('Computing '+board.count+' stone board locally...')
+      mid_async.midsolve(board).then(values => absorb('Computed', values))
+    }
   }
 }
 

@@ -7,6 +7,7 @@
   "license": "BSD-3-Clause",
   "main": "client.js",
   "dependencies": {
+    "browserify": "^16.5.0",
     "d3": "^3.5.17",
     "lru-cache": "^4.1.5",
     "nib": "1.1.x",

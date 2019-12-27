@@ -7,9 +7,10 @@ const pentago = require('./build/Release/pentago')
 const workspace = Buffer.alloc(pentago.midsolve_workspace_memory_usage(18))
 
 // Process compute requests
-process.on('message', ({root, boards}) => {
+process.on('message', board => {
   const start = Date.now()
-  const results = pentago.high_midsolve(pentago.high_board_t(root), boards.map(pentago.high_board_t), workspace)
+  const pile = pentago.midsolve(pentago.high_board_t(board), workspace)
+  const results = Object.fromEntries(pile)
   results['time'] = (Date.now() - start) / 1000
   process.send(results)
 })

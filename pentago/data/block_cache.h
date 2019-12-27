@@ -8,6 +8,7 @@
 
 #include "pentago/base/board.h"
 #include "pentago/base/superscore.h"
+#include <boost/core/noncopyable.hpp>
 #include <vector>
 namespace pentago {
 
@@ -15,7 +16,7 @@ struct section_t;
 struct supertensor_reader_t;
 using std::vector;
 
-struct block_cache_t {
+struct block_cache_t : public boost::noncopyable {
 public:
   block_cache_t();
   virtual ~block_cache_t();

@@ -48,7 +48,7 @@ function parseSize (s,name) {
   const m = s.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
   if (!m) {
     log.error("invalid %ssize '%s', expect something like 256M or 1G",name?name+' ':'',opts.cache)
-    throw 'invalid '+(name?name+' ':'')+'size '+s
+    throw Error('invalid '+(name?name+' ':'')+'size '+s)
   }
   return parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
 }
@@ -84,7 +84,7 @@ exports.values = (options, log) => {
 
   // Prepare for Cloud Files access via pkgcloud
   if (!opts.apiKey)
-    throw 'no --api-key specified'
+    throw Error('no --api-key specified')
   const container = 'pentago-edison-all'
   const download = storage.downloader({
     username: 'pentago',
@@ -95,7 +95,7 @@ exports.values = (options, log) => {
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
-    throw 'invalid --max-sockets value '+opts.maxSockets
+    throw Error('invalid --max-sockets value '+opts.maxSockets)
   https.globalAgent.maxSockets = opts.maxSockets
 
   // Initialize timing system
@@ -107,16 +107,15 @@ exports.values = (options, log) => {
     max: floor(ccache_limit/1.2),
     length: s => s.length,
   })
-  // Cache and don't simultaneously duplicate work. b = (root,boards),
-  // where boards are to be evaluated and root is their nearest common ancestor.
-  const pending_compute = Pending(async b => {
-    const results = compute_cache.get(b.root)
+  // Cache and don't simultaneously duplicate work
+  const pending_compute = Pending(async board => {
+    const results = compute_cache.get(board)
     if (results)
       return JSON.parse(results)
     else
       return await new Promise((resolve, reject) =>
-        pool.enqueue(b, results => {
-          compute_cache.set(b.root, JSON.stringify(results))
+        pool.enqueue(board, results => {
+          compute_cache.set(board, JSON.stringify(results))
           resolve(results)
         })
       )
@@ -195,7 +194,7 @@ exports.values = (options, log) => {
         }))
       else {  // Dispatch all requests to a single worker process to exploit coherence
         log.debug('computing board %s, slice %d', board.name(), board.count())
-        const res = await pending_compute({root: board.name(), boards: requests.map(({board}) => board.name())})
+        const res = await pending_compute(board.name())
         const stime = res['time']
         log.info('computed board %s, slice %d, time %s s', board.name(), board.count(), stime)
         results['search-time'] = stime

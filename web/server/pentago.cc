@@ -31,7 +31,6 @@ template<class T> struct Wrapper;
 template<class T> struct pn_valid { static constexpr bool value = false; };
 template<class T> struct pn_valid<const T> : public pn_valid<T> {};
 #define PN_TYPE(T) template<> struct pn_valid<T> { static constexpr bool value = true; };
-PN_TYPE(high_board_t)
 PN_TYPE(async_block_cache_t)
 
 // Wrap a class
@@ -63,13 +62,14 @@ PN_TYPE(async_block_cache_t)
 // Wrap a free function with a different name
 #define PN_FUNCTION_2(name, function) { \
   Isolate* const iso = Isolate::GetCurrent(); \
-  exports->Set(new_symbol(iso, #name), FunctionTemplate::New(iso, \
-    wrapped_function<decltype(&function),function>)->GetFunction()); }
+  exports->Set(Nan::GetCurrentContext(), new_symbol(iso, #name), FunctionTemplate::New(iso, \
+    wrapped_function<decltype(&function),function>)->GetFunction(Nan::GetCurrentContext()) \
+        .ToLocalChecked()).Check(); }
 
 // Utilities
 
 Local<String> new_symbol(Isolate* iso, const string& s) {
-  return String::NewFromUtf8(iso, s.c_str(), String::kInternalizedString);
+  return String::NewFromUtf8(iso, s.c_str(), NewStringType::kInternalized).ToLocalChecked();
 }
 
 template<class T> Local<T> value(Isolate* iso, const Persistent<T>& persist) {
@@ -80,18 +80,17 @@ template<class T> Local<T> value(Isolate* iso, const Persistent<T>& persist) {
 
 template<class T> struct is_numeric { static constexpr bool value =
     !std::is_same<T,bool>::value && (std::is_integral<T>::value || std::is_floating_point<T>::value); };
+template<class T> constexpr bool is_numeric_v = is_numeric<T>::value;
 
-Handle<Primitive> to_js(Isolate* iso, unit_t) {
+auto to_js(Isolate* iso, unit_t) {
   return Undefined(iso);
 }
 
-template<class T> std::enable_if_t<std::is_same<T,bool>::value,Handle<Boolean>>
-to_js(Isolate* iso, T x) {
-  return Boolean::New(iso,x);
+auto to_js(Isolate* iso, const bool x) {
+  return Boolean::New(iso, x);
 }
 
-template<class T> std::enable_if_t<is_numeric<T>::value,Handle<Number>>
-to_js(Isolate* iso, T x) {
+template<class T> auto to_js(enable_if_t<is_numeric_v<T>,Isolate*> iso, T x) {
   const double d(x);
   if (T(d) != x)
     throw ValueError(format("Can't safely convert %s to javascript, would degrade to %s",
@@ -99,69 +98,66 @@ to_js(Isolate* iso, T x) {
   return Number::New(iso, x);
 }
 
-Handle<String> to_js(Isolate* iso, const char* x) {
+auto to_js(Isolate* iso, const char* x) {
   return String::NewFromOneByte(iso, (const uint8_t*)x, v8::NewStringType::kNormal).ToLocalChecked();
 }
 
-Handle<String> to_js(Isolate* iso, const string& x) {
+auto to_js(Isolate* iso, const string& x) {
   return String::NewFromOneByte(iso, (const uint8_t*)x.c_str(), v8::NewStringType::kNormal).ToLocalChecked();
 }
 
-template<class T> Handle<v8::Object> to_js(Isolate* iso, const shared_ptr<T>& x) {
-  typedef std::remove_const_t<T> MT;
-  GEODE_ASSERT(Wrapper<MT>::constructor, format("type %s has not been wrapped", typeid(T).name()));
-  Wrapper<MT>::constructor_hack = std::const_pointer_cast<MT>(x);
-  auto js = value(iso, *Wrapper<MT>::constructor)->NewInstance(Nan::GetCurrentContext(), 0, 0);
-  Wrapper<MT>::constructor_hack.reset();
-  return js.ToLocalChecked();
-}
+template<class T> Local<v8::Object> to_js(Isolate* iso, const shared_ptr<T>& x);
+template<class T> Local<v8::Array> to_js(Isolate* iso, const vector<T>& xs);
+template<class T,int limit> Local<v8::Array> to_js(Isolate* iso, const pile<T,limit>& xs);
+template<class T0,class T1> Local<v8::Array> to_js(Isolate* iso, const tuple<T0,T1>& t);
+template<class T,int d> Local<v8::Array> to_js(Isolate* iso, const Vector<T,d>& x);
 
-template<class T> Handle<v8::Array> to_js(Isolate* iso, const vector<T>& xs);
-template<class T0,class T1> Handle<v8::Array> to_js(Isolate* iso, const tuple<T0,T1>& t);
-template<class T,int d> Handle<v8::Array> to_js(Isolate* iso, const Vector<T,d>& x);
-
-Handle<v8::Array> to_js(Isolate* iso, const section_t x) {
+auto to_js(Isolate* iso, const section_t x) {
   return to_js(iso, x.counts);
 }
 
-Handle<v8::Object> to_js(Isolate* iso, const high_board_t& x) {
+auto to_js(Isolate* iso, const high_board_t x) {
   return to_js(iso, make_shared<high_board_t>(x));
 }
 
-Handle<v8::Object> to_js(Isolate* iso, const compact_blob_t x) {
+auto to_js(Isolate* iso, const compact_blob_t x) {
   auto o = v8::Object::New(iso);
-  o->Set(to_js(iso, "offset"), to_js(iso, x.offset()));
-  o->Set(to_js(iso, "size"), to_js(iso, x.size));
+  o->Set(Nan::GetCurrentContext(), to_js(iso, "offset"), to_js(iso, x.offset())).Check();
+  o->Set(Nan::GetCurrentContext(), to_js(iso, "size"), to_js(iso, x.size)).Check();
   return o;
 }
 
-template<class T> Handle<v8::Array> to_js(Isolate* iso, const vector<T>& xs) {
+template<class T> Local<v8::Array> to_js(Isolate* iso, const vector<T>& xs) {
   int n = 0;
   auto v = v8::Array::New(iso);
   for (const auto& x : xs)
-    v->Set(n++, to_js(iso, x));
+    v->Set(Nan::GetCurrentContext(), n++, to_js(iso, x)).Check();
   return v;
 }
 
-template<class T0,class T1> Handle<v8::Array> to_js(Isolate* iso, const tuple<T0,T1>& t) {
+template<class T,int limit> Local<v8::Array> to_js(Isolate* iso, const pile<T,limit>& xs) {
+  return to_js(iso, vector<T>(xs.begin(), xs.end()));
+}
+
+template<class T0,class T1> Local<v8::Array> to_js(Isolate* iso, const tuple<T0,T1>& t) {
   const auto& [x, y] = t;
   auto v = v8::Array::New(iso);
-  v->Set(0, to_js(iso, x));
-  v->Set(1, to_js(iso, y));
+  v->Set(Nan::GetCurrentContext(), 0, to_js(iso, x)).Check();
+  v->Set(Nan::GetCurrentContext(), 1, to_js(iso, y)).Check();
   return v;
 }
 
-template<class T,int d> Handle<v8::Array> to_js(Isolate* iso, const Vector<T,d>& x) {
+template<class T,int d> Local<v8::Array> to_js(Isolate* iso, const Vector<T,d>& x) {
   auto v = v8::Array::New(iso);
   for (const int i : range(d))
-    v->Set(i, to_js(iso, x[i]));
+    v->Set(Nan::GetCurrentContext(), i, to_js(iso, x[i])).Check();
   return v;
 }
 
-template<class K,class V> Handle<v8::Object> to_js(Isolate* iso, const unordered_map<K,V>& x) {
+template<class K,class V> Local<v8::Object> to_js(Isolate* iso, const unordered_map<K,V>& x) {
   auto o = v8::Object::New(iso);
   for (const auto& p : x)
-    o->Set(to_js(iso, p.first), to_js(iso, p.second));
+    o->Set(Nan::GetCurrentContext(), to_js(iso, p.first), to_js(iso, p.second)).Check();
   return o;
 }
 
@@ -188,9 +184,9 @@ template<class T> struct FromJS<shared_ptr<T>> {
   static const shared_ptr<std::remove_const_t<T>>& convert(Isolate* iso, const Local<Value>& x) {
     typedef std::remove_const_t<T> MT;
     if (x->IsObject()) {
-      const auto o = x->ToObject();
+      const auto o = x->ToObject(Nan::GetCurrentContext()).ToLocalChecked();
       if (value(iso, *Wrapper<MT>::template_)->HasInstance(o)) {
-        const Wrapper<MT>& self = *::node::ObjectWrap::Unwrap<Wrapper<MT>>(x->ToObject());
+        const Wrapper<MT>& self = *::node::ObjectWrap::Unwrap<Wrapper<MT>>(o);
         if (!std::is_const<T>::value && !self.mutable_)
           throw format("expected mutable %s, got const", typeid(MT).name());
         return self.self;
@@ -216,7 +212,7 @@ template<class T> struct FromJS<vector<T>> {
     const int n = a->Length();
     vector<T> r;
     for (const int i : range(n))
-      r.push_back(from_js<T>(iso,a->Get(i)));
+      r.push_back(from_js<T>(iso, a->Get(Nan::GetCurrentContext(), i).ToLocalChecked()));
     return r;
   }
 };
@@ -226,8 +222,8 @@ template<class T0,class T1> struct FromJS<tuple<T0,T1>> {
     if (x->IsArray()) {
       const auto a = Local<v8::Array>::Cast(x);
       if (a->Length() == 2)
-        return make_tuple(from_js<T0>(iso, a->Get(0)),
-                          from_js<T1>(iso, a->Get(1)));
+        return make_tuple(from_js<T0>(iso, a->Get(Nan::GetCurrentContext(), 0).ToLocalChecked()),
+                          from_js<T1>(iso, a->Get(Nan::GetCurrentContext(), 1).ToLocalChecked()));
     }
     throw TypeError(format("expected length 2 tuple, types %s, %s", typeid(T0).name(),
                     typeid(T1).name()));
@@ -261,7 +257,7 @@ template<class T,int d> struct FromJS<Vector<T,d>> {
       throw TypeError(format("expected length %d vector, got length %d", d, a->Length()));
     Vector<T,d> v;
     for (const int i : range(d))
-      v[i] = from_js<T>(iso, a->Get(i));
+      v[i] = from_js<T>(iso, a->Get(Nan::GetCurrentContext(), i).ToLocalChecked());
     return v;
   }
 };
@@ -295,14 +291,15 @@ template<class T> struct Wrapper : public ::node::ObjectWrap {
 
   struct Finish : public boost::noncopyable {
     Isolate* const iso;
-    Handle<v8::Object>& exports;
+    Local<v8::Object>& exports;
     const Local<String>& sname;
-    Finish(Isolate* iso, Handle<v8::Object>& exports, const Local<String>& sname)
+    Finish(Isolate* iso, Local<v8::Object>& exports, const Local<String>& sname)
       : iso(iso), exports(exports), sname(sname) {}
     ~Finish() {
       Local<FunctionTemplate> template_ = value(iso, *Wrapper::template_);
-      Wrapper::constructor.reset(new Persistent<Function>(iso, template_->GetFunction()));
-      exports->Set(sname, value(iso, *Wrapper::constructor));
+      Wrapper::constructor.reset(new Persistent<Function>(
+          iso, template_->GetFunction(Nan::GetCurrentContext()).ToLocalChecked()));
+      exports->Set(Nan::GetCurrentContext(), sname, value(iso, *Wrapper::constructor)).Check();
     }
   };
 };
@@ -311,6 +308,15 @@ template<class T> unique_ptr<Persistent<FunctionTemplate>> Wrapper<T>::template_
 template<class T> unique_ptr<Persistent<Function>> Wrapper<T>::constructor;
 template<class T> shared_ptr<T> Wrapper<T>::constructor_hack;
 template<class T> bool Wrapper<T>::constructor_hack_mutable;
+
+template<class T> Local<v8::Object> to_js(Isolate* iso, const shared_ptr<T>& x) {
+  typedef std::remove_const_t<T> MT;
+  GEODE_ASSERT(Wrapper<MT>::constructor, format("type %s has not been wrapped", typeid(T).name()));
+  Wrapper<MT>::constructor_hack = std::const_pointer_cast<MT>(x);
+  auto js = value(iso, *Wrapper<MT>::constructor)->NewInstance(Nan::GetCurrentContext(), 0, 0);
+  Wrapper<MT>::constructor_hack.reset();
+  return js.ToLocalChecked();
+}
 
 template<class T> template<shared_ptr<T>(*factory)(const Arguments&)> void
 Wrapper<T>::wrapped_constructor(const Arguments& args) {
@@ -323,7 +329,7 @@ Wrapper<T>::wrapped_constructor(const Arguments& args) {
       try {
         self = factory(args);
       } catch (const exception& e) {
-        iso->ThrowException(Exception::Error(String::NewFromUtf8(iso, e.what())));
+        iso->ThrowException(Exception::Error(String::NewFromUtf8(iso, e.what()).ToLocalChecked()));
         return args.GetReturnValue().Set(Undefined(iso));
       }
     }
@@ -402,7 +408,7 @@ template<class T,class M,M method> void wrapped_method(const Arguments& args) {
     return args.GetReturnValue().Set(to_js(
         iso, invoke(*self->self, method, args, indices(), self->mutable_)));
   } catch (const exception& e) {
-    iso->ThrowException(Exception::Error(String::NewFromUtf8(iso, e.what())));
+    iso->ThrowException(Exception::Error(String::NewFromUtf8(iso, e.what()).ToLocalChecked()));
     return args.GetReturnValue().Set(Undefined(iso));
   }
 }
@@ -420,7 +426,7 @@ template<class F,F func> void wrapped_function(const Arguments& args) {
   try {
     return args.GetReturnValue().Set(to_js(iso, invoke(unit, func, args, indices(), false)));
   } catch (const exception& e) {
-    iso->ThrowException(Exception::Error(String::NewFromUtf8(iso, e.what())));
+    iso->ThrowException(Exception::Error(String::NewFromUtf8(iso, e.what()).ToLocalChecked()));
     return args.GetReturnValue().Set(Undefined(iso));
   }
 }
@@ -428,8 +434,9 @@ template<class F,F func> void wrapped_function(const Arguments& args) {
 // Pentago specific
 
 shared_ptr<high_board_t> make_board(const Arguments& args) {
-  return args.Length() ? make_shared<high_board_t>(high_board_t::parse(*String::Utf8Value(args[0])))
-                       : make_shared<high_board_t>(0, false);
+  if (!args.Length())
+    return make_shared<high_board_t>(0, false);
+  return make_shared<high_board_t>(high_board_t::parse(*String::Utf8Value(args.GetIsolate(), args[0])));
 }
 
 shared_ptr<sections_t> make_sections(const Arguments& args) {
@@ -439,7 +446,7 @@ shared_ptr<sections_t> make_sections(const Arguments& args) {
 shared_ptr<async_block_cache_t> make_async(const Arguments& args) {
   if (args.Length() < 1 || !args[0]->IsNumber())
     throw TypeError("async_block_cache_t: expected one numeric memory_limit argument");
-  return make_shared<async_block_cache_t>(uint64_t(args[0]->NumberValue()));
+  return make_shared<async_block_cache_t>(uint64_t(args[0]->NumberValue(Nan::GetCurrentContext()).ToChecked()));
 }
 
 shared_ptr<supertensor_index_t> make_index(const Arguments& args) {
@@ -474,7 +481,7 @@ unordered_map<string,double> config() {
   return config;
 }
 
-void init(Handle<v8::Object> exports) {
+void init(Local<v8::Object> exports) {
   {
     PN_CLASS(high_board_t, make_board)
     PN_METHOD(name)
@@ -501,7 +508,7 @@ void init(Handle<v8::Object> exports) {
   }
   PN_FUNCTION(descendent_sections)
   PN_FUNCTION(midsolve_workspace_memory_usage)
-  PN_FUNCTION(high_midsolve)
+  PN_FUNCTION(midsolve)
   PN_FUNCTION(init_threads)
   PN_FUNCTION(config)
 }

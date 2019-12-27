@@ -35,8 +35,6 @@ namespace pentago {
 #endif
 #endif
 
-using std::ostream;
-
 struct zero {};
 
 // A subset of the rotation group Z_4^4 represented as a 256 bit mask.
@@ -266,11 +264,6 @@ extern const Vector<int,4> single_rotations[8];
 
 uint8_t first(super_t s);
 
-super_t random_super(Random& random);
-
-ostream& operator<<(ostream& output, super_t s);
-ostream& operator<<(ostream& output, superinfo_t s);
-
 int popcount(super_t s);
 
 #if PENTAGO_SSE // SSE version of rmax
@@ -334,6 +327,12 @@ static inline super_t endian_reverse(const super_t s) {
 }
 #endif
 
+#ifndef __wasm__
+super_t random_super(Random& random);
+
+std::ostream& operator<<(std::ostream& output, super_t s);
+std::ostream& operator<<(std::ostream& output, superinfo_t s);
+
 uint64_t super_popcount(NdArray<const super_t> data);
 NdArray<int> super_popcounts(NdArray<const super_t> data);
 Array<super_t> random_supers(const uint128_t key, const int size);
@@ -341,5 +340,6 @@ Array<super_t> random_supers(const uint128_t key, const int size);
 template<int d> Array<super_t,d> random_supers(const uint128_t key, const Vector<int,d> shape) {
   return random_supers(key, shape.product()).reshape_own(shape);
 }
+#endif  // !__wasm__
 
 }  // namespace pentago

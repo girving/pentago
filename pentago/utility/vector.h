@@ -3,12 +3,14 @@
 
 #include <algorithm>
 #include <cassert>
-#ifndef __EMSCRIPTEN__
+#ifndef __wasm__
 #include <boost/functional/hash.hpp>
 #endif
 namespace pentago {
 
+#ifndef __wasm__
 using std::ostream;
+#endif
 template<class T, int d> class Vector;
 
 template<class TV> struct scalar_type_helper {
@@ -238,6 +240,7 @@ template<class T,int d> static inline T dot(const Vector<T,d>& x, const Vector<T
   return r;
 }
 
+#ifndef __wasm__
 template<class T,int d> ostream& operator<<(ostream& out, const Vector<T,d>& v) {
   out << '[';
   for (int i = 0; i < d; i++) {
@@ -248,13 +251,12 @@ template<class T,int d> ostream& operator<<(ostream& out, const Vector<T,d>& v) 
   return out;
 }
 
-#ifndef __EMSCRIPTEN__
 template<class T,int d> static inline size_t hash_value(const Vector<T,d>& v) {
   size_t h = 0;
   for (const auto& x : v) boost::hash_combine(h, x);
   return h;
 }
-#endif
+#endif  // !__wasm__
 
 template<int i,class T,int d> static inline T& get(Vector<T,d>& v) {
   static_assert(0 <= i && i < d);
@@ -268,13 +270,13 @@ template<int i,class T,int d> static inline const T& get(const Vector<T,d>& v) {
 
 }  // namespace pentago
 namespace std {
-#ifndef __EMSCRIPTEN__
+#ifndef __wasm__
 template<class T,int d> struct hash<pentago::Vector<T,d>> {
   size_t operator()(const pentago::Vector<T,d>& v) const {
     return hash_value(v);
   }
 };
-#endif
+#endif  // !__wasm__
 template<class T,int d> class tuple_size<pentago::Vector<T,d>> {
  public:
   constexpr static int value = d;

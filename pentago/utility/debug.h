@@ -10,8 +10,10 @@
 #include <limits>
 #include "pentago/utility/exceptions.h"
 #include "pentago/utility/format.h"
+#include "pentago/utility/wasm.h"
 namespace pentago {
 
+#ifndef __wasm__
 using std::string;
 
 // Should we print?  Defaults to true.
@@ -45,6 +47,20 @@ die(const char* msg, const Args&... args) {
   ((condition) ? (void)0 : pentago::assertion_failed( \
       __PRETTY_FUNCTION__, __FILE__, __LINE__, #condition, pentago::debug_message(__VA_ARGS__)))
 
+#else  // if __wasm__
+
+WASM_IMPORT void __attribute__((noreturn, cold)) die(const char* msg);
+
+#define THROW(Error, ...) die(#__VA_ARGS__)
+
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+
+#define GEODE_ASSERT(condition, ...) \
+  ((condition) ? (void)0 : die(__FILE__ ":" STRINGIZE(__LINE__) ": " #condition ", " #__VA_ARGS__ ))
+
+#endif  // __wasm__
+
 #ifdef NDEBUG
 # define GEODE_DEBUG_ONLY(...)
 #else
@@ -68,12 +84,13 @@ template<class T> static inline void assert_is_almost_uint64(const T n) {
 
 // Everything beyond here is internals
 
+#ifndef __wasm__
 template<class Error> void maybe_throw() __attribute__ ((noreturn, cold));
 template<class Error> void maybe_throw(const char* msg) __attribute__ ((noreturn, cold));
 
 template<class Error, class First, class... Rest> static inline void __attribute__ ((noreturn, cold))
 maybe_throw(const char* fmt, const First& first, const Rest&... rest) {
-#ifdef __EMSCRIPTEN__
+#ifdef __wasm__
   maybe_throw<Error>(fmt);  // Throw away arguments for now
 #else
   maybe_throw<Error>(format(fmt, first, rest...).c_str());
@@ -92,5 +109,6 @@ static inline const char* debug_message(const string& message) { return message.
 void __attribute__((noreturn, cold))
 assertion_failed(const char* function, const char* file, unsigned int line, const char* condition,
                  const char* message);
+#endif  // __wasm__
 
 }

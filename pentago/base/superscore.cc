@@ -4,13 +4,14 @@
 #include "pentago/base/score.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/debug.h"
-#include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
-#include <cmath>
 #include <numeric>
+#ifndef __wasm__
+#include "pentago/utility/random.h"
+#include <cmath>
+#endif  // !__wasm__
 namespace pentago {
 
-using std::abs;
 using std::min;
 using std::numeric_limits;
 using std::swap;
@@ -101,6 +102,14 @@ const Vector<int,4> single_rotations[8] = {
     vec(0,0,1,0),vec(0,0,-1,0),vec(0,0,0,1),vec(0,0,0,-1)
 };
 
+uint8_t first(super_t s) {
+  for (int r=0;r<256;r++)
+    if (s(r))
+      return r;
+  THROW(ValueError,"zero passed to super_t first");
+}
+
+#ifndef __wasm__
 super_t random_super(Random& random) {
   const uint64_t r0 = random.bits<uint64_t>(),
                  r1 = random.bits<uint64_t>(),
@@ -143,13 +152,6 @@ ostream& operator<<(ostream& output, super_t s) {
   return output<<i;
 }
 
-uint8_t first(super_t s) {
-  for (int r=0;r<256;r++)
-    if (s(r))
-      return r;
-  THROW(ValueError,"zero passed to super_t first");
-}
-
 uint64_t super_popcount(NdArray<const super_t> data) {
   uint64_t sum = 0;
   for (auto& s : data.flat())
@@ -163,5 +165,6 @@ NdArray<int> super_popcounts(NdArray<const super_t> data) {
     counts.flat()[i] = popcount(data.flat()[i]);
   return counts;
 }
+#endif  // !__wasm__
 
 }

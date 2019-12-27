@@ -10,16 +10,29 @@
 #pragma once
 
 #include "pentago/base/board.h"
+#include "pentago/utility/pile.h"
+#ifndef __wasm__
 #include "pentago/data/block_cache.h"
-#include "pentago/utility/array.h"
+#endif
 namespace pentago {
 
-struct high_board_t {
-  const board_t board; // Board state: 0 for black (first player), 1 for white (second player)
-  const bool middle; // Did we already place a stone?  I.e., are we halfway through the move?
+class high_board_t {
+  // Split into two uint32_t's to allow 4-byte alignment
+  uint32_t rep_[2];  // middle ? ~board : board
+  uint64_t rep() const { return rep_[0] | uint64_t(rep_[1]) << 32; }
+public:
 
+  high_board_t() : rep_{0, 0} {}
   high_board_t(const board_t board, const bool middle);
   ~high_board_t();
+
+  // Board state: 0 for black (first player), 1 for white (second player)
+  board_t board() const { const auto d = rep(); return middle() ? ~d : d; }
+
+  // Did we already place a stone?  I.e., are we halfway through the move?
+  bool middle() const { return bool(rep_[1] & 1<<31); }
+
+  bool operator==(const high_board_t other) const { return rep() == other.rep(); }
 
   // Total number of stones
   int count() const;
@@ -32,7 +45,7 @@ struct high_board_t {
 
   // Moves which follow this one.  Note that high level moves are "half" of a regular move:
   // there is one move to place a stone and one move to rotate it.
-  vector<high_board_t> moves() const;
+  pile<high_board_t,36> moves() const;
 
   // Place a stone at the given location
   high_board_t place(const int x, const int y) const;
@@ -43,6 +56,7 @@ struct high_board_t {
   // value() assuming done()
   int immediate_value() const;
 
+#ifndef __wasm__
   // 1 if the player to move wins, 0 for tie, -1 if the player to move loses
   int value(const block_cache_t& cache) const;
 
@@ -52,22 +66,20 @@ struct high_board_t {
   // Compare against a bunch of samples and return loss,tie,win counts
   static Vector<int,3> sample_check(const block_cache_t& cache, RawArray<const board_t> boards,
                                     RawArray<const Vector<super_t,2>> wins);
-
-  bool operator==(const high_board_t& other) const {
-    return board==other.board && middle==other.middle;
-  }
-
   string name() const;
-  friend ostream& operator<<(ostream& output, const high_board_t& board);
+  friend ostream& operator<<(ostream& output, const high_board_t board);
   static high_board_t parse(const string& name);
   template<class T> friend struct std::hash;
+#endif  // !__wasm__
 };
 
 }  // namespace pentago
+#ifndef __wasm__
 namespace std {
 template<> struct hash<pentago::high_board_t> {
-  size_t operator()(const pentago::high_board_t& b) const {
-    return hash<pentago::board_t>()(b.middle ? ~b.board : b.board);
+  size_t operator()(const pentago::high_board_t board) const {
+    return hash<uint64_t>()(board.rep());
   }
 };
 }  // namespace std
+#endif  // !__wasm__

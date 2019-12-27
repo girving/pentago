@@ -8,14 +8,14 @@
 #pragma once
 
 #include <cassert>
-#include <string>
 #include "pentago/utility/array.h"
 #include "pentago/utility/popcount.h"
-#include "pentago/utility/random.h"
 #include "pentago/base/gen/tables.h"
+#ifndef __wasm__
+#include "pentago/utility/random.h"
+#include <string>
+#endif
 namespace pentago {
-
-using std::string;
 
 // Each board is divided into 4 quadrants, and each quadrant is stored
 // in one of the 16-bit quarters of a 64-bit int.  Within a quadrant,
@@ -94,6 +94,12 @@ void check_board(board_t board);
 
 board_t standardize(board_t board);
 
+// Maybe swap sides
+static inline board_t flip_board(board_t board, bool turn = true) {
+  return pack(unpack(board,turn),unpack(board,1-turn));
+}
+
+#ifndef __wasm__
 // Random board and side generation
 side_t random_side(Random& random);
 board_t random_board(Random& random);
@@ -101,17 +107,11 @@ board_t random_board(Random& random);
 // Generate a random board with n stones
 board_t random_board(Random& random, int n);
 
-// Maybe swap sides
-static inline board_t flip_board(board_t board, bool turn = true) {
-  return pack(unpack(board,turn),unpack(board,1-turn));
-}
-
-#ifndef __EMSCRIPTEN__
-string str_board(board_t board);
-#endif
+std::string str_board(board_t board);
 
 // Turn a board into a 6x6 grid: x-y major order, 0,0 is lower left, value 0 for empty or 2^k for player k
 Array<int,2> to_table(const board_t boards);
 board_t from_table(RawArray<const int,2> tables);
+#endif  // !__wasm__
 
 }

@@ -1,12 +1,12 @@
 // Endian utilities
 #pragma once
 
-#ifndef __EMSCRIPTEN__
+#ifndef __wasm__
 #include <boost/endian/conversion.hpp>
 #endif
 namespace pentago {
 
-#ifdef __EMSCRIPTEN__
+#ifdef __wasm__
 
 #define PENTAGO_LITTLE_ENDIAN  // Emscripten is little endian
 
@@ -26,6 +26,6 @@ template<class A> void to_little_endian_inplace(const A& data) {
 #endif
 }
 
-#endif // __EMSCRIPTEN__
+#endif  // __wasm__
 
 }

@@ -31,7 +31,7 @@ public:
   // Look up the section and block containing a given board.
   // Code copied from block_cache_t::lookup due to laziness.
   // The only difference is that the board isn't flipped.
-  static block_t board_block(const high_board_t& board);
+  static block_t board_block(const high_board_t board);
 
   bool contains(const block_t block) const;
   unit_t set(const block_t block, RawArray<const uint8_t> compressed);
