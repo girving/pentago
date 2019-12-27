@@ -18,7 +18,7 @@ The client is hosted on Firebase.  To deploy:
 To build and test the `npm` extension module, do
 
     cd pentago/web/server
-    bazel build -c opt --copt=-march=native //pentago/{end,high,mid}/...
+    bazel build -c opt --copt=-march=native //pentago/{end,high}/...
     npm install
     node unit.js all
 

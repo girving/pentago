@@ -10,7 +10,6 @@
 #include <pentago/end/sections.h>
 #include <pentago/high/board.h>
 #include <pentago/high/index.h>
-#include <pentago/mid/midengine.h>
 #include <unordered_map>
 namespace pentago {
 namespace node {
@@ -507,8 +506,6 @@ void init(Local<v8::Object> exports) {
     PN_METHOD(block_location)
   }
   PN_FUNCTION(descendent_sections)
-  PN_FUNCTION(midsolve_workspace_memory_usage)
-  PN_FUNCTION(midsolve)
   PN_FUNCTION(init_threads)
   PN_FUNCTION(config)
 }

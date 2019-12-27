@@ -46,7 +46,7 @@ static inline uint64_t choose(const int n, const int k) {
 // the first 3-set of 10 is {0,1,2}, followed by {0,1,3}, {0,2,3}, ....
 void subsets(const int n, const int k, RawArray<set_t> sets) {
   GEODE_ASSERT(0<=n && n<=18 && k<=9);
-  GEODE_ASSERT(sets.size() == choose(n, k));
+  GEODE_ASSERT(uint64_t(sets.size()) == choose(n, k));
   if (!sets.size())
     return;
   const set_t sentinel = set_t(n)<<5*k;

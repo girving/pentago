@@ -10,10 +10,10 @@
         '../../bazel-pentago/external/boost',
         '../../bazel-pentago/external/tinyformat',
         '../../bazel-genfiles',
+        '../../bazel-bin',
         "<!(node -e \"require('nan')\")"
       ],
       'libraries': [
-        '../../../bazel-bin/pentago/mid/libmid.a',
         '../../../bazel-bin/pentago/high/libhigh.a',
         '../../../bazel-bin/pentago/end/libend.a',
         '../../../bazel-bin/pentago/data/libasync.a',

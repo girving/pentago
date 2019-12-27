@@ -5,6 +5,8 @@
 const board_t = require('./board.js').board_t
 const assert = require('assert').strict
 const mid_sync = require('./mid_sync.js')
+const all_games = require('./games.js')
+const pending = require('./pending.js')
 const min = Math.min
 const pow = Math.pow
 
@@ -98,20 +100,48 @@ async function test_mid() {
   console.log('    mid time = ' + (Date.now()-start) / 1000 + ' s')
 }
 
+async function test_path() {
+  const start = Date.now()
+  const compute = pending(mid_sync.midsolve)
+  await Promise.all(all_games().map(async ({path, values}) => {
+    const seen = {}
+    await Promise.all(path.map(async name => {
+      const board = new board_t(name)
+      if (board.count < 18)
+        return
+      const results = await compute(board)
+      for (const b in results) {
+        seen[b] = true
+        if (b in values && results[b] != values[b])
+          throw Error('mismatch: board '+b+', correct '+values[b]+', got '+results[b])
+      }
+    }))
+    for (const b in values) {
+      const board = new board_t(b)
+      if (!seen[b] && board.count - board.middle >= 18)
+        throw Error('missed board ' + b + ', count = ' + board.count)
+    }
+  }))
+  const elapsed = (Date.now() - start) / 1000
+  console.log('    path time = ' + elapsed + ' s')
+}
+
 const green = '\x1b[1;32m'
 const red = '\x1b[1;31m'
 const clear = '\x1b[00m'
 
-// Run all tests
-const tests = [test_moves, test_done, test_mid]
-Promise.all(tests.map(test =>
-  test().then(() =>
-    console.log('  '+test.name+': '+green+'pass'+clear)
-  ).catch(e => {
-    console.log('  '+test.name+': '+red+'failed'+clear+'\n'+e.stack)
-    process.exit(1)
-  })
-)).then(() => {
+// Run all tests in series
+async function toplevel() {
+  for (const test of [test_moves, test_done, test_mid, test_path]) {
+    try {
+      await test()
+      console.log('  '+test.name+': '+green+'pass'+clear)
+    } catch (e) {
+      console.log('  '+test.name+': '+red+'failed'+clear+'\n'+e.stack)
+      process.exit(1)
+    }
+  }
   console.log(green+'  all tests passed'+clear)
   process.exit(0)
-})
+}
+toplevel()

@@ -27,9 +27,10 @@ Representing black as 1 and white as 2 as in the ternary, this board looks like
   _ _ 2 1 _ _
   _ _ 2 2 _ 1
 
-Internally, values of positions with 18 stones or fewer are looked up in a 4 TB
-database.  If there are more stones, the value is computed from scratch using
-optimized tree search.  This is computationally expensive, so expect a delay.
+The server accepts only positions with 17 stones or fewer; these are looked up
+in a 4 TB database.  Previously, positions with 18 or more stones were solved
+using on-the-fly retrograde analysis, but this functionality has been ported to
+WebAssembly and moved into the client.
 
 All code and data for this website is BSD-licensed open source.  For details see
 

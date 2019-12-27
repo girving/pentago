@@ -1,10 +1,8 @@
-// Asynchronous board value lookup and compute
+// Asynchronous board value lookup
 
 'use strict'
 const os = require('os')
 const https = require('https')
-const LRU = require('lru-cache')
-const WorkQueue = require('mule').WorkQueue
 const Pending = require('./pending')
 const storage = require('./storage')
 const pentago = require('./build/Release/pentago')
@@ -18,9 +16,7 @@ const max = Math.max
 const floor = Math.floor
 
 exports.defaults = {
-  pool: os.cpus().length,
   cache: '250M',
-  ccache: '250M',
   maxSlice: 18,
   maxSockets: 64,
   apiKey: '',
@@ -29,9 +25,7 @@ exports.defaults = {
 
 exports.add_options = options => {
   const d = exports.defaults
-  options.option('--pool <n>','Number of worker compute processes (defaults to cpu count)',parseInt,d.pool)
-         .option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
-         .option('--ccache <size>','Size of compute cache (suffixes M/MB and G/GB are understood)',d.ccache)
+  options.option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
          .option('--max-sockets <n>','Maximum number of simultaneous https connections',parseInt,d.maxSockets)
          .option('--api-key <key>','Rackspace API key',d.apiKey)
@@ -56,7 +50,6 @@ function parseSize (s,name) {
 // Create an evaluation routine with calling convention
 //   values(board) : Promise
 // The options are
-//   pool: Number of worker compute processes (defaults to cpu count)
 //   cache: Size of block cache (suffixes M/MB and G/GB are understood)
 //   maxSlice: Maximum slice available in database (for debugging use only)
 exports.values = (options, log) => {
@@ -65,14 +58,11 @@ exports.values = (options, log) => {
   for (const k in exports.defaults)
     opts[k] = options[k] || exports.defaults[k]
   const cache_limit = parseSize(opts.cache,'--cache')
-  const ccache_limit = parseSize(opts.ccache,'--ccache')
 
   // Print information
   log.info('cache memory limit = %d (%s)', cache_limit, opts.cache)
-  log.info('compute cache memory limit = %d (%s)', ccache_limit, opts.ccache)
   log.info('max slice = %d', opts.maxSlice)
   log.info('max sockets = %d', opts.maxSockets)
-  log.info('compute pool = %d', opts.pool)
   log.info('external = %d', opts.external)
   log.info('version = %s', version)
 
@@ -100,26 +90,6 @@ exports.values = (options, log) => {
 
   // Initialize timing system
   pentago.init_threads(0,0)
-
-  // Prepare for computations
-  const pool = new WorkQueue(__dirname+'/compute.js',opts.pool)
-  const compute_cache = LRU({
-    max: floor(ccache_limit/1.2),
-    length: s => s.length,
-  })
-  // Cache and don't simultaneously duplicate work
-  const pending_compute = Pending(async board => {
-    const results = compute_cache.get(board)
-    if (results)
-      return JSON.parse(results)
-    else
-      return await new Promise((resolve, reject) =>
-        pool.enqueue(board, results => {
-          compute_cache.set(board, JSON.stringify(results))
-          resolve(results)
-        })
-      )
-  })
 
   // Get a section of a file
   function range_get(object, blob) {
@@ -152,61 +122,32 @@ exports.values = (options, log) => {
     }
   })
 
-  // Lookup or compute the value or board and its children, returning a promise of a board -> value map.
+  // Lookup the value or board and its children, returning a promise of a board -> value map.
   async function values(board) {
+    // Boards with more stones should be handled on the client
+    if (board.count() >= opts.maxSlice)
+      throw Error('board ' + board.name() + ' has ' + board.count() +
+                  ' >= ' + opts.maxSlice + ' stones, and should be computed locally')
+
     // Collect the leaf boards whose values we need
     const results = {version: version}
-    const requests = []
     async function traverse(board, children) {
+      let value
       if (board.done()) {  // Done, so no lookup required
-        const value = board.immediate_value()
-        results[board.name()] = value
-        return value
-      } else if (!children && !board.middle()) {  // Request board
-        return await new Promise((resolve, reject) => requests.push({board: board, resolve: resolve}))
+        value = board.immediate_value()
+      } else if (!children && !board.middle()) {  // Look up a remote value, caching the block in the process
+        await pending_block(cache.board_block(board))
+        value = board.value(cache)
       } else {  // Traverse into children
-        let value = -1
+        value = -1
         const scale = board.middle() ? -1 : 1
         for (const v of await Promise.all(board.moves().map(m => traverse(m, false))))
           value = max(value, scale*v)
-        results[board.name()] = value
-        return value
       }
+      results[board.name()] = value
+      return value
     }
-    const top = traverse(board, true)
-
-    if (requests.length) {
-      // Verify that all requests have the same slice
-      const slice = requests[0].board.count()
-      requests.forEach(r => {
-        if (slice != r.board.count())
-          throw Error('slice mismatch: '+slice+' != '+r.board.count())
-      })
-
-      // If the slice is in the database, make asynchronous https requests
-      if (slice <= opts.maxSlice)
-       await Promise.all(requests.map(async ({board, resolve}) => {
-          // Look up a remote value, caching the block in the process
-          await pending_block(cache.board_block(board))
-          const value = board.value(cache)
-          results[board.name()] = value
-          resolve(value)
-        }))
-      else {  // Dispatch all requests to a single worker process to exploit coherence
-        log.debug('computing board %s, slice %d', board.name(), board.count())
-        const res = await pending_compute(board.name())
-        const stime = res['time']
-        log.info('computed board %s, slice %d, time %s s', board.name(), board.count(), stime)
-        results['search-time'] = stime
-        requests.forEach(({board, resolve}) => {
-          const value = res[board.name()]
-          results[board.name()] = value
-          resolve(value)
-        })
-      }
-    }
-
-    await top
+    await traverse(board, true)
     return results
   }
   return values

@@ -72,7 +72,7 @@ currently hosted on [Rackspace](https://www.rackspace.com).  To run, do
     # Create a rackspace server via docker-machine
     docker-machine create --driver=rackspace --rackspace-username=pentago \
       --rackspace-api-key=`cat $SSL/api-key` --rackspace-region=IAD \
-      --rackspace-flavor-id=general1-8 --engine-storage-driver=overlay pentago
+      --rackspace-flavor-id=general1-1 --engine-storage-driver=overlay pentago
     eval "$(docker-machine env pentago)"
 
     # Copy ssl keys to machine
