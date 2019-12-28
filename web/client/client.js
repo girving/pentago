@@ -2,7 +2,7 @@
 
 'use strict'
 const d3 = require('d3')
-const LRU = require('lru-cache')
+const cache = require('./local_lru.js')
 const board_t = require('./board.js').board_t
 const mid_async = require('./mid_async.js')
 
@@ -16,7 +16,6 @@ const floor = Math.floor
 
 // Backend, with a bit of caching to avoid flicker on the back button
 const backend_url = 'https://backend.perfect-pentago.net/'
-const cache = LRU({max:2048})
 
 // Colors for each board value, taking care to be nice to colorblind folk.
 const value_colors = {'1':'#00ff00','0':'#0000ff','-1':'#ff0000','undefined':null}
@@ -364,9 +363,8 @@ function draw_values(svg) {
     function absorb(op, values) {
       const elapsed = (Date.now() - start) / 1000
       set_status(op + ' ' + board.count + ' stone board<br>elapsed = ' + elapsed + ' s')
-      for (const [name, value] of Object.entries(values)) {
+      for (const [name, value] of Object.entries(values))
         cache.set(name, value)
-      }
       draw_values(svg)
     }
     if (board.count <= 17) {  // Look up via server

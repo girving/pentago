@@ -9,8 +9,8 @@
   "dependencies": {
     "browserify": "^16.5.0",
     "d3": "^3.5.17",
-    "lru-cache": "^4.1.5",
     "nib": "1.1.x",
+    "storage-factory": "^0.1.0",
     "stylus": "0.54.x"
   },
   "keywords": [
