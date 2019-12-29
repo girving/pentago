@@ -7,6 +7,7 @@ const assert = require('assert').strict
 const mid_sync = require('./mid_sync.js')
 const all_games = require('./games.js')
 const pending = require('./pending.js')
+const lru = require('./local_lru.js')
 const min = Math.min
 const pow = Math.pow
 
@@ -37,6 +38,37 @@ async function test_done() {
     if (v != done[name])
       throw Error('done check failed: board '+name+', correct '+done[name]+', got '+v)
   }
+}
+
+async function test_lru() {
+  assert.equal(lru.size(), 0)
+  const top = 40
+  const lo = 13
+  const hi = 17
+  lru.set_lohi(lo, hi)
+  const all = []
+  const f = n => n * n * n + 7
+  let filled = false
+  for (let i = 0; i < 2000; i++) {
+    const k = Math.floor(Math.random() * top)
+    if (Math.random() < 0.5) { // get
+      if (lru.get(k)) all.push(k)
+    } else { // set
+      all.push(k)
+      lru.set(k, f(k))
+      filled = filled || lru.size() >= lo
+    }
+    const size = lru.size()
+    if (filled)
+      assert(lo <= size)
+    assert(size <= hi)
+    for (let j = 0; j < size; j++) {
+      const k = all[all.length-1-j]
+      const v = lru.peek(k)
+      assert.equal(v, f(k), 'key ' + k +', f(k) ' + f(k) + ', v ' + v)
+    }
+  }
+  assert(filled)
 }
 
 async function test_wasm() {
@@ -132,7 +164,7 @@ const clear = '\x1b[00m'
 
 // Run all tests in series
 async function toplevel() {
-  for (const test of [test_moves, test_done, test_mid, test_path]) {
+  for (const test of [test_moves, test_done, test_lru, test_mid, test_path]) {
     try {
       await test()
       console.log('  '+test.name+': '+green+'pass'+clear)
