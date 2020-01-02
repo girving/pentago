@@ -6,6 +6,7 @@
 #include "pentago/utility/debug.h"
 #include "pentago/utility/memory_usage.h"
 #include "pentago/utility/wasm_alloc.h"
+#include "pentago/utility/wasm_progress.h"
 #ifndef __wasm__
 #include "pentago/utility/log.h"
 #endif  // !__wasm__
@@ -143,7 +144,8 @@ static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end
 }
 
 static void midsolve_loop(const int spots, const int n, const board_t root, const bool parity,
-                          midsolve_internal_results_t& results, RawArray<uint8_t> workspace) {
+                          midsolve_internal_results_t& results, RawArray<uint8_t> workspace,
+                          wasm_progress_t& progress) {
   const int slice = 36-spots;
   const auto black_root = unpack(root, 0),
              white_root = unpack(root, 1);
@@ -392,6 +394,7 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
       above[1] = rmax(~us[0]);
       output(s1,s0p) = above;
       MD(GEODE_ASSERT(!written(s1, s0p)++));
+      progress.step();
     }
   }
 }
@@ -410,10 +413,16 @@ midsolve_internal(const board_t root, const bool parity, RawArray<uint8_t> works
   const auto safe_workspace = workspace.slice(fix, workspace.size()-fix);
   GEODE_ASSERT(safe_workspace.size() >= bottleneck(spots));
 
+  // Compute total number of steps that will happen
+  uint64_t steps = 0;
+  for (int n = spots; n >= 0; n--)
+    steps += count(spots, n);
+  wasm_progress_t progress(steps);
+
   // Compute all slices
   midsolve_internal_results_t results;
   for (int n = spots; n >= 0; n--)
-    midsolve_loop(spots, n, root, parity, results, safe_workspace);
+    midsolve_loop(spots, n, root, parity, results, safe_workspace, progress);
   return results;
 }
 
