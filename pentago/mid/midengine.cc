@@ -4,9 +4,9 @@
 #include "pentago/base/symmetry.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/debug.h"
-#include "pentago/utility/memory_usage.h"
 #include "pentago/utility/wasm_alloc.h"
 #ifndef __wasm__
+#include "pentago/utility/aligned.h"
 #include "pentago/utility/log.h"
 #endif  // !__wasm__
 namespace pentago {
@@ -35,7 +35,7 @@ static inline uint16_t fast_choose(const int n, const int k) {
   return combinations[n][k];
 }
 
-static inline uint64_t choose(const int n, const int k) {
+static inline int choose(const int n, const int k) {
   if (n<0 || k<0 || k>n)
     return 0;
   return fast_choose(n, min(k, n-k));
@@ -46,7 +46,7 @@ static inline uint64_t choose(const int n, const int k) {
 // the first 3-set of 10 is {0,1,2}, followed by {0,1,3}, {0,2,3}, ....
 void subsets(const int n, const int k, RawArray<set_t> sets) {
   GEODE_ASSERT(0<=n && n<=18 && k<=9);
-  GEODE_ASSERT(uint64_t(sets.size()) == choose(n, k));
+  GEODE_ASSERT(sets.size() == choose(n, k));
   if (!sets.size())
     return;
   const set_t sentinel = set_t(n)<<5*k;
@@ -74,7 +74,7 @@ void subsets(const int n, const int k, RawArray<set_t> sets) {
 #define ALLOCA_SUBSETS(name, n, k) \
   const int name##_n_ = (n); \
   const int name##_k_ = (k); \
-  const int name##_size_ = CHECK_CAST_INT(choose(name##_n_, name##_k_)); \
+  const int name##_size_ = choose(name##_n_, name##_k_); \
   set_t name##_raw_[name##_size_]; \
   const RawArray<const set_t> name(name##_size_, name##_raw_); \
   subsets(name##_n_, name##_k_, name.const_cast_());
@@ -109,41 +109,34 @@ void subsets(const int n, const int k, RawArray<set_t> sets) {
 static int count(const int spots, const int more) {
   if (spots < more)
     return 0;
-  return CHECK_CAST_INT(choose(spots, more) * choose(more, more/2));
+  return choose(spots, more) * choose(more, more/2);
 }
 
 static int bottleneck(const int spots) {
-  const int slice = 36-spots;
   int worst = count(spots, spots);
-  for (const int n : range(spots+1)) {
-    const int k0 = (slice+n)/2 - (slice+(n&1))/2, // Player to move
-              k1 = n-k0; // Other player
-    worst = max(worst, CHECK_CAST_INT(count(spots, n) + count(spots, n+1) + ceil_div(choose(spots, k1), 2)));
-  }
+  for (const int n : range(spots+1))
+    worst = max(worst, count(spots, n) + count(spots, n+1));
   return worst;
 }
 
-uint64_t midsolve_workspace_memory_usage(const int min_slice) {
-  // Add a bit so that we can fix alignment if it's wrong
-  return sizeof(halfsupers_t)*(bottleneck(36-min_slice)+2);
+static int midsolve_workspace_size(const int min_slice) {
+  return bottleneck(36 - min_slice);
 }
 
 #ifndef __wasm__
-Array<uint8_t> midsolve_workspace(const int min_slice) {
-  // Allocate enough memory for 18 stones, which is the most we'll need
-  return Array<uint8_t>(midsolve_workspace_memory_usage(min_slice));
+Array<halfsupers_t> midsolve_workspace(const int min_slice) {
+  return aligned_buffer<halfsupers_t>(midsolve_workspace_size(min_slice));
 }
 #endif  // !__wasm__
 
-static RawArray<halfsupers_t,2> grab(RawArray<uint8_t> workspace, const bool end,
+static RawArray<halfsupers_t,2> grab(RawArray<halfsupers_t> workspace, const bool end,
                                      const int nx, const int ny) {
-  RawArray<halfsupers_t> work(workspace.size()/sizeof(halfsupers_t), (halfsupers_t*)workspace.data());
-  const auto flat = end ? work.slice(work.size()-nx*ny, work.size()) : work.slice(0,nx*ny);
+  const auto flat = end ? workspace.slice(workspace.size()-nx*ny, workspace.size()) : workspace.slice(0,nx*ny);
   return flat.reshape(vec(nx, ny));
 }
 
 static void midsolve_loop(const int spots, const int n, const board_t root, const bool parity,
-                          midsolve_internal_results_t& results, RawArray<uint8_t> workspace) {
+                          midsolve_internal_results_t& results, RawArray<halfsupers_t> workspace) {
   const int slice = 36-spots;
   const auto black_root = unpack(root, 0),
              white_root = unpack(root, 1);
@@ -152,17 +145,10 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
   const int k0 = (slice+n)/2 - (slice+(n&1))/2, // Player to move
             k1 = n-k0; // Other player
   ALLOCA_SUBSETS(sets0, spots, k0);
-  ALLOCA_SUBSETS(sets0p, spots-k1, k0);
   ALLOCA_SUBSETS(sets1, spots, k1);
   ALLOCA_SUBSETS(sets1p, spots-k0, k1);
-  const int csets0_size = fast_choose(spots, k0+1),
-            csets1p_size = spots-k0 ? fast_choose(spots-k0-1, k1) : 0;
-  GEODE_ASSERT(!(uint64_t(workspace.data())&(sizeof(halfsupers_t)-1)));
-  const auto input = grab(workspace, n&1, csets0_size, csets1p_size).const_();
-  const auto output = grab(workspace, !(n&1), sets1.size(), sets0p.size());
-  const int all_wins_start = CHECK_CAST_INT(memory_usage(n&1 ? output.const_() : input));
-  const RawArray<halfsuper_t> all_wins1(sets1.size(), (halfsuper_t*)(workspace.data()+all_wins_start));
-  GEODE_ASSERT(memory_usage(input) + memory_usage(output) + memory_usage(all_wins1) <= uint64_t(workspace.size()));
+  const auto input = grab(workspace, n&1, choose(spots, k0+1), choose(spots-k0-1, k1)).const_();
+  const auto output = grab(workspace, !(n&1), sets1.size(), choose(spots-k1, k0));
 
   // List empty spots as bit indices into side_t
   uint8_t empty[max(spots, 1)];
@@ -192,6 +178,7 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
   };)
 
   // Evaluate whether the other side wins for all possible sides
+  halfsuper_t all_wins1[sets1.size()];
   for (int s1 = 0; s1 < sets1.size(); s1++)
     all_wins1[s1] = halfsuper_wins(root1 | set_side(k1,sets1[s1]))[(n+parity)&1];
 
@@ -399,23 +386,17 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
 }
 
 midsolve_internal_results_t
-midsolve_internal(const board_t root, const bool parity, RawArray<uint8_t> workspace) {
+midsolve_internal(const board_t root, const bool parity, RawArray<halfsupers_t> workspace) {
   check_board(root);
   const int slice = count_stones(root);
   GEODE_ASSERT(18<=slice && slice<=36);
   const int spots = 36-slice;
-
-  // Make sure workspace will do
-  const int align = int(sizeof(halfsupers_t)),
-            fix = (align-(uint64_t(workspace.data())&(align-1)))&(align-1);
-  GEODE_ASSERT(workspace.size() >= fix);
-  const auto safe_workspace = workspace.slice(fix, workspace.size()-fix);
-  GEODE_ASSERT(safe_workspace.size() >= bottleneck(spots));
+  GEODE_ASSERT(workspace.size() >= bottleneck(spots));
 
   // Compute all slices
   midsolve_internal_results_t results;
   for (int n = spots; n >= 0; n--)
-    midsolve_loop(spots, n, root, parity, results, safe_workspace);
+    midsolve_loop(spots, n, root, parity, results, workspace);
   return results;
 }
 
@@ -452,7 +433,7 @@ static int traverse(const high_board_t board, const bool children, const midsolv
   return value;
 }
 
-midsolve_results_t midsolve(const high_board_t board, RawArray<uint8_t> workspace) {
+midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
   // Compute
   const auto supers = midsolve_internal(board.board(), board.middle(), workspace);
 
@@ -470,7 +451,7 @@ WASM_EXPORT int midsolve_results_limit() {
 
 WASM_EXPORT void wasm_midsolve(const high_board_t* board, midsolve_results_t* results) {
   GEODE_ASSERT(board && results);
-  const auto workspace = wasm_buffer<uint8_t>(midsolve_workspace_memory_usage(board->count()));
+  const auto workspace = wasm_buffer<halfsupers_t>(midsolve_workspace_size(board->count()));
   *results = midsolve(*board, workspace);
 }
 #endif  // __wasm__
