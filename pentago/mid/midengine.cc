@@ -336,13 +336,15 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
       halfsupers_t us;
       {
         us[0] = us[1] = halfsuper_t(0);
+        if (slice + n == 36)
+          us[1] = ~halfsuper_t(0);
         for (int i = 0; i < spots-k0; i++)
           if (!(filled1p&1<<i)) {
             const int cs0 = child_s0s[i];
             const auto cwins = child_wins0[i];
             const halfsupers_t child = input(cs0,cs1ps[s1p][i]);
-            us[0] |= cwins | child[0]; // win
-            us[1] |= cwins | child[1]; // not lose
+            us[0] |= cwins | child[0];  // win
+            us[1] |= cwins | child[1];  // not lose
             MD({
               const auto child_set0 = set0|side_t(empty1[i])<<5*k0;
               const auto board = pack(root1|set_side(k1, sets1[s1]), root0|set_side(k0+1,child_set0));
@@ -360,8 +362,8 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
       // Account for immediate results
       const halfsuper_t wins1 = all_wins1[s1],
                         inplay = ~(wins0 | wins1);
-      us[0] = (inplay & us[0]) | (wins0 & ~wins1); // win
-      us[1] = (inplay & us[1]) | (slice+n==36 ? wins0 | ~wins1 : wins0); // not lose
+      us[0] = (inplay & us[0]) | (wins0 & ~wins1);  // win (| ~inplay & (wins0 & ~wins1))
+      us[1] = (inplay & us[1]) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
 
       // Test if desired
       MD({
