@@ -137,13 +137,11 @@ static RawArray<halfsupers_t,2> grab(RawArray<halfsupers_t> workspace, const boo
 
 static void midsolve_loop(const int spots, const int n, const board_t root, const bool parity,
                           midsolve_internal_results_t& results, RawArray<halfsupers_t> workspace) {
-  const int slice = 36-spots;
-  const auto black_root = unpack(root, 0),
-             white_root = unpack(root, 1);
-  const auto root0 = (slice+n)&1 ? white_root : black_root,
-             root1 = (slice+n)&1 ? black_root : white_root;
-  const int k0 = (slice+n)/2 - (slice+(n&1))/2, // Player to move
-            k1 = n-k0; // Other player
+  const int slice = 36 - spots;
+  const auto root0 = unpack(root, (slice+n)&1),
+             root1 = unpack(root, (slice+n+1)&1);
+  const int k0 = (slice+n)/2 - (slice+(n&1))/2,  // Player to move
+            k1 = n-k0;  // Other player
   ALLOCA_SUBSETS(sets0, spots, k0);
   ALLOCA_SUBSETS(sets1, spots, k1);
   ALLOCA_SUBSETS(sets1p, spots-k0, k1);
@@ -154,7 +152,7 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
   uint8_t empty[max(spots, 1)];
   memset(empty, 0, sizeof(empty));
   {
-    const auto free = side_mask&~(black_root|white_root);
+    const auto free = side_mask & ~(root0|root1);
     int next = 0;
     for (int i = 0; i < 64; i++)
       if (free & side_t(1)<<i)
