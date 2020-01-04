@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Quick calculations for how big generated code for the inner loop of midengine would be.
+Answer: too much, so I'm going with generated tables."""
+
+import numpy as np
+import scipy.special
+
+def factorial(n):
+  return scipy.special.factorial(n, exact=True)
+
+def choose(n, *k):
+  k = np.asarray(k)
+  sk = k.sum()
+  if k.min() < 0 or sk > n: return 0
+  f = factorial(n) // factorial(n-sk)
+  for i in k:
+    f //= factorial(i)
+  return f
+
+pairs = set()
+max_slice = 36
+for slice in range(18, max_slice+1):
+  spots = 36 - slice
+  for n in range(spots+1):
+    k0 = (slice+n)//2 - (slice+(n&1))//2
+    k1 = n - k0
+    assert(k0 <= k1)
+    pairs.add((spots - k1, k0))
+
+def ops(p):
+  s, k0 = p
+  return choose(s, k0) * (s-k0)
+  
+total = 0
+total_io = 0
+for p in sorted(pairs):
+  s, k0 = p
+  total += ops(p)
+  total_io += max(choose(s, k0), choose(s, k0+1))
+  print(f'  {s} {k0}: {choose(s, k0)} {choose(s, k0+1)} {ops(p)}')
+print()
+print(f'count = {len(pairs)}')
+print(f'total = {total}')
+print(f'total io = {total_io}')
