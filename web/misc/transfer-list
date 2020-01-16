@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""See https://cloud.google.com/storage-transfer/docs/create-url-list"""
+
+import codecs
+import json
+import os
+
+whole = json.load(open('metadata.json'))
+chunks = json.load(open('metadata-chunks.json'))
+base = 'https://b13bd9386883242c090c-81c103f827ca6373fd889208ea864720.ssl.cf5.rackcdn.com'
+
+def write_tsv(path, data, lo=0, hi=1<<50):
+  print(f'writing {path}')
+  path = os.path.join('../client/public', path)
+  with open(path, 'w') as f:
+    print('TsvHttpData-1.0', file=f)
+    for name, info in data.items():
+      size = info['size'] 
+      md5 = info['md5']
+      md5 = codecs.encode(codecs.decode(md5, 'hex'), 'base64').decode().strip()
+      if lo <= size <= hi:
+        print(f'{base}/{name}\t{size}\t{md5}', file=f)
+
+write_tsv('transfer-small.tsv', whole, lo=0, hi=16<<10)
+write_tsv('transfer-all.tsv', whole, lo=0, hi=1<<40)
+write_tsv('transfer-big.tsv', whole, lo=1<<40)
+write_tsv('transfer-chunks.tsv', chunks)
