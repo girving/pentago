@@ -10,8 +10,9 @@
     "node": ">=11.6.0"
   },
   "dependencies": {
-    "@google-cloud/storage": "^3.0.2",
+    "@google-cloud/storage": "^4.0.0",
     "commander": "^2.19.0",
+    "fast-crc32c": "^2.0.0",
     "glob": "^7.1.6",
     "log": "^1.4.0"
   },

@@ -10,23 +10,18 @@ const fs = require('fs')
 const https = require('https')
 const options = require('commander')
 const glob = require('glob')
+const {Storage} = require('@google-cloud/storage')
 
 // Command line options
-options.option('--api-key <key>', 'Rackspace API key', '')
 options.option('--max-sockets <n>', 'Maximum number of simultaneous https connections', parseInt, 64)
 options.parse(process.argv)
-if (!options.apiKey)
-  throw Error('no --api-key specified')
 if (!(0 < options.maxSockets && options.maxSockets <= 1024))
   throw Error('invalid --max-sockets value ' + options.maxSockets)
 https.globalAgent.maxSockets = options.maxSockets
 
-// Parameters
-const username = 'pentago'
-const container = 'pentago-edison-all'
-const region = 'IAD'
-const apiKey = options.apiKey
-const useInternal = true
+// Storage setup
+const storage = new Storage()
+const bucket = storage.bucket('pentago-all')
 
 // Find names we already know hashes for
 const known = {}
@@ -40,85 +35,11 @@ for (const blah of glob.sync('blah*')) {
   }
 }
 
-// Simple promise-based https request
-function request(options) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(options, res => {
-      if (res.statusCode >= 400) {
-        res.resume()
-        reject('https request failed, code ' + res.statusCode)
-      } else {
-        const data = []
-        res.on('data', chunk => data.push(chunk))
-        res.on('end', () => resolve(Buffer.concat(data)))
-      }
-    })
-    req.on('error', reject)
-    if (options.body)
-      req.write(options.body)
-    req.end()
-  })
-}
-
-// Authorization.  We use a promised token so that simultaneous auth requests get merged,
-// and wipe the promise on expiration.
-function auth() {
-  // Launch a token request if necessary
-  return request({
-    host: 'identity.api.rackspacecloud.com',
-    path: '/v2.0/tokens',
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-    body: JSON.stringify({auth: {'RAX-KSKEY:apiKeyCredentials': {username: username, apiKey: apiKey}}}),
-  }).then(body => {
-    const access = JSON.parse(body).access
-
-    // Build token
-    const token = access.token
-    if (!token || !token.id || !token.expires) throw Error('rackspace auth: Invalid token')
-    token.expires = new Date(token.expires)
-
-    function match_region(a, b) {
-      if (!a && !b)
-        return true
-      else if ((!a && b) || (a && !b))
-        return false
-      else
-        return a.toLowerCase() === b.toLowerCase()
-    }
-
-    // Add service url
-    const service = access.serviceCatalog.find(service => service.type.toLowerCase() == 'object-store')
-    if (!service) throw Error('rackspace auth: Unable to find matching endpoint for requested service')
-    const endpoint = service.endpoints.find(endpoint => match_region(endpoint.region, region))
-    if (!endpoint) throw Error('rackspace auth: Unable to identify endpoint url')
-    token.service_url = useInternal && endpoint.internalURL ? endpoint.internalURL : endpoint.publicURL
-
-    // All done!
-    return token
-  })
-}
-
 async function stream(name, absorb, done) {
-  const token = await auth()
-  const url = new URL(token.service_url)
   await new Promise((resolve, reject) => {
-    const req = https.request({
-      host: url.hostname,
-      path: url.pathname + '/' + container + '/' + name,
-      headers: {'x-auth-token': token.id},
-      method: 'GET',
-    }, res => {
-      if (res.statusCode >= 400) {
-        res.resume()
-        reject('https request failed, code ' + res.statusCode)
-      } else {
-        const data = []
-        res.on('data', absorb)
-        res.on('end', () => { done(); resolve() })
-      }
-    })
-    req.end()
+    const stream = bucket.file('edison/' + name).createReadStream()
+    stream.on('data', absorb)
+    stream.on('end', () => { done(); resolve() })
   })
 }
 
