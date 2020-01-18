@@ -4,7 +4,7 @@
 const os = require('os')
 const https = require('https')
 const Pending = require('./pending')
-const storage = require('./storage')
+const {Storage} = require('@google-cloud/storage')
 const pentago = require('./build/Release/pentago')
 
 // Public version
@@ -28,8 +28,6 @@ exports.add_options = options => {
   options.option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
          .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
          .option('--max-sockets <n>','Maximum number of simultaneous https connections',parseInt,d.maxSockets)
-         .option('--api-key <key>','Rackspace API key',d.apiKey)
-         .option('--external','Work outside of Rackspace')
 }
 
 // Useful counters
@@ -63,7 +61,6 @@ exports.values = (options, log) => {
   log.info('cache memory limit = %d (%s)', cache_limit, opts.cache)
   log.info('max slice = %d', opts.maxSlice)
   log.info('max sockets = %d', opts.maxSockets)
-  log.info('external = %d', opts.external)
   log.info('version = %s', version)
 
   // Prepare for opening book lookups
@@ -71,17 +68,7 @@ exports.values = (options, log) => {
       pentago.supertensor_index_t)
   const cache = pentago.async_block_cache_t(cache_limit)
   const cache_pending = {} // Map from block to callbacks to call once block is available
-
-  // Prepare for Cloud Files access via pkgcloud
-  if (!opts.apiKey)
-    throw Error('no --api-key specified')
-  const container = 'pentago-edison-all'
-  const download = storage.downloader({
-    username: 'pentago',
-    region: 'IAD',
-    apiKey: opts.apiKey,
-    useInternal: !opts.external,
-  }, stats, log)
+  const bucket = new Storage().bucket('pentago')
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
@@ -92,8 +79,9 @@ exports.values = (options, log) => {
   pentago.init_threads(0,0)
 
   // Get a section of a file
-  function range_get(object, blob) {
-    return download({container: container, object: object, offset: blob.offset, size: blob.size})
+  async function range_get(object, blob) {
+    const data = await bucket.file(object).download({start: blob.offset, end: blob.offset + blob.size - 1})
+    return data[0]
   }
 
   // Get a block if necessary, merging simultaneous requests

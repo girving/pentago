@@ -21,7 +21,7 @@ https.globalAgent.maxSockets = options.maxSockets
 
 // Storage setup
 const storage = new Storage()
-const bucket = storage.bucket('pentago-all')
+const bucket = storage.bucket('pentago')
 
 // Find names we already know hashes for
 const known = {}

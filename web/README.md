@@ -20,6 +20,7 @@ To build and test the `npm` extension module, do
     cd pentago/web/server
     bazel build -c opt --copt=-march=native //pentago/{end,high}/...
     npm install
+    gcloud auth application-default login
     node unit.js all
 
 ## Server setup
