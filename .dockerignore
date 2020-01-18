@@ -1,11 +1,14 @@
 bin
-data
+/data
 paper
 .git
 .DS_Store
 *.swp
 bazel-*
-web/build
-web/node_modules
+build
+node_modules
+third_party/freestanding
 web/public
+web/misc
 web/*.png
+README.md
