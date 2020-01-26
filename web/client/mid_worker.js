@@ -2,7 +2,7 @@
 
 'use strict'
 
-const board_t = require('./board.js').board_t
+const board_t = require('./board.js')
 const mid_sync = require('./mid_sync.js')
 
 global.onmessage = async e => {

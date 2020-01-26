@@ -5,10 +5,7 @@ const os = require('os')
 const https = require('https')
 const Pending = require('./pending')
 const {Storage} = require('@google-cloud/storage')
-const pentago = require('./build/Release/pentago')
-
-// Public version
-const version = '0.0.2'
+const block_cache = require('./block_cache.js')
 
 // Pull in math
 const min = Math.min
@@ -19,15 +16,14 @@ exports.defaults = {
   cache: '250M',
   maxSlice: 18,
   maxSockets: 64,
-  apiKey: '',
-  external: false
 }
 
 exports.add_options = options => {
   const d = exports.defaults
-  options.option('--cache <size>','Size of block cache (suffixes M/MB and G/GB are understood)',d.cache)
-         .option('--max-slice <n>','Maximum slice available in database (for debugging use only)',parseInt,d.maxSlice)
-         .option('--max-sockets <n>','Maximum number of simultaneous https connections',parseInt,d.maxSockets)
+  options.option('--cache <size>', 'Size of block cache (suffixes M/MB and G/GB are understood)', d.cache)
+         .option('--max-slice <n>', 'Maximum slice available in database (for debugging use only)', parseInt,
+                 d.maxSlice)
+         .option('--max-sockets <n>', 'Maximum number of simultaneous https connections', parseInt, d.maxSockets)
 }
 
 // Useful counters
@@ -61,12 +57,10 @@ exports.values = (options, log) => {
   log.info('cache memory limit = %d (%s)', cache_limit, opts.cache)
   log.info('max slice = %d', opts.maxSlice)
   log.info('max sockets = %d', opts.maxSockets)
-  log.info('version = %s', version)
 
   // Prepare for opening book lookups
-  const indices = pentago.descendent_sections([[0,0],[0,0],[0,0],[0,0]],opts.maxSlice).map(
-      pentago.supertensor_index_t)
-  const cache = pentago.async_block_cache_t(cache_limit)
+  const indices = block_cache.descendent_sections(opts.maxSlice).map(s => new block_cache.supertensor_index_t(s))
+  const cache = new block_cache.block_cache_t(cache_limit)
   const cache_pending = {} // Map from block to callbacks to call once block is available
   const bucket = new Storage().bucket('pentago')
 
@@ -74,9 +68,6 @@ exports.values = (options, log) => {
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
     throw Error('invalid --max-sockets value '+opts.maxSockets)
   https.globalAgent.maxSockets = opts.maxSockets
-
-  // Initialize timing system
-  pentago.init_threads(0,0)
 
   // Get a section of a file
   async function range_get(object, blob) {
@@ -102,10 +93,10 @@ exports.values = (options, log) => {
     for (;;) {
       const data = await range_get('slice-'+slice+'.pentago', indices[slice].block_location(blob))
       try {
-        cache.set(block, data)
+        await cache.set(block, data)
         return
       } catch (error) {
-        log.warning("corrupt block, retrying: slice %d, block [%s], error '%s'", slice, block, error)
+        log.warning("corrupt block, retrying: slice %d, block [%s], error '%s'", slice, ''+block, error.message)
       }
     }
   })
@@ -113,26 +104,27 @@ exports.values = (options, log) => {
   // Lookup the value or board and its children, returning a promise of a board -> value map.
   async function values(board) {
     // Boards with more stones should be handled on the client
-    if (board.count() >= opts.maxSlice)
-      throw Error('board ' + board.name() + ' has ' + board.count() +
+    if (board.count >= opts.maxSlice)
+      throw Error('board ' + board.name + ' has ' + board.count +
                   ' >= ' + opts.maxSlice + ' stones, and should be computed locally')
 
     // Collect the leaf boards whose values we need
-    const results = {version: version}
+    const results = {}
     async function traverse(board, children) {
       let value
       if (board.done()) {  // Done, so no lookup required
         value = board.immediate_value()
-      } else if (!children && !board.middle()) {  // Look up a remote value, caching the block in the process
-        await pending_block(cache.board_block(board))
-        value = board.value(cache)
+      } else if (!children && !board.middle) {  // Look up a remote value, caching the block in the process
+        const block = cache.board_block(board)
+        await pending_block(block)
+        value = cache.value(board)
       } else {  // Traverse into children
         value = -1
-        const scale = board.middle() ? -1 : 1
+        const scale = board.middle ? -1 : 1
         for (const v of await Promise.all(board.moves().map(m => traverse(m, false))))
           value = max(value, scale*v)
       }
-      results[board.name()] = value
+      results[board.name] = value
       return value
     }
     await traverse(board, true)

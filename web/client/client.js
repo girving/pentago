@@ -3,7 +3,7 @@
 'use strict'
 const d3 = require('d3')
 const cache = require('./local_lru.js')
-const board_t = require('./board.js').board_t
+const board_t = require('./board.js')
 const mid_async = require('./mid_async.js')
 
 // Pull in math stuff
@@ -15,7 +15,7 @@ const sqrt = Math.sqrt
 const floor = Math.floor
 
 // Backend, with a bit of caching to avoid flicker on the back button
-const backend_url = 'https://backend.perfect-pentago.net/'
+const backend_url = 'https://us-central1-naml-148801.cloudfunctions.net/pentago/'
 
 // Colors for each board value, taking care to be nice to colorblind folk.
 const value_colors = {'1':'#00ff00','0':'#0000ff','-1':'#ff0000','undefined':null}

@@ -17,7 +17,7 @@ const abs = Math.abs
 function str_to_quadrants(s) {
   // We assume s consists entirely of digits
   if (!s.match(/^\d+$/) || s.length>19)
-    throw 'expected number < 5540271966595842048, got '+s
+    throw Error('expected number < 5540271966595842048, got '+s)
   // Accumulate into base 2**16, ignoring overflow
   const quads = [0,0,0,0]
   for (let i=0;i<s.length;i++) {
@@ -31,7 +31,7 @@ function str_to_quadrants(s) {
     quads[i] &= (1<<16)-1
   }
   if (quads[3]>=(1<<16))
-    throw 'expected number < 5540271966595842048, got '+s
+    throw Error('expected number < 5540271966595842048, got '+s)
   return quads
 }
 
@@ -62,17 +62,17 @@ function board_t() {
     name = arguments[0]
     const m = name.match(/^(\d+)(m?)$/)
     if (!m)
-      throw 'invalid board '+arguments[0]
+      throw Error('invalid board '+arguments[0])
     quads = str_to_quadrants(m[1])
     middle = m[2].length
   } else if (arguments.length==2) {
     quads = arguments[0]
     middle = arguments[1]
     if (quads.length != 4 || (middle != 0 && middle != 1))
-      throw 'invalid board: quads '+quads+', middle '+middle
+      throw Error('invalid board: quads '+quads+', middle '+middle)
     name = quadrants_to_str(quads)+(middle?'m':'')
   } else
-    throw 'expected (quadrants,middle) or (name), got '+arguments
+    throw Error('expected (quadrants,middle) or (name), got '+arguments)
   this.quads = quads
   this.middle = middle
   this.name = name
@@ -102,12 +102,12 @@ function board_t() {
   const turn = (count0-1==count1-middle)+0
   this.turn = turn
   if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1))
-    throw 'bad board: quads '+quads+', middle '+middle+', turn '+turn+', counts '+count0+' '+count1
+    throw Error('bad board: quads '+quads+', middle '+middle+', turn '+turn+', counts '+count0+' '+count1)
 
   // Place a stone at the given location
   const place = this.place = (x, y) => {
     if (middle || grid[6*x+y])
-      throw 'bad place: '+name+', xy '+x+' '+y
+      throw Error('bad place: '+name+', xy '+x+' '+y)
     const qm = quads.slice(0)
     qm[2*floor(x/3)+floor(y/3)] += (1+turn)*pow(3,3*(x%3)+y%3)
     return new board_t(qm,true)
@@ -116,7 +116,7 @@ function board_t() {
   // Rotate the given quadrant left (d=1) or right (d=-1)
   const rotate = this.rotate = (qx, qy, d) => {
     if (!middle || !(qx==0 || qx==1) || !(qy==0 || qy==1) || abs(d)!=1)
-      throw 'bad rotate: '+name+', middle '+middle+', q '+qx+' '+qy+', d '+d
+      throw Error('bad rotate: '+name+', middle '+middle+', q '+qx+' '+qy+', d '+d)
     let quad = 0
     for (let x=2;x>=0;x--)
       for (let y=2;y>=0;y--)
@@ -163,7 +163,7 @@ function board_t() {
       return win && lose ? 0 : win ? 1 : -1
     if (count==36)
       return 0
-    throw 'board '+name+': immediate_value() called when board isn\'t done'
+    throw Error('board '+name+': immediate_value() called when board isn\'t done')
   }
 
   // List moves
@@ -184,4 +184,4 @@ function board_t() {
 }
 
 // Export the board type
-exports.board_t = board_t
+module.exports = board_t

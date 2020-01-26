@@ -6,6 +6,7 @@
 #include "pentago/utility/memory_usage.h"
 #include "pentago/utility/sort.h"
 #include "pentago/utility/const_cast.h"
+#include "pentago/utility/log.h"
 #include <unordered_set>
 namespace pentago {
 namespace end {

@@ -2,7 +2,7 @@
 
 'use strict'
 
-const board_t = require('./board.js').board_t
+const board_t = require('./board.js')
 
 // Compile mid.wasm
 const mid_module = (typeof fetch === 'function'

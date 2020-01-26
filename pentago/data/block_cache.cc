@@ -20,7 +20,7 @@ block_cache_t::block_cache_t() {}
 block_cache_t::~block_cache_t() {}
 
 bool block_cache_t::lookup(const bool aggressive, const side_t side0, const side_t side1, super_t& wins) const {
-  return lookup(aggressive,pack(side0,side1),wins);
+  return lookup(aggressive, pack(side0, side1), wins);
 }
 
 bool block_cache_t::lookup(const bool aggressive, const board_t board, super_t& wins) const {
@@ -56,7 +56,7 @@ bool block_cache_t::lookup(const bool aggressive, const board_t board, super_t& 
   const auto& data = block_data[I];
 
   // Extract the part we want
-  wins = transform_super(symmetry,extract(turn,aggressive,data));
+  wins = transform_super(symmetry, extract(turn, aggressive, data));
   return true;
 }
 

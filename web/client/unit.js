@@ -2,7 +2,7 @@
 // Unit tests
 
 'use strict'
-const board_t = require('./board.js').board_t
+const board_t = require('./board.js')
 const assert = require('assert').strict
 const mid_sync = require('./mid_sync.js')
 const all_games = require('./games.js')

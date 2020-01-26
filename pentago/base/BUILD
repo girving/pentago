@@ -15,6 +15,7 @@ genrule(
     outs = [
         "gen/tables.h",
         "gen/tables.cc",
+        "gen/tables.js",
     ],
     tools = [":precompute"],
     cmd = "$(location :precompute) $(OUTS)",

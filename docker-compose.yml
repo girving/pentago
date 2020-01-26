@@ -1,7 +1,0 @@
-pentago:
-    build: .
-    ports:
-        - "80:2049"
-        - "443:2048"
-    volumes:
-        - /var/pentago/ssl:/var/pentago/ssl:ro

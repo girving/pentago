@@ -3,24 +3,13 @@ load("//pentago:pentago.bzl", "cc_tests")
 
 cc_library(
     name = "data",
-    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "async_block_cache.cc", "*_test.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "*_test.cc"]),
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/base",
         "//pentago/utility",
         "@lzma//:lzma",
         "@zlib//:zlib",
-    ],
-)
-
-cc_library(
-    name = "async",
-    srcs = ["async_block_cache.cc"],
-    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
-    deps = [
-        ":data",
-        "//pentago/end:config",
-        "//pentago/high",
     ],
 )
 

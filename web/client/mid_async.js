@@ -2,7 +2,7 @@
 
 'use strict'
 
-const board_t = require('./board.js').board_t
+const board_t = require('./board.js')
 const pending = require('./pending.js')
 
 // Make a web worker, and handle onmessage in order

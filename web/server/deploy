@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+gcloud functions deploy pentago --runtime=nodejs10 --trigger-http --region=us-central1 \
+    --allow-unauthenticated --service-account=pentago-read@naml-148801.iam.gserviceaccount.com

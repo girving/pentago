@@ -1,0 +1,5 @@
+.git
+.gcloudignore
+.gitignore
+node_modules
+deploy

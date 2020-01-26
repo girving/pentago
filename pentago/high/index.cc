@@ -6,6 +6,7 @@
 #include "pentago/data/supertensor.h"
 #include "pentago/utility/index.h"
 #include "pentago/utility/endian.h"
+#include "pentago/utility/log.h"
 #ifdef PENTAGO_LITTLE_ENDIAN
 namespace pentago {
 

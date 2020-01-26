@@ -60,28 +60,24 @@ On Mac:
 
 On Ubuntu: to be written once I have clean Bazel handling of MPI.
 
-### Running the server
+### Website
 
-The website https://perfect-pentago.net is a static frontend that talks to a node.js
-backend server.  The server is managed via [Docker](https://www.docker.com), and
-currently hosted on [Rackspace](https://www.rackspace.com).  To run, do
+The website https://perfect-pentago.net is a static Firebase frontend that
+talks to a node.js Google Cloud Function.  To test and deploy the server:
 
-    # Secrets
-    export SSL=<path-to-ssl-certificate-directory>
+    cd web/server
+    node unit.js all
+    ./deploy
 
-    # Create a rackspace server via docker-machine
-    docker-machine create --driver=rackspace --rackspace-username=pentago \
-      --rackspace-api-key=`cat $SSL/api-key` --rackspace-region=IAD \
-      --rackspace-flavor-id=general1-1 --engine-storage-driver=overlay pentago
-    eval "$(docker-machine env pentago)"
+To deploy the client:
 
-    # Copy ssl keys to machine
-    docker-machine ssh pentago -- mkdir -p /var/pentago/ssl
-    rsync -avze 'docker-machine ssh pentago' $SSL/{api-key,*.crt} :/var/pentago/ssl
-
-    # Launch pentago container on the server
-    cd ~/pentago
-    docker-compose up -d --build
+    cd pentago/web/client
+    brew install llvm
+    bazel build //pentago/base/...
+    ./build-wasm
+    npm install
+    make public
+    firebase deploy
 
 ## Algorithm summary
 
