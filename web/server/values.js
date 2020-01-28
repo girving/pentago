@@ -62,7 +62,7 @@ exports.values = (options, log) => {
   const indices = block_cache.descendent_sections(opts.maxSlice).map(s => new block_cache.supertensor_index_t(s))
   const cache = new block_cache.block_cache_t(cache_limit)
   const cache_pending = {} // Map from block to callbacks to call once block is available
-  const bucket = new Storage().bucket('pentago')
+  const bucket = new Storage().bucket('pentago-us-central1')
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
