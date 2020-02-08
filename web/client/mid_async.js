@@ -4,9 +4,10 @@
 
 const board_t = require('./board.js')
 const pending = require('./pending.js')
+const work = require('webworkify')
 
 // Make a web worker, and handle onmessage in order
-const worker = new Worker('mid_worker.js')
+const worker = work(require('./mid_worker.js'))
 const callbacks = []
 worker.onmessage = e => callbacks.shift()(e.data)
 

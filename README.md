@@ -73,8 +73,6 @@ To deploy the client:
 
     cd pentago/web/client
     brew install llvm
-    bazel build //pentago/base/...
-    ./build-wasm
     npm install
     make public
     firebase deploy

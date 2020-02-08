@@ -2,13 +2,13 @@
 
 'use strict'
 
+const fs = require('fs')
 const board_t = require('./board.js')
 
 // Compile mid.wasm
-const mid_module = (typeof fetch === 'function'
-  ? fetch('mid.wasm').then(r => r.arrayBuffer())
-  : Promise.resolve(require('fs').readFileSync('public/mid.wasm')))
-  .then(bytes => WebAssembly.compile(bytes))
+const mid_module = new Promise((resolve, reject) =>
+  fs.readFile('./mid.wasm', (err, mod) => err ? reject(err) : resolve(mod))
+).then(mod => WebAssembly.compile(mod))
 
 function read_char_p(M, p) {
   const chars = new Uint8Array(M.exports.memory.buffer)

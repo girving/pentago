@@ -7,11 +7,13 @@
   "license": "BSD-3-Clause",
   "main": "client.js",
   "dependencies": {
+    "brfs": "^2.0.2",
     "browserify": "^16.5.0",
     "d3": "^3.5.17",
     "nib": "1.1.x",
     "storage-factory": "^0.1.0",
-    "stylus": "0.54.x"
+    "stylus": "0.54.x",
+    "webworkify": "^1.5.0"
   },
   "keywords": [
     "pentago",

@@ -1,20 +1,20 @@
-all: test public
+all: public test
 
-public: public/client.js public/mid_worker.js public/board.css public/main.css
+public: public/client.js public/board.css public/main.css
 
-public/client.js: client.js *.js
-	node_modules/.bin/browserify $< -o $@
+public/client.js: client.js *.js mid.wasm
+	node_modules/.bin/browserify -t brfs $< -o $@
 
-public/mid_worker.js: mid_worker.js *.js
-	node_modules/.bin/browserify $< -o $@
+mid.wasm: build-wasm
+	./build-wasm
 
 public/%.css: %.styl
 	node_modules/.bin/stylus --compress --use nib < $< > $@
 
 .PHONY: test clean
 
-test:
+test: mid.wasm
 	node unit.js
 
 clean:
-	rm -f public/client.js public/mid_worker.js public/board.css public/main.css
+	rm -f public/client.js public/mid_worker.js public/board.css public/main.css mid.wasm
