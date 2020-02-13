@@ -164,7 +164,22 @@ const clear = '\x1b[00m'
 
 // Run all tests in series
 async function toplevel() {
-  for (const test of [test_moves, test_done, test_lru, test_mid, test_path]) {
+  let tests = [test_moves, test_done, test_lru, test_mid, test_path]
+
+  // Restrict to specific tests if desired
+  if (process.argv.length > 2) {
+    const keep = []
+    for (const name of process.argv.slice(2)) {
+      const test = tests.filter(t => t.name == 'test_' + name)
+      if (test.length != 1)
+        throw Error('No test named test_' + a + ' found')
+      keep.push(test[0])
+    }
+    tests = keep
+  }
+
+  // Launch all tests
+  for (const test of tests) {
     try {
       await test()
       console.log('  '+test.name+': '+green+'pass'+clear)
