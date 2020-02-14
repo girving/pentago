@@ -56,12 +56,14 @@ struct symmetry_t {
     return global^(~global>>2&(global&1))<<1;
   }
 
+#ifndef __wasm__
   symmetry_t inverse() const {
     uint8_t li = local_symmetry_t(local).inverse().local; // Invert local
     uint8_t gi = invert_global(global); // Invert global
     // Commute local through global
-    return symmetry_t(gi,commute_global_local_symmetries[gi][li]);
+    return symmetry_t(gi, commute_global_local_symmetries[gi][li]);
   }
+#endif  // !__wasm__
 
   explicit operator bool() const {
     return global||local;
@@ -76,6 +78,7 @@ struct symmetry_t {
   }
 };
 
+#ifndef __wasm__
 // Group product
 inline symmetry_t operator*(symmetry_t a, symmetry_t b) {
   // We seek x = ag al bg bl = a.global a.local b.global b.local
@@ -94,12 +97,16 @@ inline symmetry_t operator*(local_symmetry_t a, symmetry_t b) {
   const uint8_t l2 = commute_global_local_symmetries[b.global][a.local];
   return symmetry_t(b.global,(local_symmetry_t(l2)*local_symmetry_t(b.local)).local);
 }
+#endif  // !__wasm__
 
 // A symmetry is a function s : X -> X, where X = Z_6^2 is the set of Pentago squares.
 // A side_t is a subset A of X, and a board_t is two such subsets.  These functions compute s(A).
 // For example, transform_board(symmetry_t(1,0),board) rotates the whole board left by 90 degrees.
 side_t transform_side(symmetry_t s, side_t side) __attribute__((const));
+#ifndef __wasm__
 board_t transform_board(symmetry_t s, board_t board) __attribute__((const));
+#endif  // !__wasm__
+board_t slow_transform_board(symmetry_t s, board_t board) __attribute__((const));
 
 // Let B be the set of boards, and A \subset B a subset of boards invariant to global transforms
 // (b in A iff g(b) in A for g in D_4).  Define the super operator f : B -> 2^L by

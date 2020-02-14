@@ -49,17 +49,18 @@ static inline uint64_t quadrants(quadrant_t q0, quadrant_t q1, quadrant_t q2, qu
   return q0|(uint64_t)q1<<16|(uint64_t)q2<<32|(uint64_t)q3<<48;
 }
 
+#ifndef __wasm__
 // Combine two side quadrants into a single double-sided quadrant
 static inline quadrant_t pack(quadrant_t side0, quadrant_t side1) {
-  return pack_table[side0]+2*pack_table[side1];
+  return pack_table[side0] + 2*pack_table[side1];
 }
 
 // Pack two sides into a board
 static inline board_t pack(side_t side0, side_t side1) {
-  return quadrants(pack(quadrant(side0,0),quadrant(side1,0)),
-                   pack(quadrant(side0,1),quadrant(side1,1)),
-                   pack(quadrant(side0,2),quadrant(side1,2)),
-                   pack(quadrant(side0,3),quadrant(side1,3)));
+  return quadrants(pack(quadrant(side0, 0), quadrant(side1, 0)),
+                   pack(quadrant(side0, 1), quadrant(side1, 1)),
+                   pack(quadrant(side0, 2), quadrant(side1, 2)),
+                   pack(quadrant(side0, 3), quadrant(side1, 3)));
 }
 
 // Extract one side from a double-sided quadrant
@@ -83,23 +84,19 @@ static inline Vector<side_t,2> unpack(board_t board) {
 
 // Count the stones on a board
 static inline int count_stones(board_t board) {
-  return popcount(unpack(board,0)|unpack(board,1));
+  return popcount(unpack(board, 0) | unpack(board, 1));
 }
 
 // Check whose turn it is (assuming black moved first)
 bool black_to_move(board_t board);
 
-// Throw ValueError if a board is invalid
-void check_board(board_t board);
-
 board_t standardize(board_t board);
 
 // Maybe swap sides
 static inline board_t flip_board(board_t board, bool turn = true) {
-  return pack(unpack(board,turn),unpack(board,1-turn));
+  return pack(unpack(board, turn), unpack(board, 1-turn));
 }
 
-#ifndef __wasm__
 // Random board and side generation
 side_t random_side(Random& random);
 board_t random_board(Random& random);
@@ -113,5 +110,14 @@ std::string str_board(board_t board);
 Array<int,2> to_table(const board_t boards);
 board_t from_table(RawArray<const int,2> tables);
 #endif  // !__wasm__
+
+// Throw ValueError if a board is invalid
+void check_board(board_t board);
+
+// Slow versions for __wasm__ use
+board_t slow_pack(const side_t side0, const side_t side1) __attribute__((const));
+Vector<side_t,2> slow_unpack(const board_t board) __attribute__((const));
+int slow_count_stones(const board_t board) __attribute__((const));
+board_t slow_flip_board(const board_t board, const bool turn = true) __attribute__((const));
 
 }

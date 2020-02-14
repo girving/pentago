@@ -35,6 +35,7 @@ cc_tests(
         "all_boards_test",
         "pentago_test",
         "super_test",
+        "slow_test",
     ],
     deps = [
         ":base",

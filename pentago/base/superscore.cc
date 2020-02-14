@@ -31,6 +31,7 @@ struct superwin_info_t {
   super_t horizontal, vertical, diagonal_lo, diagonal_hi, diagonal_assist;
 };
 
+#ifndef __wasm__
 // We want to compute all possible rotations which give 5 in a row.
 // To do this, we consider each pair or triple of quadrants which could give a win,
 // and use the state space of the unused quadrants to store the various ways a win
@@ -96,6 +97,7 @@ super_t super_wins(side_t side) {
   WAY(i1.diagonal_hi & i3.diagonal_assist & i2.diagonal_hi, OR0) // High diagonal from quadrant 1=(0,1) to 2=(1,0)
   return wins;
 }
+#endif  // !__wasm__
 
 const Vector<int,4> single_rotations[8] = {
     vec(1,0,0,0),vec(-1,0,0,0),vec(0,1,0,0),vec(0,-1,0,0),

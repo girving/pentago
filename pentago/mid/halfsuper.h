@@ -143,8 +143,8 @@ Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
 // Merge even and odd bits into a single super_t
 super_t merge(const halfsuper_t even, const halfsuper_t odd) __attribute__((const));
 
-// Both half of super_wins: (even,odd)
-Vector<halfsuper_t,2> halfsuper_wins(const side_t side) __attribute__((const));
+// Half of super_wins (even or odd)
+halfsuper_t halfsuper_wins(const side_t side, const bool parity) __attribute__((const));
 
 // Same as rmax for super_t, but twice as fast.  Flips parity.
 __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {

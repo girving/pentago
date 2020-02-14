@@ -23,7 +23,7 @@ static const uint8_t rotate_quadrants[4][4] = {{0,1,2,3},{1,3,0,2},{3,2,1,0},{2,
 
 side_t transform_side(symmetry_t s, side_t side) {
   // Decompose into quadrants
-  quadrant_t q[4] = {quadrant(side,0),quadrant(side,1),quadrant(side,2),quadrant(side,3)};
+  quadrant_t q[4] = {quadrant(side, 0), quadrant(side, 1), quadrant(side, 2), quadrant(side, 3)};
   // Apply local rotations plus global rotations confined to each quadrant
   for (int i=0;i<4;i++)
     switch ((s.global+(s.local>>2*i))&3) {
@@ -43,6 +43,12 @@ side_t transform_side(symmetry_t s, side_t side) {
   return quadrants(qr[0],qr[1],qr[2],qr[3]);
 }
 
+board_t slow_transform_board(symmetry_t s, board_t board) {
+  const auto [s0, s1] = slow_unpack(board);
+  return slow_pack(transform_side(s, s0), transform_side(s, s1));
+}
+
+#ifndef __wasm__
 // I don't trust the compiler to figure out that all the branching is shared between sides,
 // so this routine is two manually inlined copies of transform_side
 board_t transform_board(symmetry_t s, board_t board) {
@@ -318,7 +324,6 @@ super_t super_meaningless(const board_t board, const uint64_t salt) {
   return result;
 }
 
-#ifndef __wasm__
 symmetry_t random_symmetry(Random& random) {
   const int g = random.uniform<int>(0,symmetries.size());
   return symmetry_t(g>>8,g&255);

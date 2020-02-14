@@ -13,7 +13,7 @@ bazel build //pentago/base:tables
   -O3 -flto -Wl,--lto-O3 \
   -mno-exception-handling \
   -Wall -Werror -fcolor-diagnostics -Wl,-error-limit=0 \
-  -Wl,--stack-first -Wl,-z,stack-size=$[2 << 20] -Wl,--initial-memory=0 \
+  -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
   -Wl,--export=__heap_base \
   -isystem third_party/freestanding -I. -Ibazel-bin \
   pentago/mid/{halfsuper,midengine,js_test}.cc \

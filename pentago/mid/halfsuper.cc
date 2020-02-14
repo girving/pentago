@@ -45,9 +45,45 @@ super_t merge(const halfsuper_t even, const halfsuper_t odd) {
   return (v[0]&evens) | (v[1]&~evens);
 }
 
-// One half of super_wins
-Vector<halfsuper_t,2> halfsuper_wins(const side_t side) {
-  return split(super_wins(side));
+// Clang doesn't seem smart enough to do branch free conditional swap
+static inline void swap_if(uint16_t& q0, uint16_t& q1, const bool condition) {
+  const uint16_t x = condition ? q0 ^ q1 : 0;
+  q0 ^= x;
+  q1 ^= x;
+}
+
+// One half of super_wins.  Uses only win_contributions and rotations, not superwin_info.
+halfsuper_t halfsuper_wins(const side_t side, const bool parity) {
+  // Grab win contributions for all rotated quadrants
+  uint64_t contrib[4][4];  // Indexed by quadrant, rotation
+  #pragma clang loop unroll(full)
+  for (int q = 0; q < 4; q++) {
+    auto q0 = quadrant(side, q);
+    auto q1 = rotations[q0][0];
+    auto q2 = rotations[q1][0];
+    auto q3 = rotations[q0][1];
+    swap_if(q0, q1, parity && !q);
+    swap_if(q2, q3, parity && !q);
+    contrib[q][0] = win_contributions[q][q0];
+    contrib[q][1] = win_contributions[q][q1];
+    contrib[q][2] = win_contributions[q][q2];
+    contrib[q][3] = win_contributions[q][q3];
+  }
+
+  // Fill in the table
+  halfsuper_t wins = 0;
+  #pragma clang loop unroll(full)
+  for (int r = 0; r < 128; r++) {
+    // See won in score.h for details
+    const int r1 = r >> 1 & 3;
+    const int r2 = r >> 3 & 3;
+    const int r3 = r >> 5;
+    const int r0 = ((r & 1) << 1) + ((r1 + r2 + r3) & 1);
+    const auto c = contrib[0][r0] + contrib[1][r1] + contrib[2][r2] + contrib[3][r3];
+    if (c&(c>>1)&0x55 || c&(0xaaaaaaaaaaaaaaaa<<8))
+      wins |= halfsuper_t::singleton(r);
+  }
+  return wins;
 }
 
 int popcount(halfsuper_t h) {

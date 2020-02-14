@@ -160,8 +160,9 @@ TEST(mid, half) {
   // Test wins
   for (int step=0;step<steps;step++) {
     const side_t side = random_side(random);
-    const auto h = halfsuper_wins(side);
-    ASSERT_EQ(super_wins(side), merge(h[0], h[1]));
+    const auto h0 = halfsuper_wins(side, 0);
+    const auto h1 = halfsuper_wins(side, 1);
+    ASSERT_EQ(super_wins(side), merge(h0, h1));
   }
 }
 

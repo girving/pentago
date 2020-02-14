@@ -31,8 +31,9 @@ using std::unordered_map;
 struct unusable {};
 #define REMEMBER(name, ...) const auto name = []() { __VA_ARGS__; return unusable(); }();
 
-// type, name, c++ sizes, c++ initializer, js
-vector<tuple<string,string,string,string,bool>> tables;
+// type, name, c++ sizes, c++ initializer, flags
+const int for_js = 1, for_wasm = 2;
+vector<tuple<string,string,string,string,int>> tables;
 
 template<class Data> void
 cpp_init(ostream& out, const string& fmt, const Data& data, const int axis, const int offset) {
@@ -51,14 +52,14 @@ cpp_init(ostream& out, const string& fmt, const Data& data, const int axis, cons
 
 // Remember a table we want to save
 template<class Data> void
-remember(const string& type, const string& name, const string& fmt, const Data& data, const bool js = false) {
+remember(const string& type, const string& name, const string& fmt, const Data& data, const int flags = 0) {
   const auto scalars = scalar_view(asarray(data));
   string sizes;
   for (const auto n : scalars.shape())
     sizes += format("[%d]", n);
   ostringstream init;
   cpp_init(init, fmt, scalars.raw(), 0, 0);
-  tables.emplace_back(type, name, sizes, init.str(), js);
+  tables.emplace_back(type, name, sizes, init.str(), flags);
 }
 
 // Reformat an initializer for Javascript
@@ -83,17 +84,26 @@ void save(const string& h, const string& cc, const string& js) {
   file_cc << "#include \"pentago/base/gen/tables.h\"\n";
   file_cc << "namespace pentago {\n\n";
 
-  ofstream file_js(js.c_str());
-  file_js << note;
-
-  for (const auto& [type, name, sizes, init, js] : tables) {
-    file_h << format("extern const %s %s%s;\n", type, name, sizes);
-    file_cc << format("const %s %s%s = %s;\n", type, name, sizes, init);
-    if (js)
-      file_js << format("exports.%s = %s\n", name, js_init(init));
+  for (const int phase : {0, 1}) {
+    for (const auto& [type, name, sizes, init, flags] : tables) {
+      if (flags & for_wasm ? !phase : phase) {
+        file_h << format("extern const %s %s%s;\n", type, name, sizes);
+        file_cc << format("const %s %s%s = %s;\n", type, name, sizes, init);
+      }
+    }
+    const auto pre = phase ? "#endif  // !defined(__wasm__)\n" : "#ifndef __wasm__\n";
+    file_h << pre;
+    file_cc << pre;
   }
   file_h << "\n}\n";
   file_cc << "\n}\n";
+
+  // Javascript
+  ofstream file_js(js.c_str());
+  file_js << note;
+  for (const auto& [type, name, sizes, init, flags] : tables)
+    if (flags & for_js)
+      file_js << format("exports.%s = %s\n", name, js_init(init));
 }
 
 uint64_t ipow(uint64_t a, uint64_t b) {
@@ -244,7 +254,7 @@ const Array<const uint64_t,2> win_contributions = []() {
     }
   }
   check(table, "4e5cf35e82fceecd464d73c3de35e6af4f75ee34");
-  remember("uint64_t", "win_contributions", "0x%xL", table);
+  remember("uint64_t", "win_contributions", "0x%xL", table, for_wasm);
   return table;
 }();
 
@@ -263,7 +273,7 @@ const Array<const Vector<uint16_t,2>> rotations = []() {
     table[v] = vec(left, right);
   }
   check(table, "195f19d49311f82139a18ae681592de02b9954bc");
-  remember("uint16_t", "rotations", "0x%x", table);
+  remember("uint16_t", "rotations", "0x%x", table, for_wasm);
   return table;
 }();
 
@@ -390,7 +400,7 @@ const Array<const uint16_t> reflections = []() {
     table[v] = r;
   }
   check(table, "2b23dc37f4bc1008eba3df0ee1b7815675b658bf");
-  remember("uint16_t", "reflections", "0x%x", table);
+  remember("uint16_t", "reflections", "0x%x", table, for_wasm);
   return table;
 }();
 
@@ -811,9 +821,9 @@ REMEMBER(rotation_minimal_quadrants,
   check<uint64_t>(nest.flat, "8f48bb94ad675de569b07cca98a2e930b06b45ac");
   check<uint64_t>(inverse, "339369694f78d4a197db8dc41a1f41300ba4f46c");
   check<uint64_t>(moved, "dce212878aaebbcd995a8a0308335972bd1d5ef7");
-  remember("uint16_t", "rotation_minimal_quadrants_offsets", "%d", nest.offsets, true);
+  remember("uint16_t", "rotation_minimal_quadrants_offsets", "%d", nest.offsets, for_js);
   remember("uint16_t", "rotation_minimal_quadrants_flat", "%d", nest.flat);
-  remember("uint16_t", "rotation_minimal_quadrants_inverse", "%d", inverse, true);
+  remember("uint16_t", "rotation_minimal_quadrants_inverse", "%d", inverse, for_js);
   remember("uint16_t", "rotation_minimal_quadrants_reflect_moved", "%d", moved);
 )
 

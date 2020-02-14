@@ -14,6 +14,7 @@ namespace pentago {
 using std::min;
 using std::swap;
 
+#ifndef __wasm__
 bool black_to_move(board_t board) {
   check_board(board);
   const side_t side0 = unpack(board,0),
@@ -23,14 +24,16 @@ bool black_to_move(board_t board) {
   GEODE_ASSERT(count0==count1 || count1==count0+1);
   return count0==count1;
 }
+#endif  // !__wasm__
 
 void check_board(board_t board) {
   #define CHECK(q) \
-    if (!(quadrant(board,q) < 19683)) \
-      THROW(ValueError,"quadrant %d has invalid value %d",q,quadrant(board,q));
+    if (!(quadrant(board, q) < 19683)) \
+      THROW(ValueError, "quadrant %d has invalid value %d", q, quadrant(board, q));
   CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 
+#ifndef __wasm__
 static inline board_t pack(const Vector<Vector<quadrant_t,2>,4>& sides) {
     return quadrants(pack(sides[0][0],sides[0][1]),
                      pack(sides[1][0],sides[1][1]),
@@ -65,6 +68,7 @@ board_t standardize(board_t board) {
   }
   return RawArray<board_t>(8,transformed).min();
 }
+#endif  // !__wasm__
 
 #ifndef __wasm__
 Array<int,2> to_table(const board_t board) {
@@ -160,5 +164,42 @@ string str_board(board_t board) {
   return s+"\n   123456";
 }
 #endif  // !__wasm__
+
+// Slow versions for __wasm__ use
+
+static const uint16_t threes[9] = {1, 3, 9, 27, 81, 243, 729, 2187, 6561};
+
+board_t slow_pack(const side_t side0, const side_t side1) {
+  const uint64_t mask = 0x0001000100010001;
+  board_t board = 0;
+  for (const int i : range(9))
+    board += threes[i] * ((side0 >> i & mask) + 2 * (side1 >> i & mask));
+  return board;
+}
+
+Vector<side_t,2> slow_unpack(const board_t board) {
+  Vector<side_t,2> sides;
+  for (const int q : range(4)) {
+    const auto quad = quadrant(board, q);
+    for (const int i : range(9)) {
+      const auto t = quad / threes[i] % 3;
+      sides[0] |= uint64_t(t == 1) << (16*q + i);
+      sides[1] |= uint64_t(t == 2) << (16*q + i);
+    }
+  }
+  return sides;
+}
+
+int slow_count_stones(const board_t board) {
+  const auto [s0, s1] = slow_unpack(board);
+  return popcount(s0 | s1);
+}
+
+board_t slow_flip_board(const board_t board, const bool turn) {
+  auto sides = slow_unpack(board);
+  if (turn)
+    swap(sides[0], sides[1]);
+  return slow_pack(sides[0], sides[1]);
+}
 
 }

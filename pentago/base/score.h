@@ -44,14 +44,15 @@ static inline bool won(side_t side) {
    * of winning occur between two boards, and 4 occur between 4, so a sum
    * and a few bit twiddling checks are sufficient to test whether 5 in a
    * row exists.  See precompute for more details. */
-  uint64_t c = win_contributions[0][quadrant(side,0)]
-             + win_contributions[1][quadrant(side,1)]
-             + win_contributions[2][quadrant(side,2)]
-             + win_contributions[3][quadrant(side,3)];
+  uint64_t c = win_contributions[0][quadrant(side, 0)]
+             + win_contributions[1][quadrant(side, 1)]
+             + win_contributions[2][quadrant(side, 2)]
+             + win_contributions[3][quadrant(side, 3)];
   return c&(c>>1)&0x55 // The first four ways of winning require contributions from three quadrants
       || c&(0xaaaaaaaaaaaaaaaa<<8); // The remaining 28 ways require contributions from only two
 }
 
+#ifndef __wasm__
 // Determine if one side can win by rotating a quadrant
 static inline bool rotated_won(side_t side) {
   quadrant_t q0 = quadrant(side,0),
@@ -97,5 +98,6 @@ int arbitrarily_rotated_win_closeness(side_t black, side_t white) __attribute__(
 // Warning: slow, and checks only one side
 int rotated_status(board_t board);
 int arbitrarily_rotated_status(board_t board);
+#endif  // !__wasm__
 
 }
