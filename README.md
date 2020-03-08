@@ -74,8 +74,7 @@ To deploy the client:
     cd pentago/web/client
     brew install llvm
     npm install
-    make public
-    firebase deploy
+    npm run deploy
 
 ## Algorithm summary
 

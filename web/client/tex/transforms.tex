@@ -1,0 +1,85 @@
+\documentclass[11pt, oneside]{article} 
+\usepackage{geometry}
+\geometry{letterpaper}
+\usepackage{graphicx}	
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{natbib}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\usepackage{parskip}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\title{CSS-only quadrant rotations}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{The first rotation}
+
+We want to rotate a quadrant square of side length $L$ by $\pi/2$, translating it diagonally
+as we go to avoid intersecting the crossbars.
+As we do the rotation, the corner of the quadrant moves through an angle of $\pi/2$ from $-\pi/4$ to $\pi/4$,
+requiring a shift of
+\begin{align*}
+m(t) &= \frac{L}{\sqrt{2}} \cos(\pi t/2 - \pi/4) d - \frac{L}{2} d = \cos(\pi t/2 - \pi/4) w + w_0
+\end{align*}
+as $t$ goes from 0 to 1, where $d = (\pm 1, \pm 1)$ is the appropriate diagonal vector.
+In terms of the complex plain, the effect we want is the animated transform
+\begin{align*}
+f(t,z) &= w_0 + \cos(\pi t/2 - \pi/4) w + e^{i \pi t/2} z
+\end{align*}
+where $z \in \C$, $w \in \C$ is the maximum translation, and $t \in [0,1]$.  Let
+\begin{align*}
+e(t) &= \exp(2 \pi i t) \\
+c(t) &= \cos(2 \pi t) \\
+s(t) &= \sin(2 \pi t)
+\end{align*}
+so that
+\begin{align*}
+s(t) &= \frac{i}{2} (e(-t) - e(t)) \\
+c(t) &= \frac{1}{2} (e(t) + e(-t))
+\end{align*}
+and $f(t,z)$ becomes
+\begin{align*}
+f(t,z) &= w_0 + c(t/4 - 1/8) w + e(t/4) z \\
+  &= w_0 + (e(t/4 - 1/8) + e(-t/4 + 1/8)) w/2 + e(t/4) z \\
+  &= w_0 + e(t/4)e(-1/8) w/2 + e(-t/4)e(1/8) w/2 + e(t/4) z \\
+  &= w_0 + e(t/4)(e(-1/8) w/2 + e(-t/2)e(1/8) w/2 + z) \\
+  &= w_0 + e(t/4)(e(-1/8) w/2 + e(-t/2) (e(1/8) w/2 + e(t/2) z))
+\end{align*}
+which is now expressible as primitive transforms:
+\begin{align*}
+f(t) &= T(w_0) R(t/4) T(e(-1/8) w/2) R(-t/2) T(e(1/8) w/2) R(t/2)
+\end{align*}
+where $R$, $T$ are rotate, translate.  If we set the CSS transform property to that sequence of 5 primitive
+transforms, everything will animate correctly.
+
+\section{The second rotation}
+
+But wait!  If we extrapolate this into the next $\pi/2$, our translation will go in the wrong way.  To fix this, we
+need to make our transition correction ping-pong back between $-\pi/4$ and $\pi/4$ without leaving that
+interval:
+\begin{align*}
+f(t,z) &= w_0 + \cos(\pi/2 \operatorname{jag}(t) - \pi/4) w + e^{i \pi t/2} z \\
+\operatorname{jag}(t) &= \min(\operatorname{rem}(t, 2), \operatorname{rem}(2-t,2))
+\end{align*}
+where $\operatorname{rem}$ is the (correctly signed) floating point remainder function.  Fortunately for us we
+only need to evaluate $\operatorname{jag}$ at integers, where it has the simpler form
+\begin{align*}
+\operatorname{jag}(n) &= \operatorname{rem}(n, 2)
+\end{align*}
+Setting $j = \operatorname{jag}(t)$, we can repeat our derivation:
+\begin{align*}
+f(t,z) &= w_0 + c(j/4 - 1/8) w + e(t/4) z \\
+  &= w_0 + (e(j/4 - 1/8) + e(-j/4 + 1/8)) w/2 + e(t/4) z \\
+  &= w_0 + e(j/4)e(-1/8) w/2 + e(-j/4)e(1/8) w/2 + e(t/4) z \\
+  &= w_0 + e(j/4)(e(-1/8) w/2 + e(-j/2)e(1/8) w/2 + e(t/4-j/4) z) \\
+  &= w_0 + e(j/4)(e(-1/8) w/2 + e(-j/2) (e(1/8) w/2 + e(t/4+j/4) z)) \\
+f(t) &= T(w_0) R(j/4) T(e(-1/8) w/2) R(-j/2) T(e(1/8) w/2) R(t/4+j/4)
+\end{align*}
+
+\end{document}  

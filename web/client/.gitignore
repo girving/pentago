@@ -1,2 +1,10 @@
-firebase-debug.log
-/mid.wasm
+/node_modules/
+/public/mid.wasm
+/public/main.js
+/public/main.js.map
+/public/mid_worker.js
+/public/mid_worker.js.map
+/public/bundle.css
+/public/bundle.css.map
+/public/main.css
+.DS_Store

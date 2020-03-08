@@ -1,8 +1,7 @@
 // Lazy LRU cache using Window.localStorage (if available)
 
-'use strict'
-const {storageFactory} = require('storage-factory')
-const storage = storageFactory(() => localStorage)
+import factory from './storage-factory.js'
+const storage = factory(() => localStorage)
 const max = Math.max
 
 // Constants
@@ -38,14 +37,13 @@ for_keys(k => last_time = max(last_time, JSON.parse(storage.getItem(k)).t))
 const now = () => ++last_time
 
 // Set lower and upper bounds
-exports.set_lohi = (lo, hi) => {
+export const set_lohi = (lo, hi) => {
   lower = lo
   upper = hi
 }
 
 // Current number of cached values
-const size = () => storage.length - Object.keys(special).length
-exports.size = size
+export const size = () => storage.length - Object.keys(special).length
 
 // Discard oldest entries
 function collect() {
@@ -61,7 +59,7 @@ function collect() {
 }
 
 // Read a value, updating last access time
-exports.get = key => {
+export const get = key => {
   const data = JSON.parse(storage.getItem(key))
   if (!data)
     return undefined
@@ -71,13 +69,13 @@ exports.get = key => {
 }
 
 // Read a value, but don't update access time
-exports.peek = key => {
+export const peek = key => {
   const data = JSON.parse(storage.getItem(key))
   return data ? data.v : undefined
 }
 
 // Dump all values via console.log
-exports.dump = () => {
+export const dump = () => {
   console.log('cache (version ' + storage.getItem('version') + '):')
   for_keys(key => {
     const {t, v} = JSON.parse(storage.getItem(key))
@@ -86,7 +84,7 @@ exports.dump = () => {
 }
 
 // Write a value, garbage collecting if desired
-exports.set = (key, value) => {
+export const set = (key, value) => {
   storage.setItem(key, JSON.stringify({t: now(), v: value}))
   if (size() > upper)
     collect()

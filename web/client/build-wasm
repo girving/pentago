@@ -2,10 +2,11 @@
 
 set -e
 cd "$(dirname "$0")"/../..
+target=web/client/public/mid.wasm
 
 bazel build //pentago/base:tables
 
-/usr/local/opt/llvm/bin/clang -o web/client/mid.wasm --target=wasm32 \
+/usr/local/opt/llvm/bin/clang -o $target --target=wasm32 \
   -ffreestanding -nostdlib -std=c++1z \
   -fvisibility=hidden -Wl,--no-entry \
   -Wl,--export={wasm_malloc,wasm_midsolve,midsolve_results_limit,sqr_test,sum_test,die_test} \
@@ -23,4 +24,4 @@ bazel build //pentago/base:tables
   pentago/utility/wasm_alloc.cc \
   third_party/freestanding/cstring.cc
 
-chmod -x web/client/mid.wasm
+chmod -x $target
