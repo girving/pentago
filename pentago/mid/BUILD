@@ -7,6 +7,7 @@ cc_library(
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/base",
+        "//pentago/base:halfsuper_wins",
         "//pentago/data",
         "//pentago/high",
         "//pentago/search",

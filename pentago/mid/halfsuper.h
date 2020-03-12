@@ -65,6 +65,12 @@ struct halfsuper_t {
   explicit halfsuper_t(__m128i x)
     : x(x) {}
 
+  halfsuper_t(uint64_t a, uint64_t b) {
+    union { __m128i x; uint64_t y[2]; } u;
+    u.y[0] = a; u.y[1] = b;
+    x = u.x;
+  }
+
   explicit operator bool() const {
     return _mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0;
   }

@@ -1,4 +1,5 @@
 #include "pentago/base/board.h"
+#include "pentago/base/score.h"
 #include "pentago/base/symmetry.h"
 #include "gtest/gtest.h"
 namespace pentago {
@@ -26,6 +27,14 @@ TEST(slow, transform_board) {
     const auto s = random_symmetry(random);
     const auto board = random_board(random);
     ASSERT_EQ(transform_board(s, board), slow_transform_board(s, board));
+  }
+}
+
+TEST(slow, won) {
+  Random random(7);
+  for (int i = 0; i < (1<<20); i++) {
+    const auto side = random_side(random);
+    ASSERT_EQ(won(side), slow_won(side));
   }
 }
 

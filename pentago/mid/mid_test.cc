@@ -127,12 +127,10 @@ super_t random_super_and(Random& random, const int steps) {
   return s;
 }
 
-TEST(mid, half) {
+TEST(mid, half_split_merge) {
   const int steps = 1024;
   const bool verbose = false;
   Random random(667731);
-
-  // Test split and merge
   for (int step=0;step<steps;step++) {
     const super_t s = step<256 ? super_t::singleton(step)
                                : random_super_and(random,4);
@@ -156,13 +154,53 @@ TEST(mid, half) {
     }
     ASSERT_EQ(merge(rmax(h[1]), rmax(h[0])), rmax(s));
   }
+}
 
-  // Test wins
-  for (int step=0;step<steps;step++) {
-    const side_t side = random_side(random);
+TEST(mid, half_wins) {
+  const int steps = 1 << 20;
+  Random random(667731);
+  const auto check = [](const side_t side) {
     const auto h0 = halfsuper_wins(side, 0);
     const auto h1 = halfsuper_wins(side, 1);
-    ASSERT_EQ(super_wins(side), merge(h0, h1));
+    return super_wins(side) == merge(h0, h1);
+  };
+  for (int step=0;step<steps;step++) {
+    auto side = random_side(random);
+    if (check(side)) continue;
+
+    // Make minimal failing example
+    for (;;) {
+      for (const int i : range(64)) {
+        const auto smaller = side & ~(side_t(1)<<i);
+        if (smaller != side && !check(smaller)) {
+          side = smaller;
+          goto shrunk;
+        }
+      }
+      break;
+      shrunk:;
+    }
+
+    // Complain about it
+    const auto h0 = halfsuper_wins(side, 0);
+    const auto h1 = halfsuper_wins(side, 1);
+    const auto wins = merge(h0, h1);
+    const auto correct = super_wins(side);
+    if (wins != correct) {
+      for (const int i : range(256)) {
+        if (wins[i] != correct[i]) {
+          slog("i %d, r %d %d %d %d, wins %d, correct %d",
+               i, i&3, i>>2&3, i>>4&3, i>>6&3, wins[i], correct[i]);
+          const auto board = pack(side, 0);
+          slog("side %d, board %d", side, board);
+          slog("%s", str_board(board));
+          break;
+        }
+      }
+    }
+
+    // Bail
+    ASSERT_EQ(wins, correct);
   }
 }
 

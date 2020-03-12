@@ -34,6 +34,7 @@ static inline score_t lift(score_t sc) {
   return score(1+(sc>>2),2-(sc&3));
 }
 
+#ifndef __wasm__
 // Determine if one side has 5 in a row
 static inline bool won(side_t side) {
   /* To test whether a position is a win for a given player, we note that
@@ -52,7 +53,6 @@ static inline bool won(side_t side) {
       || c&(0xaaaaaaaaaaaaaaaa<<8); // The remaining 28 ways require contributions from only two
 }
 
-#ifndef __wasm__
 // Determine if one side can win by rotating a quadrant
 static inline bool rotated_won(side_t side) {
   quadrant_t q0 = quadrant(side,0),
@@ -99,5 +99,8 @@ int arbitrarily_rotated_win_closeness(side_t black, side_t white) __attribute__(
 int rotated_status(board_t board);
 int arbitrarily_rotated_status(board_t board);
 #endif  // !__wasm__
+
+// Slow versions for __wasm__ use
+bool slow_won(const side_t side) __attribute__((const));
 
 }

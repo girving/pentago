@@ -35,8 +35,8 @@ int high_board_t::count() const {
 bool high_board_t::done() const {
   const auto board = this->board();
   const auto [side0, side1] = slow_unpack(board);
-  return won(side0)
-      || won(side1)
+  return slow_won(side0)
+      || slow_won(side1)
       || (!middle() && slow_count_stones(board)==36);
 }
 
@@ -91,8 +91,8 @@ int high_board_t::immediate_value() const {
   GEODE_ASSERT(done());
   const auto board = this->board();
   const auto [side0, side1] = slow_unpack(board);
-  const bool bw = won(side0),
-             ww = won(side1);
+  const bool bw = slow_won(side0),
+             ww = slow_won(side1);
   if (bw || ww)
     return bw && ww ? 0 : bw==!turn() ? 1 : -1;
   return 0;
