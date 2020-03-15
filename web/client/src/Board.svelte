@@ -192,7 +192,10 @@
 
   // Track url hash
   let hash = window.location.hash || '#0'
-  window.onhashchange = () => { hash = window.location.hash }
+  window.onhashchange = () => {
+    const h = window.location.hash
+    if (hash != h) hash = h
+  }
 
   // Board and history
   let history, board, error
@@ -272,7 +275,11 @@
   // Swivel state (how far we've rotated each quadrant)
   let swivel = [0, 0, 0, 0]
   let spinning = [false, false, false, false]
-  const spin = r => () => { swivel[r.q] += r.d; spinning[r.q] = true }
+  const spin = r => () => {
+    hash = rotate_link(r)
+    swivel[r.q] += r.d
+    spinning[r.q] = true
+  }
   const nospin = q => () => spinning[q.q] = false
   const transform = (q, t) => {
     // See transforms.tex for details
