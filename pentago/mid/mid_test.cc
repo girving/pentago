@@ -33,13 +33,19 @@ void midsolve_internal_test(const board_t board, const bool parity) {
     const auto rboard = get<0>(r);
     const bool turn = count_stones(get<0>(r))&1;
     const auto rs = get<1>(r);
-    ASSERT_EQ(popcount(rs.known), 128);
     slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
          slice, rboard, parity, popcount(rs.win), popcount(~rs.win&rs.notlose),
          popcount(~(rs.win|rs.notlose)));
-    for (int a=0;a<2;a++) {
-      super_t correct = super_evaluate_all(a,100,flip_board(rboard,turn));
-      GEODE_ASSERT(!((correct^(a?rs.win:rs.notlose))&rs.known));
+    for (const int a : range(2)) {
+      const auto exp = [=](const halfsuper_t h) { return rs.parity ? merge(0,h) : merge(h,0); };
+      const auto known = exp(~halfsuper_t(0));
+      const auto correct = super_evaluate_all(a,100,flip_board(rboard,turn));
+      GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known));
+      for (const int s : range(256)) {
+        ASSERT_EQ(known[s], rs.known(s));
+        if (rs.known(s))
+          ASSERT_EQ(correct[s], rs.value(s) >= a);
+      }
     }
   }
 }

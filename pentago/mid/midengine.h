@@ -20,7 +20,11 @@ using std::tuple;
 // (win,notlose)
 typedef Vector<halfsuper_t,2> halfsupers_t;
 struct superinfos_t {
-  super_t known, win, notlose;
+  halfsuper_t win, notlose;
+  bool parity;
+
+  bool known(const int s) const { return ((s^s>>2^s>>4^s>>6) & 1) == parity; }
+  int value(const int s) const { return win[s >> 1] + notlose[s >> 1] - 1; }
 };
 
 // A k-subsets of [0,n-1], packed into 64-bit ints with 5 bits for each entry.

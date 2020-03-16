@@ -363,17 +363,12 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
 
       // If we're far enough along, remember results
       if (n <= 1) {
-        superinfos_t info;
-        const auto all = ~halfsuper_t(0);
-        info.known   = (n+parity)&1 ? merge(0, all) : merge( all,0);
-        info.win     = (n+parity)&1 ? merge(0,us[0]) : merge(us[0],0);
-        info.notlose = (n+parity)&1 ? merge(0,us[1]) : merge(us[1],0);
         const uint32_t filled_black = (slice+n)&1 ? filled1 : filled0,
                        filled_white = (slice+n)&1 ? filled0 : filled1;
         board_t board = root;
         for (int i = 0; i < spots; i++)
           board += ((filled_black>>i&1)+2*(filled_white>>i&1))*slow_pack(side_t(1)<<empty[i],side_t(0));
-        results.append(make_tuple(board, info));
+        results.append(make_tuple(board, superinfos_t{us[0], us[1], bool((n+parity)&1)}));
       }
 
       // Negate and apply rmax in preparation for the slice above
@@ -416,7 +411,7 @@ static int traverse(const high_board_t board, const bool children, const midsolv
         const auto si = s.inverse().local;
         const superinfos_t& r = get<1>(*it);
         if (r.known(si)) {
-          value = r.win(si) + r.notlose(si) - 1;
+          value = r.value(si);
           goto found;
         }
       }
