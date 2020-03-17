@@ -418,7 +418,7 @@ static int traverse(const high_board_t board, const midsolve_internal_results_t&
     for (const int q : range(4)) {
       for (const int d : {1, -1}) {
         const auto v = r.value((d & 3) << 2*q);
-        results.append(make_tuple(board.rotate(q/2, q%2, d), v));
+        results.append(make_tuple(board.rotate(q, d), v));
         value = max(value, -v);
       }
     }

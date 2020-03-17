@@ -16,6 +16,7 @@ using std::min;
 using std::swap;
 using std::tuple;
 
+#ifndef __wasm__
 const symmetries_t symmetries;
 
 // rotate_quadrants[r][q] is the quadrant moved to q under rotation r
@@ -43,12 +44,6 @@ side_t transform_side(symmetry_t s, side_t side) {
   return quadrants(qr[0],qr[1],qr[2],qr[3]);
 }
 
-board_t slow_transform_board(symmetry_t s, board_t board) {
-  const auto [s0, s1] = slow_unpack(board);
-  return slow_pack(transform_side(s, s0), transform_side(s, s1));
-}
-
-#ifndef __wasm__
 // I don't trust the compiler to figure out that all the branching is shared between sides,
 // so this routine is two manually inlined copies of transform_side
 board_t transform_board(symmetry_t s, board_t board) {

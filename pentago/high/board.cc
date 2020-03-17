@@ -59,10 +59,9 @@ pile<high_board_t,36> high_board_t::moves() const {
         if (empty & board_t(1) << (32*(x/3)+16*(y/3)+3*(x%3)+(y%3)))
           moves.append(place(x, y));
   } else { // Rotate a quadrant
-    for (const int qx : range(2))
-      for (const int qy : range(2))
-        for (const int d : vec(-1,1))
-          moves.append(rotate(qx, qy, d));
+    for (const int q : range(4))
+      for (const int d : {-1, 1})
+        moves.append(rotate(q, d));
   }
   return moves;
 }
@@ -79,12 +78,26 @@ high_board_t high_board_t::place(const int x, const int y) const {
   return high_board_t(board + slow_flip_board(slow_pack(move, side_t(0)), turn()), true);
 }
 
-high_board_t high_board_t::rotate(const int qx, const int qy, const int d) const {
+// Avoid a dependence on general board transformation for wasm
+static quadrant_t slow_rotate_quadrant_side(const quadrant_t side, const int d) {
+  quadrant_t result = 0;
+  for (const int x : range(3))
+    for (const int y : range(3))
+      if (side & 1<<(3*x+y))
+        result |= 1<<(d==1 ? 3*(2-y)+x : 3*y+2-x);
+  return result;
+}
+
+high_board_t high_board_t::rotate(const int q, const int d) const {
   GEODE_ASSERT(middle());
-  GEODE_ASSERT(qx==0 || qx==1);
-  GEODE_ASSERT(qy==0 || qy==1);
+  GEODE_ASSERT(0 <= q && q < 4);
   GEODE_ASSERT(d==1 || d==-1);
-  return high_board_t(slow_transform_board(symmetry_t(local_symmetry_t((d>0?1:3)<<2*(2*qx+qy))), board()), false);
+  auto sides = slow_unpack(board());
+  for (const int s : range(2)) {
+    const auto old = quadrant(sides[s], q);
+    sides[s] ^= side_t(old ^ slow_rotate_quadrant_side(old, d)) << 16*q;
+  }
+  return high_board_t(slow_pack(sides[0], sides[1]), false);
 }
 
 int high_board_t::immediate_value() const {

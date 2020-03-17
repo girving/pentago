@@ -21,15 +21,6 @@ TEST(slow, board) {
   }
 }
 
-TEST(slow, transform_board) {
-  Random random(7);
-  for (int i = 0; i < 256; i++) {
-    const auto s = random_symmetry(random);
-    const auto board = random_board(random);
-    ASSERT_EQ(transform_board(s, board), slow_transform_board(s, board));
-  }
-}
-
 TEST(slow, won) {
   Random random(7);
   for (int i = 0; i < (1<<20); i++) {

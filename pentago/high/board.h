@@ -51,7 +51,7 @@ public:
   high_board_t place(const int x, const int y) const;
 
   // Rotate the given quadrant in the given direction (-1 or 1)
-  high_board_t rotate(const int qx, const int qy, const int d) const;
+  high_board_t rotate(const int q, const int d) const;
 
   // value() assuming done()
   int immediate_value() const;

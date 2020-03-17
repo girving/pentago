@@ -106,7 +106,6 @@ side_t transform_side(symmetry_t s, side_t side) __attribute__((const));
 #ifndef __wasm__
 board_t transform_board(symmetry_t s, board_t board) __attribute__((const));
 #endif  // !__wasm__
-board_t slow_transform_board(symmetry_t s, board_t board) __attribute__((const));
 
 // Let B be the set of boards, and A \subset B a subset of boards invariant to global transforms
 // (b in A iff g(b) in A for g in D_4).  Define the super operator f : B -> 2^L by

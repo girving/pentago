@@ -290,7 +290,7 @@ const Array<const Vector<uint16_t,2>> rotations = []() {
     table[v] = vec(left, right);
   }
   check(table, "195f19d49311f82139a18ae681592de02b9954bc");
-  remember("uint16_t", "rotations", "0x%x", table, for_wasm);
+  remember("uint16_t", "rotations", "0x%x", table);
   return table;
 }();
 
@@ -570,7 +570,7 @@ const Array<const uint16_t> reflections = []() {
     table[v] = r;
   }
   check(table, "2b23dc37f4bc1008eba3df0ee1b7815675b658bf");
-  remember("uint16_t", "reflections", "0x%x", table, for_wasm);
+  remember("uint16_t", "reflections", "0x%x", table);
   return table;
 }();
 
