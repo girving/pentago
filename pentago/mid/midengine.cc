@@ -396,33 +396,32 @@ midsolve_internal(const board_t root, const bool parity, RawArray<halfsupers_t> 
   return results;
 }
 
-static int traverse(const high_board_t board, const bool children, const midsolve_internal_results_t& supers,
+static int traverse(const high_board_t board, const midsolve_internal_results_t& supers,
                     midsolve_results_t& results) {
   int value;
   if (board.done()) { // Done, so no lookup required
     value = board.immediate_value();
-  } else if (!children && !board.middle()) {  // Extract value from supers
-    // We can't superstandardize, since that can break parity.  Instead, we check all local rotations manually.
-    for (const int i : range(256)) {
-      const local_symmetry_t s(i);
-      const auto sboard = slow_transform_board(s, board.board());
-      const auto it = std::find_if(supers.begin(), supers.end(), [=](const auto& p) { return get<0>(p) == sboard; });
-      if (it != supers.end()) {
-        const auto si = s.inverse().local;
-        const superinfos_t& r = get<1>(*it);
-        if (r.known(si)) {
-          value = r.value(si);
-          goto found;
-        }
+  } else if (!board.middle()) {  // Recurse into children
+    value = -1;
+    for (const auto move : board.moves())
+      value = max(value, traverse(move, supers, results));
+  } else {  // if board.middle()
+    // Find unrotated board in supers
+    const auto b = board.board();
+    const auto it = std::find_if(supers.begin(), supers.end(), [=](const auto& p) { return get<0>(p) == b; });
+    if (it == supers.end())
+      THROW(RuntimeError, "traverse failure: board %s", board.name());
+    const superinfos_t& r = get<1>(*it);
+
+    // Handle recursion manually to avoid actual rotation
+    value = -1;
+    for (const int q : range(4)) {
+      for (const int d : {1, -1}) {
+        const auto v = r.value((d & 3) << 2*q);
+        results.append(make_tuple(board.rotate(q/2, q%2, d), v));
+        value = max(value, -v);
       }
     }
-    THROW(RuntimeError, "traverse failure: board %s", board.name());
-    found:;
-  } else {  // Traverse into children
-    value = -1;
-    const int scale = board.middle() ? -1 : 1;
-    for (const auto move : board.moves())
-      value = max(value, scale * traverse(move, false, supers, results));
   }
 
   // Store and return value
@@ -436,7 +435,7 @@ midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> wor
 
   // Extract all available boards
   midsolve_results_t results;
-  traverse(board, true, supers, results);
+  traverse(board, supers, results);
   return results;
 }
 
