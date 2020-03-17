@@ -14,6 +14,7 @@ using std::max;
 high_board_t::high_board_t(const board_t board, const bool middle)
   : rep_{uint32_t( middle ? ~board : board),
          uint32_t((middle ? ~board : board) >> 32)} {
+#ifndef __wasm__
   // Check correctness
   check_board(board);
   const auto [side0, side1] = slow_unpack(board);
@@ -24,6 +25,7 @@ high_board_t::high_board_t(const board_t board, const bool middle)
   if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1) || (middle && !board))
     THROW(ValueError, "high_board_t: inconsistent board %lld, turn %d, middle %d, "
           "side counts %d %d", board, turn, middle, count0, count1);
+#endif
 }
 
 high_board_t::~high_board_t() {}
@@ -67,14 +69,15 @@ pile<high_board_t,36> high_board_t::moves() const {
 }
 
 high_board_t high_board_t::place(const int x, const int y) const {
-  GEODE_ASSERT(!middle());
-  GEODE_ASSERT(0<=x && x<6);
-  GEODE_ASSERT(0<=y && y<6);
+  NON_WASM_ASSERT(!middle());
+  NON_WASM_ASSERT(0<=x && x<6);
+  NON_WASM_ASSERT(0<=y && y<6);
   const auto board = this->board();
-  const auto [side0, side1] = slow_unpack(board);
-  const auto empty = ~(side0 | side1);
   const auto move = side_t(1<<(3*(x%3)+y%3))<<16*(2*(x/3)+(y/3));
-  GEODE_ASSERT(empty & move);
+#ifndef __wasm__
+  const auto [side0, side1] = slow_unpack(board);
+  NON_WASM_ASSERT(move & ~(side0 | side1));
+#endif
   return high_board_t(board + slow_flip_board(slow_pack(move, side_t(0)), turn()), true);
 }
 
@@ -89,9 +92,9 @@ static quadrant_t slow_rotate_quadrant_side(const quadrant_t side, const int d) 
 }
 
 high_board_t high_board_t::rotate(const int q, const int d) const {
-  GEODE_ASSERT(middle());
-  GEODE_ASSERT(0 <= q && q < 4);
-  GEODE_ASSERT(d==1 || d==-1);
+  NON_WASM_ASSERT(middle());
+  NON_WASM_ASSERT(0 <= q && q < 4);
+  NON_WASM_ASSERT(d==1 || d==-1);
   auto sides = slow_unpack(board());
   for (const int s : range(2)) {
     const auto old = quadrant(sides[s], q);
@@ -101,7 +104,7 @@ high_board_t high_board_t::rotate(const int q, const int d) const {
 }
 
 int high_board_t::immediate_value() const {
-  GEODE_ASSERT(done());
+  NON_WASM_ASSERT(done());
   const auto board = this->board();
   const auto [side0, side1] = slow_unpack(board);
   const bool bw = slow_won(side0),

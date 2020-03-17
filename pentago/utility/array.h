@@ -73,7 +73,7 @@ template<class Shape> size_t safe_product(const Shape& shape) {
   size_t prod = 1;
   for (const int n : shape) {
     prod *= size_t(n);
-    GEODE_ASSERT(0 <= n && prod <= numeric_limits<int>::max());
+    NON_WASM_ASSERT(0 <= n && prod <= numeric_limits<int>::max());
   }
   return prod;
 }

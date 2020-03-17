@@ -28,7 +28,7 @@ void* wasm_malloc(size_t size) {
   if (next > page_size * heap_pages) {
     const int delta = ceil_div(next - page_size * heap_pages, page_size);
     const int r = __builtin_wasm_memory_grow(0, delta);
-    GEODE_ASSERT(r >= 0);  // -1 indicates failure
+    if (r < 0) die("wasm_malloc failed");
   }
 
   // All done!

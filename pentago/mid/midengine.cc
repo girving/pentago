@@ -37,8 +37,8 @@ static inline int choose(const int n, const int k) {
 // I.e., the set {a < b < c} has value a|b<<5|c<<10.  We order sets in large-entry-major order;
 // the first 3-set of 10 is {0,1,2}, followed by {0,1,3}, {0,2,3}, ....
 void subsets(const int n, const int k, RawArray<set_t> sets) {
-  GEODE_ASSERT(0<=n && n<=18 && k<=9);
-  GEODE_ASSERT(sets.size() == choose(n, k));
+  NON_WASM_ASSERT(0<=n && n<=18 && k<=9);
+  NON_WASM_ASSERT(sets.size() == choose(n, k));
   if (!sets.size())
     return;
   const set_t sentinel = set_t(n)<<5*k;
@@ -59,7 +59,7 @@ void subsets(const int n, const int k, RawArray<set_t> sets) {
     break;
     found:;
   }
-  GEODE_ASSERT(sets.size() == next);
+  NON_WASM_ASSERT(sets.size() == next);
 }
 
 // Allocate subsets on the stack
@@ -151,7 +151,7 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
     for (int i = 0; i < 64; i++)
       if (free & side_t(1)<<i)
         empty[next++] = i;
-    GEODE_ASSERT(next == spots);
+    NON_WASM_ASSERT(next == spots);
   }
   #define set_side(count, set) ({ \
     const int c_ = (count); \
@@ -221,7 +221,7 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
       for (int i = 0; i < spots; i++)
         if (free&side_t(1)<<empty[i])
           empty1[next++] = i;
-      GEODE_ASSERT(next==spots-k0);
+      NON_WASM_ASSERT(next==spots-k0);
     }
 
     /* What happens to indices when we add a stone?  We start with
@@ -383,11 +383,13 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
 
 midsolve_internal_results_t
 midsolve_internal(const board_t root, const bool parity, RawArray<halfsupers_t> workspace) {
+#ifndef __wasm__
   check_board(root);
+#endif
   const int slice = slow_count_stones(root);
-  GEODE_ASSERT(18<=slice && slice<=36);
+  NON_WASM_ASSERT(18<=slice && slice<=36);
   const int spots = 36-slice;
-  GEODE_ASSERT(workspace.size() >= bottleneck(spots));
+  NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
 
   // Compute all slices
   midsolve_internal_results_t results;
@@ -409,8 +411,7 @@ static int traverse(const high_board_t board, const midsolve_internal_results_t&
     // Find unrotated board in supers
     const auto b = board.board();
     const auto it = std::find_if(supers.begin(), supers.end(), [=](const auto& p) { return get<0>(p) == b; });
-    if (it == supers.end())
-      THROW(RuntimeError, "traverse failure: board %s", board.name());
+    NON_WASM_ASSERT(it != supers.end());
     const superinfos_t& r = get<1>(*it);
 
     // Handle recursion manually to avoid actual rotation
@@ -446,7 +447,7 @@ WASM_EXPORT int midsolve_results_limit() {
 }
 
 WASM_EXPORT void wasm_midsolve(const high_board_t* board, midsolve_results_t* results) {
-  GEODE_ASSERT(board && results);
+  NON_WASM_ASSERT(board && results);
   const auto workspace = wasm_buffer<halfsupers_t>(midsolve_workspace_size(board->count()));
   *results = midsolve(*board, workspace);
 }

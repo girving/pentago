@@ -109,10 +109,10 @@ std::string str_board(board_t board);
 // Turn a board into a 6x6 grid: x-y major order, 0,0 is lower left, value 0 for empty or 2^k for player k
 Array<int,2> to_table(const board_t boards);
 board_t from_table(RawArray<const int,2> tables);
-#endif  // !__wasm__
 
 // Throw ValueError if a board is invalid
 void check_board(board_t board);
+#endif  // !__wasm__
 
 // Slow versions for __wasm__ use
 board_t slow_pack(const side_t side0, const side_t side1) __attribute__((const));

@@ -24,7 +24,6 @@ bool black_to_move(board_t board) {
   GEODE_ASSERT(count0==count1 || count1==count0+1);
   return count0==count1;
 }
-#endif  // !__wasm__
 
 void check_board(board_t board) {
   #define CHECK(q) \
@@ -33,7 +32,6 @@ void check_board(board_t board) {
   CHECK(0) CHECK(1) CHECK(2) CHECK(3)
 }
 
-#ifndef __wasm__
 static inline board_t pack(const Vector<Vector<quadrant_t,2>,4>& sides) {
     return quadrants(pack(sides[0][0],sides[0][1]),
                      pack(sides[1][0],sides[1][1]),

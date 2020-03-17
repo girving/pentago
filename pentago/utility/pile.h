@@ -13,7 +13,7 @@ public:
   pile() = default;
 
   void append(const T& x) {
-    GEODE_ASSERT(size_ < limit);
+    assert(size_ < limit);
     data[size_++] = x;
   }
 

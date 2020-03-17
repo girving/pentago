@@ -47,6 +47,8 @@ die(const char* msg, const Args&... args) {
   ((condition) ? (void)0 : pentago::assertion_failed( \
       __PRETTY_FUNCTION__, __FILE__, __LINE__, #condition, pentago::debug_message(__VA_ARGS__)))
 
+#define NON_WASM_ASSERT(...) GEODE_ASSERT(__VA_ARGS__)
+
 #else  // if __wasm__
 
 WASM_IMPORT void __attribute__((noreturn, cold)) die(const char* msg);
@@ -58,6 +60,8 @@ WASM_IMPORT void __attribute__((noreturn, cold)) die(const char* msg);
 
 #define GEODE_ASSERT(condition, ...) \
   ((condition) ? (void)0 : die(__FILE__ ":" STRINGIZE(__LINE__) ": " #condition ", " #__VA_ARGS__ ))
+
+#define NON_WASM_ASSERT(...) ((void)0)
 
 #endif  // __wasm__
 
