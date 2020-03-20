@@ -53,9 +53,7 @@ int high_board_t::turn() const {
 pile<high_board_t,36> high_board_t::moves() const {
   pile<high_board_t,36> moves;
   if (!middle()) { // Place a stone
-    const auto board = this->board();
-    const auto [side0, side1] = slow_unpack(board);
-    const auto empty = ~(side0 | side1);
+    const auto empty = empty_mask();
     for (const int x : range(6))
       for (const int y : range(6))
         if (empty & board_t(1) << (32*(x/3)+16*(y/3)+3*(x%3)+(y%3)))
@@ -74,10 +72,7 @@ high_board_t high_board_t::place(const int x, const int y) const {
   NON_WASM_ASSERT(0<=y && y<6);
   const auto board = this->board();
   const auto move = side_t(1<<(3*(x%3)+y%3))<<16*(2*(x/3)+(y/3));
-#ifndef __wasm__
-  const auto [side0, side1] = slow_unpack(board);
-  NON_WASM_ASSERT(move & ~(side0 | side1));
-#endif
+  NON_WASM_ASSERT(move & empty_mask());
   return high_board_t(board + slow_flip_board(slow_pack(move, side_t(0)), turn()), true);
 }
 

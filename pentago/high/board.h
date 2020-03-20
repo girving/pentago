@@ -56,6 +56,11 @@ public:
   // value() assuming done()
   int immediate_value() const;
 
+  side_t empty_mask() const {
+    const auto [side0, side1] = slow_unpack(board());
+    return ~(side0 | side1);
+  }
+
 #ifndef __wasm__
   // 1 if the player to move wins, 0 for tie, -1 if the player to move loses
   int value(const block_cache_t& cache) const;
