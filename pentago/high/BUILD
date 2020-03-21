@@ -9,6 +9,7 @@ cc_library(
         "//pentago/base",
         "//pentago/data",
         "//pentago/end",
+        "//pentago/mid:halfsuper",
         "//pentago/search",
         "//pentago/utility",
     ],

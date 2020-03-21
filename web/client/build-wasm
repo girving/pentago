@@ -18,7 +18,6 @@ bazel build //pentago/base:tables
   -Wl,--export=__heap_base \
   -isystem third_party/freestanding -I. -Ibazel-bin \
   pentago/mid/{halfsuper,midengine,js_test}.cc \
-  bazel-bin/pentago/base/gen/slow_won.cc \
   pentago/high/board.cc \
   pentago/utility/wasm_alloc.cc \
   third_party/freestanding/cstring.cc

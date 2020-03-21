@@ -3,6 +3,7 @@
 #include "pentago/high/board.h"
 #include "pentago/base/score.h"
 #include "pentago/base/symmetry.h"
+#include "pentago/mid/halfsuper.h"
 #ifndef __wasm__
 #include "pentago/search/superengine.h"
 #include "pentago/utility/random.h"
@@ -10,6 +11,11 @@
 namespace pentago {
 
 using std::max;
+
+// We don't use this very often, so implement it on top of an expensive, hot routine
+__attribute__((cold)) static bool slow_won(const side_t side) {
+  return halfsuper_wins(side, 0)[0];
+}
 
 bool high_board_t::done() const {
   return slow_won(side(0)) || slow_won(side(1)) || ply_ == 2*36;

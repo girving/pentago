@@ -16,7 +16,6 @@ genrule(
         "gen/tables.h",
         "gen/tables.cc",
         "gen/tables.js",
-        "gen/slow_won.cc",
         "gen/halfsuper_wins.h",
     ],
     tools = [":precompute"],
@@ -30,8 +29,7 @@ cc_library(
 
 cc_library(
     name = "base",
-    srcs = glob(["*.h", "*.cc"], exclude=["precompute.cc", "*_test.cc"]) +
-           ["gen/tables.h", "gen/tables.cc", "gen/slow_won.cc"],
+    srcs = glob(["*.h", "*.cc"], exclude=["precompute.cc", "*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/utility",
@@ -43,7 +41,6 @@ cc_tests(
         "all_boards_test",
         "pentago_test",
         "super_test",
-        "slow_test",
     ],
     deps = [
         ":base",

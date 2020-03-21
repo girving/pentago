@@ -100,7 +100,4 @@ int rotated_status(board_t board);
 int arbitrarily_rotated_status(board_t board);
 #endif  // !__wasm__
 
-// Slow versions for __wasm__ use
-bool slow_won(const side_t side) __attribute__((const));
-
 }
