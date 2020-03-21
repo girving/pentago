@@ -53,14 +53,38 @@ function quadrants_to_str(quads) {
   return s.substr(Math.min(s.match(/^0*/)[0].length,s.length-1))
 }
 
-// Parse into [...quads, middle] format
+// Transform from ternary packed form to binary unpacked form, counting bits as we go
+function unpack_quadrants(quads) {
+  const s0 = [0, 0, 0, 0], s1 = [0, 0, 0, 0]
+  let slice = 0
+  for (let q = 0; q < 4; q++) {
+    for (let i = 0; i < 9; i++) {
+      const n = Math.floor(quads[q] / Math.pow(3, i)) % 3
+      s0[q] |= (n == 1) << i
+      s1[q] |= (n == 2) << i
+      slice += n != 0
+    }
+  }
+  return [s0, s1, slice]
+}
+
+function pack_quadrant(side0, side1) {
+  let quad = 0
+  for (let i = 0; i < 9; i++) {
+    const mask = 1 << i
+    quad += ((side0 >> i & 1) + 2 * (side1 >> i & 1)) * Math.pow(3, i)
+  }
+  return quad
+}
+
+// Parse into [...side0 quads, ...side1 quads, ply] format
 function parse_board(name) {
   const m = name.match(/^(\d+)(m?)$/)
   if (!m)
     throw Error('Invalid board ' + name)
-  const quads = str_to_quadrants(m[1])
+  const [side0, side1, slice] = unpack_quadrants(str_to_quadrants(m[1]))
   const middle = m[2].length
-  return [...quads, middle]
+  return [...side0, ...side1, 2*slice-middle]
 }
 
 // Turn [...quads, middle] format into string
@@ -83,18 +107,20 @@ function read_int(M, p) {
   return new Int32Array(M.exports.memory.buffer, p, 1)[0]
 }
 
+// Read high_board_t into packed [...quads, middle] format
 function read_board(M, p) {
-  const quads = new Uint16Array(M.exports.memory.buffer, p, 4)
-  const middle = (quads[3] & 1 << 15) != 0
-  const x = middle ? 0xffff : 0
-  return [quads[0] ^ x, quads[1] ^ x, quads[2] ^ x, quads[3] ^ x, middle]
+  const high = new Uint16Array(M.exports.memory.buffer, p, 9)
+  const quads = [0, 1, 2, 3].map(q => pack_quadrant(high[q], high[4+q]))
+  const ply = high[8]
+  return [...quads, ply & 1]
 }
 
 function write_board(M, p, board) {
-  const x = board[4] ? 0xffff : 0
-  const quads = new Uint16Array(M.exports.memory.buffer, p, 4)
-  for (let i = 0; i < 4; i++)
-    quads[i] = board[i] ^ x
+  const sides = new Uint16Array(M.exports.memory.buffer, p, 8)
+  for (let i = 0; i < 8; i++)
+    sides[i] = board[i]
+  const ply = new Uint32Array(M.exports.memory.buffer, p + 16, 1)
+  ply[0] = board[8]
 }
 
 // Instantiate a fresh copy
@@ -116,8 +142,8 @@ export async function midsolve(board_name) {
 
   // Allocate memory for arguments and results
   const limit = M.exports.midsolve_results_limit()
-  const board_p = M.exports.wasm_malloc(12 + 12 * limit)
-  const results_p = board_p + 8
+  const board_p = M.exports.wasm_malloc(24 + 8 + 32 * limit)
+  const results_p = board_p + 24
   write_board(M, board_p, parse_board(board_name))
 
   // Compute!
@@ -127,8 +153,8 @@ export async function midsolve(board_name) {
   const results = {}
   const num_results = read_int(M, results_p)
   for (let i = 0; i < num_results; i++) {
-    const tuple_p = results_p + 4 + 12 * i
-    results[show_board(read_board(M, tuple_p))] = read_int(M, tuple_p + 8)
+    const tuple_p = results_p + 8 + 32 * i
+    results[show_board(read_board(M, tuple_p))] = read_int(M, tuple_p + 24)
   }
   return results
 }

@@ -127,13 +127,14 @@ static RawArray<halfsupers_t,2> grab(RawArray<halfsupers_t> workspace, const boo
   return flat.reshape(vec(nx, ny));
 }
 
-static void midsolve_loop(const int spots, const int n, const board_t root, const bool parity,
+static void midsolve_loop(const high_board_t root, const int n,
                           midsolve_internal_results_t& results, RawArray<halfsupers_t> workspace) {
-  const int slice = 36 - spots;
+  const int parity = root.middle();
+  const int slice = root.count();
+  const int spots = 36 - slice;
   const bool done = spots == n;
-  const auto roots = slow_unpack(root);
-  const auto root0 = roots[(slice+n)&1],
-             root1 = roots[(slice+n+1)&1];
+  const auto root0 = root.side((slice+n)&1),
+             root1 = root.side((slice+n+1)&1);
   const int k0 = (slice+n)/2 - (slice+(n&1))/2,  // Player to move
             k1 = n-k0;  // Other player
   ALLOCA_SUBSETS(sets0, spots, k0);
@@ -365,10 +366,12 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
       if (n <= 1) {
         const uint32_t filled_black = (slice+n)&1 ? filled1 : filled0,
                        filled_white = (slice+n)&1 ? filled0 : filled1;
-        board_t board = root;
-        for (int i = 0; i < spots; i++)
-          board += ((filled_black>>i&1)+2*(filled_white>>i&1))*slow_pack(side_t(1)<<empty[i],side_t(0));
-        results.append(make_tuple(board, superinfos_t{us[0], us[1], bool((n+parity)&1)}));
+        auto sides = root.sides();
+        for (int i = 0; i < spots; i++) {
+          sides[0] |= side_t(filled_black>>i&1) << empty[i];
+          sides[1] |= side_t(filled_white>>i&1) << empty[i];
+        }
+        results.append(make_tuple(sides, superinfos_t{us[0], us[1], bool((n+parity)&1)}));
       }
 
       // Negate and apply rmax in preparation for the slice above
@@ -382,19 +385,14 @@ static void midsolve_loop(const int spots, const int n, const board_t root, cons
 }
 
 midsolve_internal_results_t
-midsolve_internal(const board_t root, const bool parity, RawArray<halfsupers_t> workspace) {
-#ifndef __wasm__
-  check_board(root);
-#endif
-  const int slice = slow_count_stones(root);
-  NON_WASM_ASSERT(18<=slice && slice<=36);
-  const int spots = 36-slice;
+midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
+  const int spots = 36 - board.count();
   NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
 
   // Compute all slices
   midsolve_internal_results_t results;
   for (int n = spots; n >= 0; n--)
-    midsolve_loop(spots, n, root, parity, results, workspace);
+    midsolve_loop(board, n, results, workspace);
   return results;
 }
 
@@ -405,14 +403,18 @@ static int traverse(const high_board_t board, const midsolve_internal_results_t&
     value = board.immediate_value();
   } else if (!board.middle()) {  // Recurse into children
     value = -1;
-    for (const auto move : board.moves())
-      value = max(value, traverse(move, supers, results));
+    const auto empty = board.empty_mask();
+    for (const int bit : range(64))
+      if (empty & side_t(1)<<bit)
+        value = max(value, traverse(board.place(bit), supers, results));
   } else {  // if board.middle()
     // Find unrotated board in supers
-    const auto b = board.board();
-    const auto it = std::find_if(supers.begin(), supers.end(), [=](const auto& p) { return get<0>(p) == b; });
-    NON_WASM_ASSERT(it != supers.end());
-    const superinfos_t& r = get<1>(*it);
+    int i;
+    for (i = 0; i < supers.size(); i++)
+      if (get<0>(supers[i]) == board.sides())
+        break;
+    NON_WASM_ASSERT(i < supers.size());
+    const superinfos_t& r = get<1>(supers[i]);
 
     // Handle recursion manually to avoid actual rotation
     value = -1;
@@ -432,7 +434,7 @@ static int traverse(const high_board_t board, const midsolve_internal_results_t&
 
 midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
   // Compute
-  const auto supers = midsolve_internal(board.board(), board.middle(), workspace);
+  const auto supers = midsolve_internal(board, workspace);
 
   // Extract all available boards
   midsolve_results_t results;
@@ -448,8 +450,10 @@ WASM_EXPORT int midsolve_results_limit() {
 
 WASM_EXPORT void wasm_midsolve(const high_board_t* board, midsolve_results_t* results) {
   NON_WASM_ASSERT(board && results);
+  results->clear();
   const auto workspace = wasm_buffer<halfsupers_t>(midsolve_workspace_size(board->count()));
-  *results = midsolve(*board, workspace);
+  const auto supers = midsolve_internal(*board, workspace);
+  traverse(*board, supers, *results);
 }
 #endif  // __wasm__
 

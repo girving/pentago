@@ -39,11 +39,11 @@ TEST(mid, slow) {
     const unordered_map<board_t,int> raw1 = {{274440791932540185,0},{274440791932540187,1},{274440791932540193,0},{274440791932605720,1},{274440791932540265,0},{274440791937848600,0},{274440791932546745,1},{274440792075867416,0},{274440830587245848,0},{274722266909250840,0},{276974066722936088,0},{282040616303727896,1},{297240265046103320,1},{274443922963698968,0},{274450185026016536,1},{274468971212969240,0},{890026565998744856,0},{2121198114131154200,0}};
     for (const bool middle : {false, true})
       for (const auto [b, v] : middle ? raw1 : raw0)
-        correct[high_board_t(b, middle)] = v;
+        correct[high_board_t::from_board(b, middle)] = v;
   }
 
   const auto start = wall_time();
-  const high_board_t board(274440791932540184, false);
+  const auto board = high_board_t::from_board(274440791932540184, false);
   const auto results = midsolve(board, midsolve_workspace(18));
   ASSERT_EQ(results.size(), 1 + 18 + 8*18);
   for (const auto [k, v] : results)

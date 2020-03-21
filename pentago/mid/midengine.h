@@ -37,11 +37,11 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice);
 #endif  // !__wasm__
 
 typedef pile<tuple<high_board_t,int>,1+18+8*18> midsolve_results_t;
-typedef pile<tuple<board_t,superinfos_t>,1+18> midsolve_internal_results_t;
+typedef pile<tuple<Vector<side_t,2>,superinfos_t>,1+18> midsolve_internal_results_t;
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
 midsolve_internal_results_t
-midsolve_internal(const board_t root, const bool parity, RawArray<halfsupers_t> workspace);
+midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
 
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)
 midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace);

@@ -11,53 +11,22 @@ namespace pentago {
 
 using std::max;
 
-high_board_t::high_board_t(const board_t board, const bool middle)
-  : rep_{uint32_t( middle ? ~board : board),
-         uint32_t((middle ? ~board : board) >> 32)} {
-#ifndef __wasm__
-  // Check correctness
-  check_board(board);
-  const auto [side0, side1] = slow_unpack(board);
-  const int count0 = popcount(side0),
-            count1 = popcount(side1);
-  GEODE_ASSERT(count0 + count1 == slow_count_stones(board));
-  const auto turn = this->turn();
-  if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1) || (middle && !board))
-    THROW(ValueError, "high_board_t: inconsistent board %lld, turn %d, middle %d, "
-          "side counts %d %d", board, turn, middle, count0, count1);
-#endif
-}
-
-high_board_t::~high_board_t() {}
-
-int high_board_t::count() const {
-  return slow_count_stones(board());
+high_board_t high_board_t::from_board(const board_t board, const bool middle) {
+  const auto side = slow_unpack(board);
+  return high_board_t(side[0], side[1], 2*popcount(side[0] | side[1]) - middle);
 }
 
 bool high_board_t::done() const {
-  const auto board = this->board();
-  const auto [side0, side1] = slow_unpack(board);
-  return slow_won(side0)
-      || slow_won(side1)
-      || (!middle() && slow_count_stones(board)==36);
-}
-
-int high_board_t::turn() const {
-  const auto board = this->board();
-  const auto [side0, side1] = slow_unpack(board);
-  const int count0 = popcount(side0),
-            count1 = popcount(side1);
-  return count0 - 1 == count1 - middle();
+  return slow_won(side(0)) || slow_won(side(1)) || ply_ == 2*36;
 }
 
 pile<high_board_t,36> high_board_t::moves() const {
   pile<high_board_t,36> moves;
   if (!middle()) { // Place a stone
     const auto empty = empty_mask();
-    for (const int x : range(6))
-      for (const int y : range(6))
-        if (empty & board_t(1) << (32*(x/3)+16*(y/3)+3*(x%3)+(y%3)))
-          moves.append(place(x, y));
+    for (const int bit : range(64))
+      if (empty & side_t(1)<<bit)
+        moves.append(place(bit));
   } else { // Rotate a quadrant
     for (const int q : range(4))
       for (const int d : {-1, 1})
@@ -66,17 +35,21 @@ pile<high_board_t,36> high_board_t::moves() const {
   return moves;
 }
 
+high_board_t high_board_t::place(const int bit) const {
+  const auto move = side_t(1) << bit;
+  NON_WASM_ASSERT(!middle() && (move & empty_mask()));
+  side_t after[2] = {side(0), side(1)};
+  after[turn()] |= move;
+  return high_board_t(after[0], after[1], ply_ + 1);
+}
+
 high_board_t high_board_t::place(const int x, const int y) const {
-  NON_WASM_ASSERT(!middle());
-  NON_WASM_ASSERT(0<=x && x<6);
-  NON_WASM_ASSERT(0<=y && y<6);
-  const auto board = this->board();
-  const auto move = side_t(1<<(3*(x%3)+y%3))<<16*(2*(x/3)+(y/3));
-  NON_WASM_ASSERT(move & empty_mask());
-  return high_board_t(board + slow_flip_board(slow_pack(move, side_t(0)), turn()), true);
+  NON_WASM_ASSERT(unsigned() < 6 && unsigned(y) < 6);
+  return place(3*(x%3) + y%3 + 16*(2*(x/3) + y/3));
 }
 
 // Avoid a dependence on general board transformation for wasm
+// TODO: Can we compress this using bit twiddling trickery?
 static quadrant_t slow_rotate_quadrant_side(const quadrant_t side, const int d) {
   quadrant_t result = 0;
   for (const int x : range(3))
@@ -87,23 +60,19 @@ static quadrant_t slow_rotate_quadrant_side(const quadrant_t side, const int d) 
 }
 
 high_board_t high_board_t::rotate(const int q, const int d) const {
-  NON_WASM_ASSERT(middle());
-  NON_WASM_ASSERT(0 <= q && q < 4);
-  NON_WASM_ASSERT(d==1 || d==-1);
-  auto sides = slow_unpack(board());
+  NON_WASM_ASSERT(middle() && 0 <= q && q < 4 && d==1 || d==-1);
+  side_t after[2] = {side(0), side(1)};
   for (const int s : range(2)) {
-    const auto old = quadrant(sides[s], q);
-    sides[s] ^= side_t(old ^ slow_rotate_quadrant_side(old, d)) << 16*q;
+    const auto old = quadrant(after[s], q);
+    after[s] ^= side_t(old ^ slow_rotate_quadrant_side(old, d)) << 16*q;
   }
-  return high_board_t(slow_pack(sides[0], sides[1]), false);
+  return high_board_t(after[0], after[1], ply_ + 1);
 }
 
 int high_board_t::immediate_value() const {
   NON_WASM_ASSERT(done());
-  const auto board = this->board();
-  const auto [side0, side1] = slow_unpack(board);
-  const bool bw = slow_won(side0),
-             ww = slow_won(side1);
+  const bool bw = slow_won(side(0)),
+             ww = slow_won(side(1));
   if (bw || ww)
     return bw && ww ? 0 : bw==!turn() ? 1 : -1;
   return 0;
@@ -164,7 +133,7 @@ Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<co
   for (const int i : range(boards.size())) {
     const int r = random.bits<uint8_t>();
     const int n = count_stones(boards[i]);
-    const high_board_t board(transform_board(symmetry_t(local_symmetry_t(r)), boards[i]), false);
+    const auto board = high_board_t::from_board(transform_board(symmetry_t(local_symmetry_t(r)), boards[i]), false);
     const int value = board.value_check(cache);
     GEODE_ASSERT(value == wins[i][n&1](r)-wins[i][!(n&1)](r));
     counts[value+1]++;
@@ -173,10 +142,7 @@ Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<co
 }
 
 string high_board_t::name() const {
-  // Use snprintf to avoid tinyformat dependency under emscripten
-  char buffer[24];
-  snprintf(buffer, sizeof(buffer), "%llu%s", (unsigned long long)board(), middle() ? "m" : "");
-  return buffer;
+  return format("%d%s", board(), middle() ? "m" : "");
 }
 
 ostream& operator<<(ostream& output, const high_board_t board) {
@@ -193,7 +159,7 @@ high_board_t high_board_t::parse(const string& name) {
     const board_t board = strtoll(name.c_str(), &end, 0);
     const auto left = name.c_str()+name.size()-end;
     if (left==0 || (left==1 && name.back()=='m'))
-      return high_board_t(board, left==1);
+      return high_board_t::from_board(board, left==1);
   }
   THROW(ValueError, "high_board_t: invalid board name '%s'", name);
 }

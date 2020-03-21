@@ -17,6 +17,8 @@ public:
     data[size_++] = x;
   }
 
+  void clear() { size_ = 0; }
+
   int size() const { return size_; }
   const T& operator[](const int i) const { GEODE_ASSERT(unsigned(i) < unsigned(size_)); return data[i]; }
   const T* begin() const { return data; }

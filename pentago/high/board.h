@@ -17,37 +17,46 @@
 namespace pentago {
 
 class high_board_t {
-  // Split into two uint32_t's to allow 4-byte alignment
-  uint32_t rep_[2];  // middle ? ~board : board
-  uint64_t rep() const { return rep_[0] | uint64_t(rep_[1]) << 32; }
+  uint64_t side_[2];  // black, white (first player, second player)
+  uint32_t ply_;
+
+  high_board_t(const side_t side0, const side_t side1, const int ply) : side_{side0, side1}, ply_(ply) {}
 public:
 
-  high_board_t() : rep_{0, 0} {}
-  high_board_t(const board_t board, const bool middle);
-  ~high_board_t();
+  high_board_t() : side_{0, 0}, ply_(0) {}
+  static high_board_t from_board(const board_t board, const bool middle);
 
-  // Board state: 0 for black (first player), 1 for white (second player)
-  board_t board() const { const auto d = rep(); return middle() ? ~d : d; }
+  side_t side(const int s) const {
+    assert(unsigned(s) < 2); return side_[s];
+  }
+
+  Vector<side_t,2> sides() const { return vec(side_[0], side_[1]); }
+
+  // Number of moves from the start of the game, counting stone placement and rotation separately.
+  int ply() const { return ply_; }
 
   // Did we already place a stone?  I.e., are we halfway through the move?
-  bool middle() const { return bool(rep_[1] & 1<<31); }
+  bool middle() const { return ply_ & 1; }
 
-  bool operator==(const high_board_t other) const { return rep() == other.rep(); }
+  bool operator==(const high_board_t other) const {
+    return side_[0] == other.side_[0] && side_[1] == other.side_[1] && ply_ == other.ply_;
+  }
 
   // Total number of stones
-  int count() const;
+  int count() const { return (ply_ + 1) >> 1; }
+
+  // Whose turn is it: 0 (black) or 1 (white)
+  int turn() const { return (ply_ >> 1) & 1; }
 
   // Is the game over?
   bool done() const;
-
-  // Whose turn is it: 0 (black) or 1 (white)
-  int turn() const;
 
   // Moves which follow this one.  Note that high level moves are "half" of a regular move:
   // there is one move to place a stone and one move to rotate it.
   pile<high_board_t,36> moves() const;
 
   // Place a stone at the given location
+  high_board_t place(const int bit) const;
   high_board_t place(const int x, const int y) const;
 
   // Rotate the given quadrant in the given direction (-1 or 1)
@@ -56,12 +65,11 @@ public:
   // value() assuming done()
   int immediate_value() const;
 
-  side_t empty_mask() const {
-    const auto [side0, side1] = slow_unpack(board());
-    return ~(side0 | side1);
-  }
+  side_t empty_mask() const { return side_mask ^ side_[0] ^ side_[1]; }
 
 #ifndef __wasm__
+  board_t board() const { return pack(side_[0], side_[1]); }
+
   // 1 if the player to move wins, 0 for tie, -1 if the player to move loses
   int value(const block_cache_t& cache) const;
 
@@ -83,7 +91,9 @@ public:
 namespace std {
 template<> struct hash<pentago::high_board_t> {
   size_t operator()(const pentago::high_board_t board) const {
-    return hash<uint64_t>()(board.rep());
+    auto b = board.board();
+    if (board.middle()) b = ~b;
+    return hash<uint64_t>()(b);
   }
 };
 }  // namespace std

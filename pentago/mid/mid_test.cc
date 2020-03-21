@@ -24,14 +24,16 @@ board_t random_board_at_slice(Random& random, const int stones) {
   return from_table(flat.reshape(vec(6, 6)));
 }
 
-void midsolve_internal_test(const board_t board, const bool parity) {
-  const int slice = count_stones(board);
+void midsolve_internal_test(const high_board_t board) {
+  const int slice = board.count();
+  const bool parity = board.middle();
   const auto workspace = midsolve_workspace(slice);
-  const auto results = midsolve_internal(board,parity,workspace);
+  const auto results = midsolve_internal(board, workspace);
   ASSERT_EQ(results.size(), 37-slice); // Only mostly true due to superstandardization, but still good
   for (const auto& r : results) {
-    const auto rboard = get<0>(r);
-    const bool turn = count_stones(get<0>(r))&1;
+    const auto sides = get<0>(r);
+    const auto rboard = pack(sides[0], sides[1]);
+    const bool turn = count_stones(rboard) & 1;
     const auto rs = get<1>(r);
     slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
          slice, rboard, parity, popcount(rs.win), popcount(~rs.win&rs.notlose),
@@ -57,7 +59,7 @@ TEST(mid, internal) {
     for (int i = 0; i < 16; i++) {
       const auto board = random_board_at_slice(random, slice);
       for (const bool parity : {false, true})
-        midsolve_internal_test(board, parity);
+        midsolve_internal_test(high_board_t::from_board(board, parity));
     }
   }
 }
@@ -71,7 +73,7 @@ TEST(mid, mid) {
     for (int i = 0; i < 8192; i++) {
       const auto root = random_board_at_slice(random, slice);
       for (const bool middle : {false, true}) {
-        const high_board_t high(root, middle);
+        const auto high = high_board_t::from_board(root, middle);
         unordered_set<high_board_t> boards = {high};
         if (!high.done()) {
           if (middle)
