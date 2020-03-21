@@ -88,7 +88,7 @@ async function test_wasm() {
 
   // Check pile limit
   const limit = M.exports.midsolve_results_limit()
-  assert.equal(limit, 8*18)
+  assert.equal(limit, 1+18+8*18)
 
   // Allocation and sum test
   const data = [1, 0, pow(2, 32) - 1, 7, 3, 13]
@@ -163,7 +163,7 @@ const clear = '\x1b[00m'
 
 // Run all tests in series
 async function toplevel() {
-  let tests = [test_moves, test_done, test_lru, test_mid, test_path]
+  let tests = [test_moves, test_done, test_lru, test_wasm, test_mid, test_path]
 
   // Restrict to specific tests if desired
   if (process.argv.length > 2) {
