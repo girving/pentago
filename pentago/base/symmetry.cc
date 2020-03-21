@@ -5,9 +5,7 @@
 #include "pentago/utility/array.h"
 #include "pentago/utility/integer_log.h"
 #include "pentago/utility/range.h"
-#ifndef __wasm__
 #include "pentago/utility/random.h"
-#endif
 namespace pentago {
 
 using std::get;
@@ -16,7 +14,6 @@ using std::min;
 using std::swap;
 using std::tuple;
 
-#ifndef __wasm__
 const symmetries_t symmetries;
 
 // rotate_quadrants[r][q] is the quadrant moved to q under rotation r
@@ -331,6 +328,5 @@ ostream& operator<<(ostream& output, symmetry_t s) {
 ostream& operator<<(ostream& output, local_symmetry_t s) {
   return output<<format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
-#endif  // !__wasm__
 
-}
+}  // namespace pentago

@@ -24,7 +24,6 @@ class high_board_t {
 public:
 
   high_board_t() : side_{0, 0}, ply_(0) {}
-  static high_board_t from_board(const board_t board, const bool middle);
 
   side_t side(const int s) const {
     assert(unsigned(s) < 2); return side_[s];
@@ -68,6 +67,7 @@ public:
   side_t empty_mask() const { return side_mask ^ side_[0] ^ side_[1]; }
 
 #ifndef __wasm__
+  static high_board_t from_board(const board_t board, const bool middle);
   board_t board() const { return pack(side_[0], side_[1]); }
 
   // 1 if the player to move wins, 0 for tie, -1 if the player to move loses

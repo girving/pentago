@@ -11,11 +11,6 @@ namespace pentago {
 
 using std::max;
 
-high_board_t high_board_t::from_board(const board_t board, const bool middle) {
-  const auto side = slow_unpack(board);
-  return high_board_t(side[0], side[1], 2*popcount(side[0] | side[1]) - middle);
-}
-
 bool high_board_t::done() const {
   return slow_won(side(0)) || slow_won(side(1)) || ply_ == 2*36;
 }
@@ -79,6 +74,12 @@ int high_board_t::immediate_value() const {
 }
 
 #ifndef __wasm__
+high_board_t high_board_t::from_board(const board_t board, const bool middle) {
+  const auto side0 = unpack(board, 0);
+  const auto side1 = unpack(board, 1);
+  return high_board_t(side0, side1, 2*popcount(side0 | side1) - middle);
+}
+
 // If aggressive is true, true is win, otherwise true is win or tie.
 static bool exact_lookup(const bool aggressive, const board_t board, const block_cache_t& cache) {
   {
@@ -96,7 +97,7 @@ int high_board_t::value(const block_cache_t& cache) const {
     return immediate_value();
   else if (!middle()) {
     // If we're not at a half move, look up the result
-    const auto flip = slow_flip_board(board(), turn());
+    const auto flip = flip_board(board(), turn());
     return exact_lookup(true,flip,cache)+exact_lookup(false,flip,cache)-1;
   } else {
     int best = -1;

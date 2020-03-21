@@ -114,10 +114,4 @@ board_t from_table(RawArray<const int,2> tables);
 void check_board(board_t board);
 #endif  // !__wasm__
 
-// Slow versions for __wasm__ use
-board_t slow_pack(const side_t side0, const side_t side1) __attribute__((const));
-Vector<side_t,2> slow_unpack(const board_t board) __attribute__((const));
-int slow_count_stones(const board_t board) __attribute__((const));
-board_t slow_flip_board(const board_t board, const bool turn = true) __attribute__((const));
-
 }

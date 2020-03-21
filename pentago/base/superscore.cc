@@ -6,10 +6,8 @@
 #include "pentago/utility/debug.h"
 #include "pentago/utility/range.h"
 #include <numeric>
-#ifndef __wasm__
 #include "pentago/utility/random.h"
 #include <cmath>
-#endif  // !__wasm__
 namespace pentago {
 
 using std::min;
@@ -31,7 +29,6 @@ struct superwin_info_t {
   super_t horizontal, vertical, diagonal_lo, diagonal_hi, diagonal_assist;
 };
 
-#ifndef __wasm__
 // We want to compute all possible rotations which give 5 in a row.
 // To do this, we consider each pair or triple of quadrants which could give a win,
 // and use the state space of the unused quadrants to store the various ways a win
@@ -97,7 +94,6 @@ super_t super_wins(side_t side) {
   WAY(i1.diagonal_hi & i3.diagonal_assist & i2.diagonal_hi, OR0) // High diagonal from quadrant 1=(0,1) to 2=(1,0)
   return wins;
 }
-#endif  // !__wasm__
 
 const Vector<int,4> single_rotations[8] = {
     vec(1,0,0,0),vec(-1,0,0,0),vec(0,1,0,0),vec(0,-1,0,0),
@@ -111,7 +107,6 @@ uint8_t first(super_t s) {
   THROW(ValueError,"zero passed to super_t first");
 }
 
-#ifndef __wasm__
 super_t random_super(Random& random) {
   const uint64_t r0 = random.bits<uint64_t>(),
                  r1 = random.bits<uint64_t>(),
@@ -167,6 +162,5 @@ NdArray<int> super_popcounts(NdArray<const super_t> data) {
     counts.flat()[i] = popcount(data.flat()[i]);
   return counts;
 }
-#endif  // !__wasm__
 
-}
+}  // namespace pentago
