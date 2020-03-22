@@ -97,6 +97,14 @@ TEST(mid, mid) {
   }
 }
 
+// Regression test, since I'm paranoid and am about to rewrite the routine in question
+TEST(mid, bottleneck) {
+  const int correct[] = {31855824, 11435424, 4036032, 1387386, 504504, 180180, 62370,
+                         23100, 8400, 2940, 1120, 420, 150, 60, 24, 9, 4, 2};
+  for (const int slice : range(18, 36))
+    ASSERT_EQ(midsolve_workspace(slice).size(), correct[slice - 18]);
+}
+
 halfsuper_t slow_split(const super_t s, const bool parity) {
   halfsuper_t h = 0;
   for (int a=0;a<2;a++)
