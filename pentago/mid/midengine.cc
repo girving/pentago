@@ -98,16 +98,14 @@ void subsets(const int n, const int k, RawArray<set_t> sets) {
  *         1100
  */
 
-static int count(const int spots, const int more) {
-  if (spots < more)
-    return 0;
-  return choose(spots, more) * choose(more, more/2);
-}
-
 static int bottleneck(const int spots) {
-  int worst = count(spots, spots);
-  for (const int n : range(spots+1))
-    worst = max(worst, count(spots, n) + count(spots, n+1));
+  int worst = 0;
+  int prev = 1;
+  for (const int n : range(spots+1)) {
+    const int next = choose(spots, n+1) * choose(n+1, (n+1)/2);
+    worst = max(worst, prev + next);
+    prev = next;
+  }
   return worst;
 }
 
