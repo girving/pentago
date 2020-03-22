@@ -21,21 +21,6 @@ bool high_board_t::done() const {
   return slow_won(side(0)) || slow_won(side(1)) || ply_ == 2*36;
 }
 
-pile<high_board_t,36> high_board_t::moves() const {
-  pile<high_board_t,36> moves;
-  if (!middle()) { // Place a stone
-    const auto empty = empty_mask();
-    for (const int bit : range(64))
-      if (empty & side_t(1)<<bit)
-        moves.append(place(bit));
-  } else { // Rotate a quadrant
-    for (const int q : range(4))
-      for (const int d : {-1, 1})
-        moves.append(rotate(q, d));
-  }
-  return moves;
-}
-
 high_board_t high_board_t::place(const int bit) const {
   const auto move = side_t(1) << bit;
   NON_WASM_ASSERT(!middle() && (move & empty_mask()));
@@ -84,6 +69,21 @@ high_board_t high_board_t::from_board(const board_t board, const bool middle) {
   const auto side0 = unpack(board, 0);
   const auto side1 = unpack(board, 1);
   return high_board_t(side0, side1, 2*popcount(side0 | side1) - middle);
+}
+
+Array<const high_board_t> high_board_t::moves() const {
+  vector<high_board_t> moves;
+  if (!middle()) { // Place a stone
+    const auto empty = empty_mask();
+    for (const int bit : range(64))
+      if (empty & side_t(1)<<bit)
+        moves.push_back(place(bit));
+  } else { // Rotate a quadrant
+    for (const int q : range(4))
+      for (const int d : {-1, 1})
+        moves.push_back(rotate(q, d));
+  }
+  return asarray(moves).copy();;
 }
 
 // If aggressive is true, true is win, otherwise true is win or tie.

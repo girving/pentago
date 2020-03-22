@@ -10,7 +10,6 @@
 #pragma once
 
 #include "pentago/base/board.h"
-#include "pentago/utility/pile.h"
 #ifndef __wasm__
 #include "pentago/data/block_cache.h"
 #endif
@@ -50,10 +49,6 @@ public:
   // Is the game over?
   bool done() const;
 
-  // Moves which follow this one.  Note that high level moves are "half" of a regular move:
-  // there is one move to place a stone and one move to rotate it.
-  pile<high_board_t,36> moves() const;
-
   // Place a stone at the given location
   high_board_t place(const int bit) const;
   high_board_t place(const int x, const int y) const;
@@ -69,6 +64,10 @@ public:
 #ifndef __wasm__
   static high_board_t from_board(const board_t board, const bool middle);
   board_t board() const { return pack(side_[0], side_[1]); }
+
+  // Moves which follow this one.  Note that high level moves are "half" of a regular move:
+  // there is one move to place a stone and one move to rotate it.
+  Array<const high_board_t> moves() const;
 
   // 1 if the player to move wins, 0 for tie, -1 if the player to move loses
   int value(const block_cache_t& cache) const;
