@@ -8,3 +8,4 @@
 /public/bundle.css.map
 /public/main.css
 .DS_Store
+/tests.wasm

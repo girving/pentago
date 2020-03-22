@@ -2,24 +2,33 @@
 
 set -e
 cd "$(dirname "$0")"/../..
-target=web/client/public/mid.wasm
 
 bazel build //pentago/base:tables
 
-/usr/local/opt/llvm/bin/clang -o $target --target=wasm32 \
-  -ffreestanding -nostdlib -std=c++1z \
-  -fvisibility=hidden -Wl,--no-entry \
-  -Wl,--export={wasm_malloc,wasm_midsolve,midsolve_results_limit,sqr_test,sum_test,die_test} \
-  -Wl,--allow-undefined \
-  -O3 -flto -Wl,--lto-O3 \
-  -mno-exception-handling \
-  -Wall -Werror -fcolor-diagnostics -Wl,-error-limit=0 \
-  -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
-  -Wl,--export=__heap_base \
-  -isystem third_party/freestanding -I. -Ibazel-bin \
-  pentago/mid/{halfsuper,midengine,js_test}.cc \
+build () {
+  /usr/local/opt/llvm/bin/clang --target=wasm32 \
+    -ffreestanding -nostdlib -std=c++1z \
+    -fvisibility=hidden -Wl,--no-entry \
+    -Wl,--allow-undefined \
+    -O3 -flto -Wl,--lto-O3 \
+    -mno-exception-handling \
+    -Wall -Werror -fcolor-diagnostics -Wl,-error-limit=0 \
+    -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
+    -Wl,--export=__heap_base \
+    -isystem third_party/freestanding -I. -Ibazel-bin \
+    -o "$@"
+  chmod -x $1
+}
+
+build web/client/public/mid.wasm \
+  -Wl,--export={wasm_malloc,wasm_midsolve} \
+  pentago/mid/{halfsuper,midengine}.cc \
   pentago/high/board.cc \
   pentago/utility/wasm_alloc.cc \
   third_party/freestanding/cstring.cc
 
-chmod -x $target
+build web/client/tests.wasm \
+  -Wl,--export={wasm_malloc,sqr_test,sum_test,die_test} \
+  pentago/mid/js_test.cc \
+  pentago/utility/wasm_alloc.cc \
+  third_party/freestanding/cstring.cc

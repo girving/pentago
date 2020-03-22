@@ -432,6 +432,7 @@ static int traverse(const high_board_t board, const midsolve_internal_results_t&
   return value;
 }
 
+#ifndef __wasm__
 midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
   // Compute
   const auto supers = midsolve_internal(board, workspace);
@@ -441,13 +442,7 @@ midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> wor
   traverse(board, supers, results);
   return results;
 }
-
-// WebAssembly interface
-#ifdef __wasm__
-WASM_EXPORT int midsolve_results_limit() {
-  return midsolve_results_t::limit;
-}
-
+#else  // if __wasm__
 WASM_EXPORT void wasm_midsolve(const high_board_t* board, midsolve_results_t* results) {
   NON_WASM_ASSERT(board && results);
   results->clear();

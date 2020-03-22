@@ -3,7 +3,8 @@
 
 import board_t from './board.js'
 import { strict as assert } from 'assert'
-import { midsolve, instantiate as mid_instantiate } from './mid_sync.js'
+import { readFileSync } from 'fs'
+import { midsolve, instantiate } from './mid_sync.js'
 import all_games from './games.js'
 import pending from './pending.js'
 import { size as lru_size, get as lru_get, set as lru_set, peek as lru_peek, set_lohi } from './local_lru.js'
@@ -71,47 +72,43 @@ async function test_lru() {
 }
 
 async function test_wasm() {
-  const M = await mid_instantiate()
   const verbose = false
+  const tests = await instantiate(WebAssembly.compile(readFileSync('../tests.wasm')))
 
   // Square test
-  const s7 = M.exports.sqr_test(7)
+  const s7 = tests.exports.sqr_test(7)
   assert.equal(s7, 7*7)
 
   // Die test
   try {
-    M.exports.die_test()
+    tests.exports.die_test()
     assert(false)
   } catch (e) {
     assert.equal(e.message, 'An informative message')
   }
 
-  // Check pile limit
-  const limit = M.exports.midsolve_results_limit()
-  assert.equal(limit, 1+18+8*18)
-
   // Allocation and sum test
   const data = [1, 0, pow(2, 32) - 1, 7, 3, 13]
   const correct = 7 + 13 + 1
-  const ptr = M.exports.wasm_malloc(8 * data.length / 2)
-  const chunks = new Uint32Array(M.exports.memory.buffer, ptr, data.length)
+  const ptr = tests.exports.wasm_malloc(8 * data.length / 2)
+  const chunks = new Uint32Array(tests.exports.memory.buffer, ptr, data.length)
   for (const [i, n] of data.entries())
     chunks[i] = n
-  const sum = M.exports.sum_test(data.length / 2, ptr)
+  const sum = tests.exports.sum_test(data.length / 2, ptr)
   assert.equal(sum, correct)
 
   // Big allocation test
   let page = 64 << 10
-  let next = M.exports.wasm_malloc(0)
+  let next = tests.exports.wasm_malloc(0)
   if (verbose)
     console.log('initial = ' + next)
   const sizes = [0, 33537473, 17, 3537473, 472, 9182]
   for (const size of sizes) {
-    const p = M.exports.wasm_malloc(size)
+    const p = tests.exports.wasm_malloc(size)
     assert.equal(p, next)
     assert.equal(p % 8, 0)
     next = (p + size + 7) & ~7
-    const after = M.exports.memory.buffer.byteLength
+    const after = tests.exports.memory.buffer.byteLength
     assert(next <= after)
     assert.equal((next + page - 1) & ~(page - 1), after)
   }

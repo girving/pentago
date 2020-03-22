@@ -43,7 +43,9 @@ typedef pile<tuple<Vector<side_t,2>,superinfos_t>,1+18> midsolve_internal_result
 midsolve_internal_results_t
 midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
 
+#ifndef __wasm__
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)
 midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace);
+#endif  // !__wasm__
 
 }

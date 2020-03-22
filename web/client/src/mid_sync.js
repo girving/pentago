@@ -124,10 +124,9 @@ function write_board(M, p, board) {
 }
 
 // Instantiate a fresh copy
-export async function instantiate() {
-  const module = await mid_module
+export async function instantiate(module) {
   let M = null
-  M = await WebAssembly.instantiate(module, {
+  M = await WebAssembly.instantiate(await (module || mid_module), {
     env: {
       die: msg_p => { throw Error(read_char_p(M, msg_p)) },
       wasm_log: (name_p, value) => console.log(read_char_p(M, name_p) + value),
@@ -141,7 +140,7 @@ export async function midsolve(board_name) {
   const M = await instantiate()
 
   // Allocate memory for arguments and results
-  const limit = M.exports.midsolve_results_limit()
+  const limit = 1+18+8*18
   const board_p = M.exports.wasm_malloc(24 + 8 + 32 * limit)
   const results_p = board_p + 24
   write_board(M, board_p, parse_board(board_name))
