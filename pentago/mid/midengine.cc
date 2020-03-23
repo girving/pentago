@@ -415,12 +415,12 @@ static int traverse(const high_board_t board, const mid_supers_t& supers, mid_va
 
     // Handle recursion manually to avoid actual rotation
     value = -1;
-    for (const int q : range(4)) {
-      for (const int d : {1, -1}) {
-        const auto v = r.value((d & 3) << 2*q);
-        results.append(make_tuple(board.rotate(q, d), v));
-        value = max(value, -v);
-      }
+    for (const int s : range(8)) {
+      const int q = s >> 1;
+      const int d = s & 1 ? -1 : 1;
+      const auto v = r.value((d & 3) << 2*q);
+      results.append(make_tuple(board.rotate(q, d), v));
+      value = max(value, -v);
     }
   }
 
