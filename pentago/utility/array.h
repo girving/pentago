@@ -11,7 +11,7 @@
 #include <iostream>
 #include <vector>
 #endif
-namespace pentago {
+NAMESPACE_PENTAGO
 
 #ifndef __wasm__
 using std::default_delete;
@@ -38,7 +38,7 @@ template<class Shape> class ArraySizes {
   struct Unusable {};
  public:
   template<class T> using RawArray = Unusable;
-  template<class T> using Array = pentago::NdArray<T>;
+  template<class T> using Array = PENTAGO_NAMESPACE::NdArray<T>;
 
   int rank() const { return shape_.size(); }
  protected:
@@ -52,7 +52,7 @@ template<class Shape> class ArraySizes {
 
 template<int d> class ArraySizes<Vector<int,d>> {
  public:
-  template<class T> using RawArray = pentago::RawArray<T,d>;
+  template<class T> using RawArray = PENTAGO_NAMESPACE::RawArray<T,d>;
 #ifndef __wasm__
   template<class T> using Array = pentago::Array<T,d>;
 #endif  // !__wasm__
@@ -428,4 +428,4 @@ template<class T,class S,class D> ostream& operator<<(ostream& out, const ArrayB
 }
 #endif  // !__wasm__
 
-}
+END_NAMESPACE_PENTAGO

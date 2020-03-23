@@ -10,14 +10,14 @@ static_assert(alignof(int) == 4);
 static_assert(alignof(uint64_t) == 8);
 static_assert(alignof(high_board_t) == 8);
 static_assert(alignof(tuple<high_board_t,int>) == 8);
-static_assert(alignof(midsolve_results_t) == 8);
+static_assert(alignof(mid_values_t) == 8);
 
 // Learn about sizes
 static_assert(sizeof(int) == 4);
 static_assert(sizeof(uint64_t) == 8);
 static_assert(sizeof(high_board_t) == 24);
 static_assert(sizeof(tuple<high_board_t,int>) == 32);
-static_assert(sizeof(midsolve_results_t) == 8 + 32 * midsolve_results_t::limit);
+static_assert(sizeof(mid_values_t) == 8 + 32 * mid_values_t::limit);
 
 WASM_EXPORT int sqr_test(const int n) {
   return n * n;

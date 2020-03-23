@@ -9,7 +9,7 @@
 #include "pentago/utility/aligned.h"
 #include "pentago/utility/log.h"
 #endif  // !__wasm__
-namespace pentago {
+NAMESPACE_PENTAGO
 
 using std::max;
 using std::min;
@@ -125,8 +125,8 @@ static RawArray<halfsupers_t,2> grab(RawArray<halfsupers_t> workspace, const boo
   return flat.reshape(vec(nx, ny));
 }
 
-static void midsolve_loop(const high_board_t root, const int n,
-                          midsolve_internal_results_t& results, RawArray<halfsupers_t> workspace) {
+static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& results,
+                          RawArray<halfsupers_t> workspace) {
   const int parity = root.middle();
   const int slice = root.count();
   const int spots = 36 - slice;
@@ -382,20 +382,18 @@ static void midsolve_loop(const high_board_t root, const int n,
   }
 }
 
-midsolve_internal_results_t
-midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
+mid_supers_t midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
   const int spots = 36 - board.count();
   NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
 
   // Compute all slices
-  midsolve_internal_results_t results;
+  mid_supers_t results;
   for (int n = spots; n >= 0; n--)
     midsolve_loop(board, n, results, workspace);
   return results;
 }
 
-static int traverse(const high_board_t board, const midsolve_internal_results_t& supers,
-                    midsolve_results_t& results) {
+static int traverse(const high_board_t board, const mid_supers_t& supers, mid_values_t& results) {
   int value;
   if (board.done()) { // Done, so no lookup required
     value = board.immediate_value();
@@ -431,17 +429,17 @@ static int traverse(const high_board_t board, const midsolve_internal_results_t&
 }
 
 #ifndef __wasm__
-midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
+mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
   // Compute
   const auto supers = midsolve_internal(board, workspace);
 
   // Extract all available boards
-  midsolve_results_t results;
+  mid_values_t results;
   traverse(board, supers, results);
   return results;
 }
 #else  // if __wasm__
-WASM_EXPORT void midsolve(const high_board_t* board, midsolve_results_t* results) {
+WASM_EXPORT void midsolve(const high_board_t* board, mid_values_t* results) {
   NON_WASM_ASSERT(board && results);
   results->clear();
   const auto workspace = wasm_buffer<halfsupers_t>(midsolve_workspace_size(board->count()));
@@ -450,4 +448,4 @@ WASM_EXPORT void midsolve(const high_board_t* board, midsolve_results_t* results
 }
 #endif  // __wasm__
 
-}
+END_NAMESPACE_PENTAGO

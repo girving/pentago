@@ -43,7 +43,7 @@
  */
 
 #include "pentago/base/superscore.h"
-namespace pentago {
+NAMESPACE_PENTAGO
 
 struct halfsuper_t {
 
@@ -208,4 +208,4 @@ __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
 
 int popcount(halfsuper_t h);
 
-}
+END_NAMESPACE_PENTAGO

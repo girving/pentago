@@ -1,12 +1,13 @@
 // Fixed size vectors
 #pragma once
 
+#include "pentago/utility/wasm.h"
 #include <algorithm>
 #include <cassert>
 #ifndef __wasm__
 #include <boost/functional/hash.hpp>
 #endif
-namespace pentago {
+NAMESPACE_PENTAGO
 
 #ifndef __wasm__
 using std::ostream;
@@ -268,7 +269,7 @@ template<int i,class T,int d> static inline const T& get(const Vector<T,d>& v) {
   return v.data()[i];
 }
 
-}  // namespace pentago
+END_NAMESPACE_PENTAGO
 namespace std {
 #ifndef __wasm__
 template<class T,int d> struct hash<pentago::Vector<T,d>> {
@@ -277,11 +278,11 @@ template<class T,int d> struct hash<pentago::Vector<T,d>> {
   }
 };
 #endif  // !__wasm__
-template<class T,int d> class tuple_size<pentago::Vector<T,d>> {
+template<class T,int d> class tuple_size<PENTAGO_NAMESPACE::Vector<T,d>> {
  public:
   constexpr static int value = d;
 };
-template<size_t i,class T,int d> class tuple_element<i,pentago::Vector<T,d>> {
+template<size_t i,class T,int d> class tuple_element<i,PENTAGO_NAMESPACE::Vector<T,d>> {
  public:
   typedef T type;
 };

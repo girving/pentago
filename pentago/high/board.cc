@@ -8,7 +8,7 @@
 #include "pentago/search/superengine.h"
 #include "pentago/utility/random.h"
 #endif  // !__wasm__
-namespace pentago {
+NAMESPACE_PENTAGO
 
 using std::max;
 
@@ -172,4 +172,4 @@ high_board_t high_board_t::parse(const string& name) {
 }
 #endif  // !__wasm__
 
-}
+END_NAMESPACE_PENTAGO

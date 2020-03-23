@@ -13,7 +13,7 @@
 #ifndef __wasm__
 #include "pentago/data/block_cache.h"
 #endif
-namespace pentago {
+NAMESPACE_PENTAGO
 
 class high_board_t {
   uint64_t side_[2];  // black, white (first player, second player)
@@ -85,7 +85,7 @@ public:
 #endif  // !__wasm__
 };
 
-}  // namespace pentago
+END_NAMESPACE_PENTAGO
 #ifndef __wasm__
 namespace std {
 template<> struct hash<pentago::high_board_t> {
