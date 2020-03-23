@@ -395,8 +395,9 @@ mid_supers_t midsolve_internal(const high_board_t board, RawArray<halfsupers_t> 
 
 static int traverse(const high_board_t board, const mid_supers_t& supers, mid_values_t& results) {
   int value;
-  if (board.done()) { // Done, so no lookup required
-    value = board.immediate_value();
+  const auto [done, immediate_value] = board.done_and_value();
+  if (done) { // Done, so no lookup required
+    value = immediate_value;
   } else if (!board.middle()) {  // Recurse into children
     value = -1;
     const auto empty = board.empty_mask();

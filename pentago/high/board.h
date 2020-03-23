@@ -15,6 +15,8 @@
 #endif
 NAMESPACE_PENTAGO
 
+using std::tuple;
+
 class high_board_t {
   uint64_t side_[2];  // black, white (first player, second player)
   uint32_t ply_;
@@ -46,8 +48,14 @@ public:
   // Whose turn is it: 0 (black) or 1 (white)
   int turn() const { return (ply_ >> 1) & 1; }
 
+  // Is the game over?  If so, what's the value()
+  tuple<bool,int> done_and_value() const;
+
   // Is the game over?
   bool done() const;
+
+  // value() assuming done()
+  int immediate_value() const;
 
   // Place a stone at the given location
   high_board_t place(const int bit) const;
@@ -55,9 +63,6 @@ public:
 
   // Rotate the given quadrant in the given direction (-1 or 1)
   high_board_t rotate(const int q, const int d) const;
-
-  // value() assuming done()
-  int immediate_value() const;
 
   side_t empty_mask() const { return side_mask ^ side_[0] ^ side_[1]; }
 

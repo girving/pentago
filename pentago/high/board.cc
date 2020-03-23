@@ -10,6 +10,7 @@
 #endif  // !__wasm__
 NAMESPACE_PENTAGO
 
+using std::make_tuple;
 using std::max;
 
 // We don't use this very often, so implement it on top of an expensive, hot routine
@@ -17,8 +18,24 @@ __attribute__((cold)) static bool slow_won(const side_t side) {
   return halfsuper_wins(side, 0)[0];
 }
 
+tuple<bool,int> high_board_t::done_and_value() const {
+  const bool bw = slow_won(side(0)),
+             ww = slow_won(side(1));
+  if (bw || ww)
+    return make_tuple(true, bw && ww ? 0 : bw==!turn() ? 1 : -1);
+  if (ply_ == 2*36)
+    return make_tuple(true, 0);
+  return make_tuple(false, 0);
+}
+
 bool high_board_t::done() const {
-  return slow_won(side(0)) || slow_won(side(1)) || ply_ == 2*36;
+  return get<0>(done_and_value());
+}
+
+int high_board_t::immediate_value() const {
+  const auto [done, value] = done_and_value();
+  NON_WASM_ASSERT(done);
+  return value;
 }
 
 high_board_t high_board_t::place(const int bit) const {
@@ -53,15 +70,6 @@ high_board_t high_board_t::rotate(const int q, const int d) const {
     after[s] ^= side_t(old ^ slow_rotate_quadrant_side(old, d)) << 16*q;
   }
   return high_board_t(after[0], after[1], ply_ + 1);
-}
-
-int high_board_t::immediate_value() const {
-  NON_WASM_ASSERT(done());
-  const bool bw = slow_won(side(0)),
-             ww = slow_won(side(1));
-  if (bw || ww)
-    return bw && ww ? 0 : bw==!turn() ? 1 : -1;
-  return 0;
 }
 
 #ifndef __wasm__

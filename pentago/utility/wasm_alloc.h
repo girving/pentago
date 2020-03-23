@@ -7,7 +7,7 @@
 #ifdef __wasm__
 namespace pentago {
 
-WASM_EXPORT void* malloc(size_t size);
+WASM_EXPORT __attribute__((cold)) void* malloc(size_t size);
 
 template<class T> RawArray<T> wasm_buffer(const int size) {
   return RawArray<T>(size, reinterpret_cast<T*>(malloc(sizeof(T) * size)));
