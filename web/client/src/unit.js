@@ -90,7 +90,7 @@ async function test_wasm() {
   // Allocation and sum test
   const data = [1, 0, pow(2, 32) - 1, 7, 3, 13]
   const correct = 7 + 13 + 1
-  const ptr = tests.exports.wasm_malloc(8 * data.length / 2)
+  const ptr = tests.exports.malloc(8 * data.length / 2)
   const chunks = new Uint32Array(tests.exports.memory.buffer, ptr, data.length)
   for (const [i, n] of data.entries())
     chunks[i] = n
@@ -99,12 +99,12 @@ async function test_wasm() {
 
   // Big allocation test
   let page = 64 << 10
-  let next = tests.exports.wasm_malloc(0)
+  let next = tests.exports.malloc(0)
   if (verbose)
     console.log('initial = ' + next)
   const sizes = [0, 33537473, 17, 3537473, 472, 9182]
   for (const size of sizes) {
-    const p = tests.exports.wasm_malloc(size)
+    const p = tests.exports.malloc(size)
     assert.equal(p, next)
     assert.equal(p % 8, 0)
     next = (p + size + 7) & ~7

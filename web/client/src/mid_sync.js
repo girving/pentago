@@ -129,24 +129,23 @@ export async function instantiate(module) {
   M = await WebAssembly.instantiate(await (module || mid_module), {
     env: {
       die: msg_p => { throw Error(read_char_p(M, msg_p)) },
-      wasm_log: (name_p, value) => console.log(read_char_p(M, name_p) + value),
     }
   })
   return M
 }
 
-// Raw interface to wasm_midsolve
+// Raw interface to midsolve
 export async function midsolve(board_name) {
   const M = await instantiate()
 
   // Allocate memory for arguments and results
   const limit = 1+18+8*18
-  const board_p = M.exports.wasm_malloc(24 + 8 + 32 * limit)
+  const board_p = M.exports.malloc(24 + 8 + 32 * limit)
   const results_p = board_p + 24
   write_board(M, board_p, parse_board(board_name))
 
   // Compute!
-  M.exports.wasm_midsolve(board_p, results_p)
+  M.exports.midsolve(board_p, results_p)
 
   // Read results
   const results = {}

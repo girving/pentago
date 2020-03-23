@@ -11,6 +11,4 @@ namespace pentago {
 #define WASM_IMPORT
 #endif
 
-WASM_IMPORT void wasm_log(const char* name, const double value);
-
 }  // namespace pentago

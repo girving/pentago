@@ -441,7 +441,7 @@ midsolve_results_t midsolve(const high_board_t board, RawArray<halfsupers_t> wor
   return results;
 }
 #else  // if __wasm__
-WASM_EXPORT void wasm_midsolve(const high_board_t* board, midsolve_results_t* results) {
+WASM_EXPORT void midsolve(const high_board_t* board, midsolve_results_t* results) {
   NON_WASM_ASSERT(board && results);
   results->clear();
   const auto workspace = wasm_buffer<halfsupers_t>(midsolve_workspace_size(board->count()));

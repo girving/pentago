@@ -10,7 +10,7 @@ static const size_t page_size = 65536;
 extern "C" unsigned char __heap_base;
 static size_t next = reinterpret_cast<size_t>(&__heap_base);
 
-void* wasm_malloc(size_t size) {
+void* malloc(size_t size) {
   // Ensure alignment
   const size_t align = 8;
   const size_t mask = ~(align - 1);
@@ -28,7 +28,7 @@ void* wasm_malloc(size_t size) {
   if (next > page_size * heap_pages) {
     const int delta = ceil_div(next - page_size * heap_pages, page_size);
     const int r = __builtin_wasm_memory_grow(0, delta);
-    if (r < 0) die("wasm_malloc failed");
+    if (r < 0) die("malloc failed");
   }
 
   // All done!
