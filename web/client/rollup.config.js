@@ -38,7 +38,7 @@ export default {
     visualizer({
       filename: 'build/stats.html',
       sourcemap: true,
-      template: 'circlepacking',
+      template: 'treemap',
     }),
   ],
   watch: {
