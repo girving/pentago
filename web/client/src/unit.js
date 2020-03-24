@@ -73,7 +73,7 @@ async function test_lru() {
 
 async function test_wasm() {
   const verbose = false
-  const tests = await instantiate(WebAssembly.compile(readFileSync('../tests.wasm')))
+  const tests = await instantiate(WebAssembly.compile(readFileSync('../build/tests.wasm')))
 
   // Square test
   const s7 = tests.exports.sqr_test(7)

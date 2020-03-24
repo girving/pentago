@@ -21,6 +21,7 @@
     "rollup-plugin-ignore": "^1.0.5",
     "rollup-plugin-svelte": "^5.0.3",
     "rollup-plugin-terser": "^5.1.2",
+    "rollup-plugin-visualizer": "^3.3.2",
     "stylus": "^0.54.7",
     "svelte": "^3.0.0"
   },
