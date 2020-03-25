@@ -31,7 +31,7 @@ function for_keys(f) {
   }
 }
 
-// Track time using an integer counter to avoid duplciate time stamps
+// Track time using an integer counter to avoid duplicate time stamps
 let last_time = 0
 for_keys(k => last_time = max(last_time, JSON.parse(storage.getItem(k)).t))
 const now = () => ++last_time
