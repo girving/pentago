@@ -48,28 +48,23 @@ function quadrants_to_str(quads) {
   return s.substr(min(s.match(/^0*/)[0].length,s.length-1))
 }
 
+function pack_quadrant(side0, side1) {
+  let quad = 0
+  for (let i = 0; i < 9; i++)
+    quad += ((side0 >> i & 1) + 2 * (side1 >> i & 1)) * pow(3, i)
+  return quad
+}
+
 // Mirror of high_board_t in python
-// Usage: board_t(quadrants,middle) or board_t(name)
-// Examples: board_t([1,0,0,0],true), board_t('1m')
-function board_t() {
-  let name, quads, middle
-  if (arguments.length == 1) {
-    name = arguments[0]
-    const m = name.match(/^(\d+)(m?)$/)
-    if (!m)
-      throw Error('Invalid board ' + name)
-    quads = str_to_quadrants(m[1])
-    middle = m[2].length
-  } else if (arguments.length==2) {
-    quads = arguments[0]
-    middle = arguments[1]
-    if (quads.length != 4 || (middle != 0 && middle != 1))
-      throw Error('invalid board: quads '+quads+', middle '+middle)
-    name = quadrants_to_str(quads)+(middle?'m':'')
-  } else
-    throw Error('expected (quadrants,middle) or (name), got '+arguments)
+// Usage: new board_t(quadrants,middle), parse_board(name), from_high(rep)
+// Examples: new board_t([1,0,0,0],true), parse_board('1m')
+export function board_t(quads, middle) {
+  if (quads.length != 4 || (middle != 0 && middle != 1))
+    throw Error('invalid board: quads '+quads+', middle '+middle)
   this.quads = quads
   this.middle = middle
+
+  const name = quadrants_to_str(quads)+(middle?'m':'')
   this.name = name
 
   // Extract grid
@@ -98,6 +93,19 @@ function board_t() {
   this.turn = turn
   if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1))
     throw Error('bad board: quads '+quads+', middle '+middle+', turn '+turn+', counts '+count0+' '+count1)
+
+  // high_board_t format for use in mid_sync
+  this.high = () => {
+    const rep = [0,0,0,0,0,0,0,0,2*count-middle]
+    for (let q = 0; q < 4; q++) {
+      for (let i = 0; i < 9; i++) {
+        const n = floor(quads[q] / pow(3, i)) % 3
+        rep[q] |= (n == 1) << i
+        rep[4+q] |= (n == 2) << i
+      }
+    }
+    return rep
+  }
 
   // Place a stone at the given location
   const place = this.place = (x, y) => {
@@ -178,5 +186,29 @@ function board_t() {
   }
 }
 
-// Export the board type
-export { board_t as default }
+// Convert from canonical board name
+export function parse_board(name) {
+  const m = name.match(/^(\d+)(m?)$/)
+  if (!m)
+    throw Error('Invalid board ' + name)
+  return new board_t(str_to_quadrants(m[1]), m[2].length)
+}
+
+// Convert from high_board_t format
+export function from_high(high) {
+  if (high.length != 9)
+    throw Error('Invalid board ' + high)
+  const quads = [0,1,2,3].map(q => pack_quadrant(high[q], high[4+q]))
+  const middle = high[8] & 1
+  return new board_t(quads, middle)
+}
+
+// Convert from stringified high_board_t format
+export function from_high_str(s) {
+  return from_high(s.split(',').map(n => parseInt(n)))
+}
+
+// Convert a dictionary with high_board_t keys to canonical keys
+export function from_high_map(m) {
+  return Object.fromEntries(Object.entries(m).map(([k,v]) => [from_high_str(k).name,v]))
+}

@@ -174,7 +174,7 @@
 </style>
 
 <script>
-  import board_t from './board.js'
+  import { parse_board } from './board.js'
   import pending from './pending.js'
   import { midsolve } from './mid_async.js'
   import { get as lru_get, set as lru_set } from './local_lru.js'
@@ -202,11 +202,11 @@
   export let back
   $: history = hash ? hash.slice(1).split(',') : []
   $: {
-    board = new board_t('0')
+    board = parse_board('0')
     error = null
     if (history.length) {
       try {
-        board = new board_t(history[history.length - 1])
+        board = parse_board(history[history.length - 1])
       } catch (e) {
         const s = 'Invalid board '+hash+', error = '+e.message
         console.log(s, e)
@@ -415,5 +415,4 @@
   //   black wins: #3694640600154188633m
   //   tie: #3005942238600111847
   //   midsolve: #274440791932540184
-
 </script>
