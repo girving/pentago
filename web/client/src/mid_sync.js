@@ -39,9 +39,10 @@ export async function midsolve(board) {
   const read_board = p => [...new Uint16Array(M.exports.memory.buffer, p, 9)]
 
   function write_board(p, board) {
-    const high = new Uint16Array(M.exports.memory.buffer, p, 9)
-    for (let i = 0; i < 9; i++)
-      high[i] = board[i]
+    // Write 9 uint16's, then an extra zero at the end to complete a uint32
+    const high = new Uint16Array(M.exports.memory.buffer, p, 10)
+    for (let i = 0; i < 10; i++)
+      high[i] = board[i] || 0
   }
 
   // Allocate memory for arguments and results
