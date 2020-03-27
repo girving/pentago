@@ -140,7 +140,7 @@
         The 4 TB data set, this website, and the backend server is hosted on Google Cloud.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 17 or fewer stones.  For positions with more stones, the server used to compute the value from scratch, but this functionality has been ported to WebAssembly and moved into the client.
         </p><p>
         The backend server is
-        <a href="https://https://us-central1-naml-148801.cloudfunctions.net/pentago">
+        <a href="https://us-central1-naml-148801.cloudfunctions.net/pentago">
           https://us-central1-naml-148801.cloudfunctions.net/pentago
         </a>.  The API is fairly simple: give it the code for a pentago board and it replies with json containing the values of all child positions.  For example,
         <a href="https://us-central1-naml-148801.cloudfunctions.net/pentago/0">here is the start position</a>.  You are welcome to use the server directly for small numbers of queries, but please email me if you want to use it
