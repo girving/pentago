@@ -1,17 +1,18 @@
-// Page layout
-
-@import 'nib'
-global-reset()
-
 html {
-  // Make a scrollbar always exist, so avoid jumps in centering between index.html and details.html.
-  // For details, see https://css-tricks.com/eliminate-jumps-in-horizontal-centering-by-forcing-a-scroll-bar.
+  /* Make a scrollbar always exist, so avoid jumps in centering between index.html and details.html.
+   * For details, see https://css-tricks.com/eliminate-jumps-in-horizontal-centering-by-forcing-a-scroll-bar. */
   overflow-y: scroll;
 }
 
 body {
   background: #d5d6d7;
+  color: black;
   margin: 8px;
+  line-height: 1;
+}
+
+a img {
+  border: none;
 }
 
 .all {
@@ -31,16 +32,12 @@ header {
   border-bottom: 1px solid;
 }
 
-// Taken from https://mxr.mozilla.org/mozilla-central/source/layout/style/html.css
-h1 { font-size: 2em;    font-weight: bold; margin: .67em 0; }
-h2 { font-size: 1.5em;  font-weight: bold; margin: .83em 0; }
+/* Taken from https://mxr.mozilla.org/mozilla-central/source/layout/style/html.css, which is now a dead link */
+h1 { font-size: 2em; font-weight: bold; margin: 0.67em 0; }
+h2 { font-size: 1.5em; font-weight: bold; margin: 0.83em 0; }
 h3 { font-size: 1.17em; font-weight: bold; margin: 1em 0; }
 p { margin: 1em 0; }
 sup { vertical-align: super; font-size: smaller; line-height: normal; }
-
-.warning {
-  color: red;
-}
 
 .main {
   background-color: white;
@@ -72,10 +69,10 @@ nav a {
   border-bottom: 1px solid black;
   color: black;
 }
-nav a           { border-bottom: 1px solid black; }
-nav.back a      { border-left: 1px solid black; }
-nav a:hover     { background-color: white; }
-nav a:visited   { color: black; }
+nav a { border-bottom: 1px solid black; }
+nav.back a { border-left: 1px solid black; }
+nav a:hover { background-color: white; }
+nav a:visited { color: black; }
 .contents .back { visibility: hidden; }
 
 .content {
@@ -84,37 +81,6 @@ nav a:visited   { color: black; }
   margin-right: -100%;
   border-left: 1px solid black;
   position: relative;
-}
-
-svg#board {
-  width: 400px;
-  max-width: 100%;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  // Improve animations on iOS, following
-  // https://chrissilich.com/blog/fix-css-animation-slow-or-choppy-in-mobile-browsers
-  -webkit-transform: translateZ(0);
-}
-
-.status {
-  text-align: center;
-  width: 100%;
-  height: 3em;
-}
-
-#error {
-  color: red;
-}
-
-.load {
-  display: inline;
-  animation: spin 2s infinite ease;
-}
-@keyframes spin {
-    0% { color: black;  text-shadow: none; }
-   20% { color: purple; text-shadow: 0px 0px 6px purple; }
-   40% { color: black;  text-shadow: none; }
 }
 
 section {
@@ -149,6 +115,7 @@ section h2 {
     width: 100%;
   }
 }
+
 @media (max-width: 800px) {
   .main {
     width: 100%;
@@ -169,7 +136,7 @@ section h2 {
     display: inline-block;
     height: 1.5em;
     line-height: 1.5em;
-    padding: 0 .5em;
+    padding: 0 0.5em;
     border: none;
     text-decoration: underline;
   }

@@ -5,6 +5,7 @@ import { terser } from 'rollup-plugin-terser'
 import omt from "@surma/rollup-plugin-off-main-thread"
 import ignore from 'rollup-plugin-ignore'
 import visualizer from 'rollup-plugin-visualizer'
+import postcss from 'rollup-plugin-postcss'
 
 const production = !process.env.ROLLUP_WATCH
 
@@ -20,7 +21,11 @@ export default {
   plugins: [
     svelte({
       dev: !production,
-      css: css => css.write('public/bundle.css')
+      emitCss: true,
+    }),
+    postcss({
+      extract: true,
+      minimize: production,
     }),
     ignore(['fs']),
     resolve({browser: true, dedupe: ['svelte']}),

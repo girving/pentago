@@ -103,6 +103,17 @@
 <svelte:window on:resize={resize}/>
 
 <style>
+  svg {
+    width: 400px;
+    max-width: 100%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    /* Improve animations on iOS, following
+     * https://chrissilich.com/blog/fix-css-animation-slow-or-choppy-in-mobile-browsers */
+    -webkit-transform: translateZ(0);
+  }
+
   .black,.white,.empty,.emptyblack,.emptywhite {
     stroke: black;
     stroke-width: 1;
@@ -145,20 +156,6 @@
     text-anchor: middle;
   }
 
-  .backrect {
-    fill: #c0c0c0;
-    stroke: black;
-    stroke-width: 1;
-    vector-effect: non-scaling-stroke;
-  }
-  .back:hover > .backrect {
-    fill: white;
-  }
-  .backlabel {
-    text-anchor: middle;
-    dominant-baseline: middle;
-  }
-
   .five {
     stroke: black;
     stroke-width: 1;
@@ -170,6 +167,24 @@
 
   .quadrant {
     transition: transform 0.5s ease-in-out;
+  }
+
+  .status {
+    text-align: center;
+    width: 100%;
+    height: 3em;
+  }
+
+  #error { color: red; }
+
+  .load {
+    display: inline;
+    animation: spin 2s infinite ease;
+  }
+  @keyframes spin {
+    0% { color: black; text-shadow: none; }
+    20% { color: purple; text-shadow: 0px 0px 6px purple; }
+    40% { color: black; text-shadow: none; }
   }
 </style>
 
