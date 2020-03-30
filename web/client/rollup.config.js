@@ -6,6 +6,8 @@ import omt from "@surma/rollup-plugin-off-main-thread"
 import ignore from 'rollup-plugin-ignore'
 import visualizer from 'rollup-plugin-visualizer'
 import postcss from 'rollup-plugin-postcss'
+import replace from '@rollup/plugin-replace'
+import { readFileSync } from 'fs'
 
 const production = !process.env.ROLLUP_WATCH
 
@@ -31,6 +33,12 @@ export default {
     resolve({browser: true, dedupe: ['svelte']}),
     commonjs(),
     omt(),
+
+    // Inline mid.wasm into mid_worker.js
+    replace({"fs.readFileSync('../build/mid.wasm')": () => {
+      const hex = readFileSync('build/mid.wasm').toString('hex')
+      return 'new Uint8Array("' + hex + '".match(/../g).map(n => parseInt(n, 16)))'
+    }, delimiters: ['', '']}),
 
     // In dev mode, call `npm run start` once
     // the bundle has been generated

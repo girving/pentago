@@ -1,4 +1,4 @@
-all: public/mid.wasm
+all: build/mid.wasm
 
-public/mid.wasm: build-wasm
+build/mid.wasm: build-wasm
 	./build-wasm

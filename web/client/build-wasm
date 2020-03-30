@@ -20,7 +20,7 @@ build () {
   chmod -x $1
 }
 
-build web/client/public/mid.wasm \
+build web/client/build/mid.wasm \
   -Wl,--export={malloc,midsolve} \
   pentago/mid/{halfsuper,midengine}.cc \
   pentago/high/board.cc \

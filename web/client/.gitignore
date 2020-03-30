@@ -1,5 +1,4 @@
 /node_modules/
-/public/mid.wasm
 /public/main.js
 /public/main.js.map
 /public/mid_worker.js

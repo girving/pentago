@@ -4,9 +4,8 @@
 import fs from 'fs'
 
 // Compile mid.wasm
-const code = fs.readFileSync ? Promise.resolve(fs.readFileSync('../public/mid.wasm'))
-                             : fetch('/mid.wasm').then(r => r.arrayBuffer())
-const mid_module = code.then(b => WebAssembly.compile(b))
+const code = fs.readFileSync('../build/mid.wasm')
+const mid_module = WebAssembly.compile(code)
 
 // Instantiate a fresh copy
 export async function instantiate(module) {
