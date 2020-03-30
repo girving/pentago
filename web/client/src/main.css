@@ -9,6 +9,9 @@ body {
   color: black;
   margin: 8px;
   line-height: 1;
+
+  /* Fix annoying flash on click on iPhone: https://stackoverflow.com/questions/8990442 */
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 
 a img {
