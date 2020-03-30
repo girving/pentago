@@ -1,7 +1,7 @@
 <svg id="board" width={width} height={scale*(6+header_size+footer_size)}>
   <g transform="{'translate('+scale*(3+margin_size)+','+scale*(3+header_size)+') scale('+scale+','+-scale+') '}">
     <!-- Header -->
-    <circle class="{turncolor}" id="turn" cx=0 cy={header_y} r={spot_radius}/>
+    <circle class="{turncolor}" cx=0 cy={header_y} r={spot_radius}/>
     {#await child_value(board) then v}
       <circle class="tvalue" cx=0 cy={header_y} r={value_radius} style="fill: {value_colors[v]}"/>
     {/await}
@@ -38,11 +38,11 @@
           <!-- Spots -->
           {#each q.grid as s}
             <g transform="translate({s.x%3-1},{s.y%3-1})">
-              <a id="spot" href="{spot_link(s)}">
-                <circle id="spot" class="{spot_class(spinning[q.q], board.grid[s.s])}" r={spot_radius}/>
+              <a href="{spot_link(s)}">
+                <circle class="{spot_class(spinning[q.q], board.grid[s.s])}" r={spot_radius}/>
                 {#if !(board.middle || board.done() || board.grid[s.s])}
                   {#await child_value(board.place(s.x, s.y)) then v}
-                    <circle id="value" class="cvalue" r={value_radius} style="fill: {value_colors[v]}"/>
+                    <circle class="cvalue" r={value_radius} style="fill: {value_colors[v]}"/>
                   {/await}
                 {/if}
               </a>
@@ -54,7 +54,7 @@
       <!-- Rotators -->
       {#if !done && board.middle}
         {#each q.rotators as r}
-          <a id="rotate" href="{rotate_link(r)}" on:click={spin(r)}>
+          <a href="{rotate_link(r)}" on:click={spin(r)}>
             <path class="rotateselect" d="{r.select}"/>
             <path class="rotate{turncolor}" d="{r.path}"/>
             {#if board.middle && !board.done()}
