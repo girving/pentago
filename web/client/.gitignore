@@ -1,7 +1,4 @@
 /node_modules/
-/public/main.js
-/public/main.js.map
-/public/mid_worker.js
-/public/mid_worker.js.map
-/public/main.css
+/public/index.html
+/public/*.js.map
 .DS_Store
