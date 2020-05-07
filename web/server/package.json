@@ -5,12 +5,12 @@
   "author": "Geoffrey Irving <irving@naml.us>",
   "homepage": "https://github.com/girving/pentago",
   "license": "BSD-3-Clause",
-  "main": "server.js",
+  "main": "index.js",
   "engines": {
     "node": ">=13.5.0"
   },
   "dependencies": {
-    "@google-cloud/functions-framework": "^1.5.0",
+    "@google-cloud/functions-framework": "^1.5.1",
     "@google-cloud/storage": "^4.2.0",
     "commander": "^2.19.0",
     "fast-crc32c": "^2.0.0",
