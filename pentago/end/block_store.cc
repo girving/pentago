@@ -73,7 +73,7 @@ accumulating_block_store_t::accumulating_block_store_t(
   , section_counts(sections->sections.size()) {
   // Count random samples in each block
   Array<int> sample_counts(total_blocks());
-  for (const auto section : sections->sections) {
+  for (const auto& section : sections->sections) {
     const auto shape = section.shape();
     Random random(hash_value(section));
     for (int i=0;i<samples_per_section;i++) {
@@ -86,7 +86,7 @@ accumulating_block_store_t::accumulating_block_store_t(
   const_cast_(samples) = Nested<sample_t>(sample_counts,uninit);
 
   // Prepare to collect random samples from each block.  Note that this duplicates the loop from above.
-  for (const auto section : sections->sections) {
+  for (const auto& section : sections->sections) {
     const auto shape = section.shape();
     const auto rmin = vec(get<0>(rotation_minimal_quadrants(section.counts[0])),
                           get<0>(rotation_minimal_quadrants(section.counts[1])),

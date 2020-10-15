@@ -49,7 +49,7 @@ TEST(supertensor, supertensor) {
   }
 
   // Write blocks out in arbitrary (hashed) order
-  for (const auto [b, block] : data)
+  for (const auto& [b, block] : data)
     writer->write_block(b, block.copy());
   writer->finalize();
 

@@ -131,7 +131,7 @@ void rasterize_history(RawArray<Vector<float,4>,2> image, const Box<Vector<float
   const auto scales = prescales*TV(1e-6,1);
   const auto scaled_ymin = scales[1]*y_range.min, scaled_ymax = scales[1]*y_range.max;
   const auto base = prescales*box.min;
-  for (const auto event : history) {
+  for (const auto& event : history) {
     const auto emin = vec(scales[0]*event.start.us,scaled_ymin) - base;
     const auto emax = vec(scales[0]*event.end.us  ,scaled_ymax) - base;
     IV imin, imax;

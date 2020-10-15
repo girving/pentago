@@ -240,7 +240,7 @@ vector<tuple<int,int,history_t>> event_dependencies(
     const vector<vector<Array<const history_t>>>& event_sorted_history, const int direction,
     const int thread, const int kind, const history_t source) {
   vector<tuple<int,int,history_t>> deps;
-  for (const auto kind_event : dependencies(direction,time_kind_t(kind),source.event)) {
+  for (const auto& kind_event : dependencies(direction,time_kind_t(kind),source.event)) {
     const int dep_kind = get<0>(kind_event);
     const event_t dep_event = get<1>(kind_event);
     // Search for event in each thread

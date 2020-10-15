@@ -313,9 +313,9 @@ int toplevel(int argc, char** argv) {
         die("internal error: inconsistent restart slices: %d vs %d", restart_slice,
             prev_partition->sections->slice);
       const auto expected = slices[restart_slice];
-      for (const auto s : expected->sections)
+      for (const auto& s : expected->sections)
         check_get(prev_partition->sections->section_id, s);
-      for (const auto s : prev_partition->sections->sections)
+      for (const auto& s : prev_partition->sections->sections)
         check_get(expected->section_id, s);
     }
 

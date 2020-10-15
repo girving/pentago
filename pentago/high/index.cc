@@ -77,11 +77,11 @@ void write_supertensor_index(const string& name,
   const auto sections = descendent_sections(section_t(),slice).at(slice);
   GEODE_ASSERT(sections->slice==int(slice));
   unordered_map<section_t,shared_ptr<const supertensor_reader_t>> section_reader;
-  for (const auto reader : readers) {
+  for (const auto& reader : readers) {
     GEODE_ASSERT(int(reader->header.filter)==filter);
     section_reader.insert(make_pair(reader->header.section,reader));
   }
-  for (const auto section : sections->sections)
+  for (const auto& section : sections->sections)
     GEODE_ASSERT(section_reader.find(section) != section_reader.end());
 
   // Write index
@@ -91,7 +91,7 @@ void write_supertensor_index(const string& name,
   fwrite("pentago index      \n",1,20,file);
   fwrite(&slice,sizeof(uint32_t),1,file);
   GEODE_ASSERT(ftell(file)==24);
-  for (const auto section : sections->sections) {
+  for (const auto& section : sections->sections) {
     const auto it = section_reader.find(section);
     GEODE_ASSERT(it != section_reader.end());
     const auto reader = it->second;

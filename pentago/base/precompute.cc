@@ -374,7 +374,7 @@ string halfsuper_wins() {
 
   // Process each pattern set
   int counter = 0;
-  for (const auto p : quadrant_set_win_patterns) {
+  for (const auto& p : quadrant_set_win_patterns) {
     const auto quads = get<0>(p);
     const auto pats = get<1>(p);
     line("\n  // Quadrants %s", asarray(quads));
@@ -676,14 +676,14 @@ REMEMBER(superwin_info,
   const string types = "hvlua";  // Horizontal, vertical, diagonal lo/hi/assist
   const string patterns[] = {"vv--", "h-h-", "-h-h", "--vv", "l-al", "ua-u", "all-", "-uua"};
   const Array<bool,7> info(vec(4,512,5,4,4,4,4));  // Indexed by quadrants, quadrant state, superwin_info field, r0-3
-  for (const auto pattern : patterns) {
+  for (const auto& pattern : patterns) {
     GEODE_ASSERT(pattern.size() == 4);
     vector<int> used, unused;
     for (const int i : range(4))
       (pattern[i] != '-' ? used : unused).push_back(i);
     GEODE_ASSERT(used.size() == 2 || used.size() == 3);
     vector<Vector<uint16_t,4>> ws;
-    for (const auto w : ways) {
+    for (const auto& w : ways) {
       for (const int i : range(4))
         if (!(bool(w[i]) == (pattern[i]!='-') || pattern[i]=='a'))
           goto skip;
