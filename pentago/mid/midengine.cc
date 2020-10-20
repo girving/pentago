@@ -15,10 +15,6 @@ NAMESPACE_PENTAGO
 using std::max;
 using std::make_tuple;
 
-// Flip to enable debugging
-//#define MD(...) __VA_ARGS__
-#define MD(...)
-
 /* In the code below, we will organized pairs of subsets of [0,n-1] into two dimensional arrays.
  * The first dimension records the player to move, the second the other player.  The first dimension
  * is organized according to the order produced by subsets(), and the second is organized by the
@@ -108,14 +104,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
     for (int i = 0; i < c_; i++) \
       s_ |= side_t(1)<<empty[set_>>5*i&0x1f]; \
     s_; })
-  MD(const auto str_set = [=](const int k0, const set_t set0, const int k1, const set_t set1, const bool flip) {
-    string s(spots,'\0');
-    for (int i = 0; i < k0; i++) s[set0>>5*i&0x1f] += flip ? 2 : 1;
-    for (int i = 0; i < k1; i++) s[set1>>5*i&0x1f] += flip ? 1 : 2;
-    for (int i = 0; i < spots; i++)
-      s[i] = uint8_t(s[i])<3 ? "_01"[int(s[i])] : 'x';
-    return s;
-  };)
 
   // Evaluate whether the other side wins for all possible sides
   halfsuper_t all_wins1[sets1.size];
@@ -143,9 +131,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
       }
     }
   }
-
-  // Make sure each output entry is written only once
-  MD(Array<uint8_t,2> written(output.sizes()));
 
   // Iterate over set of stones of player to move
   for (const int s0 : range(sets0.size)) {
@@ -260,15 +245,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
         s0p += offset0[i][q];
       }
 
-      // Print board
-      MD(const auto set1 = sets1(s1);)
-      MD({
-        const auto board = flip_board(pack(side0, root1|set_side(k1, set1)), (slice+n)&1);
-        slog("\ncomputing slice %s+%d, k0 %d, k1 %d, fill %s, board %s, s0 %d, s0p %d, s1p %d, s1 %d",
-             slice, n, k0, k1, str_set(k0,set0,k1,set1,(slice+n)&1),
-             board, s0, s0p, s1p, s1);
-      })
-
       // Consider each move in turn
       halfsupers_t us;
       {
@@ -282,17 +258,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
             const halfsupers_t child = input(cs0,cs1ps[s1p][i]);
             us[0] |= cwins | child[0];  // win
             us[1] |= cwins | child[1];  // not lose
-            MD({
-              const auto child_set0 = set0|side_t(empty1[i])<<5*k0;
-              const auto board = pack(root1|set_side(k1, set1), root0|set_side(k0+1,child_set0));
-              const auto flip = flip_board(board,(slice+n+1)&1);
-              slog("child %s, board %s, set %s, s0 %d, s1 %d, cs0 %d, cs1p %s, input %s",
-                   str_set(k1, set1, k0+1, child_set0, (slice+n+1)&1), flip, child_set0,
-                   s0, s1, cs0, cs1ps[s1p][i], input.sizes());
-              const bool p = (n+parity)&1;
-              GEODE_ASSERT(child.x==split(rmax(~super_evaluate_all(false, 100, board)))[p]);
-              GEODE_ASSERT(child.y==split(rmax(~super_evaluate_all(true , 100, board)))[p]);
-            })
           }
       }
 
@@ -301,14 +266,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
                         inplay = ~(wins0 | wins1);
       us[0] = (inplay & us[0]) | (wins0 & ~wins1);  // win (| ~inplay & (wins0 & ~wins1))
       us[1] = (inplay & us[1]) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
-
-      // Test if desired
-      MD({
-        const auto board = pack(side0,root1|set_side(k1,set1));
-        const bool p = (n+parity)&1;
-        GEODE_ASSERT(us[0]==split(super_evaluate_all(true ,100,board))[p]);
-        GEODE_ASSERT(us[1]==split(super_evaluate_all(false,100,board))[p]);
-      })
 
       // If we're far enough along, remember results
       if (n <= 1) {
@@ -327,7 +284,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
       above[0] = rmax(~us[1]);
       above[1] = rmax(~us[0]);
       output(s1,s0p) = above;
-      MD(GEODE_ASSERT(!written(s1, s0p)++));
     }
   }
 }
