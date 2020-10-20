@@ -85,40 +85,22 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
   ALLOCA_SUBSETS(sets1p, spots-k0, k1);
   const auto input = grab(workspace, n&1, choose(spots, k0+1), choose(spots-k0-1, k1)).const_();
   const auto output = grab(workspace, !(n&1), sets1.size, choose(spots-k1, k0));
-
-  // List empty spots as bit indices into side_t
-  uint8_t empty[max(spots, 1)];
-  memset(empty, 0, sizeof(empty));
-  {
-    const auto free = side_mask & ~(root0|root1);
-    int next = 0;
-    for (int i = 0; i < 64; i++)
-      if (free & side_t(1)<<i)
-        empty[next++] = i;
-    NON_WASM_ASSERT(next == spots);
-  }
-  #define set_side(count, set) ({ \
-    const int c_ = (count); \
-    const set_t set_ = (set); \
-    side_t s_ = 0; \
-    for (int i = 0; i < c_; i++) \
-      s_ |= side_t(1)<<empty[set_>>5*i&0x1f]; \
-    s_; })
+  const empty_t empty(root);
 
   // Evaluate whether the other side wins for all possible sides
   halfsuper_t all_wins1[sets1.size];
   for (const int s1 : range(sets1.size))
-    all_wins1[s1] = halfsuper_wins(root1 | set_side(k1, sets1(s1)), (n+parity)&1);
+    all_wins1[s1] = halfsuper_wins(root1 | empty.side(sets1, s1), (n+parity)&1);
 
   // Precompute whether we win on the next move
   halfsuper_t all_wins0_next[done ? 0 : choose(spots, k0+1)];
   if (!done) {
     const auto sets0_next = sets_t(spots, k0+1);
     for (int s0 = 0; s0 < sets0_next.size; s0++)
-      all_wins0_next[s0] = halfsuper_wins(root0 | set_side(k0+1, sets0_next(s0)), (n+parity)&1);
+      all_wins0_next[s0] = halfsuper_wins(root0 | empty.side(sets0_next, s0), (n+parity)&1);
   }
 
-  // Lookup table for converting s1p to cs1p (s1 relative to one more black stone:
+  // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
   uint16_t cs1ps[sets1p.size()][spots-k0];
   for (int s1p = 0; s1p < sets1p.size(); s1p++) {
@@ -136,7 +118,7 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
   for (const int s0 : range(sets0.size)) {
     // Construct side to move
     const set_t set0 = sets0(s0);
-    const side_t side0 = root0 | set_side(k0, set0);
+    const side_t side0 = root0 | empty.side(sets0, set0);
 
     // Make a mask of filled spots
     uint32_t filled0 = 0;
@@ -149,10 +131,10 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
     // List empty spots after we place s0's stones
     uint8_t empty1[spots-k0];
     {
-      const auto free = side_mask&~side0;
+      const auto free = side_mask & ~side0;
       int next = 0;
       for (int i = 0; i < spots; i++)
-        if (free&side_t(1)<<empty[i])
+        if (free&side_t(1)<<empty.empty[i])
           empty1[next++] = i;
       NON_WASM_ASSERT(next==spots-k0);
     }
@@ -273,8 +255,8 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
                        filled_white = (slice+n)&1 ? filled0 : filled1;
         auto sides = root.sides();
         for (int i = 0; i < spots; i++) {
-          sides[0] |= side_t(filled_black>>i&1) << empty[i];
-          sides[1] |= side_t(filled_white>>i&1) << empty[i];
+          sides[0] |= side_t(filled_black>>i&1) << empty.empty[i];
+          sides[1] |= side_t(filled_white>>i&1) << empty.empty[i];
         }
         results.append(make_tuple(sides, superinfos_t{us[0], us[1], bool((n+parity)&1)}));
       }

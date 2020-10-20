@@ -23,7 +23,7 @@ static inline int choose(const int n, const int k) {
 // A k-subset of [0,n-1], packed into 64-bit ints with 5 bits for each entry.
 // I.e., the set {a < b < c} has value a|b<<5|c<<10.  We order sets in large-entry-major order;
 // the first 3-set of 10 is {0,1,2}, followed by {0,1,3}, {0,2,3}, ....
-static set_t subset(const int n, const int k, int index) {
+static __attribute__((const)) set_t subset(const int n, const int k, int index) {
   assert(unsigned(n) <= 18 && unsigned(k) <= 9);
   assert(unsigned(index) < fast_choose(n, k));
   set_t set = 0;
@@ -57,6 +57,32 @@ struct sets_t {
   for (int i_ = 0; i_ < name##_size_; i_++) \
     name##_raw_[i_] = subset(name##_n_, name##_k_, i_); \
   const RawArray<const set_t> name(name##_size_, name##_raw_);
+
+// List empty spots as bit indices into side_t
+struct empty_t {
+  uint8_t empty[18];
+
+  empty_t(const high_board_t board) {
+    NON_WASM_ASSERT(board.count() >= 18);
+    const auto free = board.empty_mask();
+    memset(empty, 0, sizeof(empty));
+    int next = 0;
+    for (int i = 0; i < 64; i++)
+      if (free & side_t(1)<<i)
+        empty[next++] = i;
+  }
+
+  side_t side(const sets_t& sets, const set_t set) const {
+    side_t s = 0;
+    for (int i = 0; i < sets.k; i++)
+      s |= side_t(1) << empty[set >> 5*i & 0x1f];
+    return s;
+  }
+
+  side_t side(const sets_t& sets, const int index) const {
+    return side(sets, sets(index));
+  }
+};
 
 }
 END_NAMESPACE_PENTAGO
