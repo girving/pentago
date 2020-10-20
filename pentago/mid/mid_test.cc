@@ -1,6 +1,7 @@
 #include "pentago/base/board.h"
 #include "pentago/base/count.h"
 #include "pentago/mid/midengine.h"
+#include "pentago/mid/subsets.h"
 #include "pentago/search/superengine.h"
 #include "pentago/search/supertable.h"
 #include "pentago/utility/arange.h"
@@ -246,32 +247,32 @@ TEST(mid, rmax_limit) {
 TEST(mid, subsets) {
   for (const int n : range(18+1)) {
     for (const int k : range(4)) {
-      const Array<set_t> sets(choose(n, k));
-      subsets(n, k, sets);
+      const auto sets = sets_t(n, k);
+      ASSERT_EQ(sets.size, choose(n, k));
       int a = 0;
       switch (k) {
         case 0:
-          ASSERT_EQ(sets[a++], 0);
+          ASSERT_EQ(sets(a++), 0);
           break;
         case 1:
           for (const int i : range(n))
-            ASSERT_EQ(sets[a++], i);
+            ASSERT_EQ(sets(a++), i);
           break;
         case 2:
           for (const int i0 : range(n))
             for (const int i1 : range(n))
               if (i0 > i1)
-                ASSERT_EQ(sets[a++], i1|i0<<5);
+                ASSERT_EQ(sets(a++), i1|i0<<5);
           break;
         case 3:
           for (const int i0 : range(n))
             for (const int i1 : range(n))
               for (const int i2 : range(n))
                 if (i0 > i1 && i1 > i2)
-                  ASSERT_EQ(sets[a++], i2|i1<<5|i0<<10);
+                  ASSERT_EQ(sets(a++), i2|i1<<5|i0<<10);
           break;
       }
-      ASSERT_EQ(sets.size(), a);
+      ASSERT_EQ(sets.size, a);
     }
   }
 }
