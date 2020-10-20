@@ -70,66 +70,39 @@ static RawArray<halfsupers_t,2> grab(RawArray<halfsupers_t> workspace, const boo
   return flat.reshape(vec(nx, ny));
 }
 
-static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& results,
-                          RawArray<halfsupers_t> workspace) {
-  const int parity = root.middle();
-  const int slice = root.count();
-  const int spots = 36 - slice;
-  const bool done = spots == n;
-  const auto root0 = root.side((slice+n)&1),
-             root1 = root.side((slice+n+1)&1);
-  const int k0 = (slice+n)/2 - (slice+(n&1))/2,  // Player to move
-            k1 = n-k0;  // Other player
-  const auto sets0 = sets_t(spots, k0);
-  const auto sets1 = sets_t(spots, k1);
-  ALLOCA_SUBSETS(sets1p, spots-k0, k1);
-  const auto input = grab(workspace, n&1, choose(spots, k0+1), choose(spots-k0-1, k1)).const_();
-  const auto output = grab(workspace, !(n&1), sets1.size, choose(spots-k1, k0));
-  const empty_t empty(root);
+// Everything that's a function of just s0 in the double loop in midsolve_loop
+struct set0_info_t {
+  set_t set0;
+  side_t side0;
+  int s0;
+  uint32_t filled0;
+  halfsuper_t wins0;
+  halfsuper_t child_wins0[18];
+  uint8_t empty1[18];
+  uint16_t child_s0s[18];
+  uint16_t offset1[10][18];
+  uint16_t offset0[10][18];
 
-  // Evaluate whether the other side wins for all possible sides
-  halfsuper_t all_wins1[sets1.size];
-  for (const int s1 : range(sets1.size))
-    all_wins1[s1] = halfsuper_wins(root1 | empty.side(sets1, s1), (n+parity)&1);
+  set0_info_t(const int n, const int spots, const bool parity, const side_t root0, const empty_t& empty,
+              const halfsuper_t* all_wins0_next, const sets_t& sets0, const int s0) {
+    const int k0 = sets0.k;
+    const int k1 = n - k0;
+    const bool done = spots == n;
 
-  // Precompute whether we win on the next move
-  halfsuper_t all_wins0_next[done ? 0 : choose(spots, k0+1)];
-  if (!done) {
-    const auto sets0_next = sets_t(spots, k0+1);
-    for (int s0 = 0; s0 < sets0_next.size; s0++)
-      all_wins0_next[s0] = halfsuper_wins(root0 | empty.side(sets0_next, s0), (n+parity)&1);
-  }
-
-  // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
-  //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  uint16_t cs1ps[sets1p.size()][spots-k0];
-  for (int s1p = 0; s1p < sets1p.size(); s1p++) {
-    for (int j = 0; j < spots-k0; j++) {
-      cs1ps[s1p][j] = s1p;
-      for (int a = 0; a < k1; a++) {
-        const int s1p_a = sets1p[s1p]>>5*a&0x1f;
-        if (j<s1p_a)
-          cs1ps[s1p][j] += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
-      }
-    }
-  }
-
-  // Iterate over set of stones of player to move
-  for (const int s0 : range(sets0.size)) {
     // Construct side to move
-    const set_t set0 = sets0(s0);
-    const side_t side0 = root0 | empty.side(sets0, set0);
+    this->s0 = s0;
+    set0 = sets0(s0);
+    side0 = root0 | empty.side(sets0, set0);
 
     // Make a mask of filled spots
-    uint32_t filled0 = 0;
+    filled0 = 0;
     for (int i = 0; i < k0; i++)
       filled0 |= 1<<(set0>>5*i&0x1f);
 
     // Evaluate whether we win for side0 and all child sides
-    const halfsuper_t wins0 = halfsuper_wins(side0, (n+parity)&1);
+    wins0 = halfsuper_wins(side0, (n+parity)&1);
 
     // List empty spots after we place s0's stones
-    uint8_t empty1[spots-k0];
     {
       const auto free = side_mask & ~side0;
       int next = 0;
@@ -178,7 +151,6 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
      */
 
     // Precompute absolute indices after we place s0's stones
-    uint16_t child_s0s[spots-k0];
     for (int i = 0; i < spots-k0; i++) {
       const int j = empty1[i]-i;
       child_s0s[i] = choose(empty1[i], j+1);
@@ -187,20 +159,17 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
     }
 
     // Preload wins after we place s0's stones.
-    halfsuper_t child_wins0[spots-k0];
     if (!done)
       for (int i = 0; i < spots-k0; i++)
         child_wins0[i] = all_wins0_next[child_s0s[i]];
 
     // Lookup table to convert s1p to s1
-    uint16_t offset1[k1][spots-k0];
     for (int i = 0; i < k1; i++)
       for (int q = 0; q < spots-k0; q++)
         offset1[i][q] = fast_choose(empty1[q], i+1);
 
     // Lookup table to convert s0 to s0p
-    uint16_t offset0[k1][spots-k0];
-    for (int a = 0; a < k1; a++)
+    for (int a = 0; a < k1; a++) {
       for (int q = 0; q < spots-k0; q++) {
         offset0[a][q] = 0;
         for (int i = empty1[q]-q; i < k0; i++) {
@@ -209,64 +178,123 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
             offset0[a][q] += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
         }
       }
-
-    // Iterate over set of stones of other player
-    for (int s1p = 0; s1p < sets1p.size(); s1p++) {
-      const auto set1p = sets1p[s1p];
-
-      // Convert indices
-      uint32_t filled1 = 0;
-      uint32_t filled1p = 0;
-      uint16_t s1 = 0;
-      uint16_t s0p = s0;
-      for (int i = 0; i < k1; i++) {
-        const int q = set1p>>5*i&0x1f;
-        filled1 |= 1<<empty1[q];
-        filled1p |= 1<<q;
-        s1  += offset1[i][q];
-        s0p += offset0[i][q];
-      }
-
-      // Consider each move in turn
-      halfsupers_t us;
-      {
-        us[0] = us[1] = halfsuper_t(0);
-        if (slice + n == 36)
-          us[1] = ~halfsuper_t(0);
-        for (int i = 0; i < spots-k0; i++)
-          if (!(filled1p&1<<i)) {
-            const int cs0 = child_s0s[i];
-            const auto cwins = child_wins0[i];
-            const halfsupers_t child = input(cs0,cs1ps[s1p][i]);
-            us[0] |= cwins | child[0];  // win
-            us[1] |= cwins | child[1];  // not lose
-          }
-      }
-
-      // Account for immediate results
-      const halfsuper_t wins1 = all_wins1[s1],
-                        inplay = ~(wins0 | wins1);
-      us[0] = (inplay & us[0]) | (wins0 & ~wins1);  // win (| ~inplay & (wins0 & ~wins1))
-      us[1] = (inplay & us[1]) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
-
-      // If we're far enough along, remember results
-      if (n <= 1) {
-        const uint32_t filled_black = (slice+n)&1 ? filled1 : filled0,
-                       filled_white = (slice+n)&1 ? filled0 : filled1;
-        auto sides = root.sides();
-        for (int i = 0; i < spots; i++) {
-          sides[0] |= side_t(filled_black>>i&1) << empty.empty[i];
-          sides[1] |= side_t(filled_white>>i&1) << empty.empty[i];
-        }
-        results.append(make_tuple(sides, superinfos_t{us[0], us[1], bool((n+parity)&1)}));
-      }
-
-      // Negate and apply rmax in preparation for the slice above
-      halfsupers_t above;
-      above[0] = rmax(~us[1]);
-      above[1] = rmax(~us[0]);
-      output(s1,s0p) = above;
     }
+  }
+};
+static_assert(sizeof(set0_info_t) == 1120);
+
+static inline void inner(const high_board_t root, const int n, const int spots, const int slice, const int parity,
+                         const int k0, const int k1, RawArray<const uint16_t,2> cs1ps, RawArray<const set_t> sets1p,
+                         const halfsuper_t* all_wins1, const empty_t& empty, mid_supers_t& results,
+                         RawArray<const halfsupers_t,2> input, RawArray<halfsupers_t,2> output,
+                         const set0_info_t& I, const int s1p) {
+  const auto set1p = sets1p[s1p];
+
+  // Convert indices
+  uint32_t filled1 = 0;
+  uint32_t filled1p = 0;
+  uint16_t s1 = 0;
+  uint16_t s0p = I.s0;
+  for (int i = 0; i < k1; i++) {
+    const int q = set1p>>5*i&0x1f;
+    filled1 |= 1<<I.empty1[q];
+    filled1p |= 1<<q;
+    s1  += I.offset1[i][q];
+    s0p += I.offset0[i][q];
+  }
+
+  // Consider each move in turn
+  halfsupers_t us;
+  {
+    us[0] = us[1] = halfsuper_t(0);
+    if (slice + n == 36)
+      us[1] = ~halfsuper_t(0);
+    for (int i = 0; i < spots-k0; i++)
+      if (!(filled1p&1<<i)) {
+        const int cs0 = I.child_s0s[i];
+        const auto cwins = I.child_wins0[i];
+        const halfsupers_t child = input(cs0, cs1ps(s1p, i));
+        us[0] |= cwins | child[0];  // win
+        us[1] |= cwins | child[1];  // not lose
+      }
+  }
+
+  // Account for immediate results
+  const halfsuper_t wins1 = all_wins1[s1],
+                    inplay = ~(I.wins0 | wins1);
+  us[0] = (inplay & us[0]) | (I.wins0 & ~wins1);  // win (| ~inplay & (I.wins0 & ~wins1))
+  us[1] = (inplay & us[1]) | I.wins0;  // not lose       (| ~inplay & (I.wins0 | ~wins1))
+
+  // If we're far enough along, remember results
+  if (n <= 1) {
+    const uint32_t filled_black = (slice+n)&1 ? filled1 : I.filled0,
+                   filled_white = (slice+n)&1 ? I.filled0 : filled1;
+    auto sides = root.sides();
+    for (int i = 0; i < spots; i++) {
+      sides[0] |= side_t(filled_black>>i&1) << empty.empty[i];
+      sides[1] |= side_t(filled_white>>i&1) << empty.empty[i];
+    }
+    results.append(make_tuple(sides, superinfos_t{us[0], us[1], bool((n+parity)&1)}));
+  }
+
+  // Negate and apply rmax in preparation for the slice above
+  halfsupers_t above;
+  above[0] = rmax(~us[1]);
+  above[1] = rmax(~us[0]);
+  output(s1,s0p) = above;
+}
+
+static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& results,
+                          RawArray<halfsupers_t> workspace) {
+  const int parity = root.middle();
+  const int slice = root.count();
+  const int spots = 36 - slice;
+  const bool done = spots == n;
+  const auto root0 = root.side((slice+n)&1),
+             root1 = root.side((slice+n+1)&1);
+  const int k0 = (slice+n)/2 - (slice+(n&1))/2,  // Player to move
+            k1 = n - k0;  // Other player
+  const auto sets0 = sets_t(spots, k0);
+  const auto sets1 = sets_t(spots, k1);
+  ALLOCA_SUBSETS(sets1p, spots-k0, k1);
+  const auto input = grab(workspace, n&1, choose(spots, k0+1), choose(spots-k0-1, k1)).const_();
+  const auto output = grab(workspace, !(n&1), sets1.size, choose(spots-k1, k0));
+  const empty_t empty(root);
+
+  // Evaluate whether the other side wins for all possible sides
+  halfsuper_t all_wins1[sets1.size];
+  for (const int s1 : range(sets1.size))
+    all_wins1[s1] = halfsuper_wins(root1 | empty.side(sets1, s1), (n+parity)&1);
+
+  // Precompute whether we win on the next move
+  halfsuper_t all_wins0_next[done ? 0 : choose(spots, k0+1)];
+  if (!done) {
+    const auto sets0_next = sets_t(spots, k0+1);
+    for (int s0 = 0; s0 < sets0_next.size; s0++)
+      all_wins0_next[s0] = halfsuper_wins(root0 | empty.side(sets0_next, s0), (n+parity)&1);
+  }
+
+  // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
+  //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
+  uint16_t cs1ps_[sets1p.size() * (spots-k0)];
+  const RawArray<uint16_t,2> cs1ps(vec(sets1p.size(), spots-k0), cs1ps_);
+  for (int s1p = 0; s1p < sets1p.size(); s1p++) {
+    for (int j = 0; j < spots-k0; j++) {
+      cs1ps(s1p,j) = s1p;
+      for (int a = 0; a < k1; a++) {
+        const int s1p_a = sets1p[s1p]>>5*a&0x1f;
+        if (j<s1p_a)
+          cs1ps(s1p,j) += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
+      }
+    }
+  }
+
+  // Iterate over set of stones of player to move
+  for (const int s0 : range(sets0.size)) {
+    const set0_info_t I(n, spots, parity, root0, empty, all_wins0_next, sets0, s0);
+    // Iterate over set of stones of other player
+    for (const int s1p :  range(sets1p.size()))
+      inner(root, n, spots, slice, parity, k0, k1, cs1ps, sets1p, all_wins1, empty, results, input, output, I, s1p);
   }
 }
 
