@@ -33,33 +33,39 @@ static inline int choose(const int n, const int k) {
   return fast_choose(n, min(k, n-k));
 }
 
-// All k-subsets of [0,n-1], packed into 64-bit ints with 5 bits for each entry.
+// A k-subset of [0,n-1], packed into 64-bit ints with 5 bits for each entry.
 // I.e., the set {a < b < c} has value a|b<<5|c<<10.  We order sets in large-entry-major order;
 // the first 3-set of 10 is {0,1,2}, followed by {0,1,3}, {0,2,3}, ....
+static set_t subset(const int n, const int k, int index) {
+  assert(unsigned(n) <= 18 && unsigned(k) <= 9);
+  assert(unsigned(index) < fast_choose(n, k));
+  set_t set = 0;
+  for (int i = k-1; i >= 0; i--) {
+    int j = i, base = 0;
+    for (; j < n; j++) {
+      int next = base + fast_choose(j, i);
+      if (index < next) break;
+      base = next;
+    }
+    set |= set_t(j) << 5*i;
+    index -= base;
+  }
+  return set;
+}
+
+struct sets_t {
+  const int n, k;
+  const int size;
+
+  sets_t(const int n, const int k) : n(n), k(k), size(choose(n, k)) {}
+  set_t operator()(const int index) const { return subset(n, k, index); }
+};
+
 void subsets(const int n, const int k, RawArray<set_t> sets) {
   NON_WASM_ASSERT(0<=n && n<=18 && k<=9);
   NON_WASM_ASSERT(sets.size() == choose(n, k));
-  if (!sets.size())
-    return;
-  const set_t sentinel = set_t(n)<<5*k;
-  set_t s = ((set_t(31*k-32)<<5*k) + 32) / 961;  // 0<<0 | 1<<5 | 2<<10 | ... | (k-1)<<5*(k-1)
-  int next = 0;
-  for (;;) {
-    sets[next++] = s;
-    const auto ss = s | sentinel;
-    for (int i = 0; i < k; i++) {
-      const int a = (ss>>5*i)&31;
-      const int b = (ss>>5*(i+1))&31;
-      if (a+1 < b) {
-        s ^= set_t(a^(a+1))<<5*i;
-        goto found;
-      } else
-        s ^= set_t(a^i)<<5*i;
-    }
-    break;
-    found:;
-  }
-  NON_WASM_ASSERT(sets.size() == next);
+  for (const int i : range(sets.size()))
+    sets[i] = subset(n, k, i);
 }
 
 // Allocate subsets on the stack
@@ -102,14 +108,15 @@ static int bottleneck(const int spots) {
   int worst = 0;
   int prev = 1;
   for (const int n : range(spots+1)) {
-    const int next = choose(spots, n+1) * choose(n+1, (n+1)/2);
+    int next = choose(spots, n+1);
+    if (next) next *= choose(n+1, (n+1)/2);
     worst = max(worst, prev + next);
     prev = next;
   }
   return worst;
 }
 
-static int midsolve_workspace_size(const int min_slice) {
+int midsolve_workspace_size(const int min_slice) {
   return bottleneck(36 - min_slice);
 }
 
@@ -135,11 +142,11 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
              root1 = root.side((slice+n+1)&1);
   const int k0 = (slice+n)/2 - (slice+(n&1))/2,  // Player to move
             k1 = n-k0;  // Other player
-  ALLOCA_SUBSETS(sets0, spots, k0);
-  ALLOCA_SUBSETS(sets1, spots, k1);
+  const auto sets0 = sets_t(spots, k0);
+  const auto sets1 = sets_t(spots, k1);
   ALLOCA_SUBSETS(sets1p, spots-k0, k1);
   const auto input = grab(workspace, n&1, choose(spots, k0+1), choose(spots-k0-1, k1)).const_();
-  const auto output = grab(workspace, !(n&1), sets1.size(), choose(spots-k1, k0));
+  const auto output = grab(workspace, !(n&1), sets1.size, choose(spots-k1, k0));
 
   // List empty spots as bit indices into side_t
   uint8_t empty[max(spots, 1)];
@@ -169,16 +176,16 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
   };)
 
   // Evaluate whether the other side wins for all possible sides
-  halfsuper_t all_wins1[sets1.size()];
-  for (int s1 = 0; s1 < sets1.size(); s1++)
-    all_wins1[s1] = halfsuper_wins(root1 | set_side(k1,sets1[s1]), (n+parity)&1);
+  halfsuper_t all_wins1[sets1.size];
+  for (const int s1 : range(sets1.size))
+    all_wins1[s1] = halfsuper_wins(root1 | set_side(k1, sets1(s1)), (n+parity)&1);
 
   // Precompute whether we win on the next move
   halfsuper_t all_wins0_next[done ? 0 : choose(spots, k0+1)];
   if (!done) {
-    ALLOCA_SUBSETS(sets0_next, spots, k0+1);
-    for (int s0 = 0; s0 < sets0_next.size(); s0++)
-      all_wins0_next[s0] = halfsuper_wins(root0 | set_side(k0+1,sets0_next[s0]), (n+parity)&1);
+    const auto sets0_next = sets_t(spots, k0+1);
+    for (int s0 = 0; s0 < sets0_next.size; s0++)
+      all_wins0_next[s0] = halfsuper_wins(root0 | set_side(k0+1, sets0_next(s0)), (n+parity)&1);
   }
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone:
@@ -199,9 +206,9 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
   MD(Array<uint8_t,2> written(output.sizes()));
 
   // Iterate over set of stones of player to move
-  for (int s0 = 0; s0 < sets0.size(); s0++) {
+  for (const int s0 : range(sets0.size)) {
     // Construct side to move
-    const set_t set0 = sets0[s0];
+    const set_t set0 = sets0(s0);
     const side_t side0 = root0 | set_side(k0, set0);
 
     // Make a mask of filled spots
@@ -312,10 +319,11 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
       }
 
       // Print board
+      MD(const auto set1 = sets1(s1);)
       MD({
-        const auto board = flip_board(pack(side0, root1|set_side(k1, sets1[s1])), (slice+n)&1);
+        const auto board = flip_board(pack(side0, root1|set_side(k1, set1)), (slice+n)&1);
         slog("\ncomputing slice %s+%d, k0 %d, k1 %d, fill %s, board %s, s0 %d, s0p %d, s1p %d, s1 %d",
-             slice, n, k0, k1, str_set(k0,set0,k1,sets1[s1],(slice+n)&1),
+             slice, n, k0, k1, str_set(k0,set0,k1,set1,(slice+n)&1),
              board, s0, s0p, s1p, s1);
       })
 
@@ -334,10 +342,10 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
             us[1] |= cwins | child[1];  // not lose
             MD({
               const auto child_set0 = set0|side_t(empty1[i])<<5*k0;
-              const auto board = pack(root1|set_side(k1, sets1[s1]), root0|set_side(k0+1,child_set0));
+              const auto board = pack(root1|set_side(k1, set1), root0|set_side(k0+1,child_set0));
               const auto flip = flip_board(board,(slice+n+1)&1);
               slog("child %s, board %s, set %s, s0 %d, s1 %d, cs0 %d, cs1p %s, input %s",
-                   str_set(k1, sets1[s1], k0+1, child_set0, (slice+n+1)&1), flip, child_set0,
+                   str_set(k1, set1, k0+1, child_set0, (slice+n+1)&1), flip, child_set0,
                    s0, s1, cs0, cs1ps[s1p][i], input.sizes());
               const bool p = (n+parity)&1;
               GEODE_ASSERT(child.x==split(rmax(~super_evaluate_all(false, 100, board)))[p]);
@@ -354,7 +362,7 @@ static void midsolve_loop(const high_board_t root, const int n, mid_supers_t& re
 
       // Test if desired
       MD({
-        const auto board = pack(side0,root1|set_side(k1,sets1[s1]));
+        const auto board = pack(side0,root1|set_side(k1,set1));
         const bool p = (n+parity)&1;
         GEODE_ASSERT(us[0]==split(super_evaluate_all(true ,100,board))[p]);
         GEODE_ASSERT(us[1]==split(super_evaluate_all(false,100,board))[p]);
@@ -429,7 +437,7 @@ static int traverse(const high_board_t board, const mid_supers_t& supers, mid_va
   return value;
 }
 
-#ifndef __wasm__
+#if !defined(__wasm__) || defined(__APPLE__)
 mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
   // Compute
   const auto supers = midsolve_internal(board, workspace);

@@ -31,6 +31,9 @@ struct superinfos_t {
 typedef uint64_t set_t;
 void subsets(const int n, const int k, RawArray<set_t> sets);
 
+// Size of workspace array needed by midsolve
+int midsolve_workspace_size(const int min_slice);
+
 #ifndef __wasm__
 // Allocate enough memory for midsolves with at least the given number of stones
 Array<halfsupers_t> midsolve_workspace(const int min_slice);
@@ -42,9 +45,9 @@ struct mid_supers_t : pile<tuple<Vector<side_t,2>,superinfos_t>,1+18> {};
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
 mid_supers_t midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
 
-#ifndef __wasm__
+#if !defined(__wasm__) || defined(__APPLE__)
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)
 mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace);
-#endif  // !__wasm__
+#endif
 
 END_NAMESPACE_PENTAGO
