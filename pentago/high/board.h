@@ -20,11 +20,10 @@ using std::tuple;
 class high_board_t {
   uint64_t side_[2];  // black, white (first player, second player)
   uint32_t ply_;
-
-  high_board_t(const side_t side0, const side_t side1, const int ply) : side_{side0, side1}, ply_(ply) {}
 public:
 
   high_board_t() : side_{0, 0}, ply_(0) {}
+  high_board_t(const side_t side0, const side_t side1, const int ply) : side_{side0, side1}, ply_(ply) {}
 
   side_t side(const int s) const {
     assert(unsigned(s) < 2); return side_[s];
