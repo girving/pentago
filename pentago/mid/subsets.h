@@ -49,14 +49,11 @@ struct sets_t {
 };
 
 // Allocate subsets on the stack
-#define ALLOCA_SUBSETS(name, n, k) \
-  const int name##_n_ = (n); \
-  const int name##_k_ = (k); \
-  const int name##_size_ = choose(name##_n_, name##_k_); \
-  set_t name##_raw_[name##_size_]; \
-  for (int i_ = 0; i_ < name##_size_; i_++) \
-    name##_raw_[i_] = subset(name##_n_, name##_k_, i_); \
-  const RawArray<const set_t> name(name##_size_, name##_raw_);
+#define ALLOCA_SUBSETS(name, sets) \
+  set_t name##_raw_[sets.size]; \
+  for (int i_ = 0; i_ < sets.size; i_++) \
+    name##_raw_[i_] = sets(i_); \
+  const RawArray<const set_t> name(sets.size, name##_raw_);
 
 // List empty spots as bit indices into side_t
 struct empty_t {
