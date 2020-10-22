@@ -29,9 +29,9 @@ template<class UI> static inline int integer_log_exact(const UI x) {
   constexpr int n = sizeof(UI);
   static_assert(std::is_unsigned<UI>::value);
   static_assert(n == sizeof(int) || n == sizeof(long) || n == sizeof(long long));
-  const int b = n == sizeof(int)  ? __builtin_ffs(x)
-              : n == sizeof(long) ? __builtin_ffsl(x)
-                                  : __builtin_ffsll(x);
+  const int b = n == sizeof(int)  ? __builtin_ffs(x) - 1
+              : n == sizeof(long) ? __builtin_ffsl(x) - 1
+                                  : __builtin_ffsll(x) - 1;
   assert(x == (unsigned int)1 << b);
   return b;
 }

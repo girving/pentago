@@ -5,6 +5,7 @@
 #include "pentago/base/symmetry.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/debug.h"
+#include "pentago/utility/integer_log.h"
 #include "pentago/utility/wasm_alloc.h"
 #ifndef __wasm__
 #include "pentago/utility/aligned.h"
@@ -232,14 +233,17 @@ static inline void inner(const info_t& I, RawArray<const uint16_t,2> cs1ps, RawA
     us[0] = us[1] = halfsuper_t(0);
     if (I.slice + I.n == 36)
       us[1] = ~halfsuper_t(0);
-    for (int i = 0; i < I.spots-I.k0; i++)
-      if (!(filled1p&1<<i)) {
-        const int cs0 = I0.child_s0s[i];
-        const auto cwins = I0.child_wins0[i];
-        const halfsupers_t child = input(cs0, cs1ps(s1p, i));
-        us[0] |= cwins | child[0];  // win
-        us[1] |= cwins | child[1];  // not lose
-      }
+    auto unmoved = ~filled1p;
+    for (int m = 0; m < I.spots-I.k0-I.k1; m++) {
+      const auto bit = min_bit(unmoved);
+      const int i = integer_log_exact(bit);
+      unmoved &= ~bit;
+      const int cs0 = I0.child_s0s[i];
+      const auto cwins = I0.child_wins0[i];
+      const halfsupers_t child = input(cs0, cs1ps(s1p, i));
+      us[0] |= cwins | child[0];  // win
+      us[1] |= cwins | child[1];  // not lose
+    }
   }
 
   // Account for immediate results

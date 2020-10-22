@@ -31,6 +31,7 @@ using std::unordered_map;
  *   19dec2019 - 5.8 s - on wada without SSE (faster?)
  *   12mar2020 - 6.3 s - on wada after table cleanup
  *   20oct2020 - 5.8 s - on wada after random access subset routine
+ *   22oct2020 - 5.0 s - on wada after removing branching in inner
  */
 
 TEST(mid, slow) {
