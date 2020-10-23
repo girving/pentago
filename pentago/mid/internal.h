@@ -22,9 +22,17 @@ typedef struct info_t_ {
   bool done;
   side_t root0, root1;
   sets_t sets0, sets1, sets1p, sets0_next;
+  int cs1ps_size;
   empty_t empty;
   grab_t input, output;
 } info_t;
+
+typedef struct wins_t_ {
+  empty_t empty;
+  side_t root;
+  sets_t sets;
+  bool parity;
+} wins_t;
 
 // Everything that's a function of just s0 in the double loop in midsolve_loop
 typedef struct set0_info_t_ {
@@ -74,11 +82,36 @@ static inline info_t make_info(const high_board_t root, const int n, const int w
   I.sets0 = make_sets(I.spots, I.k0);
   I.sets1 = make_sets(I.spots, I.k1);
   I.sets1p = make_sets(I.spots-I.k0, I.k1);
-  I.sets0_next = make_sets(I.spots, I.k0+1);
+  I.sets0_next = I.done ? make_sets(0, 0) : make_sets(I.spots, I.k0+1);
+  I.cs1ps_size = I.sets1p.size * (I.spots-I.k0);
   init(I.empty, root);
   I.input = make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
   I.output = make_grab(!(n&1), I.sets1.size, choose(I.spots-I.k1, I.k0), workspace_size);
   return I;
+}
+
+static inline wins_t make_wins(const info_t& I, const int side) {
+  wins_t W;
+  W.empty = I.empty;
+  W.root = side ? I.root1 : I.root0;
+  W.sets = side ? I.sets1 : I.sets0_next;
+  W.parity = (I.n+I.parity)&1;
+  return W;
+}
+
+static inline halfsuper_t mid_wins(const wins_t& W, const int s) {
+  return halfsuper_wins(W.root | side(W.empty, W.sets, s), W.parity);
+}
+
+static inline uint16_t make_cs1ps(const info_t& I, const set_t* sets1p, const int index) {
+  const auto [s1p, j] = decompose(vec(I.sets1p.size, I.spots-I.k0), index);
+  uint16_t c = s1p;
+  for (const int a : range(I.k1)) {
+    const int s1p_a = sets1p[s1p]>>5*a&0x1f;
+    if (j<s1p_a)
+      c += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
+  }
+  return c;
 }
 
 static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all_wins0_next, const int s0) {
@@ -179,7 +212,7 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
   return I0;
 }
 
-static inline void inner(const info_t& I, RawArray<const uint16_t,2> cs1ps, RawArray<const set_t> sets1p,
+static inline void inner(const info_t& I, const uint16_t* cs1ps, RawArray<const set_t> sets1p,
                          const halfsuper_t* all_wins1, mid_super_t* results, RawArray<halfsupers_t> workspace,
                          const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
@@ -212,7 +245,7 @@ static inline void inner(const info_t& I, RawArray<const uint16_t,2> cs1ps, RawA
       unmoved &= ~bit;
       const int cs0 = I0.child_s0s[i];
       const auto cwins = I0.child_wins0[i];
-      const halfsupers_t child = input(cs0, cs1ps(s1p, i));
+      const halfsupers_t child = input(cs0, cs1ps[s1p*(I.spots-I.k0)+i]);
       us[0] |= cwins | child[0];  // win
       us[1] |= cwins | child[1];  // not lose
     }

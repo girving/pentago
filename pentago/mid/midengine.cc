@@ -72,30 +72,23 @@ static void midsolve_loop(const high_board_t root, const int n, mid_super_t* res
   ALLOCA_SUBSETS(sets1p, I.sets1p);
 
   // Evaluate whether the other side wins for all possible sides
-  halfsuper_t all_wins1[I.sets1.size];
-  for (const int s1 : range(I.sets1.size))
-    all_wins1[s1] = halfsuper_wins(I.root1 | side(I.empty, I.sets1, s1), (n+I.parity)&1);
+  const auto W1 = make_wins(I, 1);
+  halfsuper_t all_wins1[W1.sets.size];
+  for (const int s1 : range(W1.sets.size))
+    all_wins1[s1] = mid_wins(W1, s1);
 
   // Precompute whether we win on the next move
-  halfsuper_t all_wins0_next[I.done ? 0 : choose(I.spots, I.k0+1)];
+  const auto W0 = make_wins(I, 0);
+  halfsuper_t all_wins0_next[W0.sets.size];
   if (!I.done)
-    for (const int s0 : range(I.sets0_next.size))
-      all_wins0_next[s0] = halfsuper_wins(I.root0 | side(I.empty, I.sets0_next, s0), (n+I.parity)&1);
+    for (const int s0 : range(W0.sets.size))
+      all_wins0_next[s0] = mid_wins(W0, s0);
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  uint16_t cs1ps_[I.sets1p.size * (I.spots-I.k0)];
-  const RawArray<uint16_t,2> cs1ps(vec(I.sets1p.size, I.spots-I.k0), cs1ps_);
-  for (const int s1p : range(I.sets1p.size)) {
-    for (const int j : range(I.spots-I.k0)) {
-      cs1ps(s1p,j) = s1p;
-      for (const int a : range(I.k1)) {
-        const int s1p_a = sets1p[s1p]>>5*a&0x1f;
-        if (j<s1p_a)
-          cs1ps(s1p,j) += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
-      }
-    }
-  }
+  uint16_t cs1ps[I.cs1ps_size];
+  for (const int i : range(I.cs1ps_size))
+    cs1ps[i] = make_cs1ps(I, sets1p.data(), i);
 
   // Iterate over set of stones of player to move
   for (const int s0 : range(I.sets0.size)) {
