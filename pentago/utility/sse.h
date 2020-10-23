@@ -1,15 +1,30 @@
 // SSE helper routines
 #pragma once
 
+#ifdef __cplusplus
 #include <type_traits>
 #ifndef __wasm__
 #include <iostream>
-#endif
+#endif  // !__wasm__
+#endif  // __cplusplus
+
 #if defined(__SSE__)
 #include <xmmintrin.h>
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <smmintrin.h>
+
+// Decide whether or not to use SSE
+#if !defined(__SSE__)
+#define PENTAGO_SSE 0
+#else
+#define PENTAGO_SSE 1
+#ifdef PENTAGO_BIG_ENDIAN
+#error "SSE is supported only in little endian mode"
+#endif
+#endif
+
+#ifdef __cplusplus
 namespace pentago {
 
 template<class T> struct pack_type;
@@ -61,4 +76,5 @@ static inline void transpose(__m128i& i0, __m128i& i1, __m128i& i2, __m128i& i3)
 }
 
 }
-#endif
+#endif  // __cplusplus
+#endif  // __SSE__

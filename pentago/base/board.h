@@ -7,6 +7,7 @@
 // heavily on lookup tables, computed at compile time by precompute.py.
 #pragma once
 
+#ifdef __cplusplus
 #include <cassert>
 #include "pentago/utility/array.h"
 #include "pentago/utility/popcount.h"
@@ -16,6 +17,7 @@
 #include <string>
 #endif
 namespace pentago {
+#endif  // __cplusplus
 
 // Each board is divided into 4 quadrants, and each quadrant is stored
 // in one of the 16-bit quarters of a 64-bit int.  Within a quadrant,
@@ -37,6 +39,8 @@ const side_t side_mask = 0x01ff01ff01ff01ff;
 // A single quadrant always fits into uint16_t, whether in radix 2 or 3.
 typedef uint16_t quadrant_t;
 const uint16_t quadrant_count = 19683; // 3**9
+
+#ifdef __cplusplus
 
 // Extract one quadrant from either board_t or side_t
 static inline quadrant_t quadrant(uint64_t state, int q) {
@@ -114,4 +118,5 @@ board_t from_table(RawArray<const int,2> tables);
 void check_board(board_t board);
 #endif  // !__wasm__
 
-}
+}  // namespace pentago
+#endif  // __cplusplus

@@ -10,20 +10,30 @@
 #pragma once
 
 #include "pentago/base/board.h"
+#ifdef __cplusplus
 #ifndef __wasm__
 #include "pentago/data/block_cache.h"
 #endif
 NAMESPACE_PENTAGO
 
 using std::tuple;
+#endif  // __cplusplus
 
-class high_board_t {
+typedef struct high_board_s_ {
   uint64_t side_[2];  // black, white (first player, second player)
   uint32_t ply_;
-public:
+} high_board_s;
 
-  high_board_t() : side_{0, 0}, ply_(0) {}
-  high_board_t(const side_t side0, const side_t side1, const int ply) : side_{side0, side1}, ply_(ply) {}
+#ifndef __cplusplus
+typedef high_board_s high_board_t;
+#else
+
+struct high_board_t : public high_board_s {
+  high_board_t() { side_[0] = side_[1] = ply_ = 0; }
+  high_board_t(const high_board_s s) : high_board_s(s) {}
+  high_board_t(const side_t side0, const side_t side1, const int ply) {
+    side_[0] = side0; side_[1] = side1; ply_ = ply;
+  }
 
   side_t side(const int s) const {
     assert(unsigned(s) < 2); return side_[s];
@@ -101,3 +111,4 @@ template<> struct hash<pentago::high_board_t> {
 };
 }  // namespace std
 #endif  // !__wasm__
+#endif  // __cplusplus

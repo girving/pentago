@@ -1,6 +1,7 @@
 // WebAssembly machinery
 #pragma once
 
+#ifdef __cplusplus
 namespace pentago {
 
 #ifdef __wasm__
@@ -18,3 +19,7 @@ namespace pentago {
 #endif
 
 }  // namespace pentago
+#else  // !__cplusplus
+#define NAMESPACE_PENTAGO
+#define END_NAMESPACE_PENTAGO
+#endif

@@ -42,10 +42,17 @@
  * I.e., there is no difference.  That's extremely convenient.
  */
 
+#include <stdint.h>
+#include "pentago/utility/sse.h"
+#ifdef __cplusplus
 #include "pentago/base/superscore.h"
 NAMESPACE_PENTAGO
+#endif  // __cplusplus
 
-struct halfsuper_t {
+struct halfsuper_t_;
+typedef struct halfsuper_t_ halfsuper_t;
+
+struct halfsuper_t_ {
 
 #if PENTAGO_SSE
   __m128i x;
@@ -53,19 +60,21 @@ struct halfsuper_t {
   uint64_t a, b;
 #endif
 
-  halfsuper_t() = default;
+#ifdef __cplusplus
+
+  halfsuper_t_() = default;
 
 #if PENTAGO_SSE
 
   // Zero-only constructor
-  halfsuper_t(zero*) {
+  halfsuper_t_(zero*) {
     x = _mm_set1_epi32(0);
   }
 
-  explicit halfsuper_t(__m128i x)
+  explicit halfsuper_t_(__m128i x)
     : x(x) {}
 
-  halfsuper_t(uint64_t a, uint64_t b) {
+  halfsuper_t_(uint64_t a, uint64_t b) {
     union { __m128i x; uint64_t y[2]; } u;
     u.y[0] = a; u.y[1] = b;
     x = u.x;
@@ -99,9 +108,9 @@ struct halfsuper_t {
 #else  // !PENTAGO_SSE
 
   // Zero-only constructor
-  halfsuper_t(zero*) : a(0), b(0) {}
+  halfsuper_t_(zero*) : a(0), b(0) {}
 
-  halfsuper_t(uint64_t a, uint64_t b) : a(a), b(b) {}
+  halfsuper_t_(uint64_t a, uint64_t b) : a(a), b(b) {}
 
   explicit operator bool() const {
     return a || b;
@@ -141,8 +150,10 @@ struct halfsuper_t {
   static halfsuper_t singleton(int a, int b, int c, int d) {
     return singleton((a&1)+2*(b&3)+8*(c&3)+32*(d&3));
   }
+#endif  // __cplusplus
 };
 
+#ifdef __cplusplus
 // Split a super_t into two halfsuper_t's
 Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
 
@@ -209,3 +220,4 @@ __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
 int popcount(halfsuper_t h);
 
 END_NAMESPACE_PENTAGO
+#endif  // __cplusplus

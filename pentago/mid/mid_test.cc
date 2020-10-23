@@ -1,5 +1,4 @@
 #include "pentago/base/board.h"
-#include "pentago/base/count.h"
 #include "pentago/mid/midengine.h"
 #include "pentago/mid/subsets.h"
 #include "pentago/search/superengine.h"
@@ -29,13 +28,14 @@ void midsolve_internal_test(const high_board_t board) {
   const int slice = board.count();
   const bool parity = board.middle();
   const auto workspace = midsolve_workspace(slice);
-  const auto results = midsolve_internal(board, workspace);
+  const auto padded_results = midsolve_internal(board, workspace);
+  const auto results = asarray(padded_results).slice(0, mid_supers_size(board));
   ASSERT_EQ(results.size(), 37-slice); // Only mostly true due to superstandardization, but still good
   for (const auto& r : results) {
-    const auto sides = get<0>(r);
+    const auto sides = vec(r.sides[0], r.sides[1]);
     const auto rboard = pack(sides[0], sides[1]);
     const bool turn = count_stones(rboard) & 1;
-    const auto rs = get<1>(r);
+    const auto rs = r.supers;
     slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
          slice, rboard, parity, popcount(rs.win), popcount(~rs.win&rs.notlose),
          popcount(~(rs.win|rs.notlose)));
@@ -247,29 +247,29 @@ TEST(mid, rmax_limit) {
 TEST(mid, subsets) {
   for (const int n : range(18+1)) {
     for (const int k : range(4)) {
-      const auto sets = sets_t(n, k);
+      const auto sets = make_sets(n, k);
       ASSERT_EQ(sets.size, choose(n, k));
       int a = 0;
       switch (k) {
         case 0:
-          ASSERT_EQ(sets(a++), 0);
+          ASSERT_EQ(get(sets, a++), 0);
           break;
         case 1:
           for (const int i : range(n))
-            ASSERT_EQ(sets(a++), i);
+            ASSERT_EQ(get(sets, a++), i);
           break;
         case 2:
           for (const int i0 : range(n))
             for (const int i1 : range(n))
               if (i0 > i1)
-                ASSERT_EQ(sets(a++), i1|i0<<5);
+                ASSERT_EQ(get(sets, a++), i1|i0<<5);
           break;
         case 3:
           for (const int i0 : range(n))
             for (const int i1 : range(n))
               for (const int i2 : range(n))
                 if (i0 > i1 && i1 > i2)
-                  ASSERT_EQ(sets(a++), i2|i1<<5|i0<<10);
+                  ASSERT_EQ(get(sets, a++), i2|i1<<5|i0<<10);
           break;
       }
       ASSERT_EQ(sets.size, a);

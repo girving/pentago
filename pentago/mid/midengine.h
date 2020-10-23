@@ -11,24 +11,36 @@
 
 #include "pentago/mid/halfsuper.h"
 #include "pentago/high/board.h"
+#include <stdbool.h>
+#ifdef __cplusplus
 #include "pentago/utility/pile.h"
 #include <tuple>
 NAMESPACE_PENTAGO
 
 using std::tuple;
+#endif  // __cplusplus
 
-// (win,notlose)
-typedef Vector<halfsuper_t,2> halfsupers_t;
-struct superinfos_t {
+typedef struct superinfos_t_ {
   halfsuper_t win, notlose;
   bool parity;
 
+#ifdef __cplusplus
   bool known(const int s) const { return ((s^s>>2^s>>4^s>>6) & 1) == parity; }
   int value(const int s) const { return win[s >> 1] + notlose[s >> 1] - 1; }
-};
+#endif  // __cplusplus
+} superinfos_t;
+
+typedef struct {
+  side_t sides[2];
+  superinfos_t supers;
+} mid_super_t;
 
 // A k-subsets of [0,n-1], packed into 64-bit ints with 5 bits for each entry.
 typedef uint64_t set_t;
+
+#ifdef __cplusplus
+typedef Vector<halfsuper_t,2> halfsupers_t;  // (win,notlose)
+
 void subsets(const int n, const int k, RawArray<set_t> sets);
 
 // Size of workspace array needed by midsolve
@@ -38,12 +50,18 @@ int midsolve_workspace_size(const int min_slice);
 // Allocate enough memory for midsolves with at least the given number of stones
 Array<halfsupers_t> midsolve_workspace(const int min_slice);
 #endif  // !__wasm__
+#endif  // __cplusplus
+
+#ifdef __cplusplus
+static inline int mid_supers_size(const high_board_t board) {
+  return 1 + (36 - board.count());
+}
 
 struct mid_values_t : pile<tuple<high_board_t,int>,1+18+8*18> {};
-struct mid_supers_t : pile<tuple<Vector<side_t,2>,superinfos_t>,1+18> {};
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
-mid_supers_t midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
+Vector<mid_super_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
+void midsolve_traverse(const high_board_t board, const mid_super_t* supers, mid_values_t& results);
 
 #if !defined(__wasm__) || defined(__APPLE__)
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)
@@ -51,3 +69,4 @@ mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace
 #endif
 
 END_NAMESPACE_PENTAGO
+#endif  // __cplusplus

@@ -25,16 +25,6 @@
 #include "pentago/utility/vector.h"
 namespace pentago {
 
-// Decide whether or not to use SSE
-#if !defined(__SSE__)
-#define PENTAGO_SSE 0
-#else
-#define PENTAGO_SSE 1
-#ifdef PENTAGO_BIG_ENDIAN
-#error "SSE is supported only in little endian mode"
-#endif
-#endif
-
 struct zero {};
 
 // A subset of the rotation group Z_4^4 represented as a 256 bit mask.
