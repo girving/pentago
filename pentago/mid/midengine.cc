@@ -72,17 +72,10 @@ static void midsolve_loop(const high_board_t root, const int n, mid_super_t* res
   ALLOCA_SUBSETS(sets1p, I.sets1p);
 
   // Evaluate whether the other side wins for all possible sides
-  const auto W1 = make_wins(I, 1);
-  halfsuper_t all_wins1[W1.sets.size];
-  for (const int s1 : range(W1.sets.size))
-    all_wins1[s1] = mid_wins(W1, s1);
-
-  // Precompute whether we win on the next move
-  const auto W0 = make_wins(I, 0);
-  halfsuper_t all_wins0_next[W0.sets.size];
-  if (!I.done)
-    for (const int s0 : range(W0.sets.size))
-      all_wins0_next[s0] = mid_wins(W0, s0);
+  const auto W = make_wins_info(I);
+  halfsuper_t all_wins[W.size];
+  for (const int s : range(W.size))
+    all_wins[s] = mid_wins(W, s);
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
@@ -92,10 +85,10 @@ static void midsolve_loop(const high_board_t root, const int n, mid_super_t* res
 
   // Iterate over set of stones of player to move
   for (const int s0 : range(I.sets0.size)) {
-    const set0_info_t I0 = make_set0_info(I, all_wins0_next, s0);
+    const set0_info_t I0 = make_set0_info(I, all_wins, s0);
     // Iterate over set of stones of other player
     for (const int s1p :  range(sets1p.size()))
-      inner(I, cs1ps, sets1p, all_wins1, results, workspace, I0, s1p);
+      inner(I, cs1ps, sets1p, all_wins, results, workspace, I0, s1p);
   }
 }
 

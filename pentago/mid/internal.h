@@ -27,12 +27,13 @@ typedef struct info_t_ {
   grab_t input, output;
 } info_t;
 
-typedef struct wins_t_ {
+typedef struct wins_info_t_ {
   empty_t empty;
-  side_t root;
-  sets_t sets;
+  side_t root0, root1;
+  sets_t sets1, sets0_next;
+  int size;
   bool parity;
-} wins_t;
+} wins_info_t;
 
 // Everything that's a function of just s0 in the double loop in midsolve_loop
 typedef struct set0_info_t_ {
@@ -82,7 +83,7 @@ static inline info_t make_info(const high_board_t root, const int n, const int w
   I.sets0 = make_sets(I.spots, I.k0);
   I.sets1 = make_sets(I.spots, I.k1);
   I.sets1p = make_sets(I.spots-I.k0, I.k1);
-  I.sets0_next = I.done ? make_sets(0, 0) : make_sets(I.spots, I.k0+1);
+  I.sets0_next = I.done ? make_sets(0, 1) : make_sets(I.spots, I.k0+1);
   I.cs1ps_size = I.sets1p.size * (I.spots-I.k0);
   init(I.empty, root);
   I.input = make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
@@ -90,17 +91,26 @@ static inline info_t make_info(const high_board_t root, const int n, const int w
   return I;
 }
 
-static inline wins_t make_wins(const info_t& I, const int side) {
-  wins_t W;
+static inline wins_info_t make_wins_info(const info_t& I) {
+  wins_info_t W;
   W.empty = I.empty;
-  W.root = side ? I.root1 : I.root0;
-  W.sets = side ? I.sets1 : I.sets0_next;
+  W.root0 = I.root0;
+  W.root1 = I.root1;
+  W.sets1 = I.sets1;
+  W.sets0_next = I.sets0_next;
+  W.size = W.sets1.size + W.sets0_next.size;
   W.parity = (I.n+I.parity)&1;
   return W;
 }
 
-static inline halfsuper_t mid_wins(const wins_t& W, const int s) {
-  return halfsuper_wins(W.root | side(W.empty, W.sets, s), W.parity);
+// [:sets1.size] = all_wins1 = whether the other side wins for all possible sides
+// [sets1.size:] = all_wins0_next = whether we win on the next move
+static inline halfsuper_t mid_wins(const wins_info_t& W, const int s) {
+  const bool one = s < W.sets1.size;
+  const auto ss = one ? s : s - W.sets1.size;
+  const auto root = one ? W.root1 : W.root0;
+  const auto sets = one ? W.sets1 : W.sets0_next;
+  return halfsuper_wins(root | side(W.empty, sets, ss), W.parity);
 }
 
 static inline uint16_t make_cs1ps(const info_t& I, const set_t* sets1p, const int index) {
@@ -114,7 +124,7 @@ static inline uint16_t make_cs1ps(const info_t& I, const set_t* sets1p, const in
   return c;
 }
 
-static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all_wins0_next, const int s0) {
+static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all_wins, const int s0) {
   set0_info_t I0;
   const int k0 = I.sets0.k;
   const int k1 = I.n - I.k0;
@@ -189,9 +199,11 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
   }
 
   // Preload wins after we place s0's stones.
-  if (!I.done)
+  if (!I.done) {
+    const auto all_wins0_next = all_wins + I.sets1.size;
     for (const int i : range(I.spots-I.k0))
       I0.child_wins0[i] = all_wins0_next[I0.child_s0s[i]];
+  }
 
   // Lookup table to convert s1p to s1
   for (const int i : range(k1))
@@ -213,11 +225,12 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
 }
 
 static inline void inner(const info_t& I, const uint16_t* cs1ps, RawArray<const set_t> sets1p,
-                         const halfsuper_t* all_wins1, mid_super_t* results, RawArray<halfsupers_t> workspace,
+                         const halfsuper_t* all_wins, mid_super_t* results, RawArray<halfsupers_t> workspace,
                          const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input).const_();
   const auto output = slice(workspace, I.output);
+  const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
 
   // Convert indices
   uint32_t filled1 = 0;
