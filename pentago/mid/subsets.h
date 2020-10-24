@@ -62,13 +62,6 @@ static inline set_t get(const sets_t& sets, const int index) {
   return subset(sets.n, sets.k, index);
 }
 
-// Allocate subsets on the stack
-#define ALLOCA_SUBSETS(name, sets) \
-  set_t name##_raw_[sets.size]; \
-  for (int i_ = 0; i_ < sets.size; i_++) \
-    name##_raw_[i_] = get(sets, i_); \
-  const RawArray<const set_t> name(sets.size, name##_raw_);
-
 static inline void init(empty_t& e, const high_board_t board) {
   NON_WASM_ASSERT(board.count() >= 18);
   const auto free = board.empty_mask();

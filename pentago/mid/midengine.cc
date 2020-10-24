@@ -69,9 +69,13 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 static void midsolve_loop(const high_board_t root, const int n, mid_super_t* results,
                           RawArray<halfsupers_t> workspace) {
   const info_t I = make_info(root, n, workspace.size());
-  ALLOCA_SUBSETS(sets1p, I.sets1p);
 
-  // Evaluate whether the other side wins for all possible sides
+  // Precompute subsets of player 1 relative to player 0's stones
+  set_t sets1p[I.sets1p.size];
+  for (const int s1p : range(I.sets1p.size))
+    sets1p[s1p] = get(I.sets1p, s1p);
+
+  // Precompute various halfsuper wins
   const auto W = make_wins_info(I);
   halfsuper_t all_wins[W.size];
   for (const int s : range(W.size))
@@ -81,13 +85,13 @@ static void midsolve_loop(const high_board_t root, const int n, mid_super_t* res
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
   uint16_t cs1ps[I.cs1ps_size];
   for (const int i : range(I.cs1ps_size))
-    cs1ps[i] = make_cs1ps(I, sets1p.data(), i);
+    cs1ps[i] = make_cs1ps(I, sets1p, i);
 
   // Iterate over set of stones of player to move
   for (const int s0 : range(I.sets0.size)) {
     const set0_info_t I0 = make_set0_info(I, all_wins, s0);
     // Iterate over set of stones of other player
-    for (const int s1p :  range(sets1p.size()))
+    for (const int s1p :  range(I.sets1p.size))
       inner(I, cs1ps, sets1p, all_wins, results, workspace, I0, s1p);
   }
 }

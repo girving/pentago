@@ -224,7 +224,7 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
   return I0;
 }
 
-static inline void inner(const info_t& I, const uint16_t* cs1ps, RawArray<const set_t> sets1p,
+static inline void inner(const info_t& I, const uint16_t* cs1ps, const set_t* sets1p,
                          const halfsuper_t* all_wins, mid_super_t* results, RawArray<halfsupers_t> workspace,
                          const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
