@@ -1,6 +1,7 @@
 #include "pentago/base/board.h"
 #include "pentago/mid/midengine.h"
 #include "pentago/mid/subsets.h"
+#include "pentago/high/check.h"
 #include "pentago/search/superengine.h"
 #include "pentago/search/supertable.h"
 #include "pentago/utility/arange.h"
@@ -92,7 +93,7 @@ TEST(mid, mid) {
           const auto it = std::find_if(values.begin(), values.end(),
                                        [=](const auto& x) { return get<0>(x) == b; });
           ASSERT_NE(it, values.end());
-          ASSERT_EQ(get<1>(*it), b.value(*empty));
+          ASSERT_EQ(get<1>(*it), value(*empty, b));
         }
       }
     }

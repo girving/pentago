@@ -75,6 +75,7 @@ cc_binary(
         ":end",
         ":options",
         "//pentago/high",
+        "//pentago/high:check",
     ],
 )
 

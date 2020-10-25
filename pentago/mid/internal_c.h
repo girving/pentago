@@ -2,12 +2,12 @@
 #pragma once
 
 #include "pentago/mid/subsets_c.h"
+#include "pentago/mid/halfsuper_c.h"
 #include "pentago/base/board_c.h"
 #include "pentago/high/board_c.h"
 
 typedef struct grab_t_ {
-  int nx, ny;
-  int lo, hi;
+  int ny, lo;
 } grab_t;
 
 // Constant information for midsolve_loop

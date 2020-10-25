@@ -23,3 +23,9 @@ METAL_GLOBAL side_t side_mask = 0x01ff01ff01ff01ff;
 // A single quadrant always fits into uint16_t, whether in radix 2 or 3.
 typedef uint16_t quadrant_t;
 METAL_GLOBAL uint16_t quadrant_count = 19683; // 3**9
+
+// Extract one quadrant from either board_t or side_t
+METAL_INLINE quadrant_t quadrant(uint64_t state, int q) {
+  assert(0<=q && q<4);
+  return (state>>16*q)&0xffff;
+}

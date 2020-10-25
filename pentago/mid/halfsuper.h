@@ -43,7 +43,9 @@
  */
 
 #include "pentago/mid/halfsuper_c.h"
+#if PENTAGO_CPP
 #include "pentago/base/superscore.h"
+#endif
 NAMESPACE_PENTAGO
 
 // Periodic with period 128
@@ -53,7 +55,7 @@ static inline bool get(const halfsuper_s s, uint8_t r) {
   return _mm_movemask_epi8(_mm_slli_epi16(s.x,7-(r&7)))>>(r>>3&15)&1;
 }
 #else
-static inline bool get(const halfsuper_s s, uint8_t r) const {
+static inline bool get(const halfsuper_s s, uint8_t r) {
   return ((r&64 ? s.b : s.a) >> (r&63)) & 1;
 }
 #endif
@@ -104,21 +106,21 @@ struct halfsuper_t {
 #else  // !PENTAGO_SSE
 
   // Zero-only constructor
-  halfsuper_t(METAL_CONSTANT zero*) : a(0), b(0) {}
+  halfsuper_t(METAL_CONSTANT zero*) : s{0, 0} {}
 
-  halfsuper_t(uint64_t a, uint64_t b) : a(a), b(b) {}
+  halfsuper_t(uint64_t a, uint64_t b) : s{a, b} {}
 
   explicit operator bool() const {
-    return a || b;
+    return s.a || s.b;
   }
 
-  halfsuper_t operator~() const { return halfsuper_t(~a, ~b); }
-  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(a|h.a, b|h.b); }
-  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(a&h.a, b&h.b); }
-  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(a^h.a, b^h.b); }
-  halfsuper_t operator|=(halfsuper_t h) { a |= h.a; b |= h.b; return *this; }
-  halfsuper_t operator&=(halfsuper_t h) { a &= h.a; b &= h.b; return *this; }
-  halfsuper_t operator^=(halfsuper_t h) { a ^= h.a; b ^= h.b; return *this; }
+  halfsuper_t operator~() const { return halfsuper_t(~s.a, ~s.b); }
+  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(s.a|h.s.a, s.b|h.s.b); }
+  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(s.a&h.s.a, s.b&h.s.b); }
+  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(s.a^h.s.a, s.b^h.s.b); }
+  halfsuper_t operator|=(halfsuper_t h) { s.a |= h.s.a; s.b |= h.s.b; return *this; }
+  halfsuper_t operator&=(halfsuper_t h) { s.a &= h.s.a; s.b &= h.s.b; return *this; }
+  halfsuper_t operator^=(halfsuper_t h) { s.a ^= h.s.a; s.b ^= h.s.b; return *this; }
 
   // Do not use in performance critical code
   static halfsuper_t singleton(uint8_t r) {
@@ -145,18 +147,37 @@ struct halfsuper_t {
   }
 };
 
-#if PENTAGO_CPP
-// Split a super_t into two halfsuper_t's
-Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
-
-// Merge even and odd bits into a single super_t
-super_t merge(const halfsuper_t even, const halfsuper_t odd) __attribute__((const));
-
 // Half of super_wins (even or odd)
 halfsuper_t halfsuper_wins(const side_t side, const bool parity) __attribute__((const));
 
+// rmax helper functions
+#if !PENTAGO_SSE
+METAL_INLINE uint64_t rmax_rep(const uint8_t x) {
+  auto y = x | uint64_t(x) << 8;
+  y = y | y << 16;
+  return y | y << 32;
+}
+
+// First three quadrants
+METAL_INLINE uint64_t rmax_lo(const uint64_t x) {
+  // First (parity) quadrant
+  const auto t = (x | x>>1) & rmax_rep(0b01010101);
+  const auto y0 = t | t << 1;
+  // Second and third quadrants
+  const auto y1 = (x << 2 & rmax_rep(0b11111100))
+                | (x << 6 & rmax_rep(0b11000000))
+                | (x >> 2 & rmax_rep(0b00111111))
+                | (x >> 6 & rmax_rep(0b00000011));
+  const auto y2 = (x << 8  & 0xffffff00ffffff00)
+                | (x << 24 & 0xff000000ff000000)
+                | (x >> 8  & 0x00ffffff00ffffff)
+                | (x >> 24 & 0x000000ff000000ff);
+  return y0 | y1 | y2;
+}
+#endif  // !PENTAGO_SSE
+
 // Same as rmax for super_t, but twice as fast.  Flips parity.
-__attribute__((const)) static inline halfsuper_t rmax(const halfsuper_s h) {
+__attribute__((const)) METAL_INLINE halfsuper_t rmax(const halfsuper_s h) {
 #if PENTAGO_SSE
   const __m128i x = h.x;
   // First (parity) quadrant
@@ -174,42 +195,22 @@ __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_s h) {
                    | _mm_shuffle_epi32(x,LE_MM_SHUFFLE(1,2,3,0));
   // Assemble
   return halfsuper_t(y0|y1|y2|y3);
-
 #else  // !PENTAGO_SSE
-
-  // First three quadrants
-  const auto lo = [](const uint64_t x) -> uint64_t {
-    const auto rep = [](const uint8_t x) -> uint64_t {
-      auto y = x | uint64_t(x) << 8;
-      y = y | y << 16;
-      return y | y << 32;
-    };
-
-    // First (parity) quadrant
-    const auto t = (x | x>>1) & rep(0b01010101);
-    const auto y0 = t | t << 1;
-    // Second and third quadrants
-    const auto y1 = (x << 2 & rep(0b11111100))
-                  | (x << 6 & rep(0b11000000))
-                  | (x >> 2 & rep(0b00111111))
-                  | (x >> 6 & rep(0b00000011));
-    const auto y2 = (x << 8  & 0xffffff00ffffff00)
-                  | (x << 24 & 0xff000000ff000000)
-                  | (x >> 8  & 0x00ffffff00ffffff)
-                  | (x >> 24 & 0x000000ff000000ff);
-    return y0 | y1 | y2;
-  };
-
   const auto a = h.a, b = h.b;
-  // Forth quadrant
-  const auto y3 = a << 32 | a >> 32 | b << 32 | b >> 32;
-  // Assemble
-  return halfsuper_t(lo(a) | y3, lo(b) | y3);
-
+  const auto y3 = a << 32 | a >> 32 | b << 32 | b >> 32;  // Forth quadrant
+  return halfsuper_t(rmax_lo(a) | y3, rmax_lo(b) | y3);  // Assemble
 #endif  // PENTAGO_SSE
 }
 
+#if PENTAGO_CPP
+// Split a super_t into two halfsuper_t's
+Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
+
+// Merge even and odd bits into a single super_t
+super_t merge(const halfsuper_t even, const halfsuper_t odd) __attribute__((const));
+
+
 int popcount(halfsuper_s h);
+#endif  // PENTAGO_CPP
 
 END_NAMESPACE_PENTAGO
-#endif  // PENTAGO_CPP

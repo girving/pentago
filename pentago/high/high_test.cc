@@ -1,6 +1,7 @@
 // High level interface tests
 
 #include "pentago/high/board.h"
+#include "pentago/high/check.h"
 #include "pentago/search/supertable.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/log.h"
@@ -15,7 +16,7 @@ void board_test(const int slice, RawArray<const board_t> boards, RawArray<const 
   Array<Vector<super_t,2>> super_wins(wins.size() / 8, uninit);
   char_view(super_wins).copy(char_view(wins));
   slog("slice %d, samples %d", slice, boards.size());
-  const auto counts = high_board_t::sample_check(*reader_block_cache({}, 1), boards, super_wins);
+  const auto counts = sample_check(*reader_block_cache({}, 1), boards, super_wins);
   slog("counts: loss %d, tie %d, win %d", counts[0], counts[1], counts[2]);
 }
 

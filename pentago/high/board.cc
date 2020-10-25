@@ -5,7 +5,6 @@
 #include "pentago/base/symmetry.h"
 #include "pentago/mid/halfsuper.h"
 #ifndef __wasm__
-#include "pentago/search/superengine.h"
 #include "pentago/utility/random.h"
 #endif  // !__wasm__
 NAMESPACE_PENTAGO
@@ -92,68 +91,6 @@ Array<const high_board_t> high_board_t::moves() const {
         moves.push_back(rotate(q, d));
   }
   return asarray(moves).copy();;
-}
-
-// If aggressive is true, true is win, otherwise true is win or tie.
-static bool exact_lookup(const bool aggressive, const board_t board, const block_cache_t& cache) {
-  {
-    super_t wins;
-    if (cache.lookup(aggressive,board,wins))
-      return wins(0);
-  }
-  // Fall back to tree search
-  const score_t score = super_evaluate(aggressive,100,board,Vector<int,4>());
-  return (score&3)>=aggressive+1;
-}
-
-int high_board_t::value(const block_cache_t& cache) const {
-  if (done())
-    return immediate_value();
-  else if (!middle()) {
-    // If we're not at a half move, look up the result
-    const auto flip = flip_board(board(), turn());
-    return exact_lookup(true,flip,cache)+exact_lookup(false,flip,cache)-1;
-  } else {
-    int best = -1;
-    for (const auto& move : moves()) {
-      best = max(best, -move.value(cache));
-      if (best==1)
-        break;
-    }
-    return best;
-  }
-}
-
-int high_board_t::value_check(const block_cache_t& cache) const {
-  GEODE_ASSERT(!middle());
-  if (done())
-    return immediate_value();
-  {
-    int value = -1;
-    for (const auto& move : moves())
-      value = max(value, move.value(cache));
-    const int lookup = this->value(cache);
-    if (value != lookup)
-      THROW(AssertionError, "high_board_t.value_check: board %lld, turn %d, middle %d, computed %d != lookup %d",
-            board(), turn(), middle(), value, lookup);
-    return value;
-  }
-}
-
-Vector<int,3> high_board_t::sample_check(const block_cache_t& cache, RawArray<const board_t> boards,
-                                         RawArray<const Vector<super_t,2>> wins) {
-  GEODE_ASSERT(boards.size() == wins.size());
-  Vector<int,3> counts;
-  Random random(152311341);
-  for (const int i : range(boards.size())) {
-    const int r = random.bits<uint8_t>();
-    const int n = count_stones(boards[i]);
-    const auto board = high_board_t::from_board(transform_board(symmetry_t(local_symmetry_t(r)), boards[i]), false);
-    const int value = board.value_check(cache);
-    GEODE_ASSERT(value == wins[i][n&1](r)-wins[i][!(n&1)](r));
-    counts[value+1]++;
-  }
-  return counts;
 }
 
 string high_board_t::name() const {

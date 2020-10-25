@@ -2,6 +2,7 @@
 #pragma once
 
 #include "pentago/mid/internal_c.h"
+#include "pentago/mid/midengine_c.h"
 #include "pentago/mid/halfsuper.h"
 #include "pentago/mid/subsets.h"
 #include "pentago/utility/integer_log.h"
@@ -9,16 +10,21 @@ NAMESPACE_PENTAGO
 
 static inline grab_t make_grab(const bool end, const int nx, const int ny, const int workspace_size) {
   grab_t g;
-  g.nx = nx;
   g.ny = ny;
-  const auto r = end ? range(workspace_size-nx*ny, workspace_size) : range(0,nx*ny);
-  g.lo = r.lo;
-  g.hi = r.hi;
+  g.lo = end ? workspace_size - nx * ny : 0;
   return g;
 }
 
-static inline RawArray<halfsupers_t,2> slice(RawArray<halfsupers_t> workspace, const grab_t& g) {
-  return workspace.slice(g.lo, g.hi).reshape(vec(g.nx, g.ny));
+// RawArray<halfsupers_t,2>, but minimal for Metal friendliness
+struct io_t {
+  METAL_DEVICE halfsupers_t* data;
+  int stride;
+
+  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const { return data[i * stride + j]; }
+};
+
+static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
+  return io_t{workspace + g.lo, g.ny};
 }
 
 static inline info_t make_info(const high_board_t root, const int n, const int workspace_size) {
@@ -38,13 +44,13 @@ static inline info_t make_info(const high_board_t root, const int n, const int w
   I.sets1p = make_sets(I.spots-I.k0, I.k1);
   I.sets0_next = I.done ? make_sets(0, 1) : make_sets(I.spots, I.k0+1);
   I.cs1ps_size = I.sets1p.size * (I.spots-I.k0);
-  init(I.empty, root);
+  I.empty = make_empty(root);
   I.input = make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
   I.output = make_grab(!(n&1), I.sets1.size, choose(I.spots-I.k1, I.k0), workspace_size);
   return I;
 }
 
-static inline wins_info_t make_wins_info(const info_t& I) {
+static inline wins_info_t make_wins_info(METAL_CONSTANT const info_t& I) {
   wins_info_t W;
   W.empty = I.empty;
   W.root0 = I.root0;
@@ -58,7 +64,7 @@ static inline wins_info_t make_wins_info(const info_t& I) {
 
 // [:sets1.size] = all_wins1 = whether the other side wins for all possible sides
 // [sets1.size:] = all_wins0_next = whether we win on the next move
-static inline halfsuper_t mid_wins(const wins_info_t& W, const int s) {
+static inline halfsuper_t mid_wins(METAL_CONSTANT const wins_info_t& W, const int s) {
   const bool one = s < W.sets1.size;
   const auto ss = one ? s : s - W.sets1.size;
   const auto root = one ? W.root1 : W.root0;
@@ -66,10 +72,11 @@ static inline halfsuper_t mid_wins(const wins_info_t& W, const int s) {
   return halfsuper_wins(root | side(W.empty, sets, ss), W.parity);
 }
 
-static inline uint16_t make_cs1ps(const info_t& I, const set_t* sets1p, const int index) {
-  const auto [s1p, j] = decompose(vec(I.sets1p.size, I.spots-I.k0), index);
+static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_DEVICE const set_t* sets1p, const int index) {
+  const int s1p = index / (I.spots-I.k0);
+  const int j = index - s1p * (I.spots-I.k0);
   uint16_t c = s1p;
-  for (const int a : range(I.k1)) {
+  for (int a = 0; a < I.k1; a++) {
     const int s1p_a = sets1p[s1p]>>5*a&0x1f;
     if (j<s1p_a)
       c += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
@@ -77,7 +84,8 @@ static inline uint16_t make_cs1ps(const info_t& I, const set_t* sets1p, const in
   return c;
 }
 
-static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all_wins, const int s0) {
+static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_DEVICE const halfsuper_t* all_wins,
+                                         const int s0) {
   set0_info_t I0;
   const int k0 = I.sets0.k;
   const int k1 = I.n - I.k0;
@@ -89,7 +97,7 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
 
   // Make a mask of filled spots
   I0.filled0 = 0;
-  for (const int i : range(k0))
+  for (int i = 0; i < k0; i++)
     I0.filled0 |= 1<<(I0.set0>>5*i&0x1f);
 
   // Evaluate whether we win for side0 and all child sides
@@ -99,10 +107,9 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
   {
     const auto free = side_mask & ~I0.side0;
     int next = 0;
-    for (const int i : range(I.spots))
+    for (int i = 0; i < I.spots; i++)
       if (free&side_t(1)<<I.empty.empty[i])
         I0.empty1[next++] = i;
-    NON_WASM_ASSERT(next==I.spots-I.k0);
   }
 
   /* What happens to indices when we add a stone?  We start with
@@ -144,28 +151,28 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
    */
 
   // Precompute absolute indices after we place s0's stones
-  for (const int i : range(I.spots-I.k0)) {
+  for (int i = 0; i < I.spots-I.k0; i++) {
     const int j = I0.empty1[i]-i;
     I0.child_s0s[i] = choose(I0.empty1[i], j+1);
-    for (const int a : range(k0))
+    for (int a = 0; a < k0; a++)
       I0.child_s0s[i] += choose(I0.set0>>5*a&0x1f, a+(a>=j)+1);
   }
 
   // Preload wins after we place s0's stones.
   if (!I.done) {
     const auto all_wins0_next = all_wins + I.sets1.size;
-    for (const int i : range(I.spots-I.k0))
+    for (int i = 0; i < I.spots-I.k0; i++)
       I0.child_wins0[i] = all_wins0_next[I0.child_s0s[i]].s;
   }
 
   // Lookup table to convert s1p to s1
-  for (const int i : range(k1))
-    for (const int q : range(I.spots-I.k0))
+  for (int i = 0; i < k1; i++)
+    for (int q = 0; q < I.spots-I.k0; q++)
       I0.offset1[i][q] = fast_choose(I0.empty1[q], i+1);
 
   // Lookup table to convert s0 to s0p
-  for (const int a : range(k1)) {
-    for (const int q : range(I.spots-I.k0)) {
+  for (int a = 0; a < k1; a++) {
+    for (int q = 0; q < I.spots-I.k0; q++) {
       I0.offset0[a][q] = 0;
       for (int i = I0.empty1[q]-q; i < I.k0; i++) {
         const int v = I0.set0>>5*i&0x1f;
@@ -177,11 +184,12 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
   return I0;
 }
 
-static inline void inner(const info_t& I, const uint16_t* cs1ps, const set_t* sets1p,
-                         const halfsuper_t* all_wins, mid_super_t* results, RawArray<halfsupers_t> workspace,
-                         const set0_info_t& I0, const int s1p) {
+static inline void inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps,
+                         METAL_DEVICE const set_t* sets1p,
+                         METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE mid_super_t* results,
+                         METAL_DEVICE halfsupers_t* workspace, METAL_DEVICE const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
-  const auto input = slice(workspace, I.input).const_();
+  const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
 
@@ -190,7 +198,7 @@ static inline void inner(const info_t& I, const uint16_t* cs1ps, const set_t* se
   uint32_t filled1p = 0;
   uint16_t s1 = 0;
   uint16_t s0p = I0.s0;
-  for (const int i : range(I.k1)) {
+  for (int i = 0; i < I.k1; i++) {
     const int q = set1p>>5*i&0x1f;
     filled1 |= 1<<I0.empty1[q];
     filled1p |= 1<<q;
@@ -230,11 +238,11 @@ static inline void inner(const info_t& I, const uint16_t* cs1ps, const set_t* se
                    filled_white = (I.slice+I.n)&1 ? I0.filled0 : filled1;
     auto side0 = I.root.side_[0];
     auto side1 = I.root.side_[1];
-    for (const int i : range(I.spots)) {
+    for (int i = 0; i < I.spots; i++) {
       side0 |= side_t(filled_black>>i&1) << I.empty.empty[i];
       side1 |= side_t(filled_white>>i&1) << I.empty.empty[i];
     }
-    auto& r = results[I.n + s1p];
+    METAL_DEVICE auto& r = results[I.n + s1p];
     r.sides[0] = side0;
     r.sides[1] = side1;
     r.supers = superinfos_t{us.win, us.notlose, bool((I.n+I.parity)&1)};

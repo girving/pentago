@@ -9,7 +9,6 @@ cc_library(
         ":halfsuper",
         "//pentago/base",
         "//pentago/high",
-        "//pentago/search",
         "//pentago/utility",
     ],
 )
@@ -34,5 +33,6 @@ cc_tests(
     deps = [
         ":halfsuper",
         ":mid",
+        "//pentago/high:check",
     ],
 )

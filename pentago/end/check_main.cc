@@ -15,6 +15,7 @@
 #include "pentago/end/simple_partition.h"
 #include "pentago/end/verify.h"
 #include "pentago/high/board.h"
+#include "pentago/high/check.h"
 #include "pentago/search/superengine.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/thread.h"
@@ -222,7 +223,7 @@ void toplevel(int argc, char** argv) {
         // Run high level test if desired
         if (slice <= o.high_test) {
           Scope scope("high level test");
-          high_board_t::sample_check(*high_data, sample_boards, sample_wins);
+          sample_check(*high_data, sample_boards, sample_wins);
         }
 
         // Check empty.pentago hash

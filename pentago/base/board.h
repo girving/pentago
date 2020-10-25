@@ -18,12 +18,6 @@
 #endif
 namespace pentago {
 
-// Extract one quadrant from either board_t or side_t
-static inline quadrant_t quadrant(uint64_t state, int q) {
-  assert(0<=q && q<4);
-  return (state>>16*q)&0xffff;
-}
-
 // Pack four quadrants into a single board_t or side_t
 static inline uint64_t quadrants(quadrant_t q0, quadrant_t q1, quadrant_t q2, quadrant_t q3) {
   return q0|(uint64_t)q1<<16|(uint64_t)q2<<32|(uint64_t)q3<<48;

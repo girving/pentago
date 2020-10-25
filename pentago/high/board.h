@@ -10,9 +10,11 @@
 #pragma once
 
 #include "pentago/high/board_c.h"
-#ifndef __wasm__
-#include "pentago/data/block_cache.h"
-#endif  // !__wasm__
+#if PENTAGO_CPP
+#include "pentago/base/board.h"
+#include "pentago/utility/array.h"
+#include "pentago/utility/vector.h"
+#endif
 NAMESPACE_PENTAGO
 
 struct high_board_t {
@@ -74,15 +76,6 @@ struct high_board_t {
   // there is one move to place a stone and one move to rotate it.
   Array<const high_board_t> moves() const;
 
-  // 1 if the player to move wins, 0 for tie, -1 if the player to move loses
-  int value(const block_cache_t& cache) const;
-
-  // Same as value, but verify consistency with minimum depth tree search.
-  int value_check(const block_cache_t& cache) const;
-
-  // Compare against a bunch of samples and return loss,tie,win counts
-  static Vector<int,3> sample_check(const block_cache_t& cache, RawArray<const board_t> boards,
-                                    RawArray<const Vector<super_t,2>> wins);
   string name() const;
   friend ostream& operator<<(ostream& output, const high_board_t board);
   static high_board_t parse(const string& name);
