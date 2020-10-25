@@ -134,7 +134,7 @@ static int traverse(const high_board_t board, RawArray<const mid_super_t> supers
     for (const int s : range(8)) {
       const int q = s >> 1;
       const int d = s & 1 ? -1 : 1;
-      const auto v = r.value((d & 3) << 2*q);
+      const auto v = pentago::value(r, (d & 3) << 2*q);
       results.append(make_tuple(board.rotate(q, d), v));
       value = max(value, -v);
     }

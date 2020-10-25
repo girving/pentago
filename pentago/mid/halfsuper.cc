@@ -33,20 +33,20 @@ super_t merge(const halfsuper_t even, const halfsuper_t odd) {
   // Do two interleavings, (even,odd) and (odd,even).
   Vector<super_t,2> v;
 #if PENTAGO_SSE
-  v[0].x = v[1].y = even.x;
-  v[0].y = v[1].x =  odd.x;
+  v[0].x = v[1].y = even.s.x;
+  v[0].y = v[1].x =  odd.s.x;
 #else
-  v[0].a = v[1].c = even.a;
-  v[0].b = v[1].d = even.b;
-  v[0].c = v[1].a =  odd.a;
-  v[0].d = v[1].b =  odd.b;
+  v[0].a = v[1].c = even.s.a;
+  v[0].b = v[1].d = even.s.b;
+  v[0].c = v[1].a =  odd.s.a;
+  v[0].d = v[1].b =  odd.s.b;
 #endif
   v = interleave_super(v);
   // Pick out the correct result bits
   return (v[0]&evens) | (v[1]&~evens);
 }
 
-int popcount(halfsuper_t h) {
+int popcount(halfsuper_s h) {
 #if PENTAGO_SSE
   union { __m128i a; uint64_t b[2]; } c;
   c.a = h.x;

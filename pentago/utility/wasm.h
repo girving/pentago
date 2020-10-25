@@ -4,7 +4,7 @@
 #ifdef __cplusplus
 namespace pentago {
 
-#ifdef __wasm__
+#if defined(__wasm__) && !defined(__APPLE__)
 #define WASM_EXPORT extern "C"
 #define WASM_IMPORT extern "C"
 #define NAMESPACE_PENTAGO using namespace pentago;

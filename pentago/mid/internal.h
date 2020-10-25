@@ -1,58 +1,11 @@
 // Internal routines for midengine.cc and metal equivalent
 #pragma once
 
+#include "pentago/mid/internal_c.h"
+#include "pentago/mid/halfsuper.h"
 #include "pentago/mid/subsets.h"
-#include "pentago/base/board.h"
-#include "pentago/high/board.h"
-#include <stdbool.h>
-#ifdef __cplusplus
 #include "pentago/utility/integer_log.h"
-#endif  // __cplusplus
 NAMESPACE_PENTAGO
-
-typedef struct grab_t_ {
-  int nx, ny;
-  int lo, hi;
-} grab_t;
-
-// Constant information for midsolve_loop
-typedef struct info_t_ {
-  high_board_s root;
-  int n, parity, slice, spots, k0, k1;
-  bool done;
-  side_t root0, root1;
-  sets_t sets0, sets1, sets1p, sets0_next;
-  int cs1ps_size;
-  empty_t empty;
-  grab_t input, output;
-} info_t;
-
-typedef struct wins_info_t_ {
-  empty_t empty;
-  side_t root0, root1;
-  sets_t sets1, sets0_next;
-  int size;
-  bool parity;
-} wins_info_t;
-
-// Everything that's a function of just s0 in the double loop in midsolve_loop
-typedef struct set0_info_t_ {
-  set_t set0;
-  side_t side0;
-  int s0;
-  uint32_t filled0;
-  halfsuper_t wins0;
-  halfsuper_t child_wins0[18];
-  uint8_t empty1[18];
-  uint16_t child_s0s[18];
-  uint16_t offset1[10][18];
-  uint16_t offset0[10][18];
-} set0_info_t;
-
-_Static_assert(sizeof(set0_info_t) >= 1104, "");
-_Static_assert(sizeof(set0_info_t) <= 1120, "");
-
-#ifdef __cplusplus
 
 static inline grab_t make_grab(const bool end, const int nx, const int ny, const int workspace_size) {
   grab_t g;
@@ -70,7 +23,7 @@ static inline RawArray<halfsupers_t,2> slice(RawArray<halfsupers_t> workspace, c
 
 static inline info_t make_info(const high_board_t root, const int n, const int workspace_size) {
   info_t I;
-  I.root = root;
+  I.root = root.s;
   I.n = n;
   I.parity = root.middle();
   I.slice = root.count();
@@ -140,7 +93,7 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
     I0.filled0 |= 1<<(I0.set0>>5*i&0x1f);
 
   // Evaluate whether we win for side0 and all child sides
-  I0.wins0 = halfsuper_wins(I0.side0, (I.n+I.parity)&1);
+  I0.wins0 = halfsuper_wins(I0.side0, (I.n+I.parity)&1).s;
 
   // List empty spots after we place s0's stones
   {
@@ -202,7 +155,7 @@ static inline set0_info_t make_set0_info(const info_t& I, const halfsuper_t* all
   if (!I.done) {
     const auto all_wins0_next = all_wins + I.sets1.size;
     for (const int i : range(I.spots-I.k0))
-      I0.child_wins0[i] = all_wins0_next[I0.child_s0s[i]];
+      I0.child_wins0[i] = all_wins0_next[I0.child_s0s[i]].s;
   }
 
   // Lookup table to convert s1p to s1
@@ -248,27 +201,28 @@ static inline void inner(const info_t& I, const uint16_t* cs1ps, const set_t* se
   // Consider each move in turn
   halfsupers_t us;
   {
-    us[0] = us[1] = halfsuper_t(0);
+    us.win = us.notlose = halfsuper_t(0);
     if (I.slice + I.n == 36)
-      us[1] = ~halfsuper_t(0);
+      us.notlose = ~halfsuper_t(0);
     auto unmoved = ~filled1p;
     for (int m = 0; m < I.spots-I.k0-I.k1; m++) {
       const auto bit = min_bit(unmoved);
       const int i = integer_log_exact(bit);
       unmoved &= ~bit;
       const int cs0 = I0.child_s0s[i];
-      const auto cwins = I0.child_wins0[i];
+      const halfsuper_t cwins(I0.child_wins0[i]);
       const halfsupers_t child = input(cs0, cs1ps[s1p*(I.spots-I.k0)+i]);
-      us[0] |= cwins | child[0];  // win
-      us[1] |= cwins | child[1];  // not lose
+      us.win = halfsuper_t(us.win) | cwins | child.win;
+      us.notlose = halfsuper_t(us.notlose) | cwins | child.notlose;
     }
   }
 
   // Account for immediate results
-  const halfsuper_t wins1 = all_wins1[s1],
-                    inplay = ~(I0.wins0 | wins1);
-  us[0] = (inplay & us[0]) | (I0.wins0 & ~wins1);  // win (| ~inplay & (I0.wins0 & ~wins1))
-  us[1] = (inplay & us[1]) | I0.wins0;  // not lose       (| ~inplay & (I0.wins0 | ~wins1))
+  const halfsuper_t wins0(I0.wins0);
+  const auto wins1 = all_wins1[s1];
+  const auto inplay = ~(wins0 | wins1);
+  us.win = (inplay & us.win) | (wins0 & ~wins1);  // win (| ~inplay & (wins0 & ~wins1))
+  us.notlose = (inplay & us.notlose) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
 
   // If we're far enough along, remember results
   if (I.n <= 1) {
@@ -283,15 +237,14 @@ static inline void inner(const info_t& I, const uint16_t* cs1ps, const set_t* se
     auto& r = results[I.n + s1p];
     r.sides[0] = side0;
     r.sides[1] = side1;
-    r.supers = superinfos_t{us[0], us[1], bool((I.n+I.parity)&1)};
+    r.supers = superinfos_t{us.win, us.notlose, bool((I.n+I.parity)&1)};
   }
 
   // Negate and apply rmax in preparation for the slice above
   halfsupers_t above;
-  above[0] = rmax(~us[1]);
-  above[1] = rmax(~us[0]);
+  above.win = rmax(~halfsuper_t(us.notlose));
+  above.notlose = rmax(~halfsuper_t(us.win));
   output(s1,s0p) = above;
 }
 
-#endif  // __cplusplus
 END_NAMESPACE_PENTAGO

@@ -23,7 +23,7 @@ tuple<bool,int> high_board_t::done_and_value() const {
              ww = slow_won(side(1));
   if (bw || ww)
     return make_tuple(true, bw && ww ? 0 : bw==!turn() ? 1 : -1);
-  if (ply_ == 2*36)
+  if (s.ply_ == 2*36)
     return make_tuple(true, 0);
   return make_tuple(false, 0);
 }
@@ -43,7 +43,7 @@ high_board_t high_board_t::place(const int bit) const {
   NON_WASM_ASSERT(!middle() && (move & empty_mask()));
   side_t after[2] = {side(0), side(1)};
   after[turn()] |= move;
-  return high_board_t(after[0], after[1], ply_ + 1);
+  return high_board_t(after[0], after[1], s.ply_ + 1);
 }
 
 high_board_t high_board_t::place(const int x, const int y) const {
@@ -69,7 +69,7 @@ high_board_t high_board_t::rotate(const int q, const int d) const {
     const auto old = quadrant(after[s], q);
     after[s] ^= side_t(old ^ slow_rotate_quadrant_side(old, d)) << 16*q;
   }
-  return high_board_t(after[0], after[1], ply_ + 1);
+  return high_board_t(after[0], after[1], s.ply_ + 1);
 }
 
 #ifndef __wasm__

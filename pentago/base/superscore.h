@@ -23,9 +23,8 @@
 #include "pentago/utility/popcount.h"
 #include "pentago/utility/sse.h"
 #include "pentago/utility/vector.h"
+#include "pentago/utility/zero.h"
 namespace pentago {
-
-struct zero {};
 
 // A subset of the rotation group Z_4^4 represented as a 256 bit mask.
 // A rotation by (i0,i1,i2,i3) of quadrants 0,1,2,3 corresponds to bit i0+4*(i1+4*(i2+4*i3))

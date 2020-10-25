@@ -1,12 +1,12 @@
 // SSE helper routines
 #pragma once
 
-#ifdef __cplusplus
+#if PENTAGO_CPP
 #include <type_traits>
 #ifndef __wasm__
 #include <iostream>
 #endif  // !__wasm__
-#endif  // __cplusplus
+#endif  // PENTAGO_CPP
 
 #if defined(__SSE__)
 #include <xmmintrin.h>
@@ -24,7 +24,7 @@
 #endif
 #endif
 
-#ifdef __cplusplus
+#if PENTAGO_CPP
 namespace pentago {
 
 template<class T> struct pack_type;
@@ -76,5 +76,5 @@ static inline void transpose(__m128i& i0, __m128i& i1, __m128i& i2, __m128i& i3)
 }
 
 }
-#endif  // __cplusplus
+#endif  // PENTAGO_CPP
 #endif  // __SSE__

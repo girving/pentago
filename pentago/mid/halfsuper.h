@@ -42,63 +42,59 @@
  * I.e., there is no difference.  That's extremely convenient.
  */
 
-#include <stdint.h>
-#include "pentago/utility/sse.h"
-#ifdef __cplusplus
+#include "pentago/mid/halfsuper_c.h"
 #include "pentago/base/superscore.h"
 NAMESPACE_PENTAGO
-#endif  // __cplusplus
 
-struct halfsuper_t_;
-typedef struct halfsuper_t_ halfsuper_t;
-
-struct halfsuper_t_ {
-
+// Periodic with period 128
+// Do not use in performance critical code
 #if PENTAGO_SSE
-  __m128i x;
+static inline bool get(const halfsuper_s s, uint8_t r) {
+  return _mm_movemask_epi8(_mm_slli_epi16(s.x,7-(r&7)))>>(r>>3&15)&1;
+}
 #else
-  uint64_t a, b;
+static inline bool get(const halfsuper_s s, uint8_t r) const {
+  return ((r&64 ? s.b : s.a) >> (r&63)) & 1;
+}
 #endif
 
-#ifdef __cplusplus
+struct halfsuper_t {
+  halfsuper_s s;
 
-  halfsuper_t_() = default;
+  halfsuper_t() = default;
+  halfsuper_t(const halfsuper_s s) : s(s) {}
+
+  operator halfsuper_s() const { return s; }
 
 #if PENTAGO_SSE
 
   // Zero-only constructor
-  halfsuper_t_(zero*) {
-    x = _mm_set1_epi32(0);
+  halfsuper_t(METAL_CONSTANT zero*) {
+    s.x = _mm_set1_epi32(0);
   }
 
-  explicit halfsuper_t_(__m128i x)
-    : x(x) {}
+  explicit halfsuper_t(__m128i x)
+    : s{x} {}
 
-  halfsuper_t_(uint64_t a, uint64_t b) {
+  halfsuper_t(uint64_t a, uint64_t b) {
     union { __m128i x; uint64_t y[2]; } u;
     u.y[0] = a; u.y[1] = b;
-    x = u.x;
+    s.x = u.x;
   }
 
   explicit operator bool() const {
-    return _mm_movemask_epi8(~_mm_cmpeq_epi32(x,_mm_setzero_si128()))!=0;
+    return _mm_movemask_epi8(~_mm_cmpeq_epi32(s.x,_mm_setzero_si128()))!=0;
   }
 
-  halfsuper_t operator~() const { return halfsuper_t(~x); }
-  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(x|h.x); }
-  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(x&h.x); }
-  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(x^h.x); }
-  halfsuper_t operator|=(halfsuper_t h) { x |= h.x; return *this; }
-  halfsuper_t operator&=(halfsuper_t h) { x &= h.x; return *this; }
-  halfsuper_t operator^=(halfsuper_t h) { x ^= h.x; return *this; }
+  halfsuper_t operator~() const { return halfsuper_t(~s.x); }
+  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(s.x|h.s.x); }
+  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(s.x&h.s.x); }
+  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(s.x^h.s.x); }
+  halfsuper_t operator|=(halfsuper_t h) { s.x |= h.s.x; return *this; }
+  halfsuper_t operator&=(halfsuper_t h) { s.x &= h.s.x; return *this; }
+  halfsuper_t operator^=(halfsuper_t h) { s.x ^= h.s.x; return *this; }
 
-  // Do not use the following functions in performance critical code
-
-  bool operator[](uint8_t r) const {
-    // Periodic with period 128
-    return _mm_movemask_epi8(_mm_slli_epi16(x,7-(r&7)))>>(r>>3&15)&1;
-  }
-
+  // Do not use in performance critical code
   static halfsuper_t singleton(uint8_t r) {
     const bool hi = r>>6&1;
     const auto chunk = uint64_t(1)<<(r&63);
@@ -108,9 +104,9 @@ struct halfsuper_t_ {
 #else  // !PENTAGO_SSE
 
   // Zero-only constructor
-  halfsuper_t_(zero*) : a(0), b(0) {}
+  halfsuper_t(METAL_CONSTANT zero*) : a(0), b(0) {}
 
-  halfsuper_t_(uint64_t a, uint64_t b) : a(a), b(b) {}
+  halfsuper_t(uint64_t a, uint64_t b) : a(a), b(b) {}
 
   explicit operator bool() const {
     return a || b;
@@ -124,13 +120,7 @@ struct halfsuper_t_ {
   halfsuper_t operator&=(halfsuper_t h) { a &= h.a; b &= h.b; return *this; }
   halfsuper_t operator^=(halfsuper_t h) { a ^= h.a; b ^= h.b; return *this; }
 
-  // Do not use the following functions in performance critical code
-
-  bool operator[](uint8_t r) const {
-    // Periodic with period 128
-    return ((r&64 ? b : a) >> (r&63)) & 1;
-  }
-
+  // Do not use in performance critical code
   static halfsuper_t singleton(uint8_t r) {
     const auto chunk = uint64_t(1)<<(r&63);
     return r&64 ? halfsuper_t(0, chunk) : halfsuper_t(chunk, 0);
@@ -141,19 +131,21 @@ struct halfsuper_t_ {
   bool operator==(halfsuper_t h) const { return    !(*this^h); }
   bool operator!=(halfsuper_t h) const { return bool(*this^h); }
 
-  // Do not use the following functions in performance critical code
+  // Do not use in performance critical code
+  bool operator[](uint8_t r) const { return get(s, r); }
 
+  // Do not use in performance critical code
   bool operator()(int a, int b, int c, int d) const {
-    return operator[]((a&1)+2*(b&3)+8*(c&3)+32*(d&3));
+    return get(s, (a&1)+2*(b&3)+8*(c&3)+32*(d&3));
   }
 
+  // Do not use in performance critical code
   static halfsuper_t singleton(int a, int b, int c, int d) {
     return singleton((a&1)+2*(b&3)+8*(c&3)+32*(d&3));
   }
-#endif  // __cplusplus
 };
 
-#ifdef __cplusplus
+#if PENTAGO_CPP
 // Split a super_t into two halfsuper_t's
 Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
 
@@ -164,7 +156,7 @@ super_t merge(const halfsuper_t even, const halfsuper_t odd) __attribute__((cons
 halfsuper_t halfsuper_wins(const side_t side, const bool parity) __attribute__((const));
 
 // Same as rmax for super_t, but twice as fast.  Flips parity.
-__attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
+__attribute__((const)) static inline halfsuper_t rmax(const halfsuper_s h) {
 #if PENTAGO_SSE
   const __m128i x = h.x;
   // First (parity) quadrant
@@ -217,7 +209,7 @@ __attribute__((const)) static inline halfsuper_t rmax(const halfsuper_t h) {
 #endif  // PENTAGO_SSE
 }
 
-int popcount(halfsuper_t h);
+int popcount(halfsuper_s h);
 
 END_NAMESPACE_PENTAGO
-#endif  // __cplusplus
+#endif  // PENTAGO_CPP

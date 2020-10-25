@@ -3,7 +3,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 
 cc_library(
     name = "mid",
-    srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc", "halfsuper.*"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc", "halfsuper*.*"]),
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         ":halfsuper",
@@ -16,7 +16,7 @@ cc_library(
 
 cc_library(
     name = "halfsuper",
-    srcs = ["halfsuper.h", "halfsuper.cc"],
+    srcs = ["halfsuper.h", "halfsuper_c.h", "halfsuper.cc"],
     copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/base",

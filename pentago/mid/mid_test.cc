@@ -25,6 +25,7 @@ board_t random_board_at_slice(Random& random, const int stones) {
 }
 
 void midsolve_internal_test(const high_board_t board) {
+  typedef halfsuper_t h;
   const int slice = board.count();
   const bool parity = board.middle();
   const auto workspace = midsolve_workspace(slice);
@@ -37,17 +38,17 @@ void midsolve_internal_test(const high_board_t board) {
     const bool turn = count_stones(rboard) & 1;
     const auto rs = r.supers;
     slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
-         slice, rboard, parity, popcount(rs.win), popcount(~rs.win&rs.notlose),
-         popcount(~(rs.win|rs.notlose)));
+         slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win)&h(rs.notlose)),
+         popcount(~(h(rs.win)|h(rs.notlose))));
     for (const int a : range(2)) {
       const auto exp = [=](const halfsuper_t h) { return rs.parity ? merge(0,h) : merge(h,0); };
       const auto known = exp(~halfsuper_t(0));
       const auto correct = super_evaluate_all(a,100,flip_board(rboard,turn));
       GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known));
       for (const int s : range(256)) {
-        ASSERT_EQ(known[s], rs.known(s));
-        if (rs.known(s))
-          ASSERT_EQ(correct[s], rs.value(s) >= a);
+        ASSERT_EQ(known[s], pentago::known(rs, s));
+        if (pentago::known(rs, s))
+          ASSERT_EQ(correct[s], value(rs, s) >= a);
       }
     }
   }
@@ -245,6 +246,7 @@ TEST(mid, rmax_limit) {
 }
 
 TEST(mid, subsets) {
+  using pentago::get;
   for (const int n : range(18+1)) {
     for (const int k : range(4)) {
       const auto sets = make_sets(n, k);

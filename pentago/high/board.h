@@ -9,56 +9,47 @@
 // a trailing 'm'.  For example, 1m.
 #pragma once
 
-#include "pentago/base/board.h"
-#ifdef __cplusplus
+#include "pentago/high/board_c.h"
 #ifndef __wasm__
 #include "pentago/data/block_cache.h"
-#endif
+#endif  // !__wasm__
 NAMESPACE_PENTAGO
 
-using std::tuple;
-#endif  // __cplusplus
+struct high_board_t {
+  high_board_s s;
 
-typedef struct high_board_s_ {
-  uint64_t side_[2];  // black, white (first player, second player)
-  uint32_t ply_;
-} high_board_s;
-
-#ifndef __cplusplus
-typedef high_board_s high_board_t;
-#else
-
-struct high_board_t : public high_board_s {
-  high_board_t() { side_[0] = side_[1] = ply_ = 0; }
-  high_board_t(const high_board_s s) : high_board_s(s) {}
+  high_board_t() { s.side_[0] = s.side_[1] = s.ply_ = 0; }
+  high_board_t(const high_board_s s) : s(s) {}
   high_board_t(const side_t side0, const side_t side1, const int ply) {
-    side_[0] = side0; side_[1] = side1; ply_ = ply;
+    s.side_[0] = side0; s.side_[1] = side1; s.ply_ = ply;
   }
 
-  side_t side(const int s) const {
-    assert(unsigned(s) < 2); return side_[s];
+  side_t side(const int i) const {
+    assert(unsigned(i) < 2); return s.side_[i];
   }
-
-  Vector<side_t,2> sides() const { return vec(side_[0], side_[1]); }
 
   // Number of moves from the start of the game, counting stone placement and rotation separately.
-  int ply() const { return ply_; }
+  int ply() const { return s.ply_; }
 
   // Did we already place a stone?  I.e., are we halfway through the move?
-  bool middle() const { return ply_ & 1; }
+  bool middle() const { return s.ply_ & 1; }
 
   bool operator==(const high_board_t other) const {
-    return side_[0] == other.side_[0] && side_[1] == other.side_[1] && ply_ == other.ply_;
+    return s.side_[0] == other.s.side_[0] && s.side_[1] == other.s.side_[1] && s.ply_ == other.s.ply_;
   }
 
   // Total number of stones
-  int count() const { return (ply_ + 1) >> 1; }
+  int count() const { return (s.ply_ + 1) >> 1; }
 
   // Whose turn is it: 0 (black) or 1 (white)
-  int turn() const { return (ply_ >> 1) & 1; }
+  int turn() const { return (s.ply_ >> 1) & 1; }
+
+#if PENTAGO_CPP
+  Vector<side_t,2> sides() const { return vec(s.side_[0], s.side_[1]); }
 
   // Is the game over?  If so, what's the value()
-  tuple<bool,int> done_and_value() const;
+  std::tuple<bool,int> done_and_value() const;
+#endif
 
   // Is the game over?
   bool done() const;
@@ -73,11 +64,11 @@ struct high_board_t : public high_board_s {
   // Rotate the given quadrant in the given direction (-1 or 1)
   high_board_t rotate(const int q, const int d) const;
 
-  side_t empty_mask() const { return side_mask ^ side_[0] ^ side_[1]; }
+  side_t empty_mask() const { return side_mask ^ s.side_[0] ^ s.side_[1]; }
 
-#ifndef __wasm__
+#if PENTAGO_CPP && !defined(__wasm__)
   static high_board_t from_board(const board_t board, const bool middle);
-  board_t board() const { return pack(side_[0], side_[1]); }
+  board_t board() const { return pack(s.side_[0], s.side_[1]); }
 
   // Moves which follow this one.  Note that high level moves are "half" of a regular move:
   // there is one move to place a stone and one move to rotate it.
@@ -96,11 +87,11 @@ struct high_board_t : public high_board_s {
   friend ostream& operator<<(ostream& output, const high_board_t board);
   static high_board_t parse(const string& name);
   template<class T> friend struct std::hash;
-#endif  // !__wasm__
+#endif  // PENTAGO_CPP && !__wasm__
 };
 
 END_NAMESPACE_PENTAGO
-#ifndef __wasm__
+#if PENTAGO_CPP && !defined(__wasm__)
 namespace std {
 template<> struct hash<pentago::high_board_t> {
   size_t operator()(const pentago::high_board_t board) const {
@@ -110,5 +101,4 @@ template<> struct hash<pentago::high_board_t> {
   }
 };
 }  // namespace std
-#endif  // !__wasm__
-#endif  // __cplusplus
+#endif  // PENTAGO_CPP && !__wasm__
