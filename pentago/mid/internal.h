@@ -184,10 +184,10 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   return I0;
 }
 
-static inline void inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps,
-                         METAL_DEVICE const set_t* sets1p,
-                         METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE mid_super_t* results,
-                         METAL_DEVICE halfsupers_t* workspace, METAL_DEVICE const set0_info_t& I0, const int s1p) {
+template<class Workspace> static inline void
+inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_DEVICE const set_t* sets1p,
+      METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE mid_super_t* results, const Workspace workspace,
+      METAL_DEVICE const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
