@@ -7,7 +7,9 @@
 #else
 #include <stdbool.h>
 #include <stdint.h>
+#ifndef __wasm__
 #include <assert.h>
+#endif
 #ifdef __cplusplus
 #include <algorithm>
 #endif

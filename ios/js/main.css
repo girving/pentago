@@ -1,0 +1,148 @@
+html {
+  /* Make a scrollbar always exist, so avoid jumps in centering between index.html and details.html.
+   * For details, see https://css-tricks.com/eliminate-jumps-in-horizontal-centering-by-forcing-a-scroll-bar. */
+  overflow-y: scroll;
+}
+
+body {
+  background: #d5d6d7;
+  color: black;
+  margin: 8px;
+  line-height: 1;
+
+  /* Fix annoying flash on click on iPhone: https://stackoverflow.com/questions/8990442 */
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+}
+
+a img {
+  border: none;
+}
+
+.all {
+  width: 60em;
+  margin: 0 auto;
+  background-color: white;
+  border: 1px solid;
+  border-radius: 1em;
+  overflow: hidden;
+}
+
+header {
+  text-align: center;
+  background-color: #c0c0c0;
+  display: inline-block;
+  width: 100%;
+  border-bottom: 1px solid;
+}
+
+/* Taken from https://mxr.mozilla.org/mozilla-central/source/layout/style/html.css, which is now a dead link */
+h1 { font-size: 2em; font-weight: bold; margin: 0.67em 0; }
+h2 { font-size: 1.5em; font-weight: bold; margin: 0.83em 0; }
+h3 { font-size: 1.17em; font-weight: bold; margin: 1em 0; }
+p { margin: 1em 0; }
+sup { vertical-align: super; font-size: smaller; line-height: normal; }
+
+.main {
+  background-color: white;
+  float: left;
+  width: 49em;
+  width: calc(100% - 11em);
+  border-left: 11em solid #c0c0c0;
+}
+
+nav.contents {
+  float: left;
+  width: 11em;
+  margin-left: -11em;
+  position: relative;
+}
+nav.back {
+  top: 0;
+  right: 0;
+  width: 7em;
+  position: absolute;
+  background-color: #c0c0c0;
+}
+nav a {
+  display: block;
+  height: 3em;
+  line-height: 3em;
+  text-align: center;
+  text-decoration: none;
+  border-bottom: 1px solid black;
+  color: black;
+}
+nav a { border-bottom: 1px solid black; }
+nav.back a { border-left: 1px solid black; }
+nav a:hover { background-color: white; }
+nav a:visited { color: black; }
+.contents .back { visibility: hidden; }
+
+.content {
+  width: 100%;
+  float: left;
+  margin-right: -100%;
+  border-left: 1px solid black;
+  position: relative;
+}
+
+section {
+  width: 47em;
+  width: calc(100% - 2em);
+  margin-left: auto;
+  margin-right: auto;
+  text-align: justify;
+  line-height: 1.2em;
+}
+
+section h2 {
+  text-align: left;
+}
+
+.indent {
+  margin-left: 2em;
+}
+
+.logos { text-align: center; }
+.logos img { padding: 0 1em; }
+
+#counts {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+}
+
+@media (max-width: 62em) {
+  .all {
+    width: 100%;
+  }
+}
+
+@media (max-width: 800px) {
+  .main {
+    width: 100%;
+    border-left: none;
+  }
+  .content {
+    margin-right: 0;
+  }
+  nav.contents {
+    float: none;
+    width: 100%;
+    margin-left: 0;
+    background-color: #c0c0c0;
+    text-align: center;
+    border-bottom: 1px solid black;
+  }
+  nav a {
+    display: inline-block;
+    height: 1.5em;
+    line-height: 1.5em;
+    padding: 0 0.5em;
+    border: none;
+    text-decoration: underline;
+  }
+  nav.back { visibility: hidden; }
+  .contents .back { visibility: visible; }
+}

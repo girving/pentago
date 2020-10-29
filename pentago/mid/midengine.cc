@@ -67,23 +67,20 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 #endif  // !__wasm__
 
 static void midsolve_loop(const high_board_t root, const int n, mid_super_t* results,
-                          RawArray<halfsupers_t> workspace) {
+                          RawArray<halfsupers_t> workspace, set_t* sets1p, halfsuper_t* all_wins, uint16_t* cs1ps) {
   const info_t I = make_info(root, n, workspace.size());
 
   // Precompute subsets of player 1 relative to player 0's stones
-  set_t sets1p[I.sets1p.size];
   for (const int s1p : range(I.sets1p.size))
     sets1p[s1p] = get(I.sets1p, s1p);
 
   // Precompute various halfsuper wins
   const auto W = make_wins_info(I);
-  halfsuper_t all_wins[W.size];
   for (const int s : range(W.size))
     all_wins[s] = mid_wins(W, s);
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  uint16_t cs1ps[I.cs1ps_size];
   for (const int i : range(I.cs1ps_size))
     cs1ps[i] = make_cs1ps(I, sets1p, i);
 
@@ -100,10 +97,30 @@ Vector<mid_super_t,1+18> midsolve_internal(const high_board_t board, RawArray<ha
   const int spots = 36 - board.count();
   NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
 
+  // Size temporary buffers
+  int sets1p_size = 0, all_wins_size = 0, cs1ps_size = 0;
+  for (int n = spots; n >= 0; n--) {
+    const info_t I = make_info(board, n, workspace.size());
+    sets1p_size = max(sets1p_size, I.sets1p.size);
+    all_wins_size = max(all_wins_size, make_wins_info(I).size);
+    cs1ps_size = max(cs1ps_size, I.cs1ps_size);
+  }
+
+  // Allocate temporary buffers in a wasm-friendly way.
+  // Can't put these on the stack since iPhone stacks are tiny.
+  auto sets1p = (set_t*)malloc(sizeof(set_t) * sets1p_size);
+  auto all_wins = (halfsuper_t*)malloc(sizeof(halfsuper_t) * all_wins_size);
+  auto cs1ps = (uint16_t*)malloc(sizeof(uint16_t) * cs1ps_size);
+
   // Compute all slices
   Vector<mid_super_t,1+18> results;
   for (int n = spots; n >= 0; n--)
-    midsolve_loop(board, n, results.data(), workspace);
+    midsolve_loop(board, n, results.data(), workspace, sets1p, all_wins, cs1ps);
+
+  // Finish up
+  free(sets1p);
+  free(all_wins);
+  free(cs1ps);
   return results;
 }
 
@@ -134,7 +151,7 @@ static int traverse(const high_board_t board, RawArray<const mid_super_t> supers
     for (const int s : range(8)) {
       const int q = s >> 1;
       const int d = s & 1 ? -1 : 1;
-      const auto v = pentago::value(r, (d & 3) << 2*q);
+      const auto v = PENTAGO_NAMESPACE::value(r, (d & 3) << 2*q);
       results.append(make_tuple(board.rotate(q, d), v));
       value = max(value, -v);
     }
