@@ -66,7 +66,7 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 }
 #endif  // !__wasm__
 
-static void midsolve_loop(const high_board_t root, const int n, superinfos_t* results,
+static void midsolve_loop(const high_board_t root, const int n, halfsupers_t* results,
                           RawArray<halfsupers_t> workspace, set_t* sets1p, halfsuper_t* all_wins, uint16_t* cs1ps) {
   const info_t I = make_info(root, n, workspace.size());
 
@@ -93,7 +93,7 @@ static void midsolve_loop(const high_board_t root, const int n, superinfos_t* re
   }
 }
 
-Vector<superinfos_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
+Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
   const int spots = 36 - board.count();
   NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
 
@@ -113,7 +113,7 @@ Vector<superinfos_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
   auto cs1ps = (uint16_t*)malloc(sizeof(uint16_t) * cs1ps_size);
 
   // Compute all slices
-  Vector<superinfos_t,1+18> results;
+  Vector<halfsupers_t,1+18> results;
   for (int n = spots; n >= 0; n--)
     midsolve_loop(board, n, results.data(), workspace, sets1p, all_wins, cs1ps);
 
@@ -124,7 +124,7 @@ Vector<superinfos_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
   return results;
 }
 
-int midsolve_traverse(const high_board_t board, const superinfos_t* supers, mid_values_t& results) {
+int midsolve_traverse(const high_board_t board, const halfsupers_t* supers, mid_values_t& results) {
   int value;
   const auto [done, immediate_value] = board.done_and_value();
   if (done) { // Done, so no lookup required
@@ -138,7 +138,7 @@ int midsolve_traverse(const high_board_t board, const superinfos_t* supers, mid_
         value = max(value, midsolve_traverse(board.place(bit), supers + ++s, results));
   } else {  // if board.middle()
     // By construction, we want the first element of supers
-    const superinfos_t& r = *supers;
+    const halfsupers_t& r = *supers;
 
     // Handle recursion manually to avoid actual rotation
     value = -1;

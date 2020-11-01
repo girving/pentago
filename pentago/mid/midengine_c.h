@@ -15,8 +15,3 @@
 typedef struct halfsupers_t_ {
   halfsuper_s win, notlose;
 } halfsupers_t;
-
-typedef struct superinfos_t_ {
-  halfsuper_s win, notlose;
-  bool parity;
-} superinfos_t;

@@ -26,11 +26,7 @@ int midsolve_workspace_size(const int min_slice);
 Array<halfsupers_t> midsolve_workspace(const int min_slice);
 #endif  // !__wasm__
 
-static inline bool known(const superinfos_t& I, const int s) {
-  return ((s^s>>2^s>>4^s>>6) & 1) == I.parity;
-}
-
-static inline int value(const superinfos_t& I, const int s) {
+static inline int value(const halfsupers_t& I, const int s) {
   return get(I.win, s >> 1) + get(I.notlose, s >> 1) - 1;
 }
 
@@ -41,8 +37,8 @@ static inline int mid_supers_size(const high_board_t board) {
 struct mid_values_t : pile<tuple<high_board_t,int>,1+18+8*18> {};
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
-Vector<superinfos_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
-int midsolve_traverse(const high_board_t board, const superinfos_t* supers, mid_values_t& results);
+Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
+int midsolve_traverse(const high_board_t board, const halfsupers_t* supers, mid_values_t& results);
 
 #if !defined(__wasm__) || defined(__APPLE__)
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)

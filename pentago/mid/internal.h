@@ -185,7 +185,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
 
 template<class Workspace> static inline void
 inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_DEVICE const set_t* sets1p,
-      METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE superinfos_t* results, const Workspace workspace,
+      METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
       METAL_DEVICE const set0_info_t& I0, const int s0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
@@ -233,7 +233,7 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
 
   // If we're far enough along, remember results
   if (I.n <= 1)
-    results[I.n + s1p] = superinfos_t{us.win, us.notlose, bool((I.n+I.parity)&1)};
+    results[I.n + s1p] = us;
 
   // Negate and apply rmax in preparation for the slice above
   halfsupers_t above;

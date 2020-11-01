@@ -54,19 +54,18 @@ void midsolve_internal_test(const high_board_t board) {
     const auto rs = results[i];
     const auto rboard = boards[i];
     const bool turn = count_stones(rboard) & 1;
+    const bool rparity = (i > 0) != parity;
     slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
          slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win)&h(rs.notlose)),
          popcount(~(h(rs.win)|h(rs.notlose))));
     for (const int a : range(2)) {
-      const auto exp = [=](const halfsuper_t h) { return rs.parity ? merge(0,h) : merge(h,0); };
+      const auto exp = [=](const halfsuper_t h) { return rparity ? merge(0,h) : merge(h,0); };
       const auto known = exp(~halfsuper_t(0));
       const auto correct = super_evaluate_all(a,100,flip_board(rboard,turn));
       GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known));
-      for (const int s : range(256)) {
-        ASSERT_EQ(known[s], pentago::known(rs, s));
-        if (pentago::known(rs, s))
+      for (const int s : range(256))
+        if (known[s])
           ASSERT_EQ(correct[s], value(rs, s) >= a);
-      }
     }
   }
 }
