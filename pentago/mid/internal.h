@@ -168,7 +168,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   // Lookup table to convert s0 to s0p
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-I.k0; q++) {
-      I0.offset0[a][q] = 0;
+      I0.offset0[a][q] = a ? 0 : s0;
       for (int i = empty1[q]-q; i < I.k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)
@@ -182,7 +182,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
 template<class Workspace> static inline void
 inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_DEVICE const set_t* sets1p,
       METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
-      METAL_DEVICE const set0_info_t& I0, const int s0, const int s1p) {
+      METAL_DEVICE const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
@@ -191,7 +191,7 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   // Convert indices
   uint32_t filled1p = 0;
   uint16_t s1 = 0;
-  uint16_t s0p = s0;
+  uint16_t s0p = 0;
   for (int i = 0; i < I.k1; i++) {
     const int q = set1p>>5*i&0x1f;
     filled1p |= 1<<q;

@@ -89,7 +89,7 @@ static void midsolve_loop(const high_board_t root, const int n, halfsupers_t* re
     const set0_info_t I0 = make_set0_info(I, all_wins, s0);
     // Iterate over set of stones of other player
     for (const int s1p :  range(I.sets1p.size))
-      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s0, s1p);
+      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s1p);
   }
 }
 
