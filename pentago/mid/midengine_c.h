@@ -20,8 +20,3 @@ typedef struct superinfos_t_ {
   halfsuper_s win, notlose;
   bool parity;
 } superinfos_t;
-
-typedef struct mid_super_t_ {
-  side_t sides[2];
-  superinfos_t supers;
-} mid_super_t;

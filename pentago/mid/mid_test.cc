@@ -25,6 +25,21 @@ board_t random_board_at_slice(Random& random, const int stones) {
   return from_table(flat.reshape(vec(6, 6)));
 }
 
+// The boards corresponding to midsolve_internal's results
+Array<const board_t> result_boards(const high_board_t board) {
+  vector<board_t> boards = {board.board()};
+  const auto empty = board.empty_mask();
+  for (const int bit : range(64)) {
+    if (empty & side_t(1)<<bit) {
+      const auto move = side_t(1) << bit;
+      side_t after[2] = {board.side(0), board.side(1)};
+      after[board.count() & 1] |= move;
+      boards.push_back(pack(after[0], after[1]));
+    }
+  }
+  return asarray(boards).copy();
+}
+
 void midsolve_internal_test(const high_board_t board) {
   typedef halfsuper_t h;
   const int slice = board.count();
@@ -32,12 +47,13 @@ void midsolve_internal_test(const high_board_t board) {
   const auto workspace = midsolve_workspace(slice);
   const auto padded_results = midsolve_internal(board, workspace);
   const auto results = asarray(padded_results).slice(0, mid_supers_size(board));
+  const auto boards = result_boards(board);
   ASSERT_EQ(results.size(), 37-slice); // Only mostly true due to superstandardization, but still good
-  for (const auto& r : results) {
-    const auto sides = vec(r.sides[0], r.sides[1]);
-    const auto rboard = pack(sides[0], sides[1]);
+  ASSERT_EQ(results.size(), boards.size());
+  for (const int i : range(results.size())) {
+    const auto rs = results[i];
+    const auto rboard = boards[i];
     const bool turn = count_stones(rboard) & 1;
-    const auto rs = r.supers;
     slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
          slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win)&h(rs.notlose)),
          popcount(~(h(rs.win)|h(rs.notlose))));

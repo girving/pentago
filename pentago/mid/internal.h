@@ -91,7 +91,6 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   const int k1 = I.n - I.k0;
 
   // Construct side to move
-  I0.s0 = s0;
   I0.set0 = get(I.sets0, s0);
   I0.side0 = I.root0 | side(I.empty, I.sets0, I0.set0);
 
@@ -186,8 +185,8 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
 
 template<class Workspace> static inline void
 inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_DEVICE const set_t* sets1p,
-      METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE mid_super_t* results, const Workspace workspace,
-      METAL_DEVICE const set0_info_t& I0, const int s1p) {
+      METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE superinfos_t* results, const Workspace workspace,
+      METAL_DEVICE const set0_info_t& I0, const int s0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
@@ -197,7 +196,7 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   uint32_t filled1 = 0;
   uint32_t filled1p = 0;
   uint16_t s1 = 0;
-  uint16_t s0p = I0.s0;
+  uint16_t s0p = s0;
   for (int i = 0; i < I.k1; i++) {
     const int q = set1p>>5*i&0x1f;
     filled1 |= 1<<I0.empty1[q];
@@ -233,20 +232,8 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   us.notlose = (inplay & us.notlose) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
 
   // If we're far enough along, remember results
-  if (I.n <= 1) {
-    const uint32_t filled_black = (I.slice+I.n)&1 ? filled1 : I0.filled0,
-                   filled_white = (I.slice+I.n)&1 ? I0.filled0 : filled1;
-    auto side0 = I.root.side_[0];
-    auto side1 = I.root.side_[1];
-    for (int i = 0; i < I.spots; i++) {
-      side0 |= side_t(filled_black>>i&1) << I.empty.empty[i];
-      side1 |= side_t(filled_white>>i&1) << I.empty.empty[i];
-    }
-    METAL_DEVICE auto& r = results[I.n + s1p];
-    r.sides[0] = side0;
-    r.sides[1] = side1;
-    r.supers = superinfos_t{us.win, us.notlose, bool((I.n+I.parity)&1)};
-  }
+  if (I.n <= 1)
+    results[I.n + s1p] = superinfos_t{us.win, us.notlose, bool((I.n+I.parity)&1)};
 
   // Negate and apply rmax in preparation for the slice above
   halfsupers_t above;

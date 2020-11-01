@@ -32,17 +32,16 @@ typedef struct wins_info_t_ {
 
 // Everything that's a function of just s0 in the double loop in midsolve_loop
 typedef struct set0_info_t_ {
-  set_t set0;
   side_t side0;
-  int s0;
+  set_t set0;
   uint32_t filled0;
   halfsuper_s wins0;
   halfsuper_s child_wins0[18];
   uint8_t empty1[18];
   uint16_t child_s0s[18];
-  uint16_t offset1[10][18];
-  uint16_t offset0[10][18];
+  uint16_t offset1[9][18];
+  uint16_t offset0[9][18];
 } set0_info_t;
 
-_Static_assert(sizeof(set0_info_t) >= 1104, "");
-_Static_assert(sizeof(set0_info_t) <= 1120, "");
+_Static_assert(sizeof(set0_info_t) >= 1032, "");
+_Static_assert(sizeof(set0_info_t) <= 1048, "");

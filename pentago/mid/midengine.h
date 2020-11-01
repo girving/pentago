@@ -41,8 +41,8 @@ static inline int mid_supers_size(const high_board_t board) {
 struct mid_values_t : pile<tuple<high_board_t,int>,1+18+8*18> {};
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
-Vector<mid_super_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
-void midsolve_traverse(const high_board_t board, const mid_super_t* supers, mid_values_t& results);
+Vector<superinfos_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
+int midsolve_traverse(const high_board_t board, const superinfos_t* supers, mid_values_t& results);
 
 #if !defined(__wasm__) || defined(__APPLE__)
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)

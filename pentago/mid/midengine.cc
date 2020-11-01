@@ -66,7 +66,7 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 }
 #endif  // !__wasm__
 
-static void midsolve_loop(const high_board_t root, const int n, mid_super_t* results,
+static void midsolve_loop(const high_board_t root, const int n, superinfos_t* results,
                           RawArray<halfsupers_t> workspace, set_t* sets1p, halfsuper_t* all_wins, uint16_t* cs1ps) {
   const info_t I = make_info(root, n, workspace.size());
 
@@ -89,11 +89,11 @@ static void midsolve_loop(const high_board_t root, const int n, mid_super_t* res
     const set0_info_t I0 = make_set0_info(I, all_wins, s0);
     // Iterate over set of stones of other player
     for (const int s1p :  range(I.sets1p.size))
-      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s1p);
+      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s0, s1p);
   }
 }
 
-Vector<mid_super_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
+Vector<superinfos_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
   const int spots = 36 - board.count();
   NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
 
@@ -113,7 +113,7 @@ Vector<mid_super_t,1+18> midsolve_internal(const high_board_t board, RawArray<ha
   auto cs1ps = (uint16_t*)malloc(sizeof(uint16_t) * cs1ps_size);
 
   // Compute all slices
-  Vector<mid_super_t,1+18> results;
+  Vector<superinfos_t,1+18> results;
   for (int n = spots; n >= 0; n--)
     midsolve_loop(board, n, results.data(), workspace, sets1p, all_wins, cs1ps);
 
@@ -124,7 +124,7 @@ Vector<mid_super_t,1+18> midsolve_internal(const high_board_t board, RawArray<ha
   return results;
 }
 
-static int traverse(const high_board_t board, RawArray<const mid_super_t> supers, mid_values_t& results) {
+int midsolve_traverse(const high_board_t board, const superinfos_t* supers, mid_values_t& results) {
   int value;
   const auto [done, immediate_value] = board.done_and_value();
   if (done) { // Done, so no lookup required
@@ -132,19 +132,13 @@ static int traverse(const high_board_t board, RawArray<const mid_super_t> supers
   } else if (!board.middle()) {  // Recurse into children
     value = -1;
     const auto empty = board.empty_mask();
+    int s = 0;
     for (const int bit : range(64))
       if (empty & side_t(1)<<bit)
-        value = max(value, traverse(board.place(bit), supers, results));
+        value = max(value, midsolve_traverse(board.place(bit), supers + ++s, results));
   } else {  // if board.middle()
-    // Find unrotated board in supers
-    int i;
-    for (i = 0; i < supers.size(); i++) {
-      const side_t* sides = supers[i].sides;
-      if (sides[0] == board.side(0) && sides[1] == board.side(1))
-        break;
-    }
-    NON_WASM_ASSERT(i < supers.size());
-    const superinfos_t& r = supers[i].supers;
+    // By construction, we want the first element of supers
+    const superinfos_t& r = *supers;
 
     // Handle recursion manually to avoid actual rotation
     value = -1;
@@ -160,11 +154,6 @@ static int traverse(const high_board_t board, RawArray<const mid_super_t> supers
   // Store and return value
   results.append(make_tuple(board, value));
   return value;
-}
-
-void midsolve_traverse(const high_board_t board, const mid_super_t* supers, mid_values_t& results) {
-  const auto prefix = RawArray<const mid_super_t>(mid_supers_size(board), supers);
-  traverse(board, prefix, results);
 }
 
 #if !defined(__wasm__) || defined(__APPLE__)
