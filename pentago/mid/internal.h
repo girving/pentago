@@ -98,7 +98,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   I0.wins0 = halfsuper_wins(side0, (I.n+I.parity)&1).s;
 
   // List empty spots after we place s0's stones
-  uint8_t empty1[18];
+  const auto empty1 = I0.empty1;
   {
     const auto free = side_mask & ~side0;
     int next = 0;
@@ -153,18 +153,6 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
       I0.child_s0s[i] += choose(set0>>5*a&0x1f, a+(a>=j)+1);
   }
 
-  // Preload wins after we place s0's stones.
-  if (!I.done) {
-    const auto all_wins0_next = all_wins + I.sets1.size;
-    for (int i = 0; i < I.spots-I.k0; i++)
-      I0.child_wins0[i] = all_wins0_next[I0.child_s0s[i]].s;
-  }
-
-  // Lookup table to convert s1p to s1
-  for (int i = 0; i < k1; i++)
-    for (int q = 0; q < I.spots-I.k0; q++)
-      I0.offset1[i][q] = fast_choose(empty1[q], i+1);
-
   // Lookup table to convert s0 to s0p
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-I.k0; q++) {
@@ -187,6 +175,7 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
+  const auto all_wins0_next = all_wins + I.sets1.size;
 
   // Convert indices
   uint32_t filled1p = 0;
@@ -195,7 +184,7 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   for (int i = 0; i < I.k1; i++) {
     const int q = set1p>>5*i&0x1f;
     filled1p |= 1<<q;
-    s1  += I0.offset1[i][q];
+    s1 += fast_choose(I0.empty1[q], i+1);  // I0.offset1[i][q];
     s0p += I0.offset0[i][q];
   }
 
@@ -211,7 +200,7 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
       const int i = integer_log_exact(bit);
       unmoved &= ~bit;
       const int cs0 = I0.child_s0s[i];
-      const halfsuper_t cwins(I0.child_wins0[i]);
+      const halfsuper_t cwins = all_wins0_next[cs0];
       const halfsupers_t child = input(cs0, cs1ps[s1p*(I.spots-I.k0)+i]);
       us.win = halfsuper_t(us.win) | cwins | child.win;
       us.notlose = halfsuper_t(us.notlose) | cwins | child.notlose;
