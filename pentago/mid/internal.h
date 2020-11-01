@@ -91,24 +91,20 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   const int k1 = I.n - I.k0;
 
   // Construct side to move
-  I0.set0 = get(I.sets0, s0);
-  I0.side0 = I.root0 | side(I.empty, I.sets0, I0.set0);
-
-  // Make a mask of filled spots
-  I0.filled0 = 0;
-  for (int i = 0; i < k0; i++)
-    I0.filled0 |= 1<<(I0.set0>>5*i&0x1f);
+  const set_t set0 = get(I.sets0, s0);
+  const side_t side0 = I.root0 | side(I.empty, I.sets0, set0);
 
   // Evaluate whether we win for side0 and all child sides
-  I0.wins0 = halfsuper_wins(I0.side0, (I.n+I.parity)&1).s;
+  I0.wins0 = halfsuper_wins(side0, (I.n+I.parity)&1).s;
 
   // List empty spots after we place s0's stones
+  uint8_t empty1[18];
   {
-    const auto free = side_mask & ~I0.side0;
+    const auto free = side_mask & ~side0;
     int next = 0;
     for (int i = 0; i < I.spots; i++)
       if (free&side_t(1)<<I.empty.empty[i])
-        I0.empty1[next++] = i;
+        empty1[next++] = i;
   }
 
   /* What happens to indices when we add a stone?  We start with
@@ -151,10 +147,10 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
 
   // Precompute absolute indices after we place s0's stones
   for (int i = 0; i < I.spots-I.k0; i++) {
-    const int j = I0.empty1[i]-i;
-    I0.child_s0s[i] = choose(I0.empty1[i], j+1);
+    const int j = empty1[i]-i;
+    I0.child_s0s[i] = choose(empty1[i], j+1);
     for (int a = 0; a < k0; a++)
-      I0.child_s0s[i] += choose(I0.set0>>5*a&0x1f, a+(a>=j)+1);
+      I0.child_s0s[i] += choose(set0>>5*a&0x1f, a+(a>=j)+1);
   }
 
   // Preload wins after we place s0's stones.
@@ -167,14 +163,14 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   // Lookup table to convert s1p to s1
   for (int i = 0; i < k1; i++)
     for (int q = 0; q < I.spots-I.k0; q++)
-      I0.offset1[i][q] = fast_choose(I0.empty1[q], i+1);
+      I0.offset1[i][q] = fast_choose(empty1[q], i+1);
 
   // Lookup table to convert s0 to s0p
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-I.k0; q++) {
       I0.offset0[a][q] = 0;
-      for (int i = I0.empty1[q]-q; i < I.k0; i++) {
-        const int v = I0.set0>>5*i&0x1f;
+      for (int i = empty1[q]-q; i < I.k0; i++) {
+        const int v = set0>>5*i&0x1f;
         if (v>a)
           I0.offset0[a][q] += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
       }
@@ -193,13 +189,11 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
 
   // Convert indices
-  uint32_t filled1 = 0;
   uint32_t filled1p = 0;
   uint16_t s1 = 0;
   uint16_t s0p = s0;
   for (int i = 0; i < I.k1; i++) {
     const int q = set1p>>5*i&0x1f;
-    filled1 |= 1<<I0.empty1[q];
     filled1p |= 1<<q;
     s1  += I0.offset1[i][q];
     s0p += I0.offset0[i][q];
