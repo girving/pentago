@@ -156,13 +156,13 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   // Lookup table to convert s0 to s0p
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-I.k0; q++) {
-      auto& offset = I0.offset0[a * (I.spots-I.k0) + q];
-      offset = a ? 0 : s0;
+      uint16_t offset = a ? 0 : s0;
       for (int i = empty1[q]-q; i < I.k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)
           offset += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
       }
+      I0.offset0[a * (I.spots-I.k0) + q] = offset;
     }
   }
   return I0;

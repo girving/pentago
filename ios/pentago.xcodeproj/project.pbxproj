@@ -31,6 +31,8 @@
 		A66FA5112548DA7600DAE3BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A66FA5102548DA7600DAE3BD /* Assets.xcassets */; };
 		A66FA5142548DA7600DAE3BD /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A66FA5132548DA7600DAE3BD /* Preview Assets.xcassets */; };
 		A66FA5172548DA7700DAE3BD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A66FA5152548DA7700DAE3BD /* Main.storyboard */; };
+		A6788153254E1E43007E1222 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6788152254E1E43007E1222 /* Utils.swift */; };
+		A6788154254E1E43007E1222 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6788152254E1E43007E1222 /* Utils.swift */; };
 		A6840D742548DD610093281B /* board.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D732548DD610093281B /* board.cc */; };
 		A6840D7A2548DD780093281B /* halfsuper.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D782548DD780093281B /* halfsuper.cc */; };
 		A6840D7B2548DD780093281B /* midengine.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D792548DD780093281B /* midengine.cc */; };
@@ -71,6 +73,7 @@
 		A66FA5162548DA7700DAE3BD /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		A66FA5182548DA7700DAE3BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A66FA5192548DA7700DAE3BD /* mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = mac.entitlements; sourceTree = "<group>"; };
+		A6788152254E1E43007E1222 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
 		A6840D732548DD610093281B /* board.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = board.cc; path = ../../pentago/high/board.cc; sourceTree = "<group>"; };
 		A6840D782548DD780093281B /* halfsuper.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = halfsuper.cc; path = ../../pentago/mid/halfsuper.cc; sourceTree = "<group>"; };
 		A6840D792548DD780093281B /* midengine.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = midengine.cc; path = ../../pentago/mid/midengine.cc; sourceTree = "<group>"; };
@@ -153,6 +156,7 @@
 				A60A140D254197E800C7CA4D /* MetalUtils.swift */,
 				A60A14112541995600C7CA4D /* Buffer.swift */,
 				A69EB7782541CCE300875932 /* midsolve.metal */,
+				A6788152254E1E43007E1222 /* Utils.swift */,
 				A66FA5002548CE1700DAE3BD /* TestUtils.swift */,
 				A6BE0D26253DA29500A97821 /* ContentView.swift */,
 			);
@@ -341,6 +345,7 @@
 				A632C9652548DEB300ED687E /* ContentView.swift in Sources */,
 				A632C95B2548DE9400ED687E /* Board.swift in Sources */,
 				A632C95C2548DE9400ED687E /* Games.swift in Sources */,
+				A6788154254E1E43007E1222 /* Utils.swift in Sources */,
 				A632C95D2548DE9400ED687E /* MidSolver.swift in Sources */,
 				A632C95E2548DE9400ED687E /* MetalUtils.swift in Sources */,
 				A632C95F2548DE9400ED687E /* Buffer.swift in Sources */,
@@ -361,6 +366,7 @@
 				A608BC5C253DA51300140200 /* Games.swift in Sources */,
 				A6BE0D27253DA29500A97821 /* ContentView.swift in Sources */,
 				A6840D7A2548DD780093281B /* halfsuper.cc in Sources */,
+				A6788153254E1E43007E1222 /* Utils.swift in Sources */,
 				A69EB7792541CCE300875932 /* midsolve.metal in Sources */,
 				A60A140A254196CF00C7CA4D /* MidSolver.swift in Sources */,
 				A66FA5012548CE1700DAE3BD /* TestUtils.swift in Sources */,
@@ -698,6 +704,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_HEADER_SEARCH_PATHS = ".. ../bazel-bin";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = naml.pentago;

@@ -50,18 +50,39 @@ class MidSolver {
     let allWins = GPUBuffer<halfsuper_s>(device, 2 * maxSets)
     let cs1ps = GPUBuffer<UInt16>(device, maxSets * spots)
     let I0 = GPUBuffer<set0_info_t>(device, maxSets)
-    let results = Buffer<mid_super_t>(device, 37 - board.count)
+    let results = Buffer<halfsupers_t>(device, 37 - board.count)
 
-    // Start capture
-    /*
-    let capture = MTLCaptureManager.shared()
-    let desc = MTLCaptureDescriptor()
-    desc.captureObject = device
-    try! capture.startCapture(with: desc)
-    */
+    // Sizes
+    if false {
+      var subsetsTotal = 0
+      var winsTotal = 0
+      var cs1psTotal = 0
+      var set0InfoTotal = 0
+      var set0InfoSizes: [String] = []
+      var offset0Size = 0
+      for n in (0...spots).reversed() {
+        let I = make_info_t(board.s, Int32(n), Int32(workspace.count))
+        let W = make_wins_info_t(I)
+        subsetsTotal += Int(I.sets1p.size)
+        winsTotal += Int(W.size)
+        cs1psTotal += Int(I.cs1ps_size)
+        set0InfoTotal += Int(I.sets0.size)
+        set0InfoSizes.append(large(Int(I.sets0.size) * MemoryLayout<set0_info_t>.size))
+        offset0Size = max(offset0Size, Int(I.k1 * (I.spots - I.k0)))
+      }
+      print("slice \(board.count) tmp buffers:")
+      print("  subsets size = \(large(subsetsTotal * MemoryLayout<UInt64>.size))")
+      print("  wins size = \(large(winsTotal * MemoryLayout<halfsuper_s>.size))")
+      print("  cs1ps size = \(large(cs1psTotal * MemoryLayout<UInt16>.size))")
+      print("  I0 size = \(large(set0InfoTotal * MemoryLayout<set0_info_t>.size))")
+      print("  I0 sizes = \(set0InfoSizes)")
+      print("  workspace size = \(large(workspace.count * MemoryLayout<halfsupers_t>.size))")
+      print("  offset0 size = \(offset0Size)")
+    }
 
     // Compute pass
     let start = CACurrentMediaTime()
+    let capture = makeCapture(device, on: false)
     let commands = queue.makeCommandBuffer()!
     let compute = commands.makeComputeCommandEncoder()!
     for n in (0...spots).reversed() {
@@ -75,12 +96,12 @@ class MidSolver {
     }
     compute.endEncoding()
     commands.commit()
-    //capture.stopCapture()
-    
+    capture.stopCapture()
+
     commands.waitUntilCompleted()
     let elapsed = CACurrentMediaTime() - start
     print("midsolve: board \(board.name), slice \(board.count), time \(elapsed) s")
-    
+
     // Gather results
     let supers = results.array()
     var values = Array(repeating: high_board_value_t(), count: 1+18+8*18)

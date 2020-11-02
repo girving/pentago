@@ -37,7 +37,7 @@ static int set_results(high_board_value_t results[1+18+8*18], const mid_values_t
   return values.size();
 }
 
-int board_midsolve_traverse(high_board_s board, const mid_super_t* supers,
+int board_midsolve_traverse(high_board_s board, const halfsupers_t* supers,
                             high_board_value_t results[1+18+8*18]) {
   mid_values_t values;
   midsolve_traverse(board, supers, values);

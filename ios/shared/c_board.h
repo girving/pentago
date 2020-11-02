@@ -26,7 +26,7 @@ info_t make_info_t(high_board_s b, int n, int workspace_size);
 wins_info_t make_wins_info_t(const info_t I);
 
 // Returns number of entries
-int board_midsolve_traverse(high_board_s b, const mid_super_t* supers,
+int board_midsolve_traverse(high_board_s b, const halfsupers_t* supers,
                             high_board_value_t results[1+18+8*18]);
 
 // Returns number of entries
