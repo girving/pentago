@@ -46,6 +46,8 @@ static inline info_t make_info(const high_board_t root, const int n, const int w
   I.cs1ps_size = I.sets1p.size * (I.spots-I.k0);
   I.empty = make_empty(root);
   I.input = make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
+  I.input = I.done ? make_grab(0, 0, 0, 0)
+                   : make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
   I.output = make_grab(!(n&1), I.sets1.size, choose(I.spots-I.k1, I.k0), workspace_size);
   return I;
 }
