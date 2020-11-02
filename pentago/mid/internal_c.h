@@ -34,8 +34,8 @@ typedef struct wins_info_t_ {
 typedef struct set0_info_t_ {
   halfsuper_s wins0;
   uint16_t child_s0s[18];
-  uint16_t offset0[9][18];
+  uint16_t offset0[90];
   uint8_t empty1[18];
 } set0_info_t;
 
-_Static_assert(sizeof(set0_info_t) == 400, "");
+_Static_assert(sizeof(set0_info_t) == 256, "");

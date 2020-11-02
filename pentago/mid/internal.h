@@ -156,11 +156,12 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
   // Lookup table to convert s0 to s0p
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-I.k0; q++) {
-      I0.offset0[a][q] = a ? 0 : s0;
+      auto& offset = I0.offset0[a * (I.spots-I.k0) + q];
+      offset = a ? 0 : s0;
       for (int i = empty1[q]-q; i < I.k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)
-          I0.offset0[a][q] += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
+          offset += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
       }
     }
   }
@@ -177,31 +178,38 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
   const auto all_wins0_next = all_wins + I.sets1.size;
 
+  // Learn that these are constants
+  const int n = I.n;
+  const int spots = I.spots;
+  const int slice = I.slice;
+  const int k0 = I.k0;
+  const int k1 = I.k1;
+
   // Convert indices
   uint32_t filled1p = 0;
   uint16_t s1 = 0;
   uint16_t s0p = 0;
-  for (int i = 0; i < I.k1; i++) {
+  for (int i = 0; i < k1; i++) {
     const int q = set1p>>5*i&0x1f;
     filled1p |= 1<<q;
     s1 += fast_choose(I0.empty1[q], i+1);  // I0.offset1[i][q];
-    s0p += I0.offset0[i][q];
+    s0p += I0.offset0[i * (spots-k0) + q];
   }
 
   // Consider each move in turn
   halfsupers_t us;
   {
     us.win = us.notlose = halfsuper_t(0);
-    if (I.slice + I.n == 36)
+    if (slice + n == 36)
       us.notlose = ~halfsuper_t(0);
     auto unmoved = ~filled1p;
-    for (int m = 0; m < I.spots-I.k0-I.k1; m++) {
+    for (int m = 0; m < spots-k0-k1; m++) {
       const auto bit = min_bit(unmoved);
       const int i = integer_log_exact(bit);
       unmoved &= ~bit;
       const int cs0 = I0.child_s0s[i];
       const halfsuper_t cwins = all_wins0_next[cs0];
-      const halfsupers_t child = input(cs0, cs1ps[s1p*(I.spots-I.k0)+i]);
+      const halfsupers_t child = input(cs0, cs1ps[s1p*(spots-k0)+i]);
       us.win = halfsuper_t(us.win) | cwins | child.win;
       us.notlose = halfsuper_t(us.notlose) | cwins | child.notlose;
     }
@@ -215,8 +223,8 @@ inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_
   us.notlose = (inplay & us.notlose) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
 
   // If we're far enough along, remember results
-  if (I.n <= 1)
-    results[I.n + s1p] = us;
+  if (n <= 1)
+    results[n + s1p] = us;
 
   // Negate and apply rmax in preparation for the slice above
   halfsupers_t above;
