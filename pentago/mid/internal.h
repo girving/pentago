@@ -74,7 +74,8 @@ static inline halfsuper_t mid_wins(METAL_CONSTANT const wins_info_t& W, const in
   return halfsuper_wins(root | side(W.empty, sets, ss), W.parity);
 }
 
-static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_DEVICE const set_t* sets1p, const int index) {
+static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT const set_t* sets1p,
+                                  const int index) {
   const int s1p = index / (I.spots-I.k0);
   const int j = index - s1p * (I.spots-I.k0);
   uint16_t c = s1p;
@@ -86,7 +87,7 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_DEVICE c
   return c;
 }
 
-static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_DEVICE const halfsuper_t* all_wins,
+static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_CONSTANT const halfsuper_t* all_wins,
                                          const int s0) {
   set0_info_t I0;
   const int k0 = I.sets0.k;
@@ -171,9 +172,9 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_D
 }
 
 template<class Workspace> static inline void
-inner(METAL_CONSTANT const info_t& I, METAL_DEVICE const uint16_t* cs1ps, METAL_DEVICE const set_t* sets1p,
-      METAL_DEVICE const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
-      METAL_DEVICE const set0_info_t& I0, const int s1p) {
+inner(METAL_CONSTANT const info_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
+      METAL_CONSTANT const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
+      METAL_CONSTANT const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);

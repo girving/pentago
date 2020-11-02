@@ -22,7 +22,7 @@ kernel void wins(constant wins_info_t* W [[buffer(0)]],
 }
 
 kernel void cs1ps(constant info_t* I [[buffer(0)]],
-                  const device set_t* sets1p [[buffer(1)]],
+                  constant set_t* sets1p [[buffer(1)]],
                   device uint16_t* cs1ps [[buffer(2)]],
                   const uint i [[thread_position_in_grid]]) {
   if (i >= uint(I->cs1ps_size)) return;
@@ -30,7 +30,7 @@ kernel void cs1ps(constant info_t* I [[buffer(0)]],
 }
 
 kernel void set0_info(constant info_t* I [[buffer(0)]],
-                      const device halfsuper_t* all_wins [[buffer(1)]],
+                      constant halfsuper_t* all_wins [[buffer(1)]],
                       device set0_info_t* I0 [[buffer(2)]],
                       const uint s0 [[thread_position_in_grid]]) {
   if (s0 >= uint(I->sets0.size)) return;
@@ -61,10 +61,10 @@ workspace_io_t slice(const workspace_t w, const grab_t g) {
 }
 
 kernel void inner(constant info_t* I [[buffer(0)]],
-                  const device uint16_t* cs1ps [[buffer(1)]],
-                  const device set_t* sets1p [[buffer(2)]],
-                  const device halfsuper_t* all_wins [[buffer(3)]],
-                  const device set0_info_t* I0 [[buffer(4)]],
+                  constant uint16_t* cs1ps [[buffer(1)]],
+                  constant set_t* sets1p [[buffer(2)]],
+                  constant halfsuper_t* all_wins [[buffer(3)]],
+                  constant set0_info_t* I0 [[buffer(4)]],
                   device halfsupers_t* results [[buffer(5)]],
                   device halfsupers_t* workspace0 [[buffer(6)]],
                   device halfsupers_t* workspace1 [[buffer(7)]],
