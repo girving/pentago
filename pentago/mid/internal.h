@@ -8,6 +8,25 @@
 #include "pentago/utility/integer_log.h"
 NAMESPACE_PENTAGO
 
+struct helper_t {
+  const info_t& I;
+  const int n;
+
+  bool done() const { return I.spots == n; }
+  int k0() const { return n >> 1; }
+  int k1() const { return n - k0(); }
+  bool parity() const { return (n+I.root.ply_)&1; }
+  side_t root0() const { return I.root.side_[(I.slice+n)&1]; }
+  sets_t sets0() const { return make_sets(I.spots, k0()); }
+  sets_t sets1() const { return make_sets(I.spots, k1()); }
+  sets_t sets1p() const { return make_sets(I.spots-k0(), k1()); }
+  sets_t fast_sets0_next() const { assert(!done()); return make_sets(I.spots, k0()+1); }
+  sets_t sets0_next() const { return done() ? make_sets(0, 1) : fast_sets0_next(); }
+  int sets1p_size() const { return I.sets1p_offsets[n+1] - I.sets1p_offsets[n]; }
+  int wins_size() const { return I.wins_offsets[n+1] - I.wins_offsets[n]; }
+  int cs1ps_size() const { return I.cs1ps_offsets[n+1] - I.cs1ps_offsets[n]; }
+};
+
 static inline grab_t make_grab(const bool end, const int nx, const int ny, const int workspace_size) {
   grab_t g;
   g.ny = ny;
@@ -27,59 +46,47 @@ static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
   return io_t{workspace + g.lo, g.ny};
 }
 
-static inline info_t make_info(const high_board_t root, const int n, const int workspace_size) {
+static inline info_t make_info(const high_board_t root, const int workspace_size) {
   info_t I;
   I.root = root.s;
-  I.n = n;
-  I.parity = root.middle();
   I.slice = root.count();
   I.spots = 36 - I.slice;
-  I.k0 = (I.slice+n)/2 - (I.slice+(n&1))/2;
-  I.k1 = n - I.k0;
-  I.done = I.spots == I.n;
-  I.root0 = root.side((I.slice+n)&1);
-  I.root1 = root.side((I.slice+n+1)&1);
-  I.sets0 = make_sets(I.spots, I.k0);
-  I.sets1 = make_sets(I.spots, I.k1);
-  I.sets1p = make_sets(I.spots-I.k0, I.k1);
-  I.sets0_next = I.done ? make_sets(0, 1) : make_sets(I.spots, I.k0+1);
-  I.cs1ps_size = I.sets1p.size * (I.spots-I.k0);
   I.empty = make_empty(root);
-  I.input = make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
-  I.input = I.done ? make_grab(0, 0, 0, 0)
-                   : make_grab(n&1, choose(I.spots, I.k0+1), choose(I.spots-I.k0-1, I.k1), workspace_size);
-  I.output = make_grab(!(n&1), I.sets1.size, choose(I.spots-I.k1, I.k0), workspace_size);
+  I.sets1p_offsets[0] = 0;
+  I.cs1ps_offsets[0] = 0;
+  I.wins_offsets[0] = 0;
+  for (const int n : range(I.spots+1)) {
+    const helper_t H{I, n};
+    I.sets1p_offsets[n+1] = I.sets1p_offsets[n] + H.sets1p().size;
+    I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + H.sets1p_size() * (I.spots-H.k0());
+    I.wins_offsets[n+1] = I.wins_offsets[n] + H.sets1().size + H.sets0_next().size;
+    I.spaces[n] = make_grab(!(n&1), H.sets1().size, choose(I.spots-H.k1(), H.k0()), workspace_size);
+  }
+  I.spaces[I.spots+1] = make_grab(0, 0, 0, 0);
   return I;
-}
-
-static inline wins_info_t make_wins_info(METAL_CONSTANT const info_t& I) {
-  wins_info_t W;
-  W.empty = I.empty;
-  W.root0 = I.root0;
-  W.root1 = I.root1;
-  W.sets1 = I.sets1;
-  W.sets0_next = I.sets0_next;
-  W.size = W.sets1.size + W.sets0_next.size;
-  W.parity = (I.n+I.parity)&1;
-  return W;
 }
 
 // [:sets1.size] = all_wins1 = whether the other side wins for all possible sides
 // [sets1.size:] = all_wins0_next = whether we win on the next move
-static inline halfsuper_t mid_wins(METAL_CONSTANT const wins_info_t& W, const int s) {
-  const bool one = s < W.sets1.size;
-  const auto ss = one ? s : s - W.sets1.size;
-  const auto root = one ? W.root1 : W.root0;
-  const auto sets = one ? W.sets1 : W.sets0_next;
-  return halfsuper_wins(root | side(W.empty, sets, ss), W.parity);
+static inline halfsuper_t mid_wins(METAL_CONSTANT const info_t& I, const int n, const int s) {
+  const helper_t H{I, n};
+  const auto sets1 = H.sets1();
+  const bool one = s < sets1.size;
+  const auto ss = one ? s : s - sets1.size;
+  const auto root = I.root.side_[(I.slice+n+one)&1];
+  const auto sets = one ? sets1 : H.fast_sets0_next();
+  return halfsuper_wins(root | side(I.empty, sets, ss), H.parity());
 }
 
 static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT const set_t* sets1p,
-                                  const int index) {
-  const int s1p = index / (I.spots-I.k0);
-  const int j = index - s1p * (I.spots-I.k0);
+                                  const int n, const int index) {
+  const helper_t H{I, n};
+  const int k0 = H.k0();
+  const int k1 = H.k1();
+  const int s1p = index / (I.spots-k0);
+  const int j = index - s1p * (I.spots-k0);
   uint16_t c = s1p;
-  for (int a = 0; a < I.k1; a++) {
+  for (int a = 0; a < k1; a++) {
     const int s1p_a = sets1p[s1p]>>5*a&0x1f;
     if (j<s1p_a)
       c += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
@@ -88,17 +95,19 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT
 }
 
 static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_CONSTANT const halfsuper_t* all_wins,
-                                         const int s0) {
+                                         const int n, const int s0) {
   set0_info_t I0;
-  const int k0 = I.sets0.k;
-  const int k1 = I.n - I.k0;
+  const helper_t H{I, n};
+  const auto sets0 = H.sets0();
+  const int k0 = H.k0();
+  const int k1 = H.k1();
 
   // Construct side to move
-  const set_t set0 = get(I.sets0, s0);
-  const side_t side0 = I.root0 | side(I.empty, I.sets0, set0);
+  const set_t set0 = get(sets0, s0);
+  const side_t side0 = H.root0() | side(I.empty, sets0, set0);
 
   // Evaluate whether we win for side0 and all child sides
-  I0.wins0 = halfsuper_wins(side0, (I.n+I.parity)&1).s;
+  I0.wins0 = halfsuper_wins(side0, H.parity()).s;
 
   // List empty spots after we place s0's stones
   const auto empty1 = I0.empty1;
@@ -149,7 +158,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_C
    */
 
   // Precompute absolute indices after we place s0's stones
-  for (int i = 0; i < I.spots-I.k0; i++) {
+  for (int i = 0; i < I.spots-k0; i++) {
     const int j = empty1[i]-i;
     I0.child_s0s[i] = choose(empty1[i], j+1);
     for (int a = 0; a < k0; a++)
@@ -158,14 +167,14 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_C
 
   // Lookup table to convert s0 to s0p
   for (int a = 0; a < k1; a++) {
-    for (int q = 0; q < I.spots-I.k0; q++) {
+    for (int q = 0; q < I.spots-k0; q++) {
       uint16_t offset = a ? 0 : s0;
-      for (int i = empty1[q]-q; i < I.k0; i++) {
+      for (int i = empty1[q]-q; i < k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)
           offset += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
       }
-      I0.offset0[a * (I.spots-I.k0) + q] = offset;
+      I0.offset0[a * (I.spots-k0) + q] = offset;
     }
   }
   return I0;
@@ -174,19 +183,19 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_C
 template<class Workspace> static inline void
 inner(METAL_CONSTANT const info_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
       METAL_CONSTANT const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
-      METAL_CONSTANT const set0_info_t& I0, const int s1p) {
+      const int n, METAL_CONSTANT const set0_info_t& I0, const int s1p) {
+  const helper_t H{I, n};
   const auto set1p = sets1p[s1p];
-  const auto input = slice(workspace, I.input);
-  const auto output = slice(workspace, I.output);
+  const auto input = slice(workspace, I.spaces[n+1]);
+  const auto output = slice(workspace, I.spaces[n]);
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
-  const auto all_wins0_next = all_wins + I.sets1.size;
+  const auto all_wins0_next = all_wins + H.sets1().size;
 
   // Learn that these are constants
-  const int n = I.n;
   const int spots = I.spots;
   const int slice = I.slice;
-  const int k0 = I.k0;
-  const int k1 = I.k1;
+  const int k0 = H.k0();
+  const int k1 = H.k1();
 
   // Convert indices
   uint32_t filled1p = 0;

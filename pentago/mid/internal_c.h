@@ -10,25 +10,16 @@ typedef struct grab_t_ {
   int ny, lo;
 } grab_t;
 
-// Constant information for midsolve_loop
+// Constant information for an entire midsolve computation
 typedef struct info_t_ {
   high_board_s root;
-  int n, parity, slice, spots, k0, k1;
-  bool done;
-  side_t root0, root1;
-  sets_t sets0, sets1, sets1p, sets0_next;
-  int cs1ps_size;
+  int slice, spots;
   empty_t empty;
-  grab_t input, output;
+  grab_t spaces[18+2];  // output = spaces[n], input = spaces[n+1]
+  int sets1p_offsets[18+2];  // sets1p_offsets[n] = sum_{k < n} sets1p(n).size
+  int cs1ps_offsets[18+2];  // cs1ps_offsets[n] = sum_{k < n} cs1ps_size[k]
+  int wins_offsets[18+2];  // wins_offsets[n] = sum_{k < n} wins_size[k]
 } info_t;
-
-typedef struct wins_info_t_ {
-  empty_t empty;
-  side_t root0, root1;
-  sets_t sets1, sets0_next;
-  int size;
-  bool parity;
-} wins_info_t;
 
 // Everything that's a function of just s0 in the double loop in midsolve_loop
 typedef struct set0_info_t_ {

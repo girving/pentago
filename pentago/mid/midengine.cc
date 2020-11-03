@@ -66,44 +66,44 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 }
 #endif  // !__wasm__
 
-static void midsolve_loop(const high_board_t root, const int n, halfsupers_t* results,
+static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
                           RawArray<halfsupers_t> workspace, set_t* sets1p, halfsuper_t* all_wins, uint16_t* cs1ps) {
-  const info_t I = make_info(root, n, workspace.size());
+  const helper_t H{I, n};
 
   // Precompute subsets of player 1 relative to player 0's stones
-  for (const int s1p : range(I.sets1p.size))
-    sets1p[s1p] = get(I.sets1p, s1p);
+  const auto sets1p_ = H.sets1p();
+  for (const int s1p : range(sets1p_.size))
+    sets1p[s1p] = get(sets1p_, s1p);
 
   // Precompute various halfsuper wins
-  const auto W = make_wins_info(I);
-  for (const int s : range(W.size))
-    all_wins[s] = mid_wins(W, s);
+  for (const int s : range(H.wins_size()))
+    all_wins[s] = mid_wins(I, n, s);
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
-  for (const int i : range(I.cs1ps_size))
-    cs1ps[i] = make_cs1ps(I, sets1p, i);
+  for (const int i : range(H.cs1ps_size()))
+    cs1ps[i] = make_cs1ps(I, sets1p, n, i);
 
   // Iterate over set of stones of player to move
-  for (const int s0 : range(I.sets0.size)) {
-    const set0_info_t I0 = make_set0_info(I, all_wins, s0);
+  for (const int s0 : range(H.sets0().size)) {
+    const set0_info_t I0 = make_set0_info(I, all_wins, n, s0);
     // Iterate over set of stones of other player
-    for (const int s1p :  range(I.sets1p.size))
-      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s1p);
+    for (const int s1p :  range(sets1p_.size))
+      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), n, I0, s1p);
   }
 }
 
 Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
-  const int spots = 36 - board.count();
-  NON_WASM_ASSERT(workspace.size() >= bottleneck(spots));
+  const info_t I = make_info(board, workspace.size());
+  NON_WASM_ASSERT(workspace.size() >= bottleneck(I.spots));
 
   // Size temporary buffers
   int sets1p_size = 0, all_wins_size = 0, cs1ps_size = 0;
-  for (int n = spots; n >= 0; n--) {
-    const info_t I = make_info(board, n, workspace.size());
-    sets1p_size = max(sets1p_size, I.sets1p.size);
-    all_wins_size = max(all_wins_size, make_wins_info(I).size);
-    cs1ps_size = max(cs1ps_size, I.cs1ps_size);
+  for (int n = I.spots; n >= 0; n--) {
+    const helper_t H{I, n};
+    sets1p_size = max(sets1p_size, H.sets1p_size());
+    all_wins_size = max(all_wins_size, H.wins_size());
+    cs1ps_size = max(cs1ps_size, H.cs1ps_size());
   }
 
   // Allocate temporary buffers in a wasm-friendly way.
@@ -114,8 +114,8 @@ Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
 
   // Compute all slices
   Vector<halfsupers_t,1+18> results;
-  for (int n = spots; n >= 0; n--)
-    midsolve_loop(board, n, results.data(), workspace, sets1p, all_wins, cs1ps);
+  for (int n = I.spots; n >= 0; n--)
+    midsolve_loop(I, n, results.data(), workspace, sets1p, all_wins, cs1ps);
 
   // Finish up
   free(sets1p);
