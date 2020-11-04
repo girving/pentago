@@ -68,7 +68,7 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 
 static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
                           RawArray<halfsupers_t> workspace, set_t* sets1p, halfsuper_t* all_wins, uint16_t* cs1ps) {
-  const helper_t H{I, n};
+  const helper_t<> H{I, n};
 
   // Precompute subsets of player 1 relative to player 0's stones
   const auto sets1p_ = H.sets1p();
@@ -85,11 +85,12 @@ static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
     cs1ps[i] = make_cs1ps(I, sets1p, n, i);
 
   // Iterate over set of stones of player to move
+  const auto N = make_inner(I, n);
   for (const int s0 : range(H.sets0().size)) {
-    const set0_info_t I0 = make_set0_info(I, all_wins, n, s0);
+    const set0_info_t I0 = make_set0_info(I, n, s0);
     // Iterate over set of stones of other player
     for (const int s1p :  range(sets1p_.size))
-      inner(I, cs1ps, sets1p, all_wins, results, workspace.data(), n, I0, s1p);
+      inner(N, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s1p);
   }
 }
 
@@ -100,7 +101,7 @@ Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
   // Size temporary buffers
   int sets1p_size = 0, all_wins_size = 0, cs1ps_size = 0;
   for (int n = I.spots; n >= 0; n--) {
-    const helper_t H{I, n};
+    const helper_t<> H{I, n};
     sets1p_size = max(sets1p_size, H.sets1p_size());
     all_wins_size = max(all_wins_size, H.wins_size());
     cs1ps_size = max(cs1ps_size, H.cs1ps_size());

@@ -17,13 +17,20 @@ func choose(_ n: Int, _ k: Int) -> Int {
   return c
 }
 
+typealias Twenty<T> = (T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T)
+typealias Offsets = Twenty<Int32>
+
+func asarray<T>(_ o: Twenty<T>) -> [T] {
+  [o.0, o.1, o.2, o.3, o.4, o.5, o.6, o.7, o.8, o.9, o.10, o.11, o.12, o.13, o.14, o.15, o.16, o.17, o.18, o.19]
+}
+
 class MidSolver {
   let device: MTLDevice
   let queue: MTLCommandQueue
   let lib: MTLLibrary
   
   // Compute kernels
-  let subsets: Compute
+  let sets1p: Compute
   let wins: Compute
   let cs1ps: Compute
   let set0Info: Compute
@@ -33,7 +40,7 @@ class MidSolver {
     device = MTLCreateSystemDefaultDevice()!
     queue = device.makeCommandQueue()!
     lib = device.makeDefaultLibrary()!
-    subsets = Compute(device, lib, "subsets")
+    sets1p = Compute(device, lib, "sets1p")
     wins = Compute(device, lib, "wins")
     cs1ps = Compute(device, lib, "cs1ps")
     set0Info = Compute(device, lib, "set0_info")
@@ -42,57 +49,40 @@ class MidSolver {
 
   func solve(_ board: Board) -> [Board: Int] {
     let spots = 36 - board.count
-    let maxSets = choose(spots, spots / 2)
+    let workspace_size = board_workspace_size(board.s)
+    let I = make_info_t(board.s, workspace_size)
 
     // Temporary buffers
-    let workspace = BigGPUBuffer<halfsupers_t>(device, chunks: 4, count: Int(board_workspace_size(board.s)))
-    let sets1p = GPUBuffer<UInt64>(device, maxSets)
-    let allWins = GPUBuffer<halfsuper_s>(device, 2 * maxSets)
-    let cs1ps = GPUBuffer<UInt16>(device, maxSets * spots)
-    let I0 = GPUBuffer<set0_info_t>(device, maxSets)
-    let results = Buffer<halfsupers_t>(device, 37 - board.count)
-
-    // Sizes
-    if false {
-      var subsetsTotal = 0
-      var winsTotal = 0
-      var cs1psTotal = 0
-      var set0InfoTotal = 0
-      var set0InfoSizes: [String] = []
-      var offset0Size = 0
-      for n in (0...spots).reversed() {
-        let I = make_info_t(board.s, Int32(n), Int32(workspace.count))
-        let W = make_wins_info_t(I)
-        subsetsTotal += Int(I.sets1p.size)
-        winsTotal += Int(W.size)
-        cs1psTotal += Int(I.cs1ps_size)
-        set0InfoTotal += Int(I.sets0.size)
-        set0InfoSizes.append(large(Int(I.sets0.size) * MemoryLayout<set0_info_t>.size))
-        offset0Size = max(offset0Size, Int(I.k1 * (I.spots - I.k0)))
-      }
-      print("slice \(board.count) tmp buffers:")
-      print("  subsets size = \(large(subsetsTotal * MemoryLayout<UInt64>.size))")
-      print("  wins size = \(large(winsTotal * MemoryLayout<halfsuper_s>.size))")
-      print("  cs1ps size = \(large(cs1psTotal * MemoryLayout<UInt16>.size))")
-      print("  I0 size = \(large(set0InfoTotal * MemoryLayout<set0_info_t>.size))")
-      print("  I0 sizes = \(set0InfoSizes)")
-      print("  workspace size = \(large(workspace.count * MemoryLayout<halfsupers_t>.size))")
-      print("  offset0 size = \(offset0Size)")
+    func total(_ offsets: Offsets) -> Int {
+      Int(asarray(offsets)[spots + 1])
     }
+    let workspace = BigGPUBuffer<halfsupers_t>(device, chunks: 4, count: Int(workspace_size))
+    let sets1p = GPUBuffer<UInt64>(device, total(I.sets1p_offsets))
+    let allWins = GPUBuffer<halfsuper_s>(device, total(I.wins_offsets))
+    let cs1ps = GPUBuffer<UInt16>(device, total(I.cs1ps_offsets))
+    let I0 = GPUBuffer<set0_info_t>(device, total(I.sets0_offsets))
+    let results = Buffer<halfsupers_t>(device, 37 - board.count)
 
     // Compute pass
     let start = CACurrentMediaTime()
     let capture = makeCapture(device, on: false)
     let commands = queue.makeCommandBuffer()!
     let compute = commands.makeComputeCommandEncoder()!
+    self.sets1p.run(compute, [Small(I), sets1p], sets1p.count)
+    wins.run(compute, [Small(I), allWins], allWins.count)
+    self.cs1ps.run(compute, [Small(I), sets1p, cs1ps], cs1ps.count)
+    set0Info.run(compute, [Small(I), I0], I0.count)
     for n in (0...spots).reversed() {
-      let I = make_info_t(board.s, Int32(n), Int32(workspace.count))
-      let W = make_wins_info_t(I)
-      subsets.run(compute, [Small(I.sets1p), sets1p], Int(I.sets1p.size))
-      wins.run(compute, [Small(W), allWins], Int(W.size))
-      self.cs1ps.run(compute, [Small(I), sets1p, cs1ps], Int(I.cs1ps_size))
-      set0Info.run(compute, [Small(I), allWins, I0], Int(I.sets0.size))
-      inner.run(compute, [Small(I), cs1ps, sets1p, allWins, I0, results] + workspace.chunks, Int(I.sets0.size * I.sets1p.size))
+      let N = make_inner_t(I, Int32(n))
+      func slice<T>(_ buffer: GPUBuffer<T>, _ offsets: Offsets) -> GPUBuffer<T> {
+        let o = asarray(offsets)
+        return buffer[Int(o[n])..<Int(o[n+1])]
+      }
+      inner.run(compute, [Small(N),
+                          slice(cs1ps, I.cs1ps_offsets),
+                          slice(sets1p, I.sets1p_offsets),
+                          slice(allWins, I.wins_offsets),
+                          slice(I0, I.sets0_offsets), results] + workspace.chunks, Int(N.output.size))
     }
     compute.endEncoding()
     commands.commit()
@@ -115,26 +105,3 @@ class MidSolver {
     return Dictionary(pairs, uniquingKeysWith: { (v0, v1) in assert(v0 == v1); return v0 })
   }
 }
-
-
-/*
-class Bounce: AnimationDelegate {
-  let pipeline: MTLRenderPipelineState
-  let stepPipeline: MTLComputePipelineState
-  let motion: CMMotionManager
-  let particles: Particles<BounceParticle>
-  
-  func draw(_ dt: Float) {
-    let commands = anim.commands()
-    let compute = commands.makeComputeCommandEncoder()!
-    compute.setComputePipelineState(stepPipeline)
-    compute.setBuffer(particles.data, offset: 0, index: 0)
-    setBytes(compute, stepInfo(dt), index: 1)
-    compute.setTexture(screenLevelset, index: 0)
-    dispatch(compute, stepPipeline, s.count)
-    compute.endEncoding()
-    commands.commit()
-  }
-}
-
-*/

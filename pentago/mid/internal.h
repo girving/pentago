@@ -8,8 +8,8 @@
 #include "pentago/utility/integer_log.h"
 NAMESPACE_PENTAGO
 
-struct helper_t {
-  const info_t& I;
+template<class info_ref=METAL_CONSTANT const info_t&> struct helper_t {
+  info_ref I;
   const int n;
 
   bool done() const { return I.spots == n; }
@@ -24,13 +24,14 @@ struct helper_t {
   sets_t sets0_next() const { return done() ? make_sets(0, 1) : fast_sets0_next(); }
   int sets1p_size() const { return I.sets1p_offsets[n+1] - I.sets1p_offsets[n]; }
   int wins_size() const { return I.wins_offsets[n+1] - I.wins_offsets[n]; }
-  int cs1ps_size() const { return I.cs1ps_offsets[n+1] - I.cs1ps_offsets[n]; }
+  int cs1ps_size() const { return sets1p_size() * (I.spots-k0()); }
 };
 
 static inline grab_t make_grab(const bool end, const int nx, const int ny, const int workspace_size) {
   grab_t g;
   g.ny = ny;
   g.lo = end ? workspace_size - nx * ny : 0;
+  g.size = nx * ny;
   return g;
 }
 
@@ -52,13 +53,15 @@ static inline info_t make_info(const high_board_t root, const int workspace_size
   I.slice = root.count();
   I.spots = 36 - I.slice;
   I.empty = make_empty(root);
+  I.sets0_offsets[0] = 0;
   I.sets1p_offsets[0] = 0;
   I.cs1ps_offsets[0] = 0;
   I.wins_offsets[0] = 0;
-  for (const int n : range(I.spots+1)) {
-    const helper_t H{I, n};
+  for (int n = 0; n <= I.spots; n++) {
+    const helper_t<METAL_THREAD const info_t&> H{I, n};
+    I.sets0_offsets[n+1] = I.sets0_offsets[n] + H.sets0().size;
     I.sets1p_offsets[n+1] = I.sets1p_offsets[n] + H.sets1p().size;
-    I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + H.sets1p_size() * (I.spots-H.k0());
+    I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + (H.cs1ps_size()+1&~1);  // Round to even for alignment
     I.wins_offsets[n+1] = I.wins_offsets[n] + H.sets1().size + H.sets0_next().size;
     I.spaces[n] = make_grab(!(n&1), H.sets1().size, choose(I.spots-H.k1(), H.k0()), workspace_size);
   }
@@ -66,10 +69,25 @@ static inline info_t make_info(const high_board_t root, const int workspace_size
   return I;
 }
 
+static inline inner_t make_inner(METAL_CONSTANT const info_t& I, const int n) {
+  inner_t N;
+  const helper_t<> H{I, n};
+  N.n = n;
+  N.spots = I.spots;
+  N.slice = I.slice;
+  N.k0 = H.k0();
+  N.k1 = H.k1();
+  N.sets1 = H.sets1();
+  N.sets1p_size = H.sets1p().size;
+  N.input = I.spaces[n+1];
+  N.output = I.spaces[n];
+  return N;
+}
+
 // [:sets1.size] = all_wins1 = whether the other side wins for all possible sides
 // [sets1.size:] = all_wins0_next = whether we win on the next move
 static inline halfsuper_t mid_wins(METAL_CONSTANT const info_t& I, const int n, const int s) {
-  const helper_t H{I, n};
+  const helper_t<> H{I, n};
   const auto sets1 = H.sets1();
   const bool one = s < sets1.size;
   const auto ss = one ? s : s - sets1.size;
@@ -80,7 +98,7 @@ static inline halfsuper_t mid_wins(METAL_CONSTANT const info_t& I, const int n, 
 
 static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT const set_t* sets1p,
                                   const int n, const int index) {
-  const helper_t H{I, n};
+  const helper_t<> H{I, n};
   const int k0 = H.k0();
   const int k1 = H.k1();
   const int s1p = index / (I.spots-k0);
@@ -94,10 +112,9 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT
   return c;
 }
 
-static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_CONSTANT const halfsuper_t* all_wins,
-                                         const int n, const int s0) {
+static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const int n, const int s0) {
   set0_info_t I0;
-  const helper_t H{I, n};
+  const helper_t<> H{I, n};
   const auto sets0 = H.sets0();
   const int k0 = H.k0();
   const int k1 = H.k1();
@@ -181,21 +198,21 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, METAL_C
 }
 
 template<class Workspace> static inline void
-inner(METAL_CONSTANT const info_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
+inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
       METAL_CONSTANT const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
-      const int n, METAL_CONSTANT const set0_info_t& I0, const int s1p) {
-  const helper_t H{I, n};
+      METAL_CONSTANT const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
-  const auto input = slice(workspace, I.spaces[n+1]);
-  const auto output = slice(workspace, I.spaces[n]);
+  const auto input = slice(workspace, I.input);
+  const auto output = slice(workspace, I.output);
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
-  const auto all_wins0_next = all_wins + H.sets1().size;
+  const auto all_wins0_next = all_wins + I.sets1.size;
 
   // Learn that these are constants
+  const int n = I.n;
   const int spots = I.spots;
   const int slice = I.slice;
-  const int k0 = H.k0();
-  const int k1 = H.k1();
+  const int k0 = I.k0;
+  const int k1 = I.k1;
 
   // Convert indices
   uint32_t filled1p = 0;

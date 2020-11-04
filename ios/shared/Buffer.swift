@@ -43,16 +43,30 @@ class Buffer<T>: BufferLike {
 }
 
 class GPUBuffer<T>: BufferLike {
+  let offset: Int
   let count: Int
   let data: MTLBuffer
 
   init(_ device: MTLDevice, _ count: Int) {
+    offset = 0
     self.count = count
     data = MakeBuffer<T>(device).gpu(count: count)
   }
 
+  init(_ src: GPUBuffer<T>, _ r: Range<Int>) {
+    assert(0 <= r.lowerBound)
+    assert(r.upperBound <= src.count)
+    offset = src.offset + r.lowerBound
+    count = r.count
+    data = src.data
+  }
+
+  subscript(r: Range<Int>) -> GPUBuffer<T> {
+    get { GPUBuffer<T>(self, r) }
+  }
+
   func set(_ compute: MTLComputeCommandEncoder, index: Int) {
-    compute.setBuffer(data, offset: 0, index: index)
+    compute.setBuffer(data, offset: offset * MemoryLayout<T>.size, index: index)
   }
 }
 

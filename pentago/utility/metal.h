@@ -27,12 +27,14 @@ NAMESPACE_PENTAGO
 #ifdef __METAL_VERSION__
 #define METAL_CONSTANT constant
 #define METAL_DEVICE device
+#define METAL_THREAD thread
 #define METAL_GLOBAL constant
 #define METAL_INLINE
 #define NONMETAL_ASSERT(...) ((void)0)
 #else
 #define METAL_CONSTANT
 #define METAL_DEVICE
+#define METAL_THREAD
 #define METAL_GLOBAL const
 #define METAL_INLINE static inline
 #define NONMETAL_ASSERT(...) assert(__VA_ARGS__)

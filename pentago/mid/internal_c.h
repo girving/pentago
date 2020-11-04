@@ -8,6 +8,7 @@
 
 typedef struct grab_t_ {
   int ny, lo;
+  int size;
 } grab_t;
 
 // Constant information for an entire midsolve computation
@@ -16,10 +17,21 @@ typedef struct info_t_ {
   int slice, spots;
   empty_t empty;
   grab_t spaces[18+2];  // output = spaces[n], input = spaces[n+1]
-  int sets1p_offsets[18+2];  // sets1p_offsets[n] = sum_{k < n} sets1p(n).size
-  int cs1ps_offsets[18+2];  // cs1ps_offsets[n] = sum_{k < n} cs1ps_size[k]
-  int wins_offsets[18+2];  // wins_offsets[n] = sum_{k < n} wins_size[k]
+
+  // Sums of sizes of temporary arrays up to each n
+  int sets0_offsets[18+2];
+  int sets1p_offsets[18+2];
+  int cs1ps_offsets[18+2];  // Rounded to even for alignment
+  int wins_offsets[18+2];
 } info_t;
+
+// Information needed for inner
+typedef struct inner_t_ {
+  int n, spots, slice, k0, k1;
+  sets_t sets1;
+  int sets1p_size;
+  grab_t input, output;
+} inner_t;
 
 // Everything that's a function of just s0 in the double loop in midsolve_loop
 typedef struct set0_info_t_ {
