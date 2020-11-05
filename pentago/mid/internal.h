@@ -61,7 +61,7 @@ static inline info_t make_info(const high_board_t root, const int workspace_size
     const helper_t<METAL_THREAD const info_t&> H{I, n};
     I.sets0_offsets[n+1] = I.sets0_offsets[n] + H.sets0().size;
     I.sets1p_offsets[n+1] = I.sets1p_offsets[n] + H.sets1p().size;
-    I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + (H.cs1ps_size()+1&~1);  // Round to even for alignment
+    I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + H.cs1ps_size();
     I.wins_offsets[n+1] = I.wins_offsets[n] + H.sets1().size + H.sets0_next().size;
     I.spaces[n] = make_grab(!(n&1), H.sets1().size, choose(I.spots-H.k1(), H.k0()), workspace_size);
   }
@@ -79,6 +79,10 @@ static inline inner_t make_inner(METAL_CONSTANT const info_t& I, const int n) {
   N.k1 = H.k1();
   N.sets1 = H.sets1();
   N.sets1p_size = H.sets1p().size;
+  N.sets0_offset = I.sets0_offsets[n];
+  N.sets1p_offset = I.sets1p_offsets[n];
+  N.cs1ps_offset = I.cs1ps_offsets[n];
+  N.wins_offset = I.wins_offsets[n];
   N.input = I.spaces[n+1];
   N.output = I.spaces[n];
   return N;

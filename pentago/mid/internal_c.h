@@ -30,6 +30,7 @@ typedef struct inner_t_ {
   int n, spots, slice, k0, k1;
   sets_t sets1;
   int sets1p_size;
+  int sets0_offset, sets1p_offset, cs1ps_offset, wins_offset;
   grab_t input, output;
 } inner_t;
 

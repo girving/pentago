@@ -63,26 +63,26 @@ class MidSolver {
     let I0 = GPUBuffer<set0_info_t>(device, total(I.sets0_offsets))
     let results = Buffer<halfsupers_t>(device, 37 - board.count)
 
-    // Compute pass
+    // Prepare compute pass
     let start = CACurrentMediaTime()
     let capture = makeCapture(device, on: false)
     let commands = queue.makeCommandBuffer()!
     let compute = commands.makeComputeCommandEncoder()!
+
+    // Helper computations
     self.sets1p.run(compute, [Small(I), sets1p], sets1p.count)
     wins.run(compute, [Small(I), allWins], allWins.count)
     self.cs1ps.run(compute, [Small(I), sets1p, cs1ps], cs1ps.count)
     set0Info.run(compute, [Small(I), I0], I0.count)
+
+    // Midsolve!
+    // We use manual binding to avoid rundandant PipelineStateObject binding warnings
+    compute.setComputePipelineState(inner.pipeline)
+    set(compute, [cs1ps, sets1p, allWins, I0, results] + workspace.chunks, 1..<10)
     for n in (0...spots).reversed() {
       let N = make_inner_t(I, Int32(n))
-      func slice<T>(_ buffer: GPUBuffer<T>, _ offsets: Offsets) -> GPUBuffer<T> {
-        let o = asarray(offsets)
-        return buffer[Int(o[n])..<Int(o[n+1])]
-      }
-      inner.run(compute, [Small(N),
-                          slice(cs1ps, I.cs1ps_offsets),
-                          slice(sets1p, I.sets1p_offsets),
-                          slice(allWins, I.wins_offsets),
-                          slice(I0, I.sets0_offsets), results] + workspace.chunks, Int(N.output.size))
+      setBytes(compute, N, index: 0)
+      dispatch(compute, inner.pipeline, Int(N.output.size))
     }
     compute.endEncoding()
     commands.commit()

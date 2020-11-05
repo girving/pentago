@@ -74,10 +74,11 @@ func dispatch(_ compute: MTLComputeCommandEncoder, _ pipeline: MTLComputePipelin
   // compute.dispatchThreads(MTLSizeMake(count, 1, 1), threadsPerThreadgroup: MTLSizeMake(t, 1, 1))
 }
 
-// Set pipeline state and then dispatch
-func dispatchSet(_ compute: MTLComputeCommandEncoder, _ pipeline: MTLComputePipelineState, _ count: Int) {
-  compute.setComputePipelineState(pipeline)
-  dispatch(compute, pipeline, count)
+func set(_ compute: MTLComputeCommandEncoder, _ buffers: [BufferLike], _ r: Range<Int>) {
+  assert(buffers.count == r.count)
+  for i in r {
+    buffers[i - r.lowerBound].set(compute, index: i)
+  }
 }
 
 class Compute {
@@ -87,11 +88,9 @@ class Compute {
     pipeline = try! device.makeComputePipelineState(function: function(lib, f))
   }
 
-  func run(_ compute: MTLComputeCommandEncoder, _ buffers: Array<BufferLike>, _ count: Int) {
+  func run(_ compute: MTLComputeCommandEncoder, _ buffers: [BufferLike], _ count: Int) {
     compute.setComputePipelineState(pipeline)
-    for i in 0..<buffers.count {
-      buffers[i].set(compute, index: i)
-    }
+    set(compute, buffers, 0..<buffers.count)
     dispatch(compute, pipeline, count)
   }
 }

@@ -43,8 +43,6 @@ kernel void cs1ps(constant info_t* I [[buffer(0)]],
                   device uint16_t* cs1ps [[buffer(2)]],
                   const uint index [[thread_position_in_grid]]) {
   SEARCH(i, cs1ps_offsets)
-  const helper_t<> H{*I, n};
-  if (i >= H.cs1ps_size()) return;
   const auto sets1p_n = sets1p + I->sets1p_offsets[n];
   cs1ps[index] = make_cs1ps(*I, sets1p_n, n, i);
 }
@@ -82,7 +80,7 @@ workspace_io_t slice(const workspace_t w, const grab_t g) {
 kernel void inner(constant inner_t* I [[buffer(0)]],
                   constant uint16_t* cs1ps [[buffer(1)]],
                   constant set_t* sets1p [[buffer(2)]],
-                  constant halfsuper_t* all_wins [[buffer(3)]],
+                  constant halfsuper_t* wins [[buffer(3)]],
                   constant set0_info_t* I0 [[buffer(4)]],
                   device halfsupers_t* results [[buffer(5)]],
                   device halfsupers_t* workspace0 [[buffer(6)]],
@@ -94,5 +92,6 @@ kernel void inner(constant inner_t* I [[buffer(0)]],
   const auto s0 = s / I->sets1p_size;
   const auto s1p = s - s0 * I->sets1p_size;
   const workspace_t w{{workspace0, workspace1, workspace2, workspace3}};
-  pentago::inner(*I, cs1ps, sets1p, all_wins, results, w, I0[s0], s1p);
+  pentago::inner(*I, cs1ps + I->cs1ps_offset, sets1p + I->sets1p_offset,
+                 wins + I->wins_offset, results, w, I0[I->sets0_offset + s0], s1p);
 }
