@@ -1,11 +1,11 @@
 // Internal routines for midengine.cc and metal equivalent
 #pragma once
 
-#include "pentago/mid/internal_c.h"
-#include "pentago/mid/midengine_c.h"
-#include "pentago/mid/halfsuper.h"
-#include "pentago/mid/subsets.h"
-#include "pentago/utility/integer_log.h"
+#include "internal_c.h"
+#include "midengine_c.h"
+#include "halfsuper.h"
+#include "subsets.h"
+#include "../utility/integer_log.h"
 NAMESPACE_PENTAGO
 
 template<class info_ref=METAL_CONSTANT const info_t&> struct helper_t {

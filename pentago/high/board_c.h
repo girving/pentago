@@ -9,7 +9,8 @@
 // a trailing 'm'.  For example, 1m.
 #pragma once
 
-#include "pentago/base/board_c.h"
+#include "board_c.h"
+#include "../utility/metal.h"
 
 typedef struct high_board_s_ {
   uint64_t side_[2];  // black, white (first player, second player)

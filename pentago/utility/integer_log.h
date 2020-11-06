@@ -1,8 +1,8 @@
 // Base 2 logarithms of integers and related functions.  Inexact versions round down.
 #pragma once
 
-#include "pentago/utility/metal.h"
-#include "pentago/utility/wasm.h"
+#include "metal.h"
+#include "wasm.h"
 NAMESPACE_PENTAGO
 
 #if PENTAGO_CPP

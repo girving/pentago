@@ -1,7 +1,7 @@
 // Board definitions and utility functions
 #pragma once
 
-#include "pentago/utility/metal.h"
+#include "../utility/metal.h"
 
 // Each board is divided into 4 quadrants, and each quadrant is stored
 // in one of the 16-bit quarters of a 64-bit int.  Within a quadrant,

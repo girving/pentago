@@ -1,7 +1,7 @@
 // Fixed size vectors
 #pragma once
 
-#include "pentago/utility/wasm.h"
+#include "wasm.h"
 #include <algorithm>
 #include <cassert>
 #ifndef __wasm__

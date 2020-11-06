@@ -1,16 +1,16 @@
 // Solve positions near the end of the game using downstream retrograde analysis
 
-#include "pentago/mid/midengine.h"
-#include "pentago/mid/internal.h"
-#include "pentago/mid/subsets.h"
-#include "pentago/base/symmetry.h"
-#include "pentago/utility/ceil_div.h"
-#include "pentago/utility/debug.h"
-#include "pentago/utility/integer_log.h"
-#include "pentago/utility/wasm_alloc.h"
+#include "midengine.h"
+#include "internal.h"
+#include "subsets.h"
+#include "../base/symmetry.h"
+#include "../utility/ceil_div.h"
+#include "../utility/debug.h"
+#include "../utility/integer_log.h"
+#include "../utility/wasm_alloc.h"
 #ifndef __wasm__
-#include "pentago/utility/aligned.h"
-#include "pentago/utility/log.h"
+#include "../utility/aligned.h"
+#include "../utility/log.h"
 #endif  // !__wasm__
 NAMESPACE_PENTAGO
 

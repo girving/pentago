@@ -1,8 +1,8 @@
 // WebAssembly allocation
 #pragma once
 
-#include "pentago/utility/array.h"
-#include "pentago/utility/wasm.h"
+#include "array.h"
+#include "wasm.h"
 #include <cstddef>
 #if defined(__wasm__) && !defined(__APPLE__)
 namespace pentago {

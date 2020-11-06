@@ -14,9 +14,6 @@
 		A60A140E254197E800C7CA4D /* MetalUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60A140D254197E800C7CA4D /* MetalUtils.swift */; };
 		A60A14122541995600C7CA4D /* Buffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60A14112541995600C7CA4D /* Buffer.swift */; };
 		A6255A4E253DDF8A00CBF8CE /* Tests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6255A4D253DDF8A00CBF8CE /* Tests.swift */; };
-		A632C9542548DE8700ED687E /* halfsuper.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D782548DD780093281B /* halfsuper.cc */; };
-		A632C9552548DE8700ED687E /* midengine.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D792548DD780093281B /* midengine.cc */; };
-		A632C9562548DE8700ED687E /* board.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D732548DD610093281B /* board.cc */; };
 		A632C9572548DE8700ED687E /* c_board.cc in Sources */ = {isa = PBXBuildFile; fileRef = A608BC62253DA54C00140200 /* c_board.cc */; };
 		A632C95B2548DE9400ED687E /* Board.swift in Sources */ = {isa = PBXBuildFile; fileRef = A608BC5B253DA51300140200 /* Board.swift */; };
 		A632C95C2548DE9400ED687E /* Games.swift in Sources */ = {isa = PBXBuildFile; fileRef = A608BC5A253DA51300140200 /* Games.swift */; };
@@ -26,6 +23,8 @@
 		A632C9602548DE9400ED687E /* midsolve.metal in Sources */ = {isa = PBXBuildFile; fileRef = A69EB7782541CCE300875932 /* midsolve.metal */; };
 		A632C9612548DE9400ED687E /* TestUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A66FA5002548CE1700DAE3BD /* TestUtils.swift */; };
 		A632C9652548DEB300ED687E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6BE0D26253DA29500A97821 /* ContentView.swift */; };
+		A665F41B2555595F000943E3 /* board.cc in Sources */ = {isa = PBXBuildFile; fileRef = A665F41A2555595F000943E3 /* board.cc */; };
+		A665F42B25555980000943E3 /* midengine.cc in Sources */ = {isa = PBXBuildFile; fileRef = A665F42825555980000943E3 /* midengine.cc */; };
 		A66FA5012548CE1700DAE3BD /* TestUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A66FA5002548CE1700DAE3BD /* TestUtils.swift */; };
 		A66FA50D2548DA7600DAE3BD /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A66FA50C2548DA7600DAE3BD /* AppDelegate.swift */; };
 		A66FA5112548DA7600DAE3BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A66FA5102548DA7600DAE3BD /* Assets.xcassets */; };
@@ -33,9 +32,6 @@
 		A66FA5172548DA7700DAE3BD /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = A66FA5152548DA7700DAE3BD /* Main.storyboard */; };
 		A6788153254E1E43007E1222 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6788152254E1E43007E1222 /* Utils.swift */; };
 		A6788154254E1E43007E1222 /* Utils.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6788152254E1E43007E1222 /* Utils.swift */; };
-		A6840D742548DD610093281B /* board.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D732548DD610093281B /* board.cc */; };
-		A6840D7A2548DD780093281B /* halfsuper.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D782548DD780093281B /* halfsuper.cc */; };
-		A6840D7B2548DD780093281B /* midengine.cc in Sources */ = {isa = PBXBuildFile; fileRef = A6840D792548DD780093281B /* midengine.cc */; };
 		A69EB7792541CCE300875932 /* midsolve.metal in Sources */ = {isa = PBXBuildFile; fileRef = A69EB7782541CCE300875932 /* midsolve.metal */; };
 		A6BE0D25253DA29500A97821 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6BE0D24253DA29500A97821 /* App.swift */; };
 		A6BE0D27253DA29500A97821 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6BE0D26253DA29500A97821 /* ContentView.swift */; };
@@ -65,6 +61,38 @@
 		A6255A4B253DDF8A00CBF8CE /* tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6255A4D253DDF8A00CBF8CE /* Tests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests.swift; sourceTree = "<group>"; };
 		A6255A4F253DDF8A00CBF8CE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A665F4182555595F000943E3 /* board_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = board_c.h; path = ../../../pentago/high/board_c.h; sourceTree = "<group>"; };
+		A665F4192555595F000943E3 /* board.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = board.h; path = ../../../pentago/high/board.h; sourceTree = "<group>"; };
+		A665F41A2555595F000943E3 /* board.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = board.cc; path = ../../../pentago/high/board.cc; sourceTree = "<group>"; };
+		A665F42025555980000943E3 /* midengine.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = midengine.h; path = ../../../pentago/mid/midengine.h; sourceTree = "<group>"; };
+		A665F42125555980000943E3 /* subsets.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = subsets.h; path = ../../../pentago/mid/subsets.h; sourceTree = "<group>"; };
+		A665F42225555980000943E3 /* halfsuper_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = halfsuper_c.h; path = ../../../pentago/mid/halfsuper_c.h; sourceTree = "<group>"; };
+		A665F42325555980000943E3 /* halfsuper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = halfsuper.h; path = ../../../pentago/mid/halfsuper.h; sourceTree = "<group>"; };
+		A665F42425555980000943E3 /* subsets_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = subsets_c.h; path = ../../../pentago/mid/subsets_c.h; sourceTree = "<group>"; };
+		A665F42525555980000943E3 /* internal_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = internal_c.h; path = ../../../pentago/mid/internal_c.h; sourceTree = "<group>"; };
+		A665F42625555980000943E3 /* midengine_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = midengine_c.h; path = ../../../pentago/mid/midengine_c.h; sourceTree = "<group>"; };
+		A665F42825555980000943E3 /* midengine.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = midengine.cc; path = ../../../pentago/mid/midengine.cc; sourceTree = "<group>"; };
+		A665F42925555980000943E3 /* internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = internal.h; path = ../../../pentago/mid/internal.h; sourceTree = "<group>"; };
+		A665F43A25555AE5000943E3 /* metal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = metal.h; path = ../../../pentago/utility/metal.h; sourceTree = "<group>"; };
+		A665F43B25555AE5000943E3 /* wasm.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = wasm.h; path = ../../../pentago/utility/wasm.h; sourceTree = "<group>"; };
+		A665F43C25555AED000943E3 /* board_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = board_c.h; path = ../../../pentago/base/board_c.h; sourceTree = "<group>"; };
+		A665F43D25555AED000943E3 /* board.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = board.h; path = ../../../pentago/base/board.h; sourceTree = "<group>"; };
+		A665F44125555B65000943E3 /* sse.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = sse.h; path = ../../../pentago/utility/sse.h; sourceTree = "<group>"; };
+		A665F44525555B73000943E3 /* zero.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = zero.h; path = ../../../pentago/utility/zero.h; sourceTree = "<group>"; };
+		A665F44925555B9F000943E3 /* integer_log.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = integer_log.h; path = ../../../pentago/utility/integer_log.h; sourceTree = "<group>"; };
+		A665F44E25555BD9000943E3 /* halfsuper_wins.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = halfsuper_wins.h; path = "../../../../../../../var/tmp/_bazel_irving/67848f2e8cf465c6ab490abca28e32fb/execroot/pentago/bazel-out/darwin-opt/bin/pentago/base/gen/halfsuper_wins.h"; sourceTree = "<group>"; };
+		A665F4602555A76F000943E3 /* array.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = array.h; path = ../../../pentago/utility/array.h; sourceTree = "<group>"; };
+		A665F4612555A76F000943E3 /* popcount.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = popcount.h; path = ../../../pentago/utility/popcount.h; sourceTree = "<group>"; };
+		A665F4652555A788000943E3 /* vector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = vector.h; path = ../../../pentago/utility/vector.h; sourceTree = "<group>"; };
+		A665F4692555A7AA000943E3 /* score.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = score.h; path = ../../../pentago/base/score.h; sourceTree = "<group>"; };
+		A665F46A2555A7AA000943E3 /* superscore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = superscore.h; path = ../../../pentago/base/superscore.h; sourceTree = "<group>"; };
+		A665F46B2555A7BA000943E3 /* pile.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = pile.h; path = ../../../pentago/utility/pile.h; sourceTree = "<group>"; };
+		A665F46F2555A7F8000943E3 /* debug.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = debug.h; path = ../../../pentago/utility/debug.h; sourceTree = "<group>"; };
+		A665F4732555A82E000943E3 /* index.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = index.h; path = ../../../pentago/utility/index.h; sourceTree = "<group>"; };
+		A665F4772555A852000943E3 /* format.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = format.h; path = ../../../pentago/utility/format.h; sourceTree = "<group>"; };
+		A665F4782555A852000943E3 /* exceptions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = exceptions.h; path = ../../../pentago/utility/exceptions.h; sourceTree = "<group>"; };
+		A665F47C2555A895000943E3 /* range.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = range.h; path = ../../../pentago/utility/range.h; sourceTree = "<group>"; };
+		A665F4802555A8AF000943E3 /* endian.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = endian.h; path = ../../../pentago/utility/endian.h; sourceTree = "<group>"; };
 		A66FA5002548CE1700DAE3BD /* TestUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestUtils.swift; sourceTree = "<group>"; };
 		A66FA50A2548DA7600DAE3BD /* pentago mac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "pentago mac.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A66FA50C2548DA7600DAE3BD /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -74,9 +102,6 @@
 		A66FA5182548DA7700DAE3BD /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A66FA5192548DA7700DAE3BD /* mac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = mac.entitlements; sourceTree = "<group>"; };
 		A6788152254E1E43007E1222 /* Utils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utils.swift; sourceTree = "<group>"; };
-		A6840D732548DD610093281B /* board.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = board.cc; path = ../../pentago/high/board.cc; sourceTree = "<group>"; };
-		A6840D782548DD780093281B /* halfsuper.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = halfsuper.cc; path = ../../pentago/mid/halfsuper.cc; sourceTree = "<group>"; };
-		A6840D792548DD780093281B /* midengine.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = midengine.cc; path = ../../pentago/mid/midengine.cc; sourceTree = "<group>"; };
 		A69EB7782541CCE300875932 /* midsolve.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = midsolve.metal; sourceTree = "<group>"; };
 		A6BE0D21253DA29500A97821 /* pentago ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "pentago ios.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6BE0D24253DA29500A97821 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
@@ -120,6 +145,85 @@
 			path = tests;
 			sourceTree = "<group>";
 		};
+		A665F413255558F1000943E3 /* pentago */ = {
+			isa = PBXGroup;
+			children = (
+				A665F43525555A74000943E3 /* utility */,
+				A665F43625555A7A000943E3 /* base */,
+				A665F41F25555965000943E3 /* mid */,
+				A665F4172555592A000943E3 /* high */,
+			);
+			path = pentago;
+			sourceTree = "<group>";
+		};
+		A665F4172555592A000943E3 /* high */ = {
+			isa = PBXGroup;
+			children = (
+				A665F4182555595F000943E3 /* board_c.h */,
+				A665F41A2555595F000943E3 /* board.cc */,
+				A665F4192555595F000943E3 /* board.h */,
+			);
+			path = high;
+			sourceTree = "<group>";
+		};
+		A665F41F25555965000943E3 /* mid */ = {
+			isa = PBXGroup;
+			children = (
+				A665F42225555980000943E3 /* halfsuper_c.h */,
+				A665F42325555980000943E3 /* halfsuper.h */,
+				A665F42525555980000943E3 /* internal_c.h */,
+				A665F42925555980000943E3 /* internal.h */,
+				A665F42625555980000943E3 /* midengine_c.h */,
+				A665F42825555980000943E3 /* midengine.cc */,
+				A665F42025555980000943E3 /* midengine.h */,
+				A665F42425555980000943E3 /* subsets_c.h */,
+				A665F42125555980000943E3 /* subsets.h */,
+			);
+			path = mid;
+			sourceTree = "<group>";
+		};
+		A665F43525555A74000943E3 /* utility */ = {
+			isa = PBXGroup;
+			children = (
+				A665F4802555A8AF000943E3 /* endian.h */,
+				A665F47C2555A895000943E3 /* range.h */,
+				A665F4782555A852000943E3 /* exceptions.h */,
+				A665F4772555A852000943E3 /* format.h */,
+				A665F4732555A82E000943E3 /* index.h */,
+				A665F46F2555A7F8000943E3 /* debug.h */,
+				A665F46B2555A7BA000943E3 /* pile.h */,
+				A665F4652555A788000943E3 /* vector.h */,
+				A665F4602555A76F000943E3 /* array.h */,
+				A665F4612555A76F000943E3 /* popcount.h */,
+				A665F44925555B9F000943E3 /* integer_log.h */,
+				A665F44525555B73000943E3 /* zero.h */,
+				A665F44125555B65000943E3 /* sse.h */,
+				A665F43A25555AE5000943E3 /* metal.h */,
+				A665F43B25555AE5000943E3 /* wasm.h */,
+			);
+			path = utility;
+			sourceTree = "<group>";
+		};
+		A665F43625555A7A000943E3 /* base */ = {
+			isa = PBXGroup;
+			children = (
+				A665F44D25555BC0000943E3 /* gen */,
+				A665F43C25555AED000943E3 /* board_c.h */,
+				A665F43D25555AED000943E3 /* board.h */,
+				A665F4692555A7AA000943E3 /* score.h */,
+				A665F46A2555A7AA000943E3 /* superscore.h */,
+			);
+			path = base;
+			sourceTree = "<group>";
+		};
+		A665F44D25555BC0000943E3 /* gen */ = {
+			isa = PBXGroup;
+			children = (
+				A665F44E25555BD9000943E3 /* halfsuper_wins.h */,
+			);
+			path = gen;
+			sourceTree = "<group>";
+		};
 		A66FA50B2548DA7600DAE3BD /* mac */ = {
 			isa = PBXGroup;
 			children = (
@@ -144,9 +248,6 @@
 		A6840D722548DD040093281B /* shared */ = {
 			isa = PBXGroup;
 			children = (
-				A6840D782548DD780093281B /* halfsuper.cc */,
-				A6840D792548DD780093281B /* midengine.cc */,
-				A6840D732548DD610093281B /* board.cc */,
 				A608BC62253DA54C00140200 /* c_board.cc */,
 				A608BC61253DA54C00140200 /* c_board.h */,
 				A608BC60253DA54B00140200 /* bridge.h */,
@@ -166,6 +267,7 @@
 		A6BE0D18253DA29500A97821 = {
 			isa = PBXGroup;
 			children = (
+				A665F413255558F1000943E3 /* pentago */,
 				A6840D722548DD040093281B /* shared */,
 				A6BE0D23253DA29500A97821 /* ios */,
 				A66FA50B2548DA7600DAE3BD /* mac */,
@@ -351,9 +453,6 @@
 				A632C95F2548DE9400ED687E /* Buffer.swift in Sources */,
 				A632C9602548DE9400ED687E /* midsolve.metal in Sources */,
 				A632C9612548DE9400ED687E /* TestUtils.swift in Sources */,
-				A632C9542548DE8700ED687E /* halfsuper.cc in Sources */,
-				A632C9552548DE8700ED687E /* midengine.cc in Sources */,
-				A632C9562548DE8700ED687E /* board.cc in Sources */,
 				A632C9572548DE8700ED687E /* c_board.cc in Sources */,
 				A66FA50D2548DA7600DAE3BD /* AppDelegate.swift in Sources */,
 			);
@@ -365,18 +464,17 @@
 			files = (
 				A608BC5C253DA51300140200 /* Games.swift in Sources */,
 				A6BE0D27253DA29500A97821 /* ContentView.swift in Sources */,
-				A6840D7A2548DD780093281B /* halfsuper.cc in Sources */,
 				A6788153254E1E43007E1222 /* Utils.swift in Sources */,
 				A69EB7792541CCE300875932 /* midsolve.metal in Sources */,
+				A665F41B2555595F000943E3 /* board.cc in Sources */,
 				A60A140A254196CF00C7CA4D /* MidSolver.swift in Sources */,
+				A665F42B25555980000943E3 /* midengine.cc in Sources */,
 				A66FA5012548CE1700DAE3BD /* TestUtils.swift in Sources */,
 				A608BC63253DA54C00140200 /* c_board.cc in Sources */,
 				A608BC5D253DA51300140200 /* Board.swift in Sources */,
 				A60A14122541995600C7CA4D /* Buffer.swift in Sources */,
 				A6BE0D25253DA29500A97821 /* App.swift in Sources */,
-				A6840D742548DD610093281B /* board.cc in Sources */,
 				A60A140E254197E800C7CA4D /* MetalUtils.swift in Sources */,
-				A6840D7B2548DD780093281B /* midengine.cc in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -409,6 +507,7 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = BGA888BFLP;
+				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = tests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -422,10 +521,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/pentago ios.app/pentago ios";
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = (
-					..,
-					"../bazel-bin",
-				);
 			};
 			name = Debug;
 		};
@@ -436,6 +531,7 @@
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = BGA888BFLP;
+				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = tests/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -449,10 +545,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/pentago ios.app/pentago ios";
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = (
-					..,
-					"../bazel-bin",
-				);
 			};
 			name = Release;
 		};
@@ -475,16 +567,11 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MTL_HEADER_SEARCH_PATHS = ".. ../bazel-bin";
 				PRODUCT_BUNDLE_IDENTIFIER = naml.pentago;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = shared/bridge.h;
 				SWIFT_VERSION = 5.0;
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = (
-					..,
-					"../bazel-bin",
-				);
 			};
 			name = Debug;
 		};
@@ -507,16 +594,11 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MTL_HEADER_SEARCH_PATHS = ".. ../bazel-bin";
 				PRODUCT_BUNDLE_IDENTIFIER = naml.pentago;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = shared/bridge.h;
 				SWIFT_VERSION = 5.0;
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = (
-					..,
-					"../bazel-bin",
-				);
 			};
 			name = Release;
 		};
@@ -670,7 +752,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MTL_HEADER_SEARCH_PATHS = ".. ../bazel-bin";
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = naml.pentago;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -678,10 +760,6 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = (
-					..,
-					"../bazel-bin",
-				);
 				USE_HEADERMAP = YES;
 			};
 			name = Debug;
@@ -705,17 +783,12 @@
 					"@executable_path/Frameworks",
 				);
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				MTL_HEADER_SEARCH_PATHS = ".. ../bazel-bin";
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = naml.pentago;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = shared/bridge.h;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				"USER_HEADER_SEARCH_PATHS[arch=*]" = (
-					..,
-					"../bazel-bin",
-				);
 				USE_HEADERMAP = YES;
 			};
 			name = Release;

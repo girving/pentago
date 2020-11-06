@@ -1,0 +1,1 @@
+../../../../bazel-bin/pentago/base/gen/halfsuper_wins.h

@@ -1,7 +1,7 @@
 // Helper class for zero-only init
 #pragma once
 
-#include "pentago/utility/wasm.h"
+#include "wasm.h"
 NAMESPACE_PENTAGO
 
 struct zero {};

@@ -8,9 +8,9 @@
 
 #include <type_traits>
 #include <limits>
-#include "pentago/utility/exceptions.h"
-#include "pentago/utility/format.h"
-#include "pentago/utility/wasm.h"
+#include "exceptions.h"
+#include "format.h"
+#include "wasm.h"
 namespace pentago {
 
 #ifndef __wasm__

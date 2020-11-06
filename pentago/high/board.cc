@@ -1,11 +1,11 @@
 // High level interface to board
 
-#include "pentago/high/board.h"
-#include "pentago/base/score.h"
-#include "pentago/base/symmetry.h"
-#include "pentago/mid/halfsuper.h"
+#include "board.h"
+#include "../base/superscore.h"
+#include "../base/symmetry.h"
+#include "../mid/halfsuper.h"
 #ifndef __wasm__
-#include "pentago/utility/random.h"
+#include "../utility/random.h"
 #endif  // !__wasm__
 NAMESPACE_PENTAGO
 

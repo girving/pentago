@@ -1,9 +1,9 @@
 // Midgame solver in metal
 
 #include <metal_stdlib>
-#include "pentago/mid/subsets.h"
-#include "pentago/mid/internal.h"
-#include "pentago/base/gen/halfsuper_wins.h"
+#include "../pentago/mid/subsets.h"
+#include "../pentago/mid/internal.h"
+#include "../pentago/base/gen/halfsuper_wins.h"
 using namespace metal;
 using namespace pentago;
 

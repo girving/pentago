@@ -1,7 +1,7 @@
 // Metal utilities
 #pragma once
 
-#include "pentago/utility/wasm.h"
+#include "wasm.h"
 #ifdef __METAL_VERSION__
 #include <metal_stdlib>
 #else

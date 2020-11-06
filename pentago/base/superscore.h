@@ -18,12 +18,12 @@
 // If you think the bit twiddling code in this file is complicated, look at base/symmetry.cpp.
 #pragma once
 
-#include "pentago/base/board.h"
-#include "pentago/utility/endian.h"
-#include "pentago/utility/popcount.h"
-#include "pentago/utility/sse.h"
-#include "pentago/utility/vector.h"
-#include "pentago/utility/zero.h"
+#include "board.h"
+#include "../utility/endian.h"
+#include "../utility/popcount.h"
+#include "../utility/sse.h"
+#include "../utility/vector.h"
+#include "../utility/zero.h"
 namespace pentago {
 
 // A subset of the rotation group Z_4^4 represented as a 256 bit mask.

@@ -42,9 +42,9 @@
  * I.e., there is no difference.  That's extremely convenient.
  */
 
-#include "pentago/mid/halfsuper_c.h"
+#include "halfsuper_c.h"
 #if PENTAGO_CPP
-#include "pentago/base/superscore.h"
+#include "../base/superscore.h"
 #endif
 NAMESPACE_PENTAGO
 

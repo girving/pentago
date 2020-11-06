@@ -1,0 +1,1 @@
+../../../pentago/base/score.h

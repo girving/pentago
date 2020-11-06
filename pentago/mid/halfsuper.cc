@@ -1,9 +1,13 @@
 // Half of a super_t, by parity
 
-#include "pentago/mid/halfsuper.h"
+#include "halfsuper.h"
+#if defined(__APPLE__) && defined(__wasm__)
+#include "../base/gen/halfsuper_wins.h"
+#else
 #include "pentago/base/gen/halfsuper_wins.h"
-#include "pentago/data/filter.h" // For interleave and uninterleave
-#include "pentago/utility/array.h"
+#endif
+#include "../data/filter.h" // For interleave and uninterleave
+#include "../utility/array.h"
 namespace pentago {
 
 // Mask of even parity bits in a super_t, for use in split and merge

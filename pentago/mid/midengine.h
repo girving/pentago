@@ -9,10 +9,10 @@
 // the particular board, which is perfectly suited for use as a web service.
 #pragma once
 
-#include "pentago/mid/midengine_c.h"
-#include "pentago/mid/halfsuper.h"
-#include "pentago/high/board.h"
-#include "pentago/utility/pile.h"
+#include "midengine_c.h"
+#include "halfsuper.h"
+#include "../high/board.h"
+#include "../utility/pile.h"
 #include <tuple>
 NAMESPACE_PENTAGO
 

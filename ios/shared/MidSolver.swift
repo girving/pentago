@@ -65,7 +65,7 @@ class MidSolver {
 
     // Prepare compute pass
     let start = CACurrentMediaTime()
-    let capture = makeCapture(device, on: false)
+    let capture = makeCapture(device, on: false, once: true)
     let commands = queue.makeCommandBuffer()!
     let compute = commands.makeComputeCommandEncoder()!
 
@@ -86,7 +86,7 @@ class MidSolver {
     }
     compute.endEncoding()
     commands.commit()
-    capture.stopCapture()
+    capture.stop()
 
     commands.waitUntilCompleted()
     let elapsed = CACurrentMediaTime() - start

@@ -8,8 +8,8 @@
 // In the comments below, x' is the inverse of x.
 #pragma once
 
-#include "pentago/base/board.h"
-#include "pentago/base/superscore.h"
+#include "board.h"
+#include "superscore.h"
 namespace pentago {
 
 using std::tuple;

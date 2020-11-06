@@ -9,8 +9,8 @@
 // the particular board, which is perfectly suited for use as a web service.
 #pragma once
 
-#include "pentago/mid/halfsuper_c.h"
-#include "pentago/high/board_c.h"
+#include "halfsuper_c.h"
+#include "../high/board_c.h"
 
 typedef struct halfsupers_t_ {
   halfsuper_s win, notlose;

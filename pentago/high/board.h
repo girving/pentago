@@ -9,11 +9,11 @@
 // a trailing 'm'.  For example, 1m.
 #pragma once
 
-#include "pentago/high/board_c.h"
+#include "board_c.h"
 #if PENTAGO_CPP
-#include "pentago/base/board.h"
-#include "pentago/utility/array.h"
-#include "pentago/utility/vector.h"
+#include "../base/board.h"
+#include "../utility/array.h"
+#include "../utility/vector.h"
 #endif
 NAMESPACE_PENTAGO
 

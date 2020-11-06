@@ -7,12 +7,12 @@
 // heavily on lookup tables, computed at compile time by precompute.py.
 #pragma once
 
-#include "pentago/base/board_c.h"
+#include "board_c.h"
 #include <cassert>
-#include "pentago/utility/array.h"
-#include "pentago/utility/popcount.h"
-#include "pentago/base/gen/tables.h"
+#include "../utility/array.h"
+#include "../utility/popcount.h"
 #ifndef __wasm__
+#include "pentago/base/gen/tables.h"
 #include "pentago/utility/random.h"
 #include <string>
 #endif

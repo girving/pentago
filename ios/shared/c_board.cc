@@ -1,9 +1,10 @@
 // C interface to high_board_t, since Swift can't interoperate with C++.
 
 #include "c_board.h"
-#include "pentago/high/board.h"
-#include "pentago/mid/midengine.h"
-#include "pentago/mid/internal.h"
+#include "../pentago/high/board.h"
+#include "../pentago/mid/midengine.h"
+#include "../pentago/mid/internal.h"
+#include "../pentago/base/gen/halfsuper_wins.h"
 
 using namespace pentago;
 

@@ -1,7 +1,7 @@
 // Conversion between flat and multidimensional indices
 #pragma once
 
-#include "pentago/utility/vector.h"
+#include "vector.h"
 namespace pentago {
 
 // Check index validity

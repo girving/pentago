@@ -1,10 +1,10 @@
 // C interface to high_board_t, since Swift can't interoperate with C++.
 #pragma once
 
-#include "pentago/mid/halfsuper_c.h"
-#include "pentago/mid/internal_c.h"
-#include "pentago/mid/midengine_c.h"
-#include "pentago/high/board_c.h"
+#include "../pentago/mid/halfsuper_c.h"
+#include "../pentago/mid/internal_c.h"
+#include "../pentago/mid/midengine_c.h"
+#include "../pentago/high/board_c.h"
 #if __cplusplus
 extern "C" {
 #endif

@@ -95,13 +95,18 @@ class Compute {
   }
 }
 
-protocol CaptureLike { func stopCapture() }
-extension MTLCaptureManager: CaptureLike {}
-class NoCapture: CaptureLike { func stopCapture() {} }
+protocol CaptureLike { func stop() }
+struct Capture: CaptureLike {
+  let c: MTLCaptureManager
+  let once: Bool
+  func stop() { c.stopCapture(); if once { exit(0) } }
+}
+class NoCapture: CaptureLike { func stop() {} }
 
 // Write a gpu trace to Documents/pentago.gputrace.
 // To get the trace, see https://stackoverflow.com/questions/15219511
-func makeCapture(_ device: MTLDevice, on: Bool = true) -> CaptureLike {
+func makeCapture(_ device: MTLDevice,
+                 on: Bool = true, once: Bool = false) -> CaptureLike {
   if !on { return NoCapture() }
   let capture = MTLCaptureManager.shared()
   let desc = MTLCaptureDescriptor()
@@ -110,5 +115,5 @@ func makeCapture(_ device: MTLDevice, on: Bool = true) -> CaptureLike {
   let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
   desc.outputURL = path.appendingPathComponent("pentago.gputrace")
   try! capture.startCapture(with: desc)
-  return capture
+  return Capture(c: capture, once: once)
 }

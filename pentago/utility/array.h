@@ -3,10 +3,10 @@
 
 #include <memory>
 #include <type_traits>
-#include "pentago/utility/debug.h"
-#include "pentago/utility/index.h"
-#include "pentago/utility/range.h"
-#include "pentago/utility/vector.h"
+#include "debug.h"
+#include "index.h"
+#include "range.h"
+#include "vector.h"
 #ifndef __wasm__
 #include <iostream>
 #include <vector>

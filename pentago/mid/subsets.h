@@ -1,10 +1,10 @@
 // Fast subset counting, indexing, and generation
 #pragma once
 
-#include "pentago/mid/subsets_c.h"
-#include "pentago/base/board_c.h"
-#include "pentago/high/board.h"
-#include "pentago/utility/metal.h"
+#include "subsets_c.h"
+#include "../base/board_c.h"
+#include "../high/board.h"
+#include "../utility/metal.h"
 NAMESPACE_PENTAGO
 
 METAL_INLINE __attribute__((const)) uint16_t fast_choose(const int n, const int k) {

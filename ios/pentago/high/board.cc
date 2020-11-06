@@ -1,0 +1,1 @@
+../../../pentago/high/board.cc
