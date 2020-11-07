@@ -189,7 +189,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
       for (int i = empty1[q]-q; i < k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)
-          offset += fast_choose(v-a-1, i+1) - fast_choose(v-a, i+1);
+          offset -= fast_choose(v-a-1, i);
       }
       I0.offset0[a * (I.spots-k0) + q] = offset;
     }
