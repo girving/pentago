@@ -107,7 +107,7 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT
   for (int a = 0; a < k1; a++) {
     const int s1p_a = sets1p[s1p]>>5*a&0x1f;
     if (j<s1p_a)
-      c += fast_choose(s1p_a-1, a+1) - fast_choose(s1p_a, a+1);
+      c -= fast_choose(s1p_a-1, a);
   }
   return c;
 }
