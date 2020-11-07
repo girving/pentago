@@ -105,15 +105,17 @@ class NoCapture: CaptureLike { func stop() {} }
 
 // Write a gpu trace to Documents/pentago.gputrace.
 // To get the trace, see https://stackoverflow.com/questions/15219511
-func makeCapture(_ device: MTLDevice,
-                 on: Bool = true, once: Bool = false) -> CaptureLike {
+func makeCapture(_ device: MTLDevice, on: Bool = true, xcode: Bool = false,
+                 once: Bool = false) -> CaptureLike {
   if !on { return NoCapture() }
   let capture = MTLCaptureManager.shared()
   let desc = MTLCaptureDescriptor()
   desc.captureObject = device
-  desc.destination = .gpuTraceDocument
-  let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-  desc.outputURL = path.appendingPathComponent("pentago.gputrace")
+  if !xcode {
+    desc.destination = .gpuTraceDocument
+    let path = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    desc.outputURL = path.appendingPathComponent("pentago.gputrace")
+  }
   try! capture.startCapture(with: desc)
   return Capture(c: capture, once: once)
 }
