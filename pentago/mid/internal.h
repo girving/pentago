@@ -16,7 +16,7 @@ template<class info_ref=METAL_CONSTANT const info_t&> struct helper_t {
   int k0() const { return n >> 1; }
   int k1() const { return n - k0(); }
   bool parity() const { return (n+I.root.ply_)&1; }
-  side_t root0() const { return I.root.side_[(I.slice+n)&1]; }
+  side_t root0() const { return I.root.side_[(I.spots+n)&1]; }
   sets_t sets0() const { return make_sets(I.spots, k0()); }
   sets_t sets1() const { return make_sets(I.spots, k1()); }
   sets_t sets1p() const { return make_sets(I.spots-k0(), k1()); }
@@ -50,8 +50,7 @@ static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
 static inline info_t make_info(const high_board_t root, const int workspace_size) {
   info_t I;
   I.root = root.s;
-  I.slice = root.count();
-  I.spots = 36 - I.slice;
+  I.spots = 36 - root.count();
   I.empty = make_empty(root);
   I.sets0_offsets[0] = 0;
   I.sets1p_offsets[0] = 0;
@@ -74,10 +73,7 @@ static inline inner_t make_inner(METAL_CONSTANT const info_t& I, const int n) {
   const helper_t<> H{I, n};
   N.n = n;
   N.spots = I.spots;
-  N.slice = I.slice;
-  N.k0 = H.k0();
-  N.k1 = H.k1();
-  N.sets1 = H.sets1();
+  N.sets1_size = H.sets1().size;
   N.sets1p_size = H.sets1p().size;
   N.sets0_offset = I.sets0_offsets[n];
   N.sets1p_offset = I.sets1p_offsets[n];
@@ -95,7 +91,7 @@ static inline halfsuper_t mid_wins(METAL_CONSTANT const info_t& I, const int n, 
   const auto sets1 = H.sets1();
   const bool one = s < sets1.size;
   const auto ss = one ? s : s - sets1.size;
-  const auto root = I.root.side_[(I.slice+n+one)&1];
+  const auto root = I.root.side_[(I.spots+n+one)&1];
   const auto sets = one ? sets1 : H.fast_sets0_next();
   return halfsuper_wins(root | side(I.empty, sets, ss), H.parity());
 }
@@ -209,14 +205,14 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
   const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
-  const auto all_wins0_next = all_wins + I.sets1.size;
+  const auto all_wins0_next = all_wins + I.sets1_size;
 
   // Learn that these are constants
   const int n = I.n;
   const int spots = I.spots;
-  const int slice = I.slice;
-  const int k0 = I.k0;
-  const int k1 = I.k1;
+  const bool done = spots == n;
+  const int k0 = n >> 1;
+  const int k1 = n - k0;
 
   // Convert indices
   uint32_t filled1p = 0;
@@ -233,7 +229,7 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   halfsupers_t us;
   {
     us.win = us.notlose = halfsuper_t(0);
-    if (slice + n == 36)
+    if (done)
       us.notlose = ~halfsuper_t(0);
     auto unmoved = ~filled1p;
     for (int m = 0; m < spots-k0-k1; m++) {

@@ -14,21 +14,21 @@ typedef struct grab_t_ {
 // Constant information for an entire midsolve computation
 typedef struct info_t_ {
   high_board_s root;
-  int slice, spots;
+  int spots;
   empty_t empty;
   grab_t spaces[18+2];  // output = spaces[n], input = spaces[n+1]
 
   // Sums of sizes of temporary arrays up to each n
   int sets0_offsets[18+2];
   int sets1p_offsets[18+2];
-  int cs1ps_offsets[18+2];  // Rounded to even for alignment
+  int cs1ps_offsets[18+2];
   int wins_offsets[18+2];
 } info_t;
 
 // Information needed for inner
 typedef struct inner_t_ {
-  int n, spots, slice, k0, k1;
-  sets_t sets1;
+  int n, spots;
+  int sets1_size;
   int sets1p_size;
   int sets0_offset, sets1p_offset, cs1ps_offset, wins_offset;
   grab_t input, output;
