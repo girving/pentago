@@ -2,7 +2,6 @@
 #pragma once
 
 #include "internal_c.h"
-#include "midengine_c.h"
 #include "halfsuper.h"
 #include "subsets.h"
 #include "../utility/integer_log.h"
@@ -33,18 +32,6 @@ static inline grab_t make_grab(const bool end, const int nx, const int ny, const
   g.lo = end ? workspace_size - nx * ny : 0;
   g.size = nx * ny;
   return g;
-}
-
-// RawArray<halfsupers_t,2>, but minimal for Metal friendliness
-struct io_t {
-  METAL_DEVICE halfsupers_t* data;
-  int stride;
-
-  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const { return data[i * stride + j]; }
-};
-
-static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
-  return io_t{workspace + g.lo, g.ny};
 }
 
 static inline info_t make_info(const high_board_t root, const int workspace_size) {
@@ -197,9 +184,49 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
   return I0;
 }
 
-template<class Workspace> static inline void
+#ifdef __METAL_VERSION__
+// iOS has an unfortunate 256 MB buffer size limit, so we need to split workspace into up to four buffers
+constant int chunk_size = (uint64_t(256) << 20) / sizeof(halfsupers_t);
+constant int chunk_bits = 23;
+static_assert(chunk_size == 1 << chunk_bits, "");
+
+struct workspace_t {
+  METAL_DEVICE halfsupers_t* chunks[4];
+};
+
+struct io_t {
+  workspace_t w;
+  int offset, stride;
+
+  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const {
+    const int r = i * stride + j + offset;
+    return w.chunks[r >> chunk_bits][r & (chunk_size - 1)];
+  }
+};
+
+io_t slice(const workspace_t w, const grab_t g) {
+  return io_t{w, g.lo, g.ny};
+}
+
+#else  // !__METAL_VERSION
+
+typedef halfsupers_t* workspace_t;
+
+struct io_t {
+  METAL_DEVICE halfsupers_t* data;
+  int stride;
+
+  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const { return data[i * stride + j]; }
+};
+
+static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
+  return io_t{workspace + g.lo, g.ny};
+}
+#endif  // __METAL_VERSION__
+
+static inline void
 inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
-      METAL_CONSTANT const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const Workspace workspace,
+      METAL_CONSTANT const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const workspace_t workspace,
       METAL_CONSTANT const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
@@ -249,7 +276,7 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   const auto wins1 = all_wins1[s1];
   const auto inplay = ~(wins0 | wins1);
   us.win = (inplay & us.win) | (wins0 & ~wins1);  // win (| ~inplay & (wins0 & ~wins1))
-  us.notlose = (inplay & us.notlose) | wins0;  // not lose       (| ~inplay & (wins0 | ~wins1))
+  us.notlose = (inplay & us.notlose) | wins0;  // not lose (| ~inplay & (wins0 | ~wins1))
 
   // If we're far enough along, remember results
   if (n <= 1)

@@ -9,7 +9,6 @@
 // the particular board, which is perfectly suited for use as a web service.
 #pragma once
 
-#include "midengine_c.h"
 #include "halfsuper.h"
 #include "../high/board.h"
 #include "../utility/pile.h"
