@@ -19,10 +19,8 @@ template<class info_ref=METAL_CONSTANT const info_t&> struct helper_t {
   sets_t sets0() const { return make_sets(I.spots, k0()); }
   sets_t sets1() const { return make_sets(I.spots, k1()); }
   sets_t sets1p() const { return make_sets(I.spots-k0(), k1()); }
-  sets_t fast_sets0_next() const { assert(!done()); return make_sets(I.spots, k0()+1); }
-  sets_t sets0_next() const { return done() ? make_sets(0, 1) : fast_sets0_next(); }
   int sets1p_size() const { return I.sets1p_offsets[n+1] - I.sets1p_offsets[n]; }
-  int wins_size() const { return I.wins_offsets[n+1] - I.wins_offsets[n]; }
+  int wins1_size() const { return I.wins1_offsets[n+1] - I.wins1_offsets[n]; }
   int cs1ps_size() const { return sets1p_size() * (I.spots-k0()); }
 };
 
@@ -42,13 +40,13 @@ static inline info_t make_info(const high_board_t root, const int workspace_size
   I.sets0_offsets[0] = 0;
   I.sets1p_offsets[0] = 0;
   I.cs1ps_offsets[0] = 0;
-  I.wins_offsets[0] = 0;
+  I.wins1_offsets[0] = 0;
   for (int n = 0; n <= I.spots; n++) {
     const helper_t<METAL_THREAD const info_t&> H{I, n};
     I.sets0_offsets[n+1] = I.sets0_offsets[n] + H.sets0().size;
     I.sets1p_offsets[n+1] = I.sets1p_offsets[n] + H.sets1p().size;
     I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + H.cs1ps_size();
-    I.wins_offsets[n+1] = I.wins_offsets[n] + H.sets1().size + H.sets0_next().size;
+    I.wins1_offsets[n+1] = I.wins1_offsets[n] + H.sets1().size;
     I.spaces[n] = make_grab(!(n&1), H.sets1().size, choose(I.spots-H.k1(), H.k0()), workspace_size);
   }
   I.spaces[I.spots+1] = make_grab(0, 0, 0, 0);
@@ -65,22 +63,21 @@ static inline inner_t make_inner(METAL_CONSTANT const info_t& I, const int n) {
   N.sets0_offset = I.sets0_offsets[n];
   N.sets1p_offset = I.sets1p_offsets[n];
   N.cs1ps_offset = I.cs1ps_offsets[n];
-  N.wins_offset = I.wins_offsets[n];
+  N.wins1_offset = I.wins1_offsets[n];
   N.input = I.spaces[n+1];
   N.output = I.spaces[n];
   return N;
 }
 
-// [:sets1.size] = all_wins1 = whether the other side wins for all possible sides
-// [sets1.size:] = all_wins0_next = whether we win on the next move
-static inline halfsuper_t mid_wins(METAL_CONSTANT const info_t& I, const int n, const int s) {
+// wins1 = whether the other side wins for all possible sides
+static inline wins1_t mid_wins1(METAL_CONSTANT const info_t& I, const int n, const int s) {
   const helper_t<> H{I, n};
-  const auto sets1 = H.sets1();
-  const bool one = s < sets1.size;
-  const auto ss = one ? s : s - sets1.size;
-  const auto root = I.root.side_[(I.spots+n+one)&1];
-  const auto sets = one ? sets1 : H.fast_sets0_next();
-  return halfsuper_wins(root | side(I.empty, sets, ss), H.parity());
+  const auto side1 = I.root.side_[(I.spots+n+1)&1] | side(I.empty, H.sets1(), s);
+  const auto parity = H.parity();
+  wins1_t w;
+  w.after = halfsuper_wins(side1, parity);
+  w.before = halfsuper_wins(side1, !parity);
+  return w;
 }
 
 static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT const set_t* sets1p,
@@ -226,13 +223,11 @@ static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
 
 static inline void
 inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
-      METAL_CONSTANT const halfsuper_t* all_wins, METAL_DEVICE halfsupers_t* results, const workspace_t workspace,
+      METAL_CONSTANT const wins1_t* all_wins1, METAL_DEVICE halfsupers_t* results, const workspace_t workspace,
       METAL_CONSTANT const set0_info_t& I0, const int s1p) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
-  const auto all_wins1 = all_wins;  // all_wins1 is a prefix of all_wins
-  const auto all_wins0_next = all_wins + I.sets1_size;
 
   // Learn that these are constants
   const int n = I.n;
@@ -263,20 +258,19 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
       const auto bit = min_bit(unmoved);
       const int i = integer_log_exact(bit);
       unmoved &= ~bit;
-      const int cs0 = I0.child_s0s[i];
-      const halfsuper_t cwins = all_wins0_next[cs0];
-      const halfsupers_t child = input(cs0, cs1ps[s1p*(spots-k0)+i]);
-      us.win = halfsuper_t(us.win) | cwins | child.win;
-      us.notlose = halfsuper_t(us.notlose) | cwins | child.notlose;
+      const halfsupers_t child = input(I0.child_s0s[i], cs1ps[s1p*(spots-k0)+i]);
+      us.win = halfsuper_t(us.win) | child.win;
+      us.notlose = halfsuper_t(us.notlose) | child.notlose;
     }
   }
 
   // Account for immediate results
   const halfsuper_t wins0(I0.wins0);
   const auto wins1 = all_wins1[s1];
-  const auto inplay = ~(wins0 | wins1);
-  us.win = (inplay & us.win) | (wins0 & ~wins1);  // win (| ~inplay & (wins0 & ~wins1))
-  us.notlose = (inplay & us.notlose) | wins0;  // not lose (| ~inplay & (wins0 | ~wins1))
+  const halfsuper_t wins1_after(wins1.after);
+  const auto inplay = ~(wins0 | wins1_after);
+  us.win = (inplay & us.win) | (wins0 & ~wins1_after);  // win (| ~inplay & (wins0 & ~wins1.after))
+  us.notlose = (inplay & us.notlose) | wins0;  // not lose (| ~inplay & (wins0 | ~wins1.after))
 
   // If we're far enough along, remember results
   if (n <= 1)
@@ -284,8 +278,9 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
 
   // Negate and apply rmax in preparation for the slice above
   halfsupers_t above;
-  above.win = rmax(~halfsuper_t(us.notlose));
-  above.notlose = rmax(~halfsuper_t(us.win));
+  const halfsuper_t wins1_before(wins1.before);
+  above.win = rmax(~halfsuper_t(us.notlose)) | wins1_before;
+  above.notlose = rmax(~halfsuper_t(us.win)) | wins1_before;
   output(s1,s0p) = above;
 }
 

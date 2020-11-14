@@ -3,4 +3,3 @@
 
 #include "c_board.h"
 #include "../pentago/mid/internal_c.h"
-#include "../pentago/mid/midengine_c.h"

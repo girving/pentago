@@ -31,7 +31,7 @@ class MidSolver {
   
   // Compute kernels
   let sets1p: Compute
-  let wins: Compute
+  let wins1: Compute
   let cs1ps: Compute
   let set0Info: Compute
   let inner: Compute
@@ -41,7 +41,7 @@ class MidSolver {
     queue = device.makeCommandQueue()!
     lib = device.makeDefaultLibrary()!
     sets1p = Compute(device, lib, "sets1p")
-    wins = Compute(device, lib, "wins")
+    wins1 = Compute(device, lib, "wins1")
     cs1ps = Compute(device, lib, "cs1ps")
     set0Info = Compute(device, lib, "set0_info")
     inner = Compute(device, lib, "inner")
@@ -58,7 +58,7 @@ class MidSolver {
     }
     let workspace = BigGPUBuffer<halfsupers_t>(device, chunks: 4, count: Int(workspace_size))
     let sets1p = GPUBuffer<UInt64>(device, total(I.sets1p_offsets))
-    let allWins = GPUBuffer<halfsuper_s>(device, total(I.wins_offsets))
+    let wins1 = GPUBuffer<wins1_t>(device, total(I.wins1_offsets))
     let cs1ps = GPUBuffer<UInt16>(device, total(I.cs1ps_offsets))
     let I0 = GPUBuffer<set0_info_t>(device, total(I.sets0_offsets))
     let results = Buffer<halfsupers_t>(device, 37 - board.count)
@@ -71,14 +71,14 @@ class MidSolver {
 
     // Helper computations
     self.sets1p.run(compute, [Small(I), sets1p], sets1p.count)
-    wins.run(compute, [Small(I), allWins], allWins.count)
+    self.wins1.run(compute, [Small(I), wins1], wins1.count)
     self.cs1ps.run(compute, [Small(I), sets1p, cs1ps], cs1ps.count)
     set0Info.run(compute, [Small(I), I0], I0.count)
 
     // Midsolve!
     // We use manual binding to avoid rundandant PipelineStateObject binding warnings
     compute.setComputePipelineState(inner.pipeline)
-    set(compute, [cs1ps, sets1p, allWins, I0, results] + workspace.chunks, 1..<10)
+    set(compute, [cs1ps, sets1p, wins1, I0, results] + workspace.chunks, 1..<10)
     for n in (0...spots).reversed() {
       let N = make_inner_t(I, Int32(n))
       setBytes(compute, N, index: 0)

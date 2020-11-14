@@ -67,7 +67,7 @@ Array<halfsupers_t> midsolve_workspace(const int min_slice) {
 #endif  // !__wasm__
 
 static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
-                          RawArray<halfsupers_t> workspace, set_t* sets1p, halfsuper_t* all_wins, uint16_t* cs1ps) {
+                          RawArray<halfsupers_t> workspace, set_t* sets1p, wins1_t* all_wins1, uint16_t* cs1ps) {
   const helper_t<> H{I, n};
 
   // Precompute subsets of player 1 relative to player 0's stones
@@ -76,8 +76,8 @@ static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
     sets1p[s1p] = get(sets1p_, s1p);
 
   // Precompute various halfsuper wins
-  for (const int s : range(H.wins_size()))
-    all_wins[s] = mid_wins(I, n, s);
+  for (const int s : range(H.wins1_size()))
+    all_wins1[s] = mid_wins1(I, n, s);
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
@@ -90,7 +90,7 @@ static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
     const set0_info_t I0 = make_set0_info(I, n, s0);
     // Iterate over set of stones of other player
     for (const int s1p :  range(sets1p_.size))
-      inner(N, cs1ps, sets1p, all_wins, results, workspace.data(), I0, s1p);
+      inner(N, cs1ps, sets1p, all_wins1, results, workspace.data(), I0, s1p);
   }
 }
 
@@ -99,28 +99,28 @@ Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
   NON_WASM_ASSERT(workspace.size() >= bottleneck(I.spots));
 
   // Size temporary buffers
-  int sets1p_size = 0, all_wins_size = 0, cs1ps_size = 0;
+  int sets1p_size = 0, all_wins1_size = 0, cs1ps_size = 0;
   for (int n = I.spots; n >= 0; n--) {
     const helper_t<> H{I, n};
     sets1p_size = max(sets1p_size, H.sets1p_size());
-    all_wins_size = max(all_wins_size, H.wins_size());
+    all_wins1_size = max(all_wins1_size, H.wins1_size());
     cs1ps_size = max(cs1ps_size, H.cs1ps_size());
   }
 
   // Allocate temporary buffers in a wasm-friendly way.
   // Can't put these on the stack since iPhone stacks are tiny.
   auto sets1p = (set_t*)malloc(sizeof(set_t) * sets1p_size);
-  auto all_wins = (halfsuper_t*)malloc(sizeof(halfsuper_t) * all_wins_size);
+  auto all_wins1 = (wins1_t*)malloc(sizeof(wins1_t) * all_wins1_size);
   auto cs1ps = (uint16_t*)malloc(sizeof(uint16_t) * cs1ps_size);
 
   // Compute all slices
   Vector<halfsupers_t,1+18> results;
   for (int n = I.spots; n >= 0; n--)
-    midsolve_loop(I, n, results.data(), workspace, sets1p, all_wins, cs1ps);
+    midsolve_loop(I, n, results.data(), workspace, sets1p, all_wins1, cs1ps);
 
   // Finish up
   free(sets1p);
-  free(all_wins);
+  free(all_wins1);
   free(cs1ps);
   return results;
 }

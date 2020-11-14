@@ -31,11 +31,11 @@ kernel void sets1p(constant info_t* I [[buffer(0)]],
   sets1p[index] = get(H.sets1p(), s);
 }
 
-kernel void wins(constant info_t* I [[buffer(0)]],
-                 device halfsuper_t* all_wins [[buffer(1)]],
-                 const uint index [[thread_position_in_grid]]) {
-  SEARCH(s, wins_offsets)
-  all_wins[index] = mid_wins(*I, n, s);
+kernel void wins1(constant info_t* I [[buffer(0)]],
+                  device wins1_t* all_wins1 [[buffer(1)]],
+                  const uint index [[thread_position_in_grid]]) {
+  SEARCH(s, wins1_offsets)
+  all_wins1[index] = mid_wins1(*I, n, s);
 }
 
 kernel void cs1ps(constant info_t* I [[buffer(0)]],
@@ -54,33 +54,10 @@ kernel void set0_info(constant info_t* I [[buffer(0)]],
   I0[index] = make_set0_info(*I, n, s0);
 }
 
-// iOS has an unfortunate 256 MB buffer size limit, so we need to split workspace into up to four buffers
-constant int chunk_size = (uint64_t(256) << 20) / sizeof(halfsupers_t);
-constant int chunk_bits = 23;
-static_assert(chunk_size == 1 << chunk_bits, "");
-
-struct workspace_t {
-  METAL_DEVICE halfsupers_t* chunks[4];
-};
-
-struct workspace_io_t {
-  workspace_t w;
-  int offset, stride;
-  
-  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const {
-    const int r = i * stride + j + offset;
-    return w.chunks[r >> chunk_bits][r & (chunk_size - 1)];
-  }
-};
-
-workspace_io_t slice(const workspace_t w, const grab_t g) {
-  return workspace_io_t{w, g.lo, g.ny};
-}
-
 kernel void inner(constant inner_t* I [[buffer(0)]],
                   constant uint16_t* cs1ps [[buffer(1)]],
                   constant set_t* sets1p [[buffer(2)]],
-                  constant halfsuper_t* wins [[buffer(3)]],
+                  constant wins1_t* wins1 [[buffer(3)]],
                   constant set0_info_t* I0 [[buffer(4)]],
                   device halfsupers_t* results [[buffer(5)]],
                   device halfsupers_t* workspace0 [[buffer(6)]],
@@ -93,5 +70,5 @@ kernel void inner(constant inner_t* I [[buffer(0)]],
   const auto s1p = s - s0 * I->sets1p_size;
   const workspace_t w{{workspace0, workspace1, workspace2, workspace3}};
   pentago::inner(*I, cs1ps + I->cs1ps_offset, sets1p + I->sets1p_offset,
-                 wins + I->wins_offset, results, w, I0[I->sets0_offset + s0], s1p);
+                 wins1 + I->wins1_offset, results, w, I0[I->sets0_offset + s0], s1p);
 }

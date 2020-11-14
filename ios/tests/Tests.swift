@@ -26,7 +26,23 @@ class PentagoTest: XCTestCase {
       XCTAssertEqual(v, correct, "board \(name)")
     }
   }
-  
+
+  func testThreadgroupSpace() throws {
+    // Can we fit an inner slice into 32K threadgroup memory?
+    // Each halfsuper_t is 16 bytes, and the largest inner slice is 2002, so the answer
+    // is yes if we do halfsuper_t and no if we do halfsupers_t (32 bytes).
+    let spots = 18
+    var inner = 0
+    for n in 0...spots {
+      let a = choose(18-n/2,(n+1)/2)
+      let b = choose(18-(n+1)/2,n/2)
+      print("  n \(n): \(a) \(b)")
+      inner = max(inner, a, b)
+    }
+    print("max inner = \(inner)")
+    XCTAssertLessThanOrEqual(inner, 2 * 1024)
+  }
+
   func midTest(solve: (Board) -> [Board: Int]) throws {
     let M = MidTest()
     XCTAssertEqual(M.correct.count, 1+18+8*18)
@@ -40,7 +56,7 @@ class PentagoTest: XCTestCase {
       }
     }
   }
-  
+
   func pathTest(solve: (Board) -> [Board: Int]) throws {
     for game in allGames {
       var seen: Set<Board> = []
@@ -73,10 +89,6 @@ class PentagoTest: XCTestCase {
     try midTest { solver.solve($0) }
   }
   
-  func testPathCPU() throws {
-    try pathTest { $0.midsolve() }
-  }
-
   func testPathGPU() throws {
     let solver = MidSolver()
     try pathTest { solver.solve($0) }

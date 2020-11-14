@@ -22,7 +22,7 @@ typedef struct info_t_ {
   int sets0_offsets[18+2];
   int sets1p_offsets[18+2];
   int cs1ps_offsets[18+2];
-  int wins_offsets[18+2];
+  int wins1_offsets[18+2];
 } info_t;
 
 // Information needed for inner
@@ -30,7 +30,7 @@ typedef struct inner_t_ {
   int n, spots;
   int sets1_size;
   int sets1p_size;
-  int sets0_offset, sets1p_offset, cs1ps_offset, wins_offset;
+  int sets0_offset, sets1p_offset, cs1ps_offset, wins1_offset;
   grab_t input, output;
 } inner_t;
 
@@ -42,4 +42,9 @@ typedef struct set0_info_t_ {
   uint8_t empty1[18];
 } set0_info_t;
 
+typedef struct wins1_t_ {
+  halfsuper_s after, before;
+} wins1_t;
+
+_Static_assert(sizeof(wins1_t) == 32, "");
 _Static_assert(sizeof(set0_info_t) == 256, "");
