@@ -3,7 +3,7 @@
 import SwiftUI
 
 struct ContentView: View {
-  let blah = (0..<4).map { i in MidSolver().solve(MidTest().board) }
+  let blah = (0..<3).map { i in MidSolver().solve(MidTest().board) }
   var body: some View {
     Text("Hello, world!\n\(blah.description)")
       .padding()

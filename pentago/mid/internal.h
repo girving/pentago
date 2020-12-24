@@ -16,8 +16,10 @@ template<class info_ref=METAL_CONSTANT const info_t&> struct helper_t {
   int k1() const { return n - k0(); }
   bool parity() const { return (n+I.root.ply_)&1; }
   side_t root0() const { return I.root.side_[(I.spots+n)&1]; }
+  side_t root1() const { return I.root.side_[(I.spots+n+1)&1]; }
   sets_t sets0() const { return make_sets(I.spots, k0()); }
   sets_t sets1() const { return make_sets(I.spots, k1()); }
+  sets_t sets0p() const { return make_sets(I.spots-k1(), k0()); }
   sets_t sets1p() const { return make_sets(I.spots-k0(), k1()); }
   int sets1p_size() const { return I.sets1p_offsets[n+1] - I.sets1p_offsets[n]; }
   int wins1_size() const { return I.wins1_offsets[n+1] - I.wins1_offsets[n]; }
@@ -32,7 +34,19 @@ static inline grab_t make_grab(const bool end, const int nx, const int ny, const
   return g;
 }
 
-static inline info_t make_info(const high_board_t root, const int workspace_size) {
+static int bottleneck(const int spots) {
+  int worst = 0;
+  int prev = 1;
+  for (int n = 0; n <= spots; n++) {
+    int next = choose(spots, n+1);
+    if (next) next *= choose(n+1, (n+1)/2);
+    worst = max(worst, prev + next);
+    prev = next;
+  }
+  return worst;
+}
+
+static inline info_t make_info(const high_board_t root) {
   info_t I;
   I.root = root.s;
   I.spots = 36 - root.count();
@@ -41,13 +55,34 @@ static inline info_t make_info(const high_board_t root, const int workspace_size
   I.sets1p_offsets[0] = 0;
   I.cs1ps_offsets[0] = 0;
   I.wins1_offsets[0] = 0;
+  const int workspace_size = bottleneck(I.spots);
   for (int n = 0; n <= I.spots; n++) {
     const helper_t<METAL_THREAD const info_t&> H{I, n};
     I.sets0_offsets[n+1] = I.sets0_offsets[n] + H.sets0().size;
     I.sets1p_offsets[n+1] = I.sets1p_offsets[n] + H.sets1p().size;
     I.cs1ps_offsets[n+1] = I.cs1ps_offsets[n] + H.cs1ps_size();
     I.wins1_offsets[n+1] = I.wins1_offsets[n] + H.sets1().size;
-    I.spaces[n] = make_grab(!(n&1), H.sets1().size, choose(I.spots-H.k1(), H.k0()), workspace_size);
+    I.spaces[n] = make_grab(n&1, H.sets1().size, H.sets0p().size, workspace_size);
+  }
+  I.spaces[I.spots+1] = make_grab(0, 0, 0, 0);
+  return I;
+}
+
+static inline transposed_t make_transposed(const high_board_t root) {
+  transposed_t I;
+  I.root = root.s;
+  I.spots = 36 - root.count();
+  I.empty = make_empty(root);
+  I.sets0_offsets[0] = 0;
+  I.sets1_offsets[0] = 0;
+  I.cs0ps_offsets[0] = 0;
+  const int workspace_size = bottleneck(I.spots);
+  for (int n = 0; n <= I.spots; n++) {
+    const helper_t<METAL_THREAD const transposed_t&> H{I, n};
+    I.spaces[n] = make_grab(n&1, H.sets0().size, H.sets1p().size, workspace_size);
+    I.sets0_offsets[n+1] = I.sets0_offsets[n] + H.sets0().size;
+    I.sets1_offsets[n+1] = I.sets1_offsets[n] + H.sets1().size;
+    I.cs0ps_offsets[n+1] = I.cs0ps_offsets[n] + H.sets0p().size * (I.spots-n);
   }
   I.spaces[I.spots+1] = make_grab(0, 0, 0, 0);
   return I;
@@ -69,10 +104,25 @@ static inline inner_t make_inner(METAL_CONSTANT const info_t& I, const int n) {
   return N;
 }
 
+static inline transposed_inner_t make_inner(METAL_CONSTANT const transposed_t& I, const int n) {
+  const helper_t<METAL_CONSTANT const transposed_t&> H{I, n};
+  transposed_inner_t N;
+  N.spots = I.spots;
+  N.n = n;
+  N.grid[0] = H.sets1().size;
+  N.grid[1] = H.sets0p().size;
+  N.input = I.spaces[n+1];
+  N.output = I.spaces[n];
+  N.sets0_offset = I.sets0_offsets[n];
+  N.sets1_offset = I.sets1_offsets[n];
+  N.cs0ps_offset = I.cs0ps_offsets[n];
+  return N;
+}
+
 // wins1 = whether the other side wins for all possible sides
-static inline wins1_t mid_wins1(METAL_CONSTANT const info_t& I, const int n, const int s) {
+static inline wins1_t mid_wins1(METAL_CONSTANT const info_t& I, const int n, const int s1) {
   const helper_t<> H{I, n};
-  const auto side1 = I.root.side_[(I.spots+n+1)&1] | side(I.empty, H.sets1(), s);
+  const auto side1 = H.root1() | side(I.empty, H.sets1(), s1);
   const auto parity = H.parity();
   wins1_t w;
   w.after = halfsuper_wins(side1, parity);
@@ -94,6 +144,30 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT
       c -= fast_choose(s1p_a-1, a);
   }
   return c;
+}
+
+static inline int pop_bit(METAL_THREAD int& mask) {
+  const auto bit = min_bit(uint32_t(mask));
+  const int i = integer_log_exact(bit);
+  mask &= ~bit;
+  return i;
+}
+
+// Map from s0p to s0p_next
+static inline uint16_t make_cs0ps(const sets_t sets0p, const int s0p, const int m) {
+  int next = 0;
+  bool before = true;
+  for (int mask = subset_mask(sets0p, s0p), i = 0; i < sets0p.k; i++) {
+    const int j = pop_bit(mask);
+    if (m < j-i && before) {
+      next += fast_choose(m+i, i+1);
+      before = false;
+    }
+    next += fast_choose(j, i+1+!before);
+  }
+  if (before)
+    next += fast_choose(sets0p.k + m, sets0p.k+1);
+  return next;
 }
 
 static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const int n, const int s0) {
@@ -181,6 +255,63 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
   return I0;
 }
 
+typedef struct {
+  uint16_t s0, s1p;
+} s0s1p;
+
+// Turn I1, s0p into (s0,s1p)
+static inline s0s1p commute(METAL_CONSTANT const set1_info_t& I1, const sets_t sets0p, const int s0p) {
+  uint16_t s0 = 0, s1p = I1.s1;
+  for (int mask = subset_mask(sets0p, s0p), m = 0; m < sets0p.k; m++) {
+    const int j = pop_bit(mask);
+    s0 += fast_choose(I1.empty0[j], m+1);
+    s1p -= I1.offset1p[m * sets0p.n + j];
+  }
+  return s0s1p{s0, s1p};
+}
+
+static inline set1_info_t make_set1_info(METAL_CONSTANT const transposed_t& I, const int n, const int s1) {
+  set1_info_t I1;
+  const helper_t<METAL_CONSTANT const transposed_t&> H{I, n};
+  const auto sets1 = H.sets1();
+  const int k0 = H.k0();
+  const int k1 = H.k1();
+  const auto parity = H.parity();
+
+  // Construct side
+  I1.s1 = s1;
+  const set_t set1 = get(sets1, s1);
+  const side_t side1 = H.root1() | side(I.empty, sets1, set1);
+
+  // Whether we win with both parities
+  I1.wins1.after = halfsuper_wins(side1, parity);
+  I1.wins1.before = halfsuper_wins(side1, !parity);
+
+  // List empty spots after we place s1's stones
+  const auto empty0 = I1.empty0;
+  {
+    const auto free = side_mask & ~side1;
+    int next = 0;
+    for (int i = 0; i < I.spots; i++)
+      if (free&side_t(1)<<I.empty.empty[i])
+        empty0[next++] = i;
+  }
+
+  // Lookup table to compute s0-major indices
+  for (int a = 0; a < k0+1; a++) {
+    for (int q = 0; q < I.spots-k1; q++) {
+      uint16_t s1p = 0;
+      for (int i = empty0[q]-q; i < k1; i++) {
+        const int v = set1>>5*i&0x1f;
+        if (v>a)
+          s1p += fast_choose(v-a-1, i);
+      }
+      I1.offset1p[a * (I.spots-k1) + q] = s1p;
+    }
+  }
+  return I1;
+}
+
 #ifdef __METAL_VERSION__
 // iOS has an unfortunate 256 MB buffer size limit, so we need to split workspace into up to four buffers
 constant int chunk_size = (uint64_t(256) << 20) / sizeof(halfsupers_t);
@@ -243,45 +374,31 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   for (int i = 0; i < k1; i++) {
     const int q = set1p>>5*i&0x1f;
     filled1p |= 1<<q;
-    s1 += fast_choose(I0.empty1[q], i+1);  // I0.offset1[i][q];
+    s1 += fast_choose(I0.empty1[q], i+1);
     s0p += I0.offset0[i * (spots-k0) + q];
   }
 
   // Consider each move in turn
-  halfsupers_t us;
-  {
-    us.win = us.notlose = halfsuper_t(0);
-    if (done)
-      us.notlose = ~halfsuper_t(0);
-    auto unmoved = ~filled1p;
-    for (int m = 0; m < spots-k0-k1; m++) {
-      const auto bit = min_bit(unmoved);
-      const int i = integer_log_exact(bit);
-      unmoved &= ~bit;
-      const halfsupers_t child = input(I0.child_s0s[i], cs1ps[s1p*(spots-k0)+i]);
-      us.win = halfsuper_t(us.win) | child.win;
-      us.notlose = halfsuper_t(us.notlose) | child.notlose;
-    }
+  halfsupers_t us = {{0}, {0}};
+  if (done)
+    us.notlose = ~halfsuper_t(0);
+  for (int unmoved = ~filled1p, m = 0; m < spots-n; m++) {
+    const int i = pop_bit(unmoved);
+    us |= input(I0.child_s0s[i], cs1ps[s1p*(spots-k0)+i]);
   }
 
   // Account for immediate results
-  const halfsuper_t wins0(I0.wins0);
   const auto wins1 = all_wins1[s1];
-  const halfsuper_t wins1_after(wins1.after);
-  const auto inplay = ~(wins0 | wins1_after);
-  us.win = (inplay & us.win) | (wins0 & ~wins1_after);  // win (| ~inplay & (wins0 & ~wins1.after))
-  us.notlose = (inplay & us.notlose) | wins0;  // not lose (| ~inplay & (wins0 | ~wins1.after))
+  const auto inplay = ~(I0.wins0 | wins1.after);
+  us.win = (inplay & us.win) | (I0.wins0 & ~wins1.after);
+  us.notlose = (inplay & us.notlose) | I0.wins0;
 
   // If we're far enough along, remember results
   if (n <= 1)
     results[n + s1p] = us;
 
-  // Negate and apply rmax in preparation for the slice above
-  halfsupers_t above;
-  const halfsuper_t wins1_before(wins1.before);
-  above.win = rmax(~halfsuper_t(us.notlose)) | wins1_before;
-  above.notlose = rmax(~halfsuper_t(us.win)) | wins1_before;
-  output(s1,s0p) = above;
+  // Prepare for the slice above
+  output(s1,s0p) = rmax(~us) | wins1.before;;
 }
 
 END_NAMESPACE_PENTAGO

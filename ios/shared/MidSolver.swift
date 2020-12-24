@@ -29,12 +29,16 @@ class MidSolver {
   let queue: MTLCommandQueue
   let lib: MTLLibrary
   
-  // Compute kernels
+  // Compute kernels (TODO: clean this list)
   let sets1p: Compute
   let wins1: Compute
   let cs1ps: Compute
   let set0Info: Compute
   let inner: Compute
+  let set1Info: Compute
+  let wins0: Compute
+  let cs0ps: Compute
+  let transposed: Compute
 
   init() {
     device = MTLCreateSystemDefaultDevice()!
@@ -45,49 +49,50 @@ class MidSolver {
     cs1ps = Compute(device, lib, "cs1ps")
     set0Info = Compute(device, lib, "set0_info")
     inner = Compute(device, lib, "inner")
+    set1Info = Compute(device, lib, "set1_info")
+    wins0 = Compute(device, lib, "wins0")
+    cs0ps = Compute(device, lib, "cs0ps")
+    transposed = Compute(device, lib, "transposed")
   }
 
   func solve(_ board: Board) -> [Board: Int] {
+    let start = CACurrentMediaTime()
     let spots = 36 - board.count
     let workspace_size = board_workspace_size(board.s)
-    let I = make_info_t(board.s, workspace_size)
-
-    // Temporary buffers
     func total(_ offsets: Offsets) -> Int {
       Int(asarray(offsets)[spots + 1])
     }
-    let workspace = BigGPUBuffer<halfsupers_t>(device, chunks: 4, count: Int(workspace_size))
-    let sets1p = GPUBuffer<UInt64>(device, total(I.sets1p_offsets))
-    let wins1 = GPUBuffer<wins1_t>(device, total(I.wins1_offsets))
-    let cs1ps = GPUBuffer<UInt16>(device, total(I.cs1ps_offsets))
-    let I0 = GPUBuffer<set0_info_t>(device, total(I.sets0_offsets))
+
+    // Temporary buffers
+    let I = make_transposed_t(board.s)
     let results = Buffer<halfsupers_t>(device, 37 - board.count)
+    let workspace = BigGPUBuffer<halfsupers_t>(device, chunks: 4, count: Int(workspace_size))
+    let I1s = GPUBuffer<set1_info_t>(device, total(I.sets1_offsets))
+    let wins0 = GPUBuffer<halfsuper_s>(device, total(I.sets0_offsets))
+    let cs0ps = GPUBuffer<UInt16>(device, total(I.cs0ps_offsets))
 
     // Prepare compute pass
-    let start = CACurrentMediaTime()
     let capture = makeCapture(device, on: false, once: true)
     let commands = queue.makeCommandBuffer()!
     let compute = commands.makeComputeCommandEncoder()!
 
     // Helper computations
-    self.sets1p.run(compute, [Small(I), sets1p], sets1p.count)
-    self.wins1.run(compute, [Small(I), wins1], wins1.count)
-    self.cs1ps.run(compute, [Small(I), sets1p, cs1ps], cs1ps.count)
-    set0Info.run(compute, [Small(I), I0], I0.count)
+    self.set1Info.run(compute, [Small(I), I1s], I1s.count)
+    self.wins0.run(compute, [Small(I), wins0], wins0.count)
+    self.cs0ps.run(compute, [Small(I), cs0ps], cs0ps.count)
 
     // Midsolve!
     // We use manual binding to avoid rundandant PipelineStateObject binding warnings
-    compute.setComputePipelineState(inner.pipeline)
-    set(compute, [cs1ps, sets1p, wins1, I0, results] + workspace.chunks, 1..<10)
+    compute.setComputePipelineState(transposed.pipeline)
+    set(compute, [I1s, wins0, cs0ps, results] + workspace.chunks, 1..<9)
     for n in (0...spots).reversed() {
-      let N = make_inner_t(I, Int32(n))
+      let N = make_transposed_inner_t(I, Int32(n))
       setBytes(compute, N, index: 0)
-      dispatch(compute, inner.pipeline, Int(N.output.size))
+      dispatch(compute, transposed.pipeline, Int(N.grid.0) * Int(N.grid.1))
     }
     compute.endEncoding()
     commands.commit()
     capture.stop()
-
     commands.waitUntilCompleted()
     let elapsed = CACurrentMediaTime() - start
     print("midsolve: board \(board.name), slice \(board.count), time \(elapsed) s")

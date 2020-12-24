@@ -20,13 +20,11 @@ int board_workspace_size(high_board_s b) {
   return midsolve_workspace_size(t(b).count());
 }
 
-info_t make_info_t(high_board_s b, int workspace_size) {
-  return make_info(t(b), workspace_size);
-}
+info_t make_info_t(high_board_s b) { return make_info(t(b)); }
+transposed_t make_transposed_t(high_board_s b) { return make_transposed(t(b)); }
+inner_t make_inner_t(const info_t I, const int n) { return make_inner(I, n); }
+transposed_inner_t make_transposed_inner_t(const transposed_t I, const int n) { return make_inner(I, n); }
 
-inner_t make_inner_t(const info_t I, const int n) {
-  return make_inner(I, n);
-}
 
 static int set_results(high_board_value_t results[1+18+8*18], const mid_values_t& values) {
   for (const int i : range(values.size())) {

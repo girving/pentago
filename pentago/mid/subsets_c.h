@@ -1,6 +1,7 @@
 // Fast subset counting, indexing, and generation
 #pragma once
 
+#include "../utility/metal.h"
 #include "../utility/wasm.h"
 
 // A k-subsets of [0,n-1], packed into 64-bit ints with 5 bits for each entry.

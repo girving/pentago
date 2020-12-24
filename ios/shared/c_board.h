@@ -21,8 +21,10 @@ high_board_s board_rotate(high_board_s b, int q, int d);
 
 // Internal midsolver machinery
 int board_workspace_size(high_board_s b);
-info_t make_info_t(high_board_s b, int workspace_size);
+info_t make_info_t(high_board_s b);
+transposed_t make_transposed_t(high_board_s b);
 inner_t make_inner_t(const info_t I, const int n);
+transposed_inner_t make_transposed_inner_t(const transposed_t I, const int n);
 
 // Returns number of entries
 int board_midsolve_traverse(high_board_s b, const halfsupers_t* supers,

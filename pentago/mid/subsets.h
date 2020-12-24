@@ -47,6 +47,31 @@ METAL_INLINE __attribute__((const)) set_t subset(const int n, const int k, int i
   return set;
 }
 
+// Bitmask for the index-th subset
+METAL_INLINE __attribute__((const)) uint32_t subset_mask(const sets_t sets, int index) {
+  uint32_t mask = 0;
+  for (int i = sets.k-1; i >= 0; i--) {
+    int j = i, base = 0;
+    for (; j < sets.n; j++) {
+      int next = base + fast_choose(j, i);
+      if (index < next) break;
+      base = next;
+    }
+    mask |= 1<<j;
+    index -= base;
+  }
+  return mask;
+}
+
+METAL_INLINE uint16_t subset_index(const sets_t sets, const set_t set) {
+  uint16_t index = 0;
+  for (int i = 0; i < sets.k; i++) {
+    const int j = set>>5*i&0x1f;
+    index += fast_choose(j, i+1);
+  }
+  return index;
+}
+
 METAL_INLINE sets_t make_sets(const int n, const int k) {
   return sets_t{n, k, choose(n, k)};
 }

@@ -1,5 +1,6 @@
 #include "pentago/base/board.h"
 #include "pentago/mid/midengine.h"
+#include "pentago/mid/internal.h"
 #include "pentago/mid/subsets.h"
 #include "pentago/high/check.h"
 #include "pentago/search/superengine.h"
@@ -42,6 +43,7 @@ Array<const board_t> result_boards(const high_board_t board) {
 
 void midsolve_internal_test(const high_board_t board) {
   typedef halfsuper_t h;
+  const bool verbose = false;
   const int slice = board.count();
   const bool parity = board.middle();
   const auto workspace = midsolve_workspace(slice);
@@ -55,9 +57,10 @@ void midsolve_internal_test(const high_board_t board) {
     const auto rboard = boards[i];
     const bool turn = count_stones(rboard) & 1;
     const bool rparity = (i > 0) != parity;
-    slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
-         slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win)&h(rs.notlose)),
-         popcount(~(h(rs.win)|h(rs.notlose))));
+    if (verbose)
+      slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
+           slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win)&h(rs.notlose)),
+           popcount(~(h(rs.win)|h(rs.notlose))));
     for (const int a : range(2)) {
       const auto exp = [=](const halfsuper_t h) { return rparity ? merge(0,h) : merge(h,0); };
       const auto known = exp(~halfsuper_t(0));
@@ -72,7 +75,7 @@ void midsolve_internal_test(const high_board_t board) {
 
 TEST(mid, internal) {
   Random random(5554);
-  init_supertable(20);
+  init_supertable(20, false);
   for (int slice = 36; slice >= 30; slice--) {
     for (int i = 0; i < 16; i++) {
       const auto board = random_board_at_slice(random, slice);
@@ -84,7 +87,7 @@ TEST(mid, internal) {
 
 TEST(mid, mid) {
   Random random(2223);
-  init_supertable(20);
+  init_supertable(20, false);
   const auto workspace = midsolve_workspace(30);
   const auto empty = empty_block_cache();
   for (const int slice : range(30, 35+1)) {
@@ -292,6 +295,111 @@ TEST(mid, subsets) {
       }
       ASSERT_EQ(sets.size, a);
     }
+  }
+}
+
+TEST(mid, subset_indices) {
+  using pentago::get;
+  for (const int n : range(18+1)) {
+    for (const int k : range(4)) {
+      const auto sets = make_sets(n, k);
+      for (const int s : range(sets.size)) {
+        const auto set = get(sets, s);
+        const auto mask = subset_mask(sets, s);
+        ASSERT_EQ(s, subset_index(sets, set));
+        ASSERT_EQ(k, popcount(mask));
+        for (const int i : range(k)) {
+          const int j = set>>5*i&0x1f;
+          GEODE_ASSERT(mask & 1<<j);
+        }
+      }
+    }
+  }
+}
+
+TEST(mid, cs0ps) {
+  for (const int n : range(18)) {
+    for (const int k : range(4)) {
+      const auto sets0p = make_sets(n, k);
+      const auto csets0p = make_sets(n, k+1);
+      for (const int s0p : range(sets0p.size)) {
+        const auto mask = subset_mask(sets0p, s0p);
+        int m = 0;
+        for (const int i : range(n)) {
+          if (!(mask & 1<<i)) {
+            const auto cs0p = make_cs0ps(sets0p, s0p, m++);
+            const auto cmask = mask | 1<<i;
+            ASSERT_EQ(cmask, subset_mask(csets0p, cs0p))
+              << format("n %d, k %d, s0p %d, mask %d, i %d, m %d, cs0p %d, cmask %d",
+                        n, k, s0p, mask, i, m-1, cs0p, cmask);
+          }
+        }
+      }
+    }
+  }
+}
+
+static inline uint32_t absolute_mask(const uint32_t taken, const uint32_t relative) {
+  GEODE_ASSERT(popcount(taken) + popcount(relative) <= 18);
+  uint8_t empty[18];
+  for (int next = 0, i = 0; i < 18; i++)
+    if (!(taken & 1<<i))
+      empty[next++] = i;
+  uint32_t absolute = 0;
+  for (int i = 0; i < 18; i++)
+    if (relative & 1<<i)
+      absolute |= 1<<empty[i];
+  return absolute;
+}
+
+static string bin(int n) {
+  string s;
+  do {
+    s.push_back('0' + (n & 1));
+    n >>= 1;
+  } while (n);
+  s += "b0";
+  std::reverse(s.begin(), s.end());
+  return s;
+}
+
+TEST(mid, set1_info) {
+  Random random(7);
+  for (int sample = 0; sample < (1<<17); sample++) {
+    // Sample a random call to set1_info_t::commute
+    const int slice = random.uniform<int>(18, 36+1);
+    const auto board = high_board_t::from_board(random_board(random, slice), sample & 1);
+    const auto I = make_transposed(board);
+    const int n = random.uniform<int>(I.spots+1);
+    const helper_t<transposed_t> H{I, n};
+    const auto sets1 = H.sets1(), sets1p = H.sets1p();
+    const int s1 = random.uniform<int>(sets1.size);
+    const auto I1 = make_set1_info(I, n, s1);
+    const bool next = !H.done() && random.uniform<int>(2);
+    const auto sets0 = make_sets(I.spots, H.k0()+next);
+    const auto sets0p = make_sets(I.spots-H.k1(), H.k0()+next);
+    const int s0p = random.uniform<int>(sets0p.size);
+    const auto c = commute(I1, sets0p, s0p);
+
+    // Verify consistency
+    GEODE_ASSERT(unsigned(c.s0) < unsigned(sets0.size));
+    GEODE_ASSERT(unsigned(c.s1p) < unsigned(sets1p.size));
+    const auto mask1 = subset_mask(sets1, s1);
+    const auto mask0p = subset_mask(sets0p, s0p);
+    const auto mask0 = subset_mask(sets0, c.s0);
+    const auto mask1p = subset_mask(sets1p, c.s1p);
+    const auto amask0 = absolute_mask(mask1, mask0p);
+    const auto amask1 = absolute_mask(mask0, mask1p);
+    if (amask0 != mask0 || amask1 != mask1) {
+      slog("bad:");
+      slog("  slice %d, n %d, next %d", slice, n, next);
+      slog("  spots %d, k0 %d, k1 %d", I.spots, H.k0(), H.k1());
+      slog("  s1 %d, s0p %d -> s0 %d, s1p %d", s1, s0p, c.s0, c.s1p);
+      slog("  mask1 %s, mask0p %s -> mask0 %s, mask1p %s", bin(mask1), bin(mask0p), bin(mask0), bin(mask1p));
+      slog("  amask0 %s, amask1 %s", bin(amask0), bin(amask1));
+    }
+    ASSERT_EQ(amask0, mask0);
+    ASSERT_EQ(amask1, mask1);
   }
 }
 

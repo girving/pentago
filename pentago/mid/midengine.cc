@@ -44,18 +44,6 @@ using std::make_tuple;
  *         1100
  */
 
-static int bottleneck(const int spots) {
-  int worst = 0;
-  int prev = 1;
-  for (const int n : range(spots+1)) {
-    int next = choose(spots, n+1);
-    if (next) next *= choose(n+1, (n+1)/2);
-    worst = max(worst, prev + next);
-    prev = next;
-  }
-  return worst;
-}
-
 int midsolve_workspace_size(const int min_slice) {
   return bottleneck(36 - min_slice);
 }
@@ -95,7 +83,7 @@ static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
 }
 
 Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
-  const info_t I = make_info(board, workspace.size());
+  const info_t I = make_info(board);
   NON_WASM_ASSERT(workspace.size() >= bottleneck(I.spots));
 
   // Size temporary buffers

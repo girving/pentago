@@ -89,12 +89,12 @@ struct halfsuper_t {
   }
 
   halfsuper_t operator~() const { return halfsuper_t(~s.x); }
-  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(s.x|h.s.x); }
-  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(s.x&h.s.x); }
-  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(s.x^h.s.x); }
-  halfsuper_t operator|=(halfsuper_t h) { s.x |= h.s.x; return *this; }
-  halfsuper_t operator&=(halfsuper_t h) { s.x &= h.s.x; return *this; }
-  halfsuper_t operator^=(halfsuper_t h) { s.x ^= h.s.x; return *this; }
+  halfsuper_t operator|(halfsuper_s h) const { return halfsuper_t(s.x|h.x); }
+  halfsuper_t operator&(halfsuper_s h) const { return halfsuper_t(s.x&h.x); }
+  halfsuper_t operator^(halfsuper_s h) const { return halfsuper_t(s.x^h.x); }
+  halfsuper_t operator|=(halfsuper_s h) { s.x |= h.x; return *this; }
+  halfsuper_t operator&=(halfsuper_s h) { s.x &= h.x; return *this; }
+  halfsuper_t operator^=(halfsuper_s h) { s.x ^= h.x; return *this; }
 
   // Do not use in performance critical code
   static halfsuper_t singleton(uint8_t r) {
@@ -115,12 +115,12 @@ struct halfsuper_t {
   }
 
   halfsuper_t operator~() const { return halfsuper_t(~s.a, ~s.b); }
-  halfsuper_t operator|(halfsuper_t h) const { return halfsuper_t(s.a|h.s.a, s.b|h.s.b); }
-  halfsuper_t operator&(halfsuper_t h) const { return halfsuper_t(s.a&h.s.a, s.b&h.s.b); }
-  halfsuper_t operator^(halfsuper_t h) const { return halfsuper_t(s.a^h.s.a, s.b^h.s.b); }
-  halfsuper_t operator|=(halfsuper_t h) { s.a |= h.s.a; s.b |= h.s.b; return *this; }
-  halfsuper_t operator&=(halfsuper_t h) { s.a &= h.s.a; s.b &= h.s.b; return *this; }
-  halfsuper_t operator^=(halfsuper_t h) { s.a ^= h.s.a; s.b ^= h.s.b; return *this; }
+  halfsuper_t operator|(halfsuper_s h) const { return halfsuper_t(s.a|h.a, s.b|h.b); }
+  halfsuper_t operator&(halfsuper_s h) const { return halfsuper_t(s.a&h.a, s.b&h.b); }
+  halfsuper_t operator^(halfsuper_s h) const { return halfsuper_t(s.a^h.a, s.b^h.b); }
+  halfsuper_t operator|=(halfsuper_s h) { s.a |= h.a; s.b |= h.b; return *this; }
+  halfsuper_t operator&=(halfsuper_s h) { s.a &= h.a; s.b &= h.b; return *this; }
+  halfsuper_t operator^=(halfsuper_s h) { s.a ^= h.a; s.b ^= h.b; return *this; }
 
   // Do not use in performance critical code
   static halfsuper_t singleton(uint8_t r) {
@@ -202,13 +202,29 @@ __attribute__((const)) METAL_INLINE halfsuper_t rmax(const halfsuper_s h) {
 #endif  // PENTAGO_SSE
 }
 
+// Convenience operators
+static inline halfsuper_t operator~(const halfsuper_s x) { return ~halfsuper_t(x); }
+static inline halfsuper_t operator|(const halfsuper_s x, const halfsuper_s y) { return halfsuper_t(x) | y; }
+static inline halfsuper_t operator&(const halfsuper_s x, const halfsuper_s y) { return halfsuper_t(x) & y; }
+static inline halfsupers_t operator~(const halfsupers_t x) { return halfsupers_t{~x.notlose, ~x.win}; }
+static inline halfsupers_t operator|(const halfsupers_t x, const halfsupers_t y) {
+  return halfsupers_t{x.win | y.win, x.notlose | y.notlose};
+}
+static inline halfsupers_t operator|(const halfsupers_t x, const halfsuper_s y) {
+  return halfsupers_t{x.win | y, x.notlose | y};
+}
+static inline halfsupers_t operator&(const halfsupers_t x, const halfsuper_s y) {
+  return halfsupers_t{x.win & y, x.notlose & y};
+}
+static inline void operator|=(METAL_THREAD halfsupers_t& x, const halfsupers_t y) { x = x | y; }
+static inline halfsupers_t rmax(const halfsupers_t x) { return halfsupers_t{rmax(x.win), rmax(x.notlose)}; }
+
 #if PENTAGO_CPP
 // Split a super_t into two halfsuper_t's
 Vector<halfsuper_t,2> split(const super_t s) __attribute__((const));
 
 // Merge even and odd bits into a single super_t
 super_t merge(const halfsuper_t even, const halfsuper_t odd) __attribute__((const));
-
 
 int popcount(halfsuper_s h);
 #endif  // PENTAGO_CPP

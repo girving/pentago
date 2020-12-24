@@ -41,14 +41,15 @@ template<class D,class S> static inline D mcast(const S& src) {
 static int table_bits = 0;
 static Array<superentry_t> table;
 
-void init_supertable(int bits) {
+void init_supertable(const int bits, const bool verbose) {
   if (bits<1 || bits>30)
     THROW(ValueError,"expected 1<=bits<=30, got bits = %d",bits);
   if (64-bits>hash_bits)
     THROW(ValueError,"bits = %d is too small, the high order hash bits won't fit",bits);
   table_bits = bits;
-  slog("initializing supertable: bits = %d, size = %gMB", 
-       bits, pow(2.,double(bits-20))*sizeof(superentry_t));
+  if (verbose)
+    slog("initializing supertable: bits = %d, size = %gMB",
+         bits, pow(2.,double(bits-20))*sizeof(superentry_t));
   table = Array<superentry_t>(1<<bits,uninit);
   clear_supertable();
 }
@@ -70,7 +71,7 @@ template<bool aggressive> superlookup_t super_lookup(int depth, side_t side0, si
   board_t standard;
   tie(standard, data.symmetry) = superstandardize(side0, side1);
   data.hash = hash_board(standard|(uint64_t)aggressive<<aggressive_bit);
-  // Lookup entry 
+  // Lookup entry
   const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
   if (entry.hash==data.hash>>table_bits) {
     superinfo_t& info = data.info;
@@ -127,7 +128,7 @@ template<bool aggressive> void super_store(int depth, const superlookup_t& data)
     // Insert new entry or merge with the existing one
     if (entry.hash==data.hash>>table_bits) {
       // Discard low depth information
-      int max_depth = max(depth,(int)entry.depth); 
+      int max_depth = max(depth,(int)entry.depth);
       if (depth<max_depth) {
         super_t mask = aggressive?info.wins:~info.wins;
         info.known &= mask;

@@ -18,7 +18,7 @@ static const int aggressive_bit = 63;
 static const uint64_t aggressive_mask = (uint64_t)1<<aggressive_bit;
 
 // Initialize a empty table with 1<<bits entries
-extern void init_supertable(int bits);
+extern void init_supertable(const int bits, const bool verbose = true);
 
 // Clear all supertable entries
 void clear_supertable();

@@ -43,6 +43,20 @@ class PentagoTest: XCTestCase {
     XCTAssertLessThanOrEqual(inner, 2 * 1024)
   }
 
+  func testThreadgroupSizes() throws {
+    // If we do computations that are s1-major, s0p-inner, how big will the inner dimensions be?
+    // How should we best fit this into a threadgroup size limit of 384?
+    let spots = 18
+    for n in 0...spots {
+      let k0 = n / 2
+      let k1 = n - k0
+      let s1s = choose(spots, k1)
+      let s0ps = choose(spots-k1, k0)
+      let cs0ps = choose(spots-k1, k0+1)
+      print("  n \(n): s1s \(s1s), s0ps \(s0ps), cs0ps \(cs0ps)")
+    }
+  }
+
   func midTest(solve: (Board) -> [Board: Int]) throws {
     let M = MidTest()
     XCTAssertEqual(M.correct.count, 1+18+8*18)
@@ -88,7 +102,7 @@ class PentagoTest: XCTestCase {
     let solver = MidSolver()
     try midTest { solver.solve($0) }
   }
-  
+
   func testPathGPU() throws {
     let solver = MidSolver()
     try pathTest { solver.solve($0) }

@@ -45,6 +45,7 @@ NAMESPACE_PENTAGO
 #ifdef __METAL_VERSION__
 
 using metal::min;
+using metal::max;
 using metal::popcount;
 template<class T> struct is_unsigned;
 template<class T> struct make_signed;
@@ -63,6 +64,7 @@ SIGNS(int64_t, uint64_t)
 #else  // if non-metal C++
 
 using std::min;
+using std::max;
 using std::is_unsigned;
 using std::make_signed;
 using std::make_unsigned;

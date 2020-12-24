@@ -70,7 +70,6 @@
 		A665F42325555980000943E3 /* halfsuper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = halfsuper.h; path = ../../../pentago/mid/halfsuper.h; sourceTree = "<group>"; };
 		A665F42425555980000943E3 /* subsets_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = subsets_c.h; path = ../../../pentago/mid/subsets_c.h; sourceTree = "<group>"; };
 		A665F42525555980000943E3 /* internal_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = internal_c.h; path = ../../../pentago/mid/internal_c.h; sourceTree = "<group>"; };
-		A665F42625555980000943E3 /* midengine_c.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = midengine_c.h; path = ../../../pentago/mid/midengine_c.h; sourceTree = "<group>"; };
 		A665F42825555980000943E3 /* midengine.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = midengine.cc; path = ../../../pentago/mid/midengine.cc; sourceTree = "<group>"; };
 		A665F42925555980000943E3 /* internal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = internal.h; path = ../../../pentago/mid/internal.h; sourceTree = "<group>"; };
 		A665F43A25555AE5000943E3 /* metal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = metal.h; path = ../../../pentago/utility/metal.h; sourceTree = "<group>"; };
@@ -173,7 +172,6 @@
 				A665F42325555980000943E3 /* halfsuper.h */,
 				A665F42525555980000943E3 /* internal_c.h */,
 				A665F42925555980000943E3 /* internal.h */,
-				A665F42625555980000943E3 /* midengine_c.h */,
 				A665F42825555980000943E3 /* midengine.cc */,
 				A665F42025555980000943E3 /* midengine.h */,
 				A665F42425555980000943E3 /* subsets_c.h */,
@@ -367,7 +365,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 1210;
-				LastUpgradeCheck = 1210;
+				LastUpgradeCheck = 1220;
 				TargetAttributes = {
 					A6255A4A253DDF8A00CBF8CE = {
 						CreatedOnToolsVersion = 12.0.1;
@@ -509,6 +507,7 @@
 				DEVELOPMENT_TEAM = BGA888BFLP;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = tests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -533,6 +532,7 @@
 				DEVELOPMENT_TEAM = BGA888BFLP;
 				HEADER_SEARCH_PATHS = "";
 				INFOPLIST_FILE = tests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -555,6 +555,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_ENTITLEMENTS = mac/mac.entitlements;
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"mac/Preview Content\"";
@@ -582,6 +583,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
 				CODE_SIGN_ENTITLEMENTS = mac/mac.entitlements;
+				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"mac/Preview Content\"";
@@ -747,7 +749,7 @@
 				DEVELOPMENT_TEAM = BGA888BFLP;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = ios/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -777,7 +779,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_TESTABILITY = YES;
 				INFOPLIST_FILE = ios/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.2;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

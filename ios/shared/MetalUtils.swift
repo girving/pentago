@@ -64,14 +64,10 @@ struct Small<T>: BufferLike {
   }
 }
 
-// iPhone 7 and even recent MacBook Pros don't support varying threadgroups, unfortunately, so we
-// needs bounds checking in each compute kernel.
 func dispatch(_ compute: MTLComputeCommandEncoder, _ pipeline: MTLComputePipelineState, _ count: Int) {
   if count == 0 { return }
-  let t = min(count, pipeline.threadExecutionWidth)
-  compute.dispatchThreadgroups(MTLSizeMake(ceilDiv(count, t), 1, 1), threadsPerThreadgroup: MTLSizeMake(t, 1, 1))
-  // When varying works, we can switch to
-  // compute.dispatchThreads(MTLSizeMake(count, 1, 1), threadsPerThreadgroup: MTLSizeMake(t, 1, 1))
+  let threads = min(count, pipeline.threadExecutionWidth)
+  compute.dispatchThreads(MTLSizeMake(count, 1, 1), threadsPerThreadgroup: MTLSizeMake(threads, 1, 1))
 }
 
 func set(_ compute: MTLComputeCommandEncoder, _ buffers: [BufferLike], _ r: Range<Int>) {
