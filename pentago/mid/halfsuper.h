@@ -218,6 +218,10 @@ static inline halfsupers_t operator&(const halfsupers_t x, const halfsuper_s y) 
 }
 static inline void operator|=(METAL_THREAD halfsupers_t& x, const halfsupers_t y) { x = x | y; }
 static inline halfsupers_t rmax(const halfsupers_t x) { return halfsupers_t{rmax(x.win), rmax(x.notlose)}; }
+static inline METAL_DEVICE halfsuper_s& get(METAL_DEVICE halfsupers_t& x, const int i) {
+  assert(unsigned(i) < 2);
+  return (&x.win)[i];
+}
 
 #if PENTAGO_CPP
 // Split a super_t into two halfsuper_t's
