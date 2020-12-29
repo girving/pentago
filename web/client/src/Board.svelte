@@ -31,6 +31,24 @@
 
     <!-- Board -->
     {#each quadrant_data as q}
+      <!-- Rotators -->
+      <!-- Important to put these prior to quadrants; otherwise on iPhone tapping on a quadrant center causes -->
+      <!-- a rotation falled by an errant fake placed stone. -->
+      {#if !done && board.middle}
+        {#each q.rotators as r}
+          <a href="{rotate_link(r)}" on:click={spin(r)}>
+            <path class="rotateselect" d="{r.select}"/>
+            <path class="rotate{turncolor}" d="{r.path}"/>
+            {#if board.middle && !board.done()}
+              {#await child_value(board.rotate(r.qx, r.qy, r.d)) then v}
+                <path class="rvalue" d="{r.value}" style="fill: {value_colors[-v]}"/>
+              {/await}
+            {/if}
+          </a>
+        {/each}
+      {/if}
+
+      <!-- Quadrants -->
       <g class="quadrant" style="transform: {transform(q, swivel[q.q])}" on:transitionend={nospin(q)}>
         <g transform="rotate({-90*swivel[q.q]})">
           <rect class="board" x=-1.5 y=-1.5 width=3 height=3/>
@@ -50,21 +68,6 @@
           {/each}
         </g>
       </g>
-
-      <!-- Rotators -->
-      {#if !done && board.middle}
-        {#each q.rotators as r}
-          <a href="{rotate_link(r)}" on:click={spin(r)}>
-            <path class="rotateselect" d="{r.select}"/>
-            <path class="rotate{turncolor}" d="{r.path}"/>
-            {#if board.middle && !board.done()}
-              {#await child_value(board.rotate(r.qx, r.qy, r.d)) then v}
-                <path class="rvalue" d="{r.value}" style="fill: {value_colors[-v]}"/>
-              {/await}
-            {/if}
-          </a>
-        {/each}
-      {/if}
     {/each}
 
     <!-- Fives-in-a-row -->
@@ -150,6 +153,10 @@
     stroke: gray;
     stroke-width: .5;
     vector-effect: non-scaling-stroke;
+  }
+  .rvalue {
+    stroke: black;
+    stroke-width: 1;
   }
 
   .turnlabel,.valuelabel {
