@@ -6,8 +6,8 @@ genrule(
     name = "stubs",
     srcs = ["snappy-stubs-public.h.in"],
     outs = ["snappy-stubs-public.h"],
-    cmd = "sed -e 's/\$${HAVE_.*}/1/g' -e 's/\$${SNAPPY_MAJOR}/1/' " +
-          "-e 's/\$${SNAPPY_MINOR}/1/' -e 's/\$${SNAPPY_PATCHLEVEL}/7/' $< > $@",
+    cmd = "sed -e 's/\\$${HAVE_.*}/1/g' -e 's/\\$${SNAPPY_MAJOR}/1/' " +
+          "-e 's/\\$${SNAPPY_MINOR}/1/' -e 's/\\$${SNAPPY_PATCHLEVEL}/7/' $< > $@",
 )
 
 cc_library(
