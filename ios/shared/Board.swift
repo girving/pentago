@@ -37,6 +37,12 @@ func unpack(_ board: UInt64) throws -> (UInt64, UInt64) {
   return (side0, side1)
 }
 
+enum Stone: Int {
+  case empty = 0
+  case black = 1
+  case white = 2
+}
+
 struct Board: Hashable, CustomStringConvertible {
   let s: high_board_s
 
@@ -78,15 +84,30 @@ struct Board: Hashable, CustomStringConvertible {
     return "\(pack(s.side_.0, s.side_.1))\(m)"
   }
   var description: String { name }
-  
+
   var count: Int { Int((s.ply_ + 1) >> 1) }
   var middle: Bool { s.ply_ & 1 != 0}
-  var turn: Int { Int((s.ply_ >> 1) & 1) }
+  var turn: Bool { (s.ply_ >> 1) & 1 != 0 }
+  var turnStone: Stone { turn ? .white : .black }
   var emptyMask: UInt64 { 0x01ff01ff01ff01ff ^ s.side_.0 ^ s.side_.1 }
 
   func done() -> Bool { board_done(s) }
   func immediateValue() -> Int { Int(board_immediate_value(s)) }
 
+  // Map quadrant and spot id to stone
+  func stone(q: Int, k: Int) -> Stone {
+    assert(0 <= q && q < 4 && 0 <= k && k < 9)
+    func bit(_ n: UInt64) -> Bool { n >> UInt64(16*q+k) & 1 != 0 }
+    return bit(s.side_.0) ? .black : bit(s.side_.1) ? .white : .empty
+  }
+
+  // Place a stone, if the move is valid
+  func place(q: Int, k: Int) -> Board? {
+    assert(0 <= q && q < 4 && 0 <= k && k < 9)
+    return middle || stone(q: q, k: k) != .empty ? .none : Board(board_place_bit(s, Int32(16*q+k)))
+  }
+
+  // All valid moves
   func moves() -> [Board] {
     var moves: [Board] = []
     if !middle {  // Place a stone
