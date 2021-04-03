@@ -18,7 +18,7 @@
     "@surma/rollup-plugin-off-main-thread": "^1.4.1",
     "rollup": "^2.31.0",
     "rollup-plugin-ignore": "^1.0.9",
-    "rollup-plugin-postcss": "^3.1.8",
+    "rollup-plugin-postcss": "^4.0.0",
     "rollup-plugin-svelte": "^6.0.1",
     "rollup-plugin-terser": "^5.3.1",
     "rollup-plugin-visualizer": "^4.0.0",
