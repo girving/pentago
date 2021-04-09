@@ -104,6 +104,6 @@ def invariant_net(boards, *, layers, width, mid):
   """A simple equivariant pentago reset"""
   x = equivariant_embed(boards, width=width)
   for layer in range(layers):
-    x = EquivariantBlock2(mid=mid)(x)
+    x = EquivariantBlock(mid=mid)(x)
   logits = InvariantLogits()(x)
   return logits

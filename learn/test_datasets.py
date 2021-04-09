@@ -18,11 +18,11 @@ def test_sparse():
   cached = True
   if not cached:
     _correct.clear()
-  dataset = datasets.SparseData(batch=batch, seed=7, counts=(4,5))
-  assert dataset.batches == 12544 // batch
+  dataset = datasets.SparseData(seed=7, counts=(4,5))
+  assert dataset.batches(batch=batch) == 12544 // batch
 
   # Test correctness
-  for step, b in zip(range(steps), dataset.forever()):
+  for step, b in zip(range(steps), dataset.forever(batch=batch)):
     for i in range(batch):
       board = np.asarray(b['board'][i]).view(np.uint64)[0]
       quads = b['quads'][i]
@@ -36,6 +36,6 @@ def test_sparse():
     print(f'correct = {str(_correct).replace(" ","")}')
 
   # Test that each epoch is different
-  n = dataset.batches
-  data = [b for _, b in zip(range(3*n), dataset.forever())]
+  n = dataset.batches(batch=batch)
+  data = [b for _, b in zip(range(3*n), dataset.forever(batch=batch))]
   assert np.any(data[0]['value'] != data[n]['value'])

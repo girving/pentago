@@ -35,9 +35,7 @@ def process_sparse_batch(step, data):
 
 
 class SparseData:
-  def __init__(self, *, batch, seed, counts, base='../data/edison/project/all'):
-    self._batch = batch
-
+  def __init__(self, *, seed, counts, base='../data/edison/project/all'):
     # Concatenate and shuffle all data
     data = []
     for count in counts:
@@ -53,7 +51,8 @@ class SparseData:
     data = data.reshape(len(data), 9, 2)
     self._data = jnp.asarray(data)
 
-    def epoch(e):
+    @partial(jax.jit, static_argnums=1)
+    def epoch(e, batch):
       # Shuffle differently per epoch
       key = jax.random.PRNGKey(17)
       key = jax.random.fold_in(key, e)
@@ -62,18 +61,17 @@ class SparseData:
       # Organize into batches
       data = data[:len(data) // batch * batch]
       return data.reshape(len(data) // batch, batch, 9, 2)
-    self._epoch = jax.jit(epoch)
+    self._epoch = lambda e, *, batch: epoch(e, batch)
 
-  @property
-  def batches(self):
-    return len(self._data) // self._batch
+  def batches(self, *, batch):
+    return len(self._data) // batch
 
-  def forever(self):
+  def forever(self, *, batch):
     step = 0
     for e in range(100000):
-      for raw in self._epoch(e):
+      for raw in self._epoch(e, batch=batch):
         yield process_sparse_batch(step, raw)
         step += 1
 
-  def step_to_epoch(self, step):
-    return step / self.batches
+  def step_to_epoch(self, step, *, batch):
+    return step / self.batches(batch=batch)
