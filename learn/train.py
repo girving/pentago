@@ -10,6 +10,7 @@ import jax.numpy as jnp
 import numpy as np
 import numbers
 import optax
+import timeit
 
 
 def pretty_info(info):
@@ -68,9 +69,11 @@ def train(*,
     return params, opt_state, metrics
 
   # Train
-  metrics = dict(loss=[], accuracy=[])
+  metrics = dict(sps=[], loss=[], accuracy=[])
   for step, data in enumerate(dataset.forever(batch=batch)):
+    start = timeit.default_timer()
     params, opt_state, ms = update(params, opt_state, data)
+    ms['sps'] = batch / (timeit.default_timer() - start)
     for s in metrics:
       metrics[s].append(ms[s])
     if step % log_every == 0:
