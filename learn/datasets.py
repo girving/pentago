@@ -35,13 +35,13 @@ def process_sparse_batch(step, data):
 
 
 class SparseData:
-  def __init__(self, *, batch, seed, counts):
+  def __init__(self, *, batch, seed, counts, base='../data/edison/project/all'):
     self._batch = batch
 
     # Concatenate and shuffle all data
     data = []
     for count in counts:
-      sparse = np.load(f'../data/edison/project/all/sparse-{count}.npy')
+      sparse = np.load(f'{base}/sparse-{count}.npy')
       assert sparse.dtype == np.uint64
       assert sparse.shape[1] == 9
       data.append(sparse)
