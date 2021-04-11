@@ -20,7 +20,7 @@ import jax.numpy as jnp
 import numpy as np
 
 
-def equivariant_embed(boards, *, width):
+class Embed(hk.Module):
   """Embed [batch,4,9]-shaped boards equivariantly into [batch,4,width] activations
 
   We embed each quadrant by summing together embeddings at each position, using
@@ -37,19 +37,116 @@ def equivariant_embed(boards, *, width):
   Returns:
     [batch,4,width]-shaped tensor
   """
-  batch = boards.shape[0]
-  assert boards.shape == (batch, 4, 9)
-  q0, q1, q2, q3 = boards.swapaxes(0,1)
-  q1 = q1.reshape(batch, 3, 3).swapaxes(1,2)[:,::-1,:].reshape(batch, 9)
-  q2 = q2.reshape(batch, 3, 3)[:,::-1,:].swapaxes(1,2).reshape(batch, 9)
-  q3 = q3[:, ::-1]
-  rotated = jnp.stack([q0, q2, q3, q1], axis=1)  # Put quads in counterclockwise order
-  count = (rotated.reshape(batch, 4*9) != 0).astype(np.int32).sum(axis=-1)
-  init = hk.initializers.TruncatedNormal(stddev=0.01)
-  x = hk.Embed(name='quads', vocab_size=9*3, embed_dim=width, w_init=init)(rotated + 3*jnp.arange(9)).sum(axis=-2)
-  x += hk.Embed(name='count', vocab_size=19, embed_dim=width, w_init=init)(count)[:,None,:]
-  assert x.shape == (batch, 4, width), x.shape
-  return x
+  def __init__(self, width):
+    super().__init__()
+    self._width = width
+
+  def __call__(self, boards):
+    batch = boards.shape[0]
+    width = self._width
+    assert boards.shape == (batch, 4, 9)
+    q0, q1, q2, q3 = boards.swapaxes(0,1)
+    q1 = q1.reshape(batch, 3, 3).swapaxes(1,2)[:,::-1,:].reshape(batch, 9)
+    q2 = q2.reshape(batch, 3, 3)[:,::-1,:].swapaxes(1,2).reshape(batch, 9)
+    q3 = q3[:, ::-1]
+    rotated = jnp.stack([q0, q2, q3, q1], axis=1)  # Put quads in counterclockwise order
+    count = (rotated.reshape(batch, 4*9) != 0).astype(np.int32).sum(axis=-1)
+    init = hk.initializers.RandomNormal(1 / np.sqrt(9+1))
+    w_quads = hk.get_parameter('w_quads', shape=(9*3, width), init=init)
+    w_count = hk.get_parameter('w_count', shape=(19, width), init=init)
+    x = jax.nn.one_hot(rotated, 3).reshape(batch, 4, 9*3) @ w_quads
+    x += (jax.nn.one_hot(count, 19) @ w_count)[:,None,:]
+    assert x.shape == (batch, 4, width)
+    return x
+
+
+def fourier(s, *, axis, scale=0.5):
+  """Size 4 Fourier transform"""
+  assert s.dtype == np.float32
+  s0, s1, s2, s3 = scale * jnp.moveaxis(s, axis, 0)
+  s02 = s0 + s2
+  s13 = s1 + s3
+  t0 = s02 + s13
+  t1 = jax.lax.complex(s0 - s2, s3 - s1)
+  t2 = s02 - s13
+  return t0, t1, t2
+
+
+def unfourier(t, *, axis, scale=0.5):
+  """Size 4 inverse Fourier transform"""
+  t0, t1, t2 = t
+  t0 = scale * t0
+  t2 = scale * t2
+  t1 = 2 * scale * t1
+  s02 = t0 + t2
+  s13 = t0 - t2
+  s0 = s02 + t1.real
+  s2 = s02 - t1.real
+  s1 = s13 - t1.imag
+  s3 = s13 + t1.imag
+  return jnp.stack([s0, s1, s2, s3], axis=axis)
+
+
+def convolve(x, y, *, axis, mul=jnp.matmul):
+  """Convolve tensors of shape [a,4,b], [b,4,c] → shape [a,4,c]"""
+  x = fourier(x, axis=axis, scale=1)
+  y = fourier(y, axis=axis, scale=1)
+  z = jax.tree_multimap(mul, x, y)
+  return unfourier(z, axis=axis, scale=0.25)
+
+
+def sws_standardize(w, *, gain, eps=1e-4, scale=1):
+  """Scaled weight standardize a matrix, with optional scalar gain
+
+  See Brock et al., https://arxiv.org/abs/2101.08692 for details.
+  Code modified from https://github.com/deepmind/deepmind-research/blob/master/nfnets/base.py#L121.
+  """
+  n_in, n_out = w.shape
+  w = w - jnp.mean(w, axis=0, keepdims=True)
+  sum_sqr = jnp.square(w).sum(axis=0, keepdims=True)
+  scale *= jax.lax.rsqrt(jnp.maximum(sum_sqr, eps))  # 1 / sqrt(n_in * var)
+  if gain:
+    scale *= hk.get_parameter('gain', shape=(n_out,), dtype=w.dtype, init=jnp.ones)
+  return scale * w
+
+
+class SwsLinear(hk.Module):
+  """SWS linear layer"""
+  def __init__(self, size, *, gain=True):
+    super().__init__()
+    self._size = size
+    self._gain = gain
+
+  def __call__(self, x):
+    n_in = x.shape[-1]
+    n_out = self._size
+    w = hk.get_parameter('w', shape=(n_in, n_out), dtype=x.dtype,
+                         init=hk.initializers.VarianceScaling(1, 'fan_in', 'normal'))
+    bias = hk.get_parameter('bias', shape=(n_out,), dtype=x.dtype, init=jnp.zeros)
+    w = sws_standardize(w, gain=self._gain)
+    return x @ w + bias
+
+
+class SwsConv(hk.Module):
+  """SWS convolutional layer"""
+  def __init__(self, size, *, gain=True, scale=1):
+    super().__init__()
+    self._size = size
+    self._gain = gain
+    self._scale = scale
+
+  def __call__(self, x):
+    batch, _, n_in = x.shape
+    n_out = self._size
+    assert x.shape == (batch, 4, n_in)
+    w = hk.get_parameter('w', shape=(4*n_in, n_out), dtype=x.dtype,
+                         init=hk.initializers.VarianceScaling(1, 'fan_in', 'normal'))
+    bias = hk.get_parameter('bias', shape=(n_out,), dtype=x.dtype, init=jnp.zeros)
+    w = sws_standardize(w, gain=self._gain, scale=self._scale)
+    w = w.reshape(n_in, 4, n_out)
+    y = convolve(x, w, axis=1) + bias
+    assert y.shape == (batch, 4, n_out)
+    return y
 
 
 class EquivariantLinear:
@@ -68,10 +165,11 @@ class EquivariantLinear:
     return x
 
 
-class EquivariantBlock:
+class EquivariantBlock(hk.Module):
   """An equivariant resnet block: x → x + linear(gelu(ev_linear(norm(x))))"""
 
   def __init__(self, *, mid):
+    super().__init__()
     self._mid = mid
 
   def __call__(self, x):
@@ -85,8 +183,27 @@ class EquivariantBlock:
     return x + y
 
 
+class NFBlock(hk.Module):
+  """Normalizer-free resnet block
+
+  See Brock et al., https://arxiv.org/abs/2101.08692 for details.
+  """
+  def __init__(self, mid):
+    super().__init__()
+    self._mid = mid
+
+  def __call__(self, x, *, in_scale, out_scale):
+    batch, _, width = x.shape
+    assert x.shape == (batch, 4, width)
+    gamma = np.sqrt(2 / (1 - 1/np.pi))
+    y = SwsConv(self._mid, scale=gamma / in_scale)(x)
+    y = jax.nn.relu(y)
+    y = SwsConv(width, scale=out_scale)(y)
+    return x + y
+
+
 class InvariantLogits:
-  def __call__(self, x):
+  def __call__(self, x, *, classes=3):
     """Invariant final logit layer
 
     Returns [batch,3]-shaped outcome logits on the value of the positions, with indices
@@ -96,14 +213,38 @@ class InvariantLogits:
     assert x.shape == (batch, 4, width)
     x = hk.LayerNorm(axis=-1, create_scale=False, create_offset=False)(x)
     x = jnp.mean(x, axis=1)
-    logits = hk.Linear(3)(x)
+    logits = hk.Linear(classes)(x)
     return logits
 
 
 def invariant_net(boards, *, layers, width, mid):
   """A simple equivariant pentago reset"""
-  x = equivariant_embed(boards, width=width)
+  x = Embed(width)(boards)
   for layer in range(layers):
     x = EquivariantBlock(mid=mid)(x)
   logits = InvariantLogits()(x)
-  return logits
+  metrics = {}
+  return logits, metrics
+
+
+def nf_net_scale(layer, *, layer_scale):
+  return jnp.sqrt(1 + layer*jnp.square(layer_scale))
+
+
+def nf_net(boards, *, layers, width, mid, layer_scale, classes=3):
+  """A normalizer-free equivariant pentago resnet"""
+  scale = partial(nf_net_scale, layer_scale=layer_scale)
+  means, stds = [], []
+  def stat(x):
+    means.append(jnp.mean(x))
+    stds.append(jnp.std(x))
+  x = Embed(width)(boards)
+  stat(x)
+  for layer in range(layers):
+    x = NFBlock(mid)(x, in_scale=scale(layer), out_scale=layer_scale)
+    stat(x)
+  x = 0.25 / scale(layers) * x.sum(axis=1)
+  logits = hk.Linear(classes)(x)
+  metrics = dict(means=jnp.asarray(means),
+                 stds=jnp.asarray(stds))
+  return logits, metrics

@@ -12,7 +12,7 @@ import symmetry
 def super_extract(g, values):
   """Game value according to black"""
   assert values.dtype == np.uint32
-  b, w = jax.vmap(lambda v: (v[g >> 5] >> (g & 31)) & 1)(values.reshape(2, 8)).astype(np.int32)
+  b, w = jax.vmap(lambda v: (v[g >> 5 & 7] >> (g & 31)) & 1)(values.reshape(2, 8)).astype(np.int32)
   return b - w
 
 
@@ -25,7 +25,7 @@ def process_sparse_batch(step, data):
   assert data.dtype == np.uint32
   assert data.shape == (batch, 9, 2)
   key = jax.random.fold_in(jax.random.PRNGKey(80), step)
-  g = jax.random.randint(key, (batch,), 0, 256).astype(np.uint8)
+  g = jax.random.randint(key, (batch,), 0, 2048)
   data = jnp.asarray(data, dtype=data.dtype)
   board = symmetry.super_transform_board(g, data[:, 0])
   quads = board_to_quads(board)

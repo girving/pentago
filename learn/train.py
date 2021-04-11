@@ -27,7 +27,8 @@ def logits_fn(quads):
   layers = 4
   width = 128
   mid = 128
-  return ev.invariant_net(quads, layers=layers, width=width, mid=mid)
+  layer_scale = 1
+  return ev.nf_net(quads, layers=layers, width=width, mid=mid, layer_scale=layer_scale)
 
 
 def train(*,
@@ -40,20 +41,20 @@ def train(*,
           key=jax.random.PRNGKey(7)):
   # Define network
   @hk.transform
-  def loss_and_metrics(data):
+  def loss_fn(data):
     quads = data['quads']
     values = data['value']
     assert quads.shape == (batch, 4, 9)
     assert values.shape == (batch,)
     labels = jax.nn.one_hot(values + 1, num_classes=3)
-    logits = logits_fn(quads)
+    logits, metrics = logits_fn(quads)
     loss = jnp.sum(labels * jax.nn.log_softmax(logits)) / -batch
     accuracy = (jnp.argmax(logits, axis=-1) == values + 1).astype(np.float32).mean()
-    return loss, dict(loss=loss, accuracy=accuracy)
+    return loss, dict(loss=loss, accuracy=accuracy, **metrics)
 
   # Initialize
   key, key_ = jax.random.split(key)
-  params = loss_and_metrics.init(key_, next(dataset.forever(batch=batch)))
+  params = loss_fn.init(key_, next(dataset.forever(batch=batch)))
   print(f'params = {sum(p.size for p in jax.tree_leaves(params)):,}')
 
   # Optimizer
@@ -63,7 +64,7 @@ def train(*,
   # Update step
   @jax.jit
   def update(params, opt_state, data):
-    grads, metrics = jax.grad(lambda p: loss_and_metrics.apply(p, None, data), has_aux=True)(params)
+    grads, metrics = jax.grad(lambda p: loss_fn.apply(p, None, data), has_aux=True)(params)
     updates, opt_state = opt.update(grads, opt_state)
     params = optax.apply_updates(params, updates)
     return params, opt_state, metrics

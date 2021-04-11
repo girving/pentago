@@ -17,19 +17,23 @@ def _rotate(g, x):
 
 @partial(jnp.vectorize, signature='(),(4,9)->(4,9)')
 def transform_board(g, board):
-  """Globally transform one board by a rotation g (for now, we ignore reflections)"""
+  """Globally transform one board by an element of D4"""
+  assert g.dtype == np.int32
   assert board.shape == (4,9)
   rotate = partial(_rotate, g)
   board = jax.vmap(rotate, 0, 0)(board)
-  return jax.vmap(rotate, 1, 1)(board)
+  board = jax.vmap(rotate, 1, 1)(board)
+  board = jax.lax.cond(g & 4, lambda q: q.reshape(2,2,3,3)[:,::-1,:,::-1].reshape(4,9), lambda q: q, board)
+  return board
 
 
 @partial(jnp.vectorize, signature='(),(2)->(2)')
 def super_transform_board(g, board):
   """Transform a board according to a supersymmetry, keeping it in uint64 form"""
-  assert g.dtype == np.uint8
+  assert g.dtype == np.int32
   quads = boards.board_to_quads(board)
   quads = jax.vmap(_rotate)(g >> 2*jnp.arange(4) & 3, quads)
+  quads = transform_board(g >> 8, quads)
   return boards.quads_to_board(quads)
 
 
