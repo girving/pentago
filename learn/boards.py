@@ -26,6 +26,17 @@ def quads_to_board(quads):
   return ((quads * t).sum(axis=-1).reshape(2,2) << s).astype(np.uint32).sum(axis=-1)
 
 
+def show_quads(quads):
+  assert quads.shape == (4,9)
+  return str(quads.reshape(2,2,3,3).swapaxes(1,2).reshape(6,6)[:,::-1].T)
+
+
+def random_quads(*, size, n):
+  quads = np.asarray([Board.random_board(n).quad_grid for _ in range(size)])
+  assert quads.shape == (size, 4, 9)
+  return quads
+
+
 class Board:
   """Mirror of high_board_t"""
 

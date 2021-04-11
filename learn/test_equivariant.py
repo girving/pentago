@@ -1,25 +1,14 @@
 #!/usr/bin/env python3
 """Test equivariances"""
 
-from boards import Board
+from boards import Board, show_quads, random_quads
 import equivariant as ev
-from symmetry import transform_board, transform_state
+from symmetry import transform_quads, transform_state
 from functools import partial
 import haiku as hk
 import jax
 import jax.numpy as jnp
 import numpy as np
-
-
-def show_board(board):
-  assert board.shape == (4,9)
-  return str(board.reshape(2,2,3,3).swapaxes(1,2).reshape(6,6)[:,::-1].T)
-
-
-def random_boards(*, size, n):
-  boards = np.asarray([Board.random_board(n).quad_grid for _ in range(size)])
-  assert boards.shape == (size, 4, 9)
-  return boards
 
 
 def test_embed():
@@ -28,7 +17,7 @@ def test_embed():
   np.random.seed(7)
   key = jax.random.PRNGKey(7)
   gs = np.random.randint(4, size=batch)
-  boards = random_boards(size=batch, n=11)
+  boards = random_quads(size=batch, n=11)
 
   @hk.transform
   def net(boards):
@@ -42,11 +31,11 @@ def test_embed():
   h = jax.jit(lambda b: net.apply(params, None, b))
   hb = h(boards)
   gh = transform_state(gs, hb)
-  hg = h(transform_board(gs, boards))
+  hg = h(transform_quads(gs, boards))
   if 0:
     print(f'g = {gs}')
-    print(f'board =\n{show_board(boards[0])}')
-    print(f'g board =\n{show_board(transform_board(gs[0], boards[0]))}')
+    print(f'board =\n{show_quads(boards[0])}')
+    print(f'g board =\n{show_quads(transform_quads(gs[0], boards[0]))}')
     print(f'h =\n{h(boards)}')
     print(f'gh =\n{gh}')
     print(f'hg =\n{hg}')
@@ -174,12 +163,12 @@ def net_test(net, *, batch=23):
   np.random.seed(7)
   key = jax.random.PRNGKey(7)
   gs = np.random.randint(4, size=batch)
-  boards = random_boards(size=batch, n=11)
+  boards = random_quads(size=batch, n=11)
   net = hk.transform(net)
   params = net.init(key, boards)
   h = jax.jit(lambda b: net.apply(params, None, b))
   hb, metrics = h(boards)
-  hgb, _ = h(transform_board(gs, boards))
+  hgb, _ = h(transform_quads(gs, boards))
   if 0:
     print(f'g = {gs}')
     print(f'h =\n{hb}')

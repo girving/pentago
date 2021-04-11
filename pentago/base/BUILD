@@ -16,6 +16,7 @@ genrule(
         "gen/tables.h",
         "gen/tables.cc",
         "gen/tables.js",
+        "gen/tables.py",
         "gen/halfsuper_wins.h",
     ],
     tools = [":precompute"],
