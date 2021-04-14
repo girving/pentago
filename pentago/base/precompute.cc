@@ -82,7 +82,8 @@ string script_init(const string& init) {
 
 // C++ type to numpy dtype
 string dtype(const string& type) {
-  if (type == "uint8_t") return "uint8";
+  if (type == "uint8_t" || type == "uint16_t")
+    return type.substr(0, type.size() - 2);
   throw ValueError(format("Don't know dtype for type '%s'", type));
 }
 
@@ -960,8 +961,8 @@ REMEMBER(rotation_minimal_quadrants,
   check<uint64_t>(nest.flat, "8f48bb94ad675de569b07cca98a2e930b06b45ac");
   check<uint64_t>(inverse, "339369694f78d4a197db8dc41a1f41300ba4f46c");
   check<uint64_t>(moved, "dce212878aaebbcd995a8a0308335972bd1d5ef7");
-  remember("uint16_t", "rotation_minimal_quadrants_offsets", "%d", nest.offsets, for_js);
-  remember("uint16_t", "rotation_minimal_quadrants_flat", "%d", nest.flat);
+  remember("uint16_t", "rotation_minimal_quadrants_offsets", "%d", nest.offsets, for_js | for_py);
+  remember("uint16_t", "rotation_minimal_quadrants_flat", "%d", nest.flat, for_py);
   remember("uint16_t", "rotation_minimal_quadrants_inverse", "%d", inverse, for_js);
   remember("uint16_t", "rotation_minimal_quadrants_reflect_moved", "%d", moved);
 )
