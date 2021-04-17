@@ -1,7 +1,6 @@
 """Supertensor reading"""
 
 from batching import batch_vmap
-import functools
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -9,6 +8,7 @@ import lzma
 import numpy as np
 import os
 import struct
+from semicache import semicache
 from symmetry import transform_section
 import tables
 
@@ -154,8 +154,8 @@ class Supertensors:
   def __init__(self, *, index_path, super_path, max_slice):
     self.sections = sections = descendent_sections(max_slice)
     self._indices = tuple(SupertensorIndex(s) for s in sections)
-    self._index_file = functools.cache(lambda n: open(f'{index_path}/slice-{n}.pentago.index', 'rb'))
-    self._super_file = functools.cache(lambda n: open(f'{super_path}/slice-{n}.pentago', 'rb'))
+    self._index_file = semicache(lambda n: open(f'{index_path}/slice-{n}.pentago.index', 'rb'))
+    self._super_file = semicache(lambda n: open(f'{super_path}/slice-{n}.pentago', 'rb'))
 
   def all_blocks(self, section):
     assert section.shape == (4,2), section.shape

@@ -10,6 +10,7 @@ setup(name='pentago',
       url='https://perfect-pentago.net',
       license='BSD3',
       install_requires=[
+          'apache-beam',
           'dm-haiku',
           'jax',
           'optax',

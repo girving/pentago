@@ -58,7 +58,7 @@ def train(*,
   print(f'params = {sum(p.size for p in jax.tree_leaves(params)):,}')
 
   # Optimizer
-  opt = optax.adam(lr)
+  opt = optax.adamw(lr)
   opt_state = opt.init(params)
 
   # Update step

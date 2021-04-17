@@ -37,6 +37,28 @@ def random_quads(*, size, n):
   return quads
 
 
+def pack_board_and_value(board, value):
+  assert value.shape + (2,) == board.shape
+  assert board.dtype == np.uint32
+  assert value.dtype == np.int32, value.dtype
+  assert np.all(np.abs(value) <= 1)
+  board = np.asarray(board).view(np.uint64).squeeze(axis=-1)
+  def f(v, n):
+    return v.astype(np.uint64) << np.uint64(n)
+  return board | f(value < 0, 15) | f(value > 0, 16+15)
+
+
+def unpack_board_and_value(packed):
+  assert packed.dtype == np.uint64
+  I = np.uint64
+  def bit(n):
+    return (packed >> I(n) & I(1)).astype(np.int32)
+  ns = np.array([15, 16+15], dtype=I)
+  board = packed & ~(I(1) << ns).sum()
+  value = bit(16+15) - bit(15)
+  return board[...,None].view(np.uint32), value
+
+
 class Board:
   """Mirror of high_board_t"""
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Pentago board tests"""
 
+import boards
 from boards import Board
+import numpy as np
 
 
 def test_moves():
@@ -29,3 +31,17 @@ def test_str():
   s = '1846757322198614016m'
   b = Board.parse(s)
   assert s == str(b)
+
+
+def test_pack():
+  np.random.seed(7)
+  source = boards.quads_to_board(boards.random_quads(size=3*5, n=17))
+  for shape in (), (7,), (3,5):
+    bs = source[:np.prod(shape, dtype=int)].reshape(shape + (2,))
+    vs = np.random.randint(3, size=shape, dtype=np.int32) - np.int32(1)
+    packed = boards.pack_board_and_value(bs, vs)
+    assert packed.dtype == np.uint64
+    assert packed.shape == shape
+    b, v = boards.unpack_board_and_value(packed)
+    assert np.all(bs == b)
+    assert np.all(vs == v)

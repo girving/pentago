@@ -83,20 +83,28 @@ def sparse_dataset(*, counts, base='../data/edison/project/all'):
   return SuperData(data.view(np.uint32).reshape(len(data), 9, 2))
 
 
-def dataset_correctness_test(dataset, *, correct, steps, batch):
+def correctness_test(boards_and_values, *, correct):
   backend = 'https://us-central1-naml-148801.cloudfunctions.net/pentago'
   cached = correct is not None
   if not cached:
     correct = {}
-  for step, b in zip(range(steps), dataset.forever(batch=batch)):
-    for i in range(batch):
-      board = np.asarray(b['board'][i]).view(np.uint64)[0]
-      quads = b['quads'][i]
-      value = b['value'][i]
-      assert np.all(boards.Board.parse(str(board)).quad_grid == quads)
-      if not cached:
-        correct[board] = requests.get(f'{backend}/{board}').json()[str(board)]
-      assert value == correct[board], f'{board} → {value} != {correct[board]}'
-  assert len(correct) == steps * batch
+  for board, value in boards_and_values:
+    assert board.dtype == np.uint64
+    if not cached:
+      correct[board] = requests.get(f'{backend}/{board}').json()[str(board)]
+    assert value == correct[board], f'{board} → {value} != {correct[board]}'
   if not cached:
     print(f'correct = {str(correct).replace(" ","")}')
+
+
+def dataset_correctness_test(dataset, *, correct, steps, batch):
+  def gen():
+    for step, b in zip(range(steps), dataset.forever(batch=batch)):
+      for i in range(batch):
+        board = np.asarray(b['board'][i]).view(np.uint64)[0]
+        quads = b['quads'][i]
+        value = b['value'][i]
+        assert np.all(boards.Board.parse(str(board)).quad_grid == quads)
+        yield board, value
+  correctness_test(gen(), correct=correct)
+  assert len(correct) == steps * batch

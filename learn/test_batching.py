@@ -24,5 +24,21 @@ def test_batch_vmap():
     assert np.allclose(y[:n], bf(k[:n], i[:n]))
 
 
+def test_batch_vmap_tuple():
+  def f(x):
+    return x + 1, 2 * x
+
+  batch = 17
+  sf = jnp.vectorize(f, signature='()->(),()')
+  bf = batch_vmap(batch)(f)
+  x = jnp.arange(100)
+  sy, sz = sf(x)
+  for n in 0, 5, batch, batch + 5, 100:
+    y, z = bf(x[:n])
+    assert np.all(sy[:n] == y)
+    assert np.all(sz[:n] == z)
+
+
 if __name__ == '__main__':
   test_batch_vmap()
+  test_batch_vmap_tuple()
