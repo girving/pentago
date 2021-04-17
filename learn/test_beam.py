@@ -24,6 +24,7 @@ def test_beam():
       pieces = [np.load(f'{path}/subsample-p{prob}-shard{s}-of-{shards}.npz')['pack'] for s in range(shards)]
       packs[shards] = pack = np.sort(np.concatenate(pieces))
       assert pack.shape == (79,)
+      assert np.all(pack == np.unique(pack))
 
   # Check data
   assert np.all(packs[7] == packs[10])
