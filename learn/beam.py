@@ -53,8 +53,7 @@ def subsample(
       max_slice=max_slice, index_path=index_path, super_path=super_path))
   expand = semicache(lambda: batch_vmap(16)(partial(expand_board, prob=prob)))
 
-  def read_and_sample(block):
-    section, I = block
+  def read_and_sample(section, I):
     board, data = supers().read_block(section, I)
     keep, board, value = map(np.asarray, expand()(board, data))
     return np.unique(boards.pack_board_and_value(board[keep], value[keep]))
@@ -69,15 +68,13 @@ def subsample(
     for i in range(shards):
       yield i, packs[s == i]
 
-  def concat_and_shuffle(spacks):
+  def concat_and_shuffle(s, packs):
     """Assemble and shuffle a shard"""
-    s, packs = spacks
     packs = np.unique(np.concatenate(packs + [np.zeros((0,), dtype=np.uint64)]))
     np.random.default_rng(seed=s).shuffle(packs)
     return s, packs
 
-  def simple_write(spack):
-    s, pack = spack
+  def simple_write(s, pack):
     name = f'{output_path}/subsample-p{prob}-shard{s}-of-{shards}.npz'
     if not os.path.exists(name):  # Be idempotent
       np.savez(name, pack=pack)
@@ -89,11 +86,11 @@ def subsample(
   with beam.Pipeline(options=options) as p:
     (p | beam.Create(np.concatenate(supers().sections))
        | beam.FlatMap(lambda s: ((s,I) for I in supers().all_blocks(s)))
-       | beam.Map(read_and_sample)
+       | beam.MapTuple(read_and_sample)
        | beam.FlatMap(shatter)
        | beam.GroupByKey()
-       | beam.Map(concat_and_shuffle)
-       | beam.Map(simple_write))
+       | beam.MapTuple(concat_and_shuffle)
+       | beam.MapTuple(simple_write))
 
 
 def main():
