@@ -2,11 +2,13 @@
 
 from batching import batch_vmap
 from functools import partial
+from google.cloud import storage
 import jax
 import jax.numpy as jnp
 import lzma
 import numpy as np
 import os
+import re
 import struct
 from semicache import semicache
 from symmetry import transform_section
@@ -154,8 +156,10 @@ class Supertensors:
   def __init__(self, *, index_path, super_path, max_slice):
     self.sections = sections = descendent_sections(max_slice)
     self._indices = tuple(SupertensorIndex(s) for s in sections)
-    self._index_file = semicache(lambda n: open(f'{index_path}/slice-{n}.pentago.index', 'rb'))
-    self._super_file = semicache(lambda n: open(f'{super_path}/slice-{n}.pentago', 'rb'))
+    self._file = semicache(lambda path: open(path, 'rb'))
+    self._index = lambda n: f'{index_path}/slice-{n}.pentago.index'
+    self._super = lambda n: f'{super_path}/slice-{n}.pentago'
+    self._client = semicache(lambda: storage.Client())
 
   def all_blocks(self, section):
     assert section.shape == (4,2), section.shape
@@ -165,20 +169,23 @@ class Supertensors:
     blocks = np.stack([np.broadcast_to(dim(i, s), shape) for i, s in enumerate(shape)], axis=-1)
     return blocks.reshape(shape.prod(), 4)
 
+  def _read(self, path, *, offset, size):
+    if path.startswith('gs://'):
+      m = re.match(r'^gs://([^/]+)/(.*)$', path)
+      blob = self._client().bucket(m.group(1)).blob(m.group(2))
+      s = blob.download_as_bytes(start=offset, end=offset+size-1)
+    else:
+      f = self._file(path)
+      s = os.pread(f.fileno(), size, offset)
+    assert len(s) == size
+    return s
+
   def read_block(self, section, I):
     assert section.shape == (4,2)
     n = np.asscalar(section_sum(section))
     index = self._indices[n]
-    def read(f, loc):
-      offset = loc['offset']
-      size = loc['size']
-      s = os.pread(f.fileno(), size, offset)
-      assert len(s) == size, (
-             f'{os.path.basename(f.name)}: {section_str(section)}, I {I}, sbs {section_block_shape(section)}, ' +
-             f'offset {offset}, size {size}, got {len(s)}, filesize {os.stat(f.name).st_size}')
-      return s
-    blob = read(self._index_file(n), index.blob_location(section, I))
-    data = read(self._super_file(n), index.block_location(blob))
+    blob = self._read(self._index(n), **index.blob_location(section, I))
+    data = self._read(self._super(n), **index.block_location(blob))
     data = lzma.decompress(data)
     data = np.frombuffer(data, dtype=np.uint8).reshape(-1, 64)
     data = uninterleave(data)

@@ -8,6 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import supertensors as st
 import symmetry as sym
+import sys
 import timeit
 
 
@@ -29,14 +30,14 @@ def test_section_sig():
 def test_standardize_section():
   key = jax.random.PRNGKey(7)
   s = jax.random.randint(key, (117,4,2), 0, 9, dtype=np.uint8)
-  gs, g = st.standardize_section(s) 
+  gs, g = st.standardize_section(s)
   assert np.all(st.section_sig(gs) <= st.section_sig(s))
   assert np.all(gs == sym.transform_section(g, s))
 
 
 def test_section_misc():
   """Regression test for section functionality which is hard to unit test"""
-  s = st.quads_to_section(boards.Board.parse('410395854709526080').quad_grid) 
+  s = st.quads_to_section(boards.Board.parse('410395854709526080').quad_grid)
   assert np.all(s == np.array([[2,1],[1,3],[3,1],[0,1]]))
 
   # Transformations
@@ -49,7 +50,7 @@ def test_section_misc():
 
   # Standardization
   g = jnp.arange(8)
-  ss, h = st.standardize_section(t(g, s)) 
+  ss, h = st.standardize_section(t(g, s))
   assert np.all(ss == s)
   assert np.all(sym.global_mul(g, h) == 0)
 
@@ -105,12 +106,17 @@ def test_descendent_sections():
     assert known_bits[n] == bits, f'n {n}, known {known_bits[n]}, bits {bits}'
 
 
-def test_supertensors():
-  base = '../data/edison/project/all'
+def test_supertensors(*, local=True):
+  if local:
+    super_path = '../data/edison/project/all'
+    index_path = super_path + '-index'
+  else:
+    super_path = index_path = 'gs://pentago-us-central1'
   max_slice = 5
+  print(f'super_path = {super_path}')
 
   # Load .pentago data
-  supers = st.Supertensors(max_slice=max_slice, index_path=base+'-index', super_path=base)
+  supers = st.Supertensors(max_slice=max_slice, index_path=index_path, super_path=super_path)
   sections = np.concatenate(supers.sections)
   boards, data = [], []
   for s in sections:
@@ -145,4 +151,4 @@ def test_supertensors():
 
 
 if __name__ == '__main__':
-  test_supertensors()
+  test_supertensors(local='--gs' not in sys.argv)
