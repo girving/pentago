@@ -27,13 +27,25 @@ def block_key(key, section, I):
   return key
 
 
+
+def safe_bernoulli(key, p, *, shape=None):
+  """Bernoulli distribution that's accurate even for p ~ 1e5"""
+  assert key.shape == (2,)
+  p = jnp.asarray(p)
+  if shape is None:
+    shape = p.shape
+  hi = np.uint32(2**32 - 1)
+  n = jax.random.randint(key, shape=shape, minval=0, maxval=hi, dtype=np.uint32)
+  return n < jnp.clip(p, 0, 1) * hi
+
+
 def expand_board(board, data, *, prob):
   assert board.shape == (2,)
   assert data.shape == (16,)
   assert board.dtype == data.dtype == np.uint32
   turn = (boards.board_to_quads(board) != 0).astype(np.int32).sum() & 1
   board = symmetry.super_transform_board(jnp.arange(256), board) 
-  keep = jax.vmap(lambda b: jax.random.bernoulli(b, p=prob))(board)
+  keep = jax.vmap(lambda b: safe_bernoulli(b, p=prob))(board)
   black, white = ((data[:,None] >> jnp.arange(32)) & 1).astype(np.int8).reshape(2,256)
   value = (1-2*turn) * (black - white)
   return keep, board, value
