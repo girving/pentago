@@ -39,11 +39,13 @@ def expand_board(board, data, *, prob):
   return keep, board, value
 
 
-def estimate(*, slices, prob=1.0):
+def estimate(*, slices, prob=1, sections=None):
   """Estimate the number of entries produced by subsample"""
-  sections = st.descendent_sections(max(slices, default=0))
-  return prob * 256 * sum(np.asarray(st.section_shape(sections[s]), dtype=np.uint64).prod(axis=-1).sum()
-                          for s in slices)
+  if sections is None:
+    sections = st.descendent_sections(max(slices, default=0))
+  def reduce(shapes):
+    return np.asarray(shapes).prod(axis=-1, dtype=int).sum(dtype=int)
+  return prob * 256 * sum(reduce(st.section_shape(sections[s])) for s in slices)
 
 
 def subsample(
