@@ -84,6 +84,15 @@ def block_shape(section, block):
   return jnp.minimum(_block_size, section_shape(section) - _block_size * block)
 
 
+def section_all_blocks(section):
+  assert section.shape == (4,2), section.shape
+  shape = section_block_shape(section)
+  def dim(i, s):
+    return np.arange(s)[(slice(None),) + (None,)*(3-i)]
+  blocks = np.stack([np.broadcast_to(dim(i, s), shape) for i, s in enumerate(shape)], axis=-1)
+  return blocks.reshape(shape.prod(), 4)
+
+
 @batch_vmap(32)
 def uninterleave(data):
   """Uninterleave buffer viewed as super_t[...,2]"""
@@ -160,14 +169,6 @@ class Supertensors:
     self._index = lambda n: f'{index_path}/slice-{n}.pentago.index'
     self._super = lambda n: f'{super_path}/slice-{n}.pentago'
     self._client = semicache(lambda: storage.Client())
-
-  def all_blocks(self, section):
-    assert section.shape == (4,2), section.shape
-    shape = section_block_shape(section)
-    def dim(i, s):
-      return np.arange(s)[(slice(None),) + (None,)*(3-i)]
-    blocks = np.stack([np.broadcast_to(dim(i, s), shape) for i, s in enumerate(shape)], axis=-1)
-    return blocks.reshape(shape.prod(), 4)
 
   def _read(self, path, *, offset, size):
     if path.startswith('gs://'):

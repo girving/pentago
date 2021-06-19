@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import os
 from semicache import semicache
-import supertensors
+import supertensors as st
 import symmetry
 
 
@@ -39,24 +39,38 @@ def expand_board(board, data, *, prob):
   return keep, board, value
 
 
+def estimate(*, slices, prob=1.0):
+  """Estimate the number of entries produced by subsample"""
+  sections = st.descendent_sections(max(slices, default=0))
+  return prob * 256 * sum(np.asarray(st.section_shape(sections[s]), dtype=np.uint64).prod(axis=-1).sum()
+                          for s in slices)
+
+
 def subsample(
     *,
     options=None,
-    max_slice,
+    slices,
     index_path,
     super_path,
     prob,
     shards,
     output_path,
+    unique=True,
 ):
-  supers = semicache(lambda: supertensors.Supertensors(
-      max_slice=max_slice, index_path=index_path, super_path=super_path))
+  slices = tuple(slices)
+  if not slices:
+    return
+  supers = semicache(lambda: st.Supertensors(
+      max_slice=max(slices), index_path=index_path, super_path=super_path))
   expand = semicache(lambda: batch_vmap(16)(partial(expand_board, prob=prob)))
+
+  def maybe_unique(xs):
+    return (np.unique if unique else np.sort)(xs)
 
   def read_and_sample(section, I):
     board, data = supers().read_block(section, I)
     keep, board, value = map(np.asarray, expand()(board, data))
-    return np.unique(boards.pack_board_and_value(board[keep], value[keep]))
+    return maybe_unique(boards.pack_board_and_value(board[keep], value[keep]))
 
   def pack_to_shard_(pack):
     return jax.random.randint(pack, shape=(), minval=0, maxval=shards)
@@ -70,7 +84,7 @@ def subsample(
 
   def concat_and_shuffle(s, packs):
     """Assemble and shuffle a shard"""
-    packs = np.unique(np.concatenate(packs + [np.zeros((0,), dtype=np.uint64)]))
+    packs = maybe_unique(np.concatenate(packs + [np.zeros((0,), dtype=np.uint64)]))
     np.random.default_rng(seed=s).shuffle(packs)
     return s, packs
 
@@ -84,8 +98,8 @@ def subsample(
 
   # Pipeline!
   with beam.Pipeline(options=options) as p:
-    (p | beam.Create(np.concatenate(supers().sections))
-       | beam.FlatMap(lambda s: ((s,I) for I in supers().all_blocks(s)))
+    (p | beam.Create(np.concatenate([supers().sections[s] for s in slices]))
+       | beam.FlatMap(lambda s: ((s,I) for I in st.section_all_blocks(s)))
        | beam.MapTuple(read_and_sample)
        | beam.FlatMap(shatter)
        | beam.GroupByKey()

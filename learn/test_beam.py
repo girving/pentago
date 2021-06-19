@@ -10,6 +10,7 @@ import tempfile
 
 def test_beam():
   max_slice = 5
+  slices = range(max_slice + 1)
   prob = 0.0001
   super_path = '../data/edison/project/all'
   index_path = super_path + '-index'
@@ -17,13 +18,13 @@ def test_beam():
   # Subsample with two different numbers of shards
   packs = {}
   with tempfile.TemporaryDirectory() as tmp:
-    for shards in 7, 10: 
+    for shards in 7, 10:
       path = f'{tmp}/{shards}'
-      beam.subsample(max_slice=max_slice, index_path=index_path, super_path=super_path, prob=prob,
+      beam.subsample(slices=slices, index_path=index_path, super_path=super_path, prob=prob,
                      shards=shards, output_path=path)
       pieces = [np.load(f'{path}/subsample-p{prob}-shard{s}-of-{shards}.npz')['pack'] for s in range(shards)]
       packs[shards] = pack = np.sort(np.concatenate(pieces))
-      assert pack.shape == (79,)
+      assert pack.shape == (79,), pack.shape
       assert np.all(pack == np.unique(pack))
 
   # Check data
@@ -34,5 +35,13 @@ def test_beam():
   datasets.correctness_test(zip(board, value), correct=correct)
 
 
+def test_estimate():
+  nonunique = {4: 804352, 5: 4841984}
+  for max_slice, count in nonunique.items():
+    approx = beam.estimate(slices=range(max_slice+1))
+    assert approx == count  # estimate is exact when compared against unique=False, prob=1
+
+
 if __name__ == '__main__':
   test_beam()
+  test_estimate()

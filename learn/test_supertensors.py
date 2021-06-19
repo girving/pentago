@@ -120,7 +120,7 @@ def test_supertensors(*, local=True):
   sections = np.concatenate(supers.sections)
   boards, data = [], []
   for s in sections:
-    for I in supers.all_blocks(s):
+    for I in st.section_all_blocks(s):
       b, d = supers.read_block(s, I)
       boards.append(b)
       data.append(d)
