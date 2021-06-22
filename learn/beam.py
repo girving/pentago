@@ -44,7 +44,7 @@ def expand_board(board, data, *, prob):
   assert data.shape == (16,)
   assert board.dtype == data.dtype == np.uint32
   turn = (boards.board_to_quads(board) != 0).astype(np.int32).sum() & 1
-  board = symmetry.super_transform_board(jnp.arange(256), board) 
+  board = symmetry.super_transform_board(jnp.arange(256), board)
   keep = jax.vmap(lambda b: safe_bernoulli(b, p=prob))(board)
   black, white = ((data[:,None] >> jnp.arange(32)) & 1).astype(np.int8).reshape(2,256)
   value = (1-2*turn) * (black - white)
@@ -103,10 +103,18 @@ def subsample(
     return s, packs
 
   def simple_write(s, pack):
-    name = f'{output_path}/subsample-p{prob}-shard{s}-of-{shards}.npz'
-    if not os.path.exists(name):  # Be idempotent
-      np.savez(name, pack=pack)
-    
+    name = f'{output_path}/subsample-shard{s}-of-{shards}.npz'
+    if name.startswith('gs://'):
+      m = re.match(r'^gs://([^/]+)/(.*)$', name)
+      blob = supers()._client().bucket(m.group(1)).blob(m.group(2))
+      if not blob.exists():  # Be idempotent
+        npz = io.BytesIO()
+        np.savez(npz, pack=pack)
+        blob.upload_from_string(npz.getvalue())
+    else:  # Local
+      if not os.path.exists(name):  # Be idempotent
+        np.savez(name, pack=pack)
+
   # Create directory if necessary
   os.makedirs(output_path, exist_ok=True)
 
@@ -123,7 +131,7 @@ def subsample(
 
 def main():
   options = PipelineOptions()
-  
+
   # Parameters
   max_slice = 5
   base = '../data/edison/project/all'

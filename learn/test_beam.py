@@ -23,7 +23,7 @@ def test_beam():
       path = f'{tmp}/{shards}'
       beam.subsample(slices=slices, index_path=index_path, super_path=super_path, prob=prob,
                      shards=shards, output_path=path)
-      pieces = [np.load(f'{path}/subsample-p{prob}-shard{s}-of-{shards}.npz')['pack'] for s in range(shards)]
+      pieces = [np.load(f'{path}/subsample-shard{s}-of-{shards}.npz')['pack'] for s in range(shards)]
       packs[shards] = pack = np.sort(np.concatenate(pieces))
       assert pack.shape == (67,), pack.shape
       assert np.all(pack == np.unique(pack))
