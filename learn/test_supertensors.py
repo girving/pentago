@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Test supertensors"""
 
+import asyncio
 import boards
 import datasets
 import jax
 import jax.numpy as jnp
+import pytest
 import numpy as np
 import supertensors as st
 import symmetry as sym
@@ -106,7 +108,8 @@ def test_descendent_sections():
     assert known_bits[n] == bits, f'n {n}, known {known_bits[n]}, bits {bits}'
 
 
-def test_supertensors(*, local=True):
+@pytest.mark.asyncio
+async def test_supertensors(*, local=True):
   if local:
     super_path = '../data/edison/project/all'
     index_path = super_path + '-index'
@@ -121,7 +124,7 @@ def test_supertensors(*, local=True):
   boards, data = [], []
   for s in sections:
     for I in st.section_all_blocks(s):
-      b, d = supers.read_block(s, I)
+      b, d = await supers.read_block(s, I)
       boards.append(b)
       data.append(d)
   boards = np.concatenate(boards)
@@ -151,4 +154,4 @@ def test_supertensors(*, local=True):
 
 
 if __name__ == '__main__':
-  test_supertensors(local='--gs' not in sys.argv)
+  asyncio.run(test_supertensors(local='--gs' not in sys.argv))

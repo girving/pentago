@@ -1,7 +1,11 @@
-# Symmetry tests
+#!/usr/bin/env python3
+"""Symmetry tests"""
+
+import jax
+jax.config.update('jax_platform_name', 'cpu')
 
 import boards
-import jax
+import jax.numpy as jnp
 import numpy as np
 import symmetry as sym
 
@@ -38,3 +42,15 @@ def test_action():
       print(f'b =\n{boards.show_quads(b)}')
       print(f'h b =\n{boards.show_quads(act(h, b))}')
     assert np.all(act(mul(g, h), b) == act(g, act(h, b)))
+
+
+def test_super_all_transform_board():
+  np.random.seed(7)
+  board, = boards.quads_to_board(boards.random_quads(size=1, n=18))
+  slow = sym.super_transform_board(jnp.arange(256), board)
+  fast = sym.super_all_transform_board(board)
+  assert np.all(slow == fast)
+
+
+if __name__ == '__main__':
+  test_super_all_transform_board()

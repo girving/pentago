@@ -10,12 +10,13 @@ setup(name='pentago',
       url='https://perfect-pentago.net',
       license='BSD3',
       install_requires=[
-          'apache-beam>=2.30',
-          'Cython==0.29.23',
+          'aiofiles>=0.7.0',
+          'chardet<4.0',  # For gcloud-aio
           'dm-haiku>=0.0.3',
-          'google-cloud-storage>=1.37.1',
+          'gcloud-aio-storage>=6.1.0',
           'jax>=0.2.12',
           'optax>=0.0.6',
+          'pytest-asyncio>=0.15.1',
           'requests>=2.25.1',
       ],
 )

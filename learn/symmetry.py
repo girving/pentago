@@ -80,6 +80,17 @@ def super_transform_board(g, board):
   return boards.quads_to_board(super_transform_quads(g, boards.board_to_quads(board)))
 
 
+@partial(jnp.vectorize, signature='(2)->(256,2)')
+def super_all_transform_board(board):
+  """Transform a board according to all 256 supersymmetries, keeping it in uint64 form"""
+  quads = boards.board_to_quads(board)
+  quads = _transform(jnp.arange(4), quads[:,None])
+  q0, q1, q2, q3 = (quads * 3**jnp.arange(9)).sum(axis=-1).astype(np.uint32)
+  board = jnp.stack([jnp.broadcast_to((q0 + (q1[:,None] << 16)).reshape(1,16),(16,16)),
+                     jnp.broadcast_to((q2 + (q3[:,None] << 16)).reshape(16,1),(16,16))], axis=-1)
+  return board.reshape(256,2)
+
+
 @partial(jnp.vectorize, signature='(),(4,w)->(4,w)')
 def transform_state(g, x):
   """Globally transform an internal activation state by a rotation g (for now, we ignore reflections)"""

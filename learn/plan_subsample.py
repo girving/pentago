@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Figure out what our probabilities should be"""
 
-import beam
+import jax
+jax.config.update('jax_platform_name', 'cpu')
+
 import numpy as np
+import subsample
 import supertensors as st
 
 # Memorized plan
@@ -19,7 +22,7 @@ def plan():
   probs = {}
   all_shards = {}
   for slice in range(18+1):
-    before = beam.estimate(slices=[slice], sections=sections)
+    before = subsample.estimate(slices=[slice], sections=sections)
     prob = min(1.0, limit / before)
     after = int(prob * before)
     shards = (after - 1) // shard_limit + 1

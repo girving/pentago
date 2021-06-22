@@ -4,6 +4,7 @@
 from functools import wraps
 import jax
 import jax.numpy as jnp
+import numpy as np
 import timeit
 
 
@@ -20,15 +21,14 @@ def batch_vmap(batch):
       batches = max(1, -(-n // batch))
       padding = (0, batches * batch - n),
       last = n - (batches - 1) * batch
+      mode = 'edge' if n else 'constant'
       def prep(x):
         assert len(x) == n
-        mode = 'edge' if n else 'constant'
-        x = jnp.pad(x, padding + ((0,0),)*(x.ndim-1), mode=mode)
+        x = np.pad(x, padding + ((0,0),)*(x.ndim-1), mode=mode)
         return x.reshape((batches,batch) + x.shape[1:])
-      args = [prep(x) for x in args]
-      ys = [batched(*(x[i] for x in args)) for i in range(batches)]
+      ys = [batched(*xs) for xs in zip(*map(prep, args))]
       def take(y):
-        return jnp.concatenate(y[:-1] + (y[-1][:last],))
+        return np.concatenate(y[:-1] + (y[-1][:last],))
       if isinstance(ys[0], tuple):
         return tuple(take(y) for y in zip(*ys))
       else:

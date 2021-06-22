@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Tests for batch_vmap"""
 
-from batching import batch_vmap
 import jax
+jax.config.update('jax_platform_name', 'cpu')
+
+from batching import batch_vmap
 import jax.numpy as jnp
 import numpy as np
 

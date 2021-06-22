@@ -1,8 +1,8 @@
 """Supertensor reading"""
 
+import aiofiles
 from batching import batch_vmap
-from functools import partial
-from google.cloud import storage
+from functools import partial, cache
 import jax
 import jax.numpy as jnp
 import lzma
@@ -10,9 +10,9 @@ import numpy as np
 import os
 import re
 import struct
-from semicache import semicache
 from symmetry import transform_section
 import tables
+from trace import scope, scoped
 
 _block_size = 8
 _compact_blob_size = 12
@@ -53,11 +53,11 @@ def section_sum(section):
 @jax.jit
 def section_rmq_i(section):
   assert section.dtype == np.uint8
-  black, white = section.T.astype(np.int32)
+  black, white = jnp.moveaxis(section, -1, 0).astype(np.int32)
   return ((black * (21-black)) >> 1) + white
 
 
-@partial(jnp.vectorize, signature='(4,2)->(4)')
+@jax.jit
 def section_shape(section):
   i = section_rmq_i(section)
   return _rmq_offsets[i + 1] - _rmq_offsets[i]
@@ -73,13 +73,13 @@ def section_str(section):
 
 def section_rmqs(section):
   """Rotation minimal quadrants for each quadrant of a section"""
-  i = section_rmq_i(section)
-  lo = _rmq_offsets[i]
-  hi = _rmq_offsets[i+1]
+  i = np.asarray(section_rmq_i(section))
+  lo = tables.rotation_minimal_quadrants_offsets[i]
+  hi = tables.rotation_minimal_quadrants_offsets[i+1]
   return [tables.rotation_minimal_quadrants_flat[l:h] for l, h in zip(lo, hi)]
 
 
-@partial(jnp.vectorize, signature='(4,2),(4)->(4)')
+@jax.jit
 def block_shape(section, block):
   return jnp.minimum(_block_size, section_shape(section) - _block_size * block)
 
@@ -93,7 +93,7 @@ def section_all_blocks(section):
   return blocks.reshape(shape.prod(), 4)
 
 
-@batch_vmap(32)
+@batch_vmap(128)
 def uninterleave(data):
   """Uninterleave buffer viewed as super_t[...,2]"""
   assert data.dtype == np.uint8
@@ -165,37 +165,40 @@ class Supertensors:
   def __init__(self, *, index_path, super_path, max_slice):
     self.sections = sections = descendent_sections(max_slice)
     self._indices = tuple(SupertensorIndex(s) for s in sections)
-    self._file = semicache(lambda path: open(path, 'rb'))
+    self._file = cache(lambda path: open(path, 'rb'))
     self._index = lambda n: f'{index_path}/slice-{n}.pentago.index'
     self._super = lambda n: f'{super_path}/slice-{n}.pentago'
-    self._client = semicache(lambda: storage.Client())
 
-  def _read(self, path, *, offset, size):
+  async def _read(self, path, *, offset, size, client=None):
     if path.startswith('gs://'):
       m = re.match(r'^gs://([^/]+)/(.*)$', path)
-      blob = self._client().bucket(m.group(1)).blob(m.group(2))
-      s = blob.download_as_bytes(start=offset, end=offset+size-1)
+      s = await client.download(m.group(1), m.group(2), headers=dict(Range=f'bytes={offset}-{offset+size-1}'))
     else:
-      f = self._file(path)
-      s = os.pread(f.fileno(), size, offset)
+      s = os.pread(self._file(path).fileno(), size, offset)
     assert len(s) == size
     return s
 
-  def read_block(self, section, I):
+  @scoped
+  async def read_block(self, section, I, *, client=None):
     assert section.shape == (4,2)
     n = np.asscalar(section_sum(section))
     index = self._indices[n]
-    blob = self._read(self._index(n), **index.blob_location(section, I))
-    data = self._read(self._super(n), **index.block_location(blob))
-    data = lzma.decompress(data)
-    data = np.frombuffer(data, dtype=np.uint8).reshape(-1, 64)
-    data = uninterleave(data)
-    shape = tuple(block_shape(section, I))
-    assert data.shape == (np.prod(shape, dtype=int), 16)
-    q0, q1, q2, q3 = [q.astype(np.uint32)[_block_size*i:][:_block_size] for i, q in zip(I,section_rmqs(section))]
-    q0 = np.broadcast_to(q0[:,None,None,None], shape)
-    q1 = q1[:,None,None]
-    q2 = np.broadcast_to(q2[:,None], shape)
-    boards = np.stack([q0 | q1 << 16, q2 | q3 << 16], axis=-1)
-    boards = boards.reshape(len(data), 2)
-    return boards, data
+    with scope('read'):
+      blob = await self._read(self._index(n), **index.blob_location(section, I), client=client)
+      data = await self._read(self._super(n), **index.block_location(blob), client=client)
+    with scope('process'):
+      with scope('decompress'):
+        data = lzma.decompress(data)
+      with scope('uninterleave'):
+        data = np.frombuffer(data, dtype=np.uint8).reshape(-1, 64)
+        data = uninterleave(data)
+      with scope('boards'):
+        shape = tuple(block_shape(section, I))
+        assert data.shape == (np.prod(shape, dtype=int), 16)
+        q0, q1, q2, q3 = [q[_block_size*i:][:_block_size].astype(np.uint32) for i, q in zip(I,section_rmqs(section))]
+        q0 = np.broadcast_to(q0[:,None,None,None], shape)
+        q1 = q1[:,None,None]
+        q2 = np.broadcast_to(q2[:,None], shape)
+        boards = np.stack([q0 | q1 << 16, q2 | q3 << 16], axis=-1)
+        boards = boards.reshape(len(data), 2)
+      return boards, data
