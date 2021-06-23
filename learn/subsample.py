@@ -11,6 +11,7 @@ import jax.numpy as jnp
 import io
 import numpy as np
 import os
+import re
 import supertensors as st
 import symmetry
 import trace
@@ -115,7 +116,7 @@ async def subsample(
     name = f'{output_path}/subsample-shard{shard}-of-{shards}.npz'
     if name.startswith('gs://'):
       m = re.match(r'^gs://([^/]+)/(.*)$', name)
-      await client.upload(m.group(1), m.group(2), npz)
+      await client.upload(m.group(1), m.group(2), npz, timeout=1_000_000_000)
     else:
       os.makedirs(os.path.dirname(name), exist_ok=True)
       async with aiofiles.open(name, 'wb') as f:

@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+import jax
+jax.config.update('jax_platform_name', 'cpu')
+
+import argparse
+import asyncio
+import subsample
+import plan_subsample
+import trace
+from trace import scoped
+
+
+async def main(argv=None, save_main_session=True):
+  # Parse arguments
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--input', default='gs://pentago-us-central1', help='Input path')
+  parser.add_argument('--output', default='gs://pentago-subsample', help='Output path')
+  parser.add_argument('--slices', default=(5,), type=int, nargs='+', help='Slice to process')
+  options = parser.parse_args(argv)
+
+  # Subsample!
+  @scoped
+  async def slice(s):
+    prob = plan_subsample.PROBS[s]
+    shards = plan_subsample.SHARDS[s]
+    await subsample.subsample(slices=[s], index_path=options.input, super_path=options.input,
+                              prob=prob, shards=shards, output_path=f'{options.output}/subsample-{s}')
+  await asyncio.gather(*[slice(s) for s in set(options.slices)])
+  trace.dump()
+
+
+if __name__ == '__main__':
+  asyncio.run(main())

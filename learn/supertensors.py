@@ -172,7 +172,8 @@ class Supertensors:
   async def _read(self, path, *, offset, size, client=None):
     if path.startswith('gs://'):
       m = re.match(r'^gs://([^/]+)/(.*)$', path)
-      s = await client.download(m.group(1), m.group(2), headers=dict(Range=f'bytes={offset}-{offset+size-1}'))
+      s = await client.download(m.group(1), m.group(2), timeout=1_000_000_000,
+                                headers=dict(Range=f'bytes={offset}-{offset+size-1}'))
     else:
       s = os.pread(self._file(path).fileno(), size, offset)
     assert len(s) == size

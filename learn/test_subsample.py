@@ -19,8 +19,11 @@ async def test_subsample():
   max_slice = 5
   slices = range(max_slice + 1)
   prob = 0.0001
-  super_path = '../data/edison/project/all'
-  index_path = super_path + '-index'
+  if 0:
+    super_path = index_path = 'gs://pentago-us-central1'
+  else:
+    super_path = '../data/edison/project/all'
+    index_path = super_path + '-index'
 
   # Subsample with two different numbers of shards
   packs = {}
