@@ -1,0 +1,13 @@
+Metal speed for MidTest.board solve:
+
+Initial (1f989e00): 5.51 s
+
+set0_info_t compression (c136130f3f): 4.54 s
+
+merged temporary loops (d1f63213f5): 4.52 s
+
+fewer fast_chooses (b9d51096b9f): 3.72 s
+
+constant combinations (42b295890bec): 2.42 s
+
+transposed (s1,s0p-major): 2.32 s
