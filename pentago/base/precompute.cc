@@ -719,7 +719,7 @@ REMEMBER(superwin_info,
   // Check hash before converting to final endianness
   check(bits, "668eb0a940489f434f804d994698a4fc85f5b576");
   // Account for big endianness if necessary.  Note that the byte order for the entire 256 bit super_t is reversed
-  if (boost::endian::order::native == boost::endian::order::big)
+  if (std::endian::native == std::endian::big)
     for (const int i : range(bits.size() / (256/8)))
       std::reverse(bits.data()+256/8*i, bits.data()+256/8*(i+1));
   remember("uint64_t", "superwin_info", "0x%xL", bits);

@@ -1,9 +1,9 @@
 // npy i/o
 
 #include "pentago/data/numpy.h"
+#include "pentago/utility/endian.h"
 #include "pentago/utility/mmap.h"
 #include "pentago/utility/str.h"
-#include <boost/endian/conversion.hpp>
 #include <regex>
 namespace pentago {
 
@@ -35,7 +35,7 @@ static tuple<int,char> dtype_info(const int dtype) {
   return make_tuple(bytes, letter);
 }
 
-static const char endian = boost::endian::order::native == boost::endian::order::little ? '<' : '>';
+static const char endian = std::endian::native == std::endian::little ? '<' : '>';
 
 tuple<string,size_t> numpy_header(RawArray<const int> shape, const int dtype) {
   const auto [bytes, letter] = dtype_info(dtype);
@@ -47,7 +47,7 @@ tuple<string,size_t> numpy_header(RawArray<const int> shape, const int dtype) {
   while ((header.size()+1) & 15)
     header.push_back(' ');
   header.push_back('\n');
-  const auto header_size = boost::endian::native_to_little(uint16_t(header.size()-10));
+  const auto header_size = native_to_little_endian(uint16_t(header.size()-10));
   memcpy(header.data() + 8, &header_size, 2);
   return make_tuple(header, bytes*shape.product());
 }
@@ -61,7 +61,7 @@ Array<const uint8_t> read_numpy_helper(const string& path, const int d, const in
   std::smatch m;
   if (!regex_search(header, m, pattern))
     throw ValueError(format("'%s' has an invalid header for a rank 2 .npy file", path));
-  const uint16_t header_size = boost::endian::little_to_native(
+  const uint16_t header_size = little_to_native_endian(
       *reinterpret_cast<const uint16_t*>(m[1].str().data()));
   const char got_endian = m[2].str()[0];
   const char got_letter = m[3].str()[0];

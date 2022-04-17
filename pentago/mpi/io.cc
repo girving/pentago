@@ -78,10 +78,10 @@ static void filter_and_compress_and_store(Array<uint8_t>* dst, RawArray<const Ve
 #endif
     if (!turn)
       for (int i=0;i<data.size();i++)
-        filtered[i] = boost::endian::native_to_little(interleave_super(vec(data[i][0],~data[i][1])));
+        filtered[i] = native_to_little_endian(interleave_super(vec(data[i][0],~data[i][1])));
     else
       for (int i=0;i<data.size();i++)
-        filtered[i] = boost::endian::native_to_little(interleave_super(vec(~data[i][1],data[i][0])));
+        filtered[i] = native_to_little_endian(interleave_super(vec(~data[i][1],data[i][0])));
   }
   // Compress
   *dst = compress(char_view(filtered),level,event);
@@ -475,7 +475,7 @@ shared_ptr<const readable_block_store_t> read_sections(
         for (const int i : range(unfiltered.size())) {
           Vector<super_t,2> s;
           memcpy(&s,&filtered[sizeof(s)*i],sizeof(s));
-          s = uninterleave_super(boost::endian::little_to_native(s));
+          s = uninterleave_super(little_to_native_endian(s));
           unfiltered[i] = !turn ? vec(s[0],~s[1]) : vec(s[1],~s[0]);
         }
         blocks->set(local_blocks[b].local_id,unfiltered);

@@ -35,7 +35,6 @@
 #include "pentago/utility/random.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/log.h"
-#include <boost/endian/conversion.hpp>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <getopt.h>
@@ -236,9 +235,9 @@ int toplevel(int argc, char** argv) {
     slog("compress outputs = %d", PENTAGO_MPI_COMPRESS_OUTPUTS);
     slog("timing = %d", PENTAGO_TIMING);
     slog("sse = %d", PENTAGO_SSE);
-    slog("endian = %s", boost::endian::order::native == boost::endian::order::little ? "little"
-                      : boost::endian::order::native == boost::endian::order::big    ? "big"
-                                                                                     : "unknown");
+    slog("endian = %s", std::endian::native == std::endian::little ? "little"
+                      : std::endian::native == std::endian::big    ? "big"
+                                                                   : "unknown");
     slog("history = %d", thread_history_enabled());
     slog("papi = %s", papi_enabled() ? join(" ",papi_event_names()) : "<disabled>");
     slog("wildcard recvs = %d", wildcard_recv_count);

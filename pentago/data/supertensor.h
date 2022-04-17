@@ -53,10 +53,10 @@
 #include "pentago/data/file.h"
 #include "pentago/base/superscore.h"
 #include "pentago/base/section.h"
+#include "pentago/utility/endian.h"
 #include "pentago/utility/thread.h"
 #include "pentago/utility/spinlock.h"
 #include "pentago/utility/array.h"
-#include <boost/endian/conversion.hpp>
 namespace pentago {
 
 struct supertensor_blob_t {
@@ -208,7 +208,6 @@ Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array
 
 // Endian conversion
 static inline supertensor_blob_t endian_reverse(supertensor_blob_t blob) {
-  using boost::endian::endian_reverse;
   blob.uncompressed_size = endian_reverse(blob.uncompressed_size);
   blob.compressed_size = endian_reverse(blob.compressed_size);
   blob.offset = endian_reverse(blob.offset);
