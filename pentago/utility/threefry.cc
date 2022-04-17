@@ -1,4 +1,3 @@
-#if !defined(__arm__) && !defined(__aarch64__)
 #define __STDC_CONSTANT_MACROS
 #include "pentago/utility/uint128.h"
 #include "Random123/threefry.h"
@@ -16,4 +15,3 @@ uint128_t threefry(uint128_t key, uint128_t ctr) {
 }
 
 }  // namespace pentago
-#endif  // !__arm__
