@@ -16,7 +16,7 @@
     "fast-crc32c": "^2.0.0",
     "log": "1.4.x",
     "lru-cache": "^4.1.5",
-    "lzma-native": "^6.0.0"
+    "lzma-native": "^8.0.6"
   },
   "keywords": [
     "pentago",

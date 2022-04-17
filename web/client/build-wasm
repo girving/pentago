@@ -5,8 +5,14 @@ cd "$(dirname "$0")"/../..
 
 bazel build //pentago/base:tables
 
+if [ -e /usr/local/opt/llvm/bin/clang ]; then
+  clang=/usr/local/opt/llvm/bin/clang
+else
+  clang=/opt/homebrew/opt/llvm/bin/clang
+fi
+
 build () {
-  /usr/local/opt/llvm/bin/clang --target=wasm32 \
+  $clang --target=wasm32 \
     -ffreestanding -nostdlib -std=c++1z \
     -fvisibility=hidden -Wl,--no-entry \
     -Wl,--allow-undefined \
