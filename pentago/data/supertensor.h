@@ -98,7 +98,7 @@ struct supertensor_header_t {
   static supertensor_header_t unpack(RawArray<const uint8_t> buffer);
 };
 
-struct supertensor_reader_t : public boost::noncopyable {
+struct supertensor_reader_t : public noncopyable_t {
   const shared_ptr<const read_file_t> fd;
   const supertensor_header_t header;
 
@@ -139,7 +139,7 @@ struct supertensor_reader_t : public boost::noncopyable {
 };
 
 // Locked allocation of space at the end of a file
-struct next_offset_t : public boost::noncopyable {
+struct next_offset_t : public noncopyable_t {
  private:
   mutable spinlock_t lock;
   uint64_t offset;
@@ -152,7 +152,7 @@ struct next_offset_t : public boost::noncopyable {
   uint64_t reserve(const uint64_t size);
 };
 
-struct supertensor_writer_t : public boost::noncopyable {
+struct supertensor_writer_t : public noncopyable_t {
   typedef supertensor_writer_t Self;
 
   const string path;

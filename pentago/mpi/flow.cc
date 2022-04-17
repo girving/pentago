@@ -43,7 +43,7 @@ static inline int request_response_tag(const Vector<int,2>* buffer) {
 }
 
 namespace {
-struct block_request_t : public boost::noncopyable {
+struct block_request_t : public noncopyable_t {
   // The section is determined by the dependent line, so we don't need to store it
   const section_t section; // child section
   const Vector<uint8_t,4> block;

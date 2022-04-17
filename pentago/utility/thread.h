@@ -7,9 +7,9 @@
 #pragma once
 
 #include "pentago/utility/array.h"
+#include "pentago/utility/noncopyable.h"
 #include "pentago/utility/unit.h"
 #include "pentago/utility/wall_time.h"
-#include <boost/core/noncopyable.hpp>
 #include <functional>
 #include <string>
 #include <vector>
@@ -83,7 +83,7 @@ const event_t ekind_mask        = event_t(7)<<61;
 
 #if PENTAGO_TIMING
 
-class thread_time_t : boost::noncopyable {
+class thread_time_t : noncopyable_t {
   time_entry_t* entry;
 public:
   thread_time_t(time_kind_t kind, event_t event);
@@ -93,7 +93,7 @@ public:
 
 #else
 
-class thread_time_t : boost::noncopyable {
+class thread_time_t : noncopyable_t {
 public:
   thread_time_t(time_kind_t kind, event_t event) {}
   ~thread_time_t() {}

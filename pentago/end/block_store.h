@@ -54,7 +54,7 @@ struct block_info_t {
 static_assert(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS,"");
 
 // A readable block store, not including counts and samples
-class readable_block_store_t : public boost::noncopyable {
+class readable_block_store_t : public noncopyable_t {
 public:
   const shared_ptr<const sections_t> sections;
   const shared_ptr<const block_partition_t> partition;

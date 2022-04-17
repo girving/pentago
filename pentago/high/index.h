@@ -16,7 +16,7 @@
 #include "pentago/end/sections.h"
 #include "pentago/data/supertensor.h"
 #include "pentago/utility/endian.h"
-#include <boost/core/noncopyable.hpp>
+#include "pentago/utility/noncopyable.h"
 #ifdef PENTAGO_LITTLE_ENDIAN
 namespace pentago {
 
@@ -34,7 +34,7 @@ struct compact_blob_t {
 };
 static_assert(sizeof(compact_blob_t)==12, "struct packing failed");
 
-struct supertensor_index_t : private boost::noncopyable {
+struct supertensor_index_t : private noncopyable_t {
   typedef tuple<section_t,Vector<uint8_t,4>> block_t;
 
   const shared_ptr<const end::sections_t> sections;

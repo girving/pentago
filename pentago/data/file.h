@@ -3,7 +3,7 @@
 
 #include "pentago/utility/debug.h"
 #include "pentago/utility/array.h"
-#include <boost/core/noncopyable.hpp>
+#include "pentago/utility/noncopyable.h"
 namespace pentago {
 
 using std::function;
@@ -18,7 +18,7 @@ vector<string> listdir(const string& path);
 vector<string> glob(const string& pattern);
 
 // Abstract readable file
-struct read_file_t : private boost::noncopyable {
+struct read_file_t : private noncopyable_t {
 public:
   read_file_t();
   virtual ~read_file_t();
@@ -31,7 +31,7 @@ public:
 };
 
 // Abstract writable file
-struct write_file_t : private boost::noncopyable {
+struct write_file_t : private noncopyable_t {
 public:
   write_file_t();
   virtual ~write_file_t();

@@ -3,7 +3,7 @@
 
 #include "pentago/utility/format.h"
 #include "pentago/utility/wall_time.h"
-#include <boost/core/noncopyable.hpp>
+#include "pentago/utility/noncopyable.h"
 namespace pentago {
 
 using std::string;
@@ -14,7 +14,7 @@ void suppress_log();
 // Copy log messages to a file
 void copy_log_to_file(const string& path);
 
-class Scope : public boost::noncopyable {
+class Scope : public noncopyable_t {
   const string name;
   const wall_time_t start;
  public:

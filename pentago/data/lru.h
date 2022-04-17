@@ -2,9 +2,9 @@
 #pragma once
 
 #include "pentago/utility/debug.h"
+#include "pentago/utility/noncopyable.h"
 #include <list>
 #include <unordered_map>
-#include <boost/core/noncopyable.hpp>
 #include <boost/functional/hash.hpp>
 namespace pentago {
 
@@ -14,7 +14,7 @@ using std::make_tuple;
 using std::tuple;
 using std::unordered_map;
 
-template<class K,class V> class lru_t : boost::noncopyable {
+template<class K,class V> class lru_t : noncopyable_t {
   // Least to most recently used
   mutable list<tuple<K,V>> order;
 

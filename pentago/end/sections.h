@@ -4,7 +4,7 @@
 #pragma once
 
 #include "pentago/base/section.h"
-#include <boost/core/noncopyable.hpp>
+#include "pentago/utility/noncopyable.h"
 #include <unordered_map>
 namespace pentago {
 struct supertensor_reader_t;
@@ -13,7 +13,7 @@ namespace end {
 using std::unordered_map;
 
 // An ordered list of sections at the same slice
-struct sections_t : private boost::noncopyable {
+struct sections_t : private noncopyable_t {
   const int slice;
   const Array<const section_t> sections;
   const unordered_map<section_t,int> section_id; // The inverse of sections

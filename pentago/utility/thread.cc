@@ -267,7 +267,7 @@ namespace {
 
 typedef std::unique_lock<std::mutex> lock_t;
 
-class thread_pool_t : private boost::noncopyable {
+class thread_pool_t : private noncopyable_t {
 public:
   const thread_type_t type;
   const int count;

@@ -23,7 +23,7 @@
 namespace pentago {
 namespace end {
 
-class sparse_store_t : public boost::noncopyable {
+class sparse_store_t : public noncopyable_t {
   struct sizes_t {
     int size; // Current size of the array
     int peak_size; // Peak size

@@ -1,8 +1,8 @@
 // Spin locks
 #pragma once
 
+#include "pentago/utility/noncopyable.h"
 #include <type_traits>
-#include <boost/core/noncopyable.hpp>
 #ifdef __APPLE__
 #include <os/lock.h>
 #else
@@ -95,7 +95,7 @@ struct spinlock_t {
 #endif
 
 // Convenience class to lock and unlock a spinlock
-struct spin_t : boost::noncopyable {
+struct spin_t : noncopyable_t {
   spinlock_t& lock;
 
   spin_t(spinlock_t& lock)
