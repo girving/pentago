@@ -1,8 +1,8 @@
 // Cast a typed array down to bytes
 #pragma once
 
-#include "pentago/utility/debug.h"
 #include "pentago/utility/array.h"
+#include "pentago/utility/debug.h"
 namespace pentago {
 
 template<class A> static auto char_view(const A& data) {

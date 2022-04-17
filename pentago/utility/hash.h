@@ -1,20 +1,20 @@
 #pragma once
 
-#include "pentago/utility/array.h"
-#include "pentago/utility/char_view.h"
-#include "pentago/utility/endian.h"
+#include <tuple>
 namespace pentago {
 
-string sha1(RawArray<const uint8_t> data);
-
-template<class A> string portable_hash(const A& data) {
-#ifdef PENTAGO_BIG_ENDIAN
-  const auto flat = asarray(data).flat().copy();
-  for (auto& x : flat) x = native_to_little_endian(x);
-#else
-  const auto flat = asarray(data).flat();
-#endif
-  return sha1(char_view(flat).const_());
+template<class T> static inline void hash_combine(size_t& seed, const T& v) {
+  // Following boost::hash_combine
+  seed ^= std::hash<T>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 }
 
-}
+}  // namespace pentago
+namespace std {
+template<class... Args> struct hash<tuple<Args...>> {
+  size_t operator()(const tuple<Args...>& t) const {
+    size_t h = 0;
+    std::apply([&h](auto&&... args) { (pentago::hash_combine(h, args), ...); }, t);
+    return h;
+  }
+};
+}  // namespace std

@@ -8,10 +8,12 @@
 #include "pentago/utility/popcount.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/str.h"
+#include <cmath>
 namespace pentago {
 
 using std::ostream;
 using std::make_tuple;
+using std::pow;
 
 // The current transposition table
 static int table_bits = 0;

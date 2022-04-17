@@ -30,8 +30,7 @@ struct situation_t {
 
 // Persistent trace information
 static unordered_set<board_t> board_flags; // Map from traced boards to depth
-static unordered_map<tuple<int,board_t>,superinfo_t,
-                     boost::hash<tuple<int,board_t>>> known; // Known information at various depths
+static unordered_map<tuple<int,board_t>,superinfo_t> known; // Known information at various depths
 static vector<situation_t> errors; // Potentially problematic aggressive,depth,boards triples
 static vector<situation_t> dependencies; // Aggressive,depth,board triples that we depend on
 static int stone_depth; // Current search depth + stone count

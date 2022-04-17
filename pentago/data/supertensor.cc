@@ -12,6 +12,7 @@
 #include "pentago/utility/curry.h"
 #include "pentago/utility/str.h"
 #include "pentago/utility/endian.h"
+#include <unistd.h>
 namespace pentago {
 
 using std::make_shared;

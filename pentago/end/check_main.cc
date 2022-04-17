@@ -21,7 +21,7 @@
 #include "pentago/utility/thread.h"
 #include "pentago/utility/join.h"
 #include "pentago/utility/mmap.h"
-#include "pentago/utility/hash.h"
+#include "pentago/utility/portable_hash.h"
 #include <unordered_set>
 #include <regex>
 #include <vector>

@@ -25,7 +25,7 @@ struct random_partition_t : public partition_t {
   const int total_lines;
   const Array<const sheaf_t> sheafs; // One per section per dimension
   // Map from section,dimension to sheaf index
-  const unordered_map<tuple<section_t,uint8_t>,int,boost::hash<tuple<section_t,uint8_t>>> sheaf_id;
+  const unordered_map<tuple<section_t,uint8_t>,int> sheaf_id;
 
 public:
   random_partition_t(const uint128_t key, const int ranks,

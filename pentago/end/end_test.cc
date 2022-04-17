@@ -33,8 +33,7 @@ using std::unordered_set;
 void partition_test(const partition_t& partition) {
   // Extract all information from partition
   unordered_set<event_t> all_lines;
-  unordered_map<tuple<section_t,Vector<uint8_t,4>>,tuple<int,local_id_t>,
-                boost::hash<tuple<section_t,Vector<uint8_t,4>>>> block_info;
+  unordered_map<tuple<section_t,Vector<uint8_t,4>>,tuple<int,local_id_t>> block_info;
   for (const int rank : range(partition.ranks)) {
     const auto lines = partition.rank_lines(rank);
     ASSERT_EQ(partition.rank_count_lines(rank), uint64_t(lines.size()));
@@ -171,8 +170,7 @@ TEST(end, simple_partition) {
       for (int i=0;i<100;i++) {
         const int rank = random.uniform<int>(0,ranks);
         // We should own all blocks in lines we own
-        unordered_set<tuple<section_t,Vector<uint8_t,4>>,
-                      boost::hash<tuple<section_t,Vector<uint8_t,4>>>> blocks;
+        unordered_set<tuple<section_t,Vector<uint8_t,4>>> blocks;
         const auto owned = partition.rank_lines(rank,true);
         ASSERT_EQ((uint64_t)owned.size(), partition.rank_count_lines(rank,true));
         const auto first_offsets = partition.rank_offsets(rank),

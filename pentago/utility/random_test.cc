@@ -3,11 +3,13 @@
 #include "pentago/utility/log.h"
 #include "pentago/utility/sqr.h"
 #include "gtest/gtest.h"
+#include <cmath>
 namespace pentago {
 namespace {
 
 using std::abs;
 using std::numeric_limits;
+using std::sqrt;
 
 template<class F> void uniform_test(const string& name, const Box<double> box, const F gen) {
   const int n = 100000;

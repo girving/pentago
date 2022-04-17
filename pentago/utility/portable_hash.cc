@@ -1,4 +1,4 @@
-#include "pentago/utility/hash.h"
+#include "pentago/utility/portable_hash.h"
 #include <boost/uuid/sha1.hpp>
 namespace pentago {
 

@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 namespace pentago {
 
 shared_ptr<void> mmap_buffer_helper(size_t size) {

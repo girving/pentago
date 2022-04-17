@@ -52,16 +52,10 @@ struct local_block_t {
 
 ostream& operator<<(ostream& output, const line_t& line);
 
-template<class T,int d> static inline size_t hash_value(const Vector<T,d>& v) {
-  size_t h = 0;
-  for (const auto& x : v) boost::hash_combine(h, x);
-  return h;
-}
-
 static inline size_t hash_value(local_id_t i) { return i.id; }
 
-}
-}
+}  // namespace end
+}  // namespace pentago
 
 namespace std {
 template<> struct hash<pentago::end::local_id_t> {

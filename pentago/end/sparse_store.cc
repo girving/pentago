@@ -8,6 +8,7 @@
 #include "pentago/utility/memory_usage.h"
 #include <sys/mman.h>
 #include <errno.h>
+#include <unistd.h>
 namespace pentago {
 namespace end {
 

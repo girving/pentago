@@ -7,16 +7,18 @@
 // the ordering of boards within a section is defined by rotation_minimal_quadrants.
 
 #include "pentago/utility/array.h"
+#include "pentago/utility/char_view.h"
 #include "pentago/utility/endian.h"
 #include "pentago/utility/format.h"
-#include "pentago/utility/hash.h"
 #include "pentago/utility/join.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/nested.h"
 #include "pentago/utility/popcount.h"
+#include "pentago/utility/portable_hash.h"
 #include "pentago/utility/scalar_view.h"
 #include "pentago/utility/sqr.h"
 #include <fstream>
+#include <map>
 #include <unordered_map>
 namespace pentago {
 namespace {
