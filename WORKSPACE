@@ -63,16 +63,5 @@ http_archive(
     build_file = "//third_party:zlib.BUILD",
 )
 
-http_archive(
-    name = "boost",
-    urls = [
-        "https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.gz",
-        "https://boostorg.jfrog.io/artifactory/main/release/1.65.1/source/boost_1_65_1.tar.gz",
-    ],
-    sha256 = "a13de2c8fbad635e6ba9c8f8714a0e6b4264b60a29b964b940a22554705b6b60",
-    strip_prefix = "boost_1_65_1",
-    build_file = "//third_party:boost.BUILD",
-)
-
 mpi_repository(name = "mpi")
 tensorflow_repository(name = "tensorflow")

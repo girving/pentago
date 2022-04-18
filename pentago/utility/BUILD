@@ -11,7 +11,6 @@ cc_library(
     deps = [
         "@random123//:random123",
         "@tinyformat//:tinyformat",
-        "@boost//:boost",
     ],
 )
 
