@@ -4,7 +4,7 @@ import pending from './pending.js'
 import { from_high_map } from './board.js'
 
 // Make a web worker, and handle onmessage in order
-const worker = new Worker('./mid_worker.js')
+const worker = new Worker(new URL('mid_worker.js', import.meta.url))
 const callbacks = []
 worker.onmessage = e => callbacks.shift()(e.data)
 

@@ -5,7 +5,7 @@ const storage = factory(() => localStorage)
 const max = Math.max
 
 // Constants
-const version = '1'
+const version = '2'
 const special = {_version: true}
 
 // Wipe entries if we're not at the right version

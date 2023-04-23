@@ -18,7 +18,7 @@ build () {
     -Wl,--allow-undefined \
     -O3 -flto -Wl,--lto-O3 \
     -mno-exception-handling \
-    -Wall -Werror -fcolor-diagnostics -Wl,-error-limit=0 \
+    -Wall -Werror -fcolor-diagnostics -ferror-limit=0 \
     -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
     -Wl,--export=__heap_base \
     -isystem third_party/freestanding -I. -Ibazel-bin \

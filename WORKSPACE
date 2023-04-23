@@ -57,7 +57,7 @@ http_archive(
 
 http_archive(
     name = "zlib",
-    urls = ["https://www.zlib.net/zlib-1.2.12.tar.gz"],
+    urls = ["https://www.zlib.net/fossils/zlib-1.2.12.tar.gz"],
     sha256 = "91844808532e5ce316b3c010929493c0244f3d37593afd6de04f71821d5136d9",
     strip_prefix = "zlib-1.2.12",
     build_file = "//third_party:zlib.BUILD",

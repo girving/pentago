@@ -44,7 +44,7 @@ Bazel handles a few extra dependencies automatically (see `WORKSPACE` for detail
 On Mac:
 
     # Install dependencies
-    brew install bazel openmpi node
+    brew install bazel openmpi node llvm
 
     # Build and test C++
     bazel test -c opt --copt=-march=native ...
@@ -72,7 +72,6 @@ talks to a node.js Google Cloud Function.  To test and deploy the server:
 To deploy the client:
 
     cd pentago/web/client
-    brew install llvm
     npm install
     npm run deploy
 
