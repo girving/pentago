@@ -76,7 +76,7 @@ void midsolve_internal_test(const high_board_t board) {
 TEST(mid, internal) {
   Random random(5554);
   init_supertable(20, false);
-  for (int slice = 36; slice >= 30; slice--) {
+  for (int slice = 36; slice >= 21; slice--) {
     for (int i = 0; i < 16; i++) {
       const auto board = random_board_at_slice(random, slice);
       for (const bool parity : {false, true})
