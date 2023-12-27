@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from numpy import *
-from scipy.misc import comb
+import numpy as np
+from scipy.special import comb
 
 '''
 The Plan:
@@ -61,20 +61,20 @@ of 2: use aggressive and passive modes.  Let's do it that way.
 
 def large(n):
   s = str(n)
-  return ''.join((',' if i and i%3==0 else '')+c for i,c in enumerate(reversed(s)))[::-1]
+  return ''.join((',' if i and i%3==0 else '') + c for i,c in enumerate(reversed(s)))[::-1]
 
 def count(n, k):
-  return int(comb(n,k)) * int(comb(k,k//2))
+  return int(comb(n, k)) * int(comb(k, k//2))
 
 def total(n):
   return sum(count(n,k) for k in range(n+1))
 
 # Print everything
 for n in 18,:
-  print('total %d = %s'%(n,large(total(n))))
+  print('total %d = %s' % (n, large(total(n))))
   for k in range(n+1):
-    print('  count %2d = %10s'%(k,large(count(n,k))))
+    print('  count %2d = %10s' % (k, large(count(n,k))))
 
-bottleneck = count(18,11)+count(18,12)
-for e in 32,:
-  print('memory %d = %s entries / %g GB'%(e,large(bottleneck),e*bottleneck/2**30))
+bottleneck = count(18,11) + count(18,12)
+entry = 32  # sizeof(halfsupers_t)
+print('memory = %s entries * %d bytes = %g GB' % (large(bottleneck), entry, entry*bottleneck/2**30))
