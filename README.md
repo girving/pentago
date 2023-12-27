@@ -73,7 +73,12 @@ To deploy the client:
 
     cd pentago/web/client
     npm install
+    (cd src && node unit.js)
     npm run deploy
+
+    # If there is an error like 'resolving hosting target of a site with no site name...', do
+    firebase logout
+    firebase login
 
 ## Algorithm summary
 

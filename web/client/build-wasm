@@ -26,6 +26,8 @@ build () {
   chmod -x $1
 }
 
+mkdir -p web/client/build
+
 build web/client/public/mid.wasm \
   -Wl,--export={malloc,midsolve} \
   pentago/mid/{halfsuper,midengine}.cc \

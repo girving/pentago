@@ -206,7 +206,6 @@ __attribute__((const)) METAL_INLINE halfsuper_t rmax(const halfsuper_s h) {
 static inline halfsuper_t operator~(const halfsuper_s x) { return ~halfsuper_t(x); }
 static inline halfsuper_t operator|(const halfsuper_s x, const halfsuper_s y) { return halfsuper_t(x) | y; }
 static inline halfsuper_t operator&(const halfsuper_s x, const halfsuper_s y) { return halfsuper_t(x) & y; }
-static inline halfsupers_t operator~(const halfsupers_t x) { return halfsupers_t{~x.notlose, ~x.win}; }
 static inline halfsupers_t operator|(const halfsupers_t x, const halfsupers_t y) {
   return halfsupers_t{x.win | y.win, x.notlose | y.notlose};
 }
@@ -222,6 +221,9 @@ static inline METAL_DEVICE halfsuper_s& get(METAL_DEVICE halfsupers_t& x, const 
   assert(unsigned(i) < 2);
   return (&x.win)[i];
 }
+
+// ~ swaps win and notlose, since the other player wins if we don't notlose
+static inline halfsupers_t operator~(const halfsupers_t x) { return halfsupers_t{~x.notlose, ~x.win}; }
 
 #if PENTAGO_CPP
 // Split a super_t into two halfsuper_t's

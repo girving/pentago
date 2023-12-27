@@ -49,13 +49,13 @@ int midsolve_workspace_size(const int min_slice) {
 }
 
 #ifndef __wasm__
-Array<halfsupers_t> midsolve_workspace(const int min_slice) {
-  return aligned_buffer<halfsupers_t>(midsolve_workspace_size(min_slice));
+Array<halfsuper_s> midsolve_workspace(const int min_slice) {
+  return aligned_buffer<halfsuper_s>(midsolve_workspace_size(min_slice));
 }
 #endif  // !__wasm__
 
-static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
-                          RawArray<halfsupers_t> workspace, set_t* sets1p, wins1_t* all_wins1, uint16_t* cs1ps) {
+static void midsolve_loop(const info_t& I, const int n, halfsuper_s* results,
+                          RawArray<halfsuper_s> workspace, set_t* sets1p, wins1_t* all_wins1, uint16_t* cs1ps, const bool aggressive) {
   const helper_t<> H{I, n};
 
   // Precompute subsets of player 1 relative to player 0's stones
@@ -78,11 +78,11 @@ static void midsolve_loop(const info_t& I, const int n, halfsupers_t* results,
     const set0_info_t I0 = make_set0_info(I, n, s0);
     // Iterate over set of stones of other player
     for (const int s1p :  range(sets1p_.size))
-      inner(N, cs1ps, sets1p, all_wins1, results, workspace.data(), I0, s1p);
+      inner(N, cs1ps, sets1p, all_wins1, results, workspace.data(), I0, s1p, aggressive);
   }
 }
 
-Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsupers_t> workspace) {
+Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsuper_s> workspace) {
   const info_t I = make_info(board);
   NON_WASM_ASSERT(workspace.size() >= bottleneck(I.spots));
 
@@ -102,14 +102,21 @@ Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
   auto cs1ps = (uint16_t*)malloc(sizeof(uint16_t) * cs1ps_size);
 
   // Compute all slices
-  Vector<halfsupers_t,1+18> results;
-  for (int n = I.spots; n >= 0; n--)
-    midsolve_loop(I, n, results.data(), workspace, sets1p, all_wins1, cs1ps);
+  Vector<halfsuper_s,1+18> raw[2];
+  for (const int aggressive : range(2))
+    for (int n = I.spots; n >= 0; n--)
+      midsolve_loop(I, n, raw[aggressive].data(), workspace, sets1p, all_wins1, cs1ps, aggressive);
 
   // Finish up
   free(sets1p);
   free(all_wins1);
   free(cs1ps);
+
+  // Interleave results.  We need to swap win and notlose for 0 < i.
+  Vector<halfsupers_t,1+18> results;
+  for (const int i : range(results.size()))
+    for (const int j : range(2))
+      get(results[i], j) = raw[j ^ (i == 0)][i];
   return results;
 }
 
@@ -146,7 +153,7 @@ int midsolve_traverse(const high_board_t board, const halfsupers_t* supers, mid_
 }
 
 #if !defined(__wasm__) || defined(__APPLE__)
-mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace) {
+mid_values_t midsolve(const high_board_t board, RawArray<halfsuper_s> workspace) {
   // Compute
   const auto supers = midsolve_internal(board, workspace);
 
@@ -159,7 +166,7 @@ mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace
 WASM_EXPORT void midsolve(const high_board_t* board, mid_values_t* results) {
   NON_WASM_ASSERT(board && results);
   results->clear();
-  const auto workspace = wasm_buffer<halfsupers_t>(midsolve_workspace_size(board->count()));
+  const auto workspace = wasm_buffer<halfsuper_s>(midsolve_workspace_size(board->count()));
   const auto supers = midsolve_internal(*board, workspace);
   midsolve_traverse(*board, supers.data(), *results);
 }

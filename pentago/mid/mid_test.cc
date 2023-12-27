@@ -43,32 +43,38 @@ Array<const board_t> result_boards(const high_board_t board) {
 
 void midsolve_internal_test(const high_board_t board) {
   typedef halfsuper_t h;
-  const bool verbose = false;
   const int slice = board.count();
   const bool parity = board.middle();
   const auto workspace = midsolve_workspace(slice);
-  const auto padded_results = midsolve_internal(board, workspace);
+  const Vector<halfsupers_t,1+18> padded_results = midsolve_internal(board, workspace);
   const auto results = asarray(padded_results).slice(0, mid_supers_size(board));
   const auto boards = result_boards(board);
-  ASSERT_EQ(results.size(), 37-slice); // Only mostly true due to superstandardization, but still good
+  ASSERT_EQ(results.size(), 37-slice);  // Only mostly true due to superstandardization, but still good
   ASSERT_EQ(results.size(), boards.size());
   for (const int i : range(results.size())) {
     const auto rs = results[i];
     const auto rboard = boards[i];
     const bool turn = count_stones(rboard) & 1;
     const bool rparity = (i > 0) != parity;
+    const bool verbose = false;
     if (verbose)
       slog("slice %d, board %19lld, parity %d: win %3d, tie %3d, loss %3d",
-           slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win)&h(rs.notlose)),
-           popcount(~(h(rs.win)|h(rs.notlose))));
+           slice, rboard, parity, popcount(rs.win), popcount(~h(rs.win) & h(rs.notlose)),
+           popcount(~(h(rs.win) | h(rs.notlose))));
+    for (const int s : range(128)) {
+      // Assert win implies notlose
+      GEODE_ASSERT(pentago::get(rs.notlose, s) >= pentago::get(rs.win, s),
+                   format("slice %d, board %d, s %d, notlose %d, win %d", s,
+                          slice, rboard, pentago::get(rs.notlose, s), pentago::get(rs.win, s)));
+    }
     for (const int a : range(2)) {
       const auto exp = [=](const halfsuper_t h) { return rparity ? merge(0,h) : merge(h,0); };
       const auto known = exp(~halfsuper_t(0));
-      const auto correct = super_evaluate_all(a,100,flip_board(rboard,turn));
-      GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known));
+      const super_t correct = super_evaluate_all(a, 100, flip_board(rboard, turn));
       for (const int s : range(256))
         if (known[s])
           ASSERT_EQ(correct[s], value(rs, s) >= a);
+      GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known), format("slice %d, board %s, a %d", slice, rboard, a));
     }
   }
 }
