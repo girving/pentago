@@ -13,27 +13,27 @@ using std::unordered_map;
 /*
  * Results:
  * 
- *   3jan2014 - 17.4 s - initial working version
+ *   2014jan3 - 17.4 s - initial working version
  *            - 16.2 s - hoist cwins downwards
  *            - 15.4 s - unroll and templatize slice loop
- *   4jan2014 - 15.3 s - halfsuper_t (seems anomalous, I was expecting much faster)
+ *   2014jan4 - 15.3 s - halfsuper_t (seems anomalous, I was expecting much faster)
  *            - 15.8 s - unhoist cwins (a little slower, but reduces memory bandwidth)
  * 
  * Actually, the above times are a bit of a lie: they are the minimums of several runs.
  * The typical value is typically several seconds slower.  I am not sure why the variance
  * is so high.  I am going to switch to median of three runs now to reduce the variance:
  * 
- *   4jan2014 - 19.7 s - median of three runs
- *   5jan2014 - 10.3 s - transpose input and output arrays!
- *   21oct2017 - 9.5 s - bazel port
- *   2mar2019  - 6.3 s - tried again on poisson (MacBook Pro, 15-inch, 2017, 3.1 GHz Intel Core i7)
- *   18dec2019 - 6.0 s - on wada (MacBook Pro, 13-inch, 2019, 2.5 GHz Quad-Core Intel Core i5)
- *   19dec2019 - 5.8 s - on wada without SSE (faster?)
- *   12mar2020 - 6.3 s - on wada after table cleanup
- *   20oct2020 - 5.8 s - on wada after random access subset routine
- *   22oct2020 - 5.0 s - on wada after removing branching in inner
- *   28dec2023 - 2.3 s - on julia (M2 MacBook Air) before aggressive memory save (~0.95 GB peak)
- *   28dec2023 - 3.1 s - on julia (M2 MacBook Air) after aggressive memory save (~0.48 GB peak)
+ *   2014jan4 - 19.7 s - median of three runs
+ *   2014jan5 - 10.3 s - transpose input and output arrays!
+ *   2017oct21 - 9.5 s - bazel port
+ *   2019mar2  - 6.3 s - tried again on poisson (MacBook Pro, 15-inch, 2017, 3.1 GHz Intel Core i7)
+ *   2019dec18 - 6.0 s - on wada (MacBook Pro, 13-inch, 2019, 2.5 GHz Quad-Core Intel Core i5)
+ *   2019dec19 - 5.8 s - on wada without SSE (faster?)
+ *   2020mar12 - 6.3 s - on wada after table cleanup
+ *   2020oct20 - 5.8 s - on wada after random access subset routine
+ *   2020oct22 - 5.0 s - on wada after removing branching in inner
+ *   2023dec28 - 2.3 s - on julia (M2 MacBook Air) before aggressive memory save (~0.95 GB peak)
+ *   2023dec28 - 3.1 s - on julia (M2 MacBook Air) after aggressive memory save (~0.48 GB peak)
  */
 
 TEST(benchmark, slow) {
