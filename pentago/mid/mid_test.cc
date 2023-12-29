@@ -115,7 +115,7 @@ TEST(mid, mid) {
         ASSERT_EQ(values.size(), boards.size());
         for (const auto& b : boards) {
           const auto it = std::find_if(values.begin(), values.end(),
-                                       [=](const auto& x) { return get<0>(x) == b; });
+                                       [=](const auto& x) { return get<0>(x) == b.raw(); });
           ASSERT_NE(it, values.end());
           ASSERT_EQ(get<1>(*it), value(*empty, b));
         }

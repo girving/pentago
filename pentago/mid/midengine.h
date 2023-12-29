@@ -33,7 +33,7 @@ static inline int mid_supers_size(const high_board_t board) {
   return 1 + (36 - board.count());
 }
 
-struct mid_values_t : pile<tuple<high_board_t,int>,1+18+8*18> {};
+struct mid_values_t : pile<tuple<raw_t,int>,1+18+8*18> {};
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
 // Results are {whether we don't lose, whether we win}

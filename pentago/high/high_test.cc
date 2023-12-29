@@ -9,6 +9,24 @@
 namespace pentago {
 namespace {
 
+TEST(high, conversion) {
+  Random random(5554);
+  for (const int slice : range(36+1)) {
+    for (int i = 0; i < 16; i++) {
+      const auto board = random_board(random, slice);
+      for (const bool middle : {false, true}) {
+        const auto high0 = high_board_t::from_board(board, middle);
+        ASSERT_EQ(high0.board(), board);
+        ASSERT_EQ(high0.middle(), middle);
+        const auto high1 = high_board_t::from_raw(high0.raw());
+        ASSERT_EQ(high1.board(), board);
+        ASSERT_EQ(high1.middle(), middle);
+        ASSERT_EQ(high1.raw(), high0.raw());
+      }
+    }
+  }
+}
+
 void board_test(const int slice, RawArray<const board_t> boards, RawArray<const uint64_t> wins) {
   Scope scope("board test");
   ASSERT_EQ(boards.size() * 8, wins.size());

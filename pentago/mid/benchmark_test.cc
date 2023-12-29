@@ -50,8 +50,10 @@ TEST(benchmark, slow) {
   const auto board = high_board_t::from_board(274440791932540184, false);
   const auto results = midsolve(board, midsolve_workspace(18));
   ASSERT_EQ(results.size(), 1 + 18 + 8*18);
-  for (const auto& [k, v] : results)
-    ASSERT_EQ(check_get(correct, k), v) << "board = " << k;
+  for (const auto& [k, v] : results) {
+    const auto board = high_board_t::from_raw(k);
+    ASSERT_EQ(check_get(correct, board), v) << "board = " << board;
+  }
   slog("time = %g s", (wall_time()-start).seconds());
 }
 

@@ -36,7 +36,7 @@ build web/client/public/mid.wasm \
   third_party/freestanding/cstring.cc
 
 build web/client/build/tests.wasm \
-  -Wl,--export={malloc,sqr_test,sum_test,die_test} \
+  -Wl,--export={malloc,sqr_test,sum_test,die_test,int64_test} \
   pentago/mid/js_test.cc \
   pentago/utility/wasm_alloc.cc \
   third_party/freestanding/cstring.cc

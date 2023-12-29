@@ -6,135 +6,61 @@ const win_rays = [[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[1
 // Pull in math
 const floor = Math.floor
 const min = Math.min
-const pow = Math.pow
 const abs = Math.abs
 
-function str_to_quadrants(s) {
-  // We assume s consists entirely of digits
-  if (s.match(/^\d+$/) && s.length<=19) {
-    // Accumulate into base 2**16, ignoring overflow
-    const quads = [0,0,0,0]
-    for (let i = 0; i < s.length; i++) {
-      const d = parseInt(s[s.length-1-i])
-      for (let q = 0; q < 4; q++)
-        quads[q] += (floor(pow(5, i) * pow(2, i-16*q)) & 0xffff) * d
-    }
-    // Reduce down to base 2**16
-    for (let q = 0; q < 3; q++) {
-      quads[q+1] += quads[q] >> 16
-      quads[q] &= 0xffff
-    }
-    if (quads[3] <= 0xffff)
-      return quads
-  }
-  throw Error('expected number < 5540271966595842048, got '+s)
-}
-
-function quadrants_to_str(quads) {
-  // Accumulate into base 10**5, ignoring overflow
-  const sections = [0,0,0,0]
-  for (let b = 0; b < 64; b++)
-    if (quads[b>>4] & 1<<(b&15))
-      for (let a = 0; a < 4; a++)
-        sections[a] += floor(pow(2, b-5*a) / pow(5, 5*a)) % 100000
-  // Reduce down to base 10**5
-  let s = ''
-  for (let i = 0; i < 3; i++) {
-    sections[i+1] += floor(sections[i] / 100000)
-    const si = '00000' + sections[i] % 100000
-    s = si.substr(si.length-5)+s
-  }
-  s = sections[3]+s
-  return s.substr(min(s.match(/^0*/)[0].length,s.length-1))
-}
-
-function pack_quadrant(side0, side1) {
-  let quad = 0
-  for (let i = 0; i < 9; i++)
-    quad += ((side0 >> i & 1) + 2 * (side1 >> i & 1)) * pow(3, i)
-  return quad
-}
-
-// Mirror of high_board_t in python
-// Usage: new board_t(quadrants,middle), parse_board(name), from_high(rep)
+// Usage: new board_t(stones,middle), parse_board(name)
 // Examples: new board_t([1,0,0,0],true), parse_board('1m')
-export function board_t(quads, middle) {
-  if (quads.length != 4 || (middle != 0 && middle != 1))
-    throw Error('invalid board: quads '+quads+', middle '+middle)
-  this.quads = quads
+function board_t(grid, middle) {
+  this.grid = grid
   this.middle = middle
 
-  const name = quadrants_to_str(quads)+(middle?'m':'')
-  this.name = name
-
-  // Extract grid
-  const grid = Array(36)
-  for (let qx=0;qx<2;qx++)
-    for (let qy=0;qy<2;qy++) {
-      let quad = quads[2*qx+qy]
-      for (let x=0;x<3;x++)
-        for (let y=0;y<3;y++) {
-          grid[6*(3*qx+x)+3*qy+y] = quad%3
-          quad = floor(quad/3)
-        }
-    }
-  this.grid = grid
-
-  // Count stones 
+  // Count stones, compute name
+  let stones = 0n
   let count0 = 0
   let count1 = 0
-  for (let i=0;i<36;i++) {
-    count0 += grid[i]==1
-    count1 += grid[i]==2
+  for (let i = 0n; i < 36n; i++) {
+    const x = i / 6n
+    const y = i % 6n
+    const s = BigInt(grid[i])
+    stones += s * 3n**(x % 3n * 3n + y % 3n) << (16n * (x / 3n * 2n + y / 3n))
+    count0 += s == 1
+    count1 += s == 2
   }
-  const count = count0+count1
-  this.count = count
-  const turn = (count0-1==count1-middle)+0
-  this.turn = turn
-  if (count0-turn-middle*(turn==0)!=count1-middle*(turn==1))
-    throw Error('bad board: quads '+quads+', middle '+middle+', turn '+turn+', counts '+count0+' '+count1)
+  const name = this.name = stones + (middle ? 'm' : '')
+  this.raw = stones | BigInt(middle) << 63n
+  const count = this.count = count0 + count1
+  const turn = this.turn = (count0-1 == count1-middle)+0
 
-  // high_board_t format for use in mid_sync
-  this.high = () => {
-    const rep = [0,0,0,0,0,0,0,0,2*count-middle]
-    for (let q = 0; q < 4; q++) {
-      for (let i = 0; i < 9; i++) {
-        const n = floor(quads[q] / pow(3, i)) % 3
-        rep[q] |= (n == 1) << i
-        rep[4+q] |= (n == 2) << i
-      }
-    }
-    return rep
-  }
+  // Check validity
+  if (count0-turn-middle*(turn==0) != count1-middle*(turn==1))
+    throw Error('bad board '+name+': turn '+turn+', counts '+count0+' '+count1)
 
   // Place a stone at the given location
   const place = this.place = (x, y) => {
     if (middle || grid[6*x+y])
       throw Error('bad place: '+name+', xy '+x+' '+y)
-    const qm = quads.slice(0)
-    qm[2*floor(x/3)+floor(y/3)] += (1+turn)*pow(3,3*(x%3)+y%3)
-    return new board_t(qm,true)
+    const g = grid.slice()
+    g[6*x+y] = 1 + turn
+    return new board_t(g, true)
   }
 
   // Rotate the given quadrant left (d=1) or right (d=-1)
   const rotate = this.rotate = (qx, qy, d) => {
     if (!middle || !(qx==0 || qx==1) || !(qy==0 || qy==1) || abs(d)!=1)
-      throw Error('bad rotate: '+name+', middle '+middle+', q '+qx+' '+qy+', d '+d)
-    let quad = 0
-    for (let x=2;x>=0;x--)
-      for (let y=2;y>=0;y--)
-        quad = 3*quad+grid[6*(3*qx+1+d*(y-1))+3*qy+1-d*(x-1)]
-    const qm = quads.slice(0)
-    qm[2*qx+qy] = quad
-    return new board_t(qm, false)
+      throw Error('bad rotate: '+name+', q '+qx+' '+qy+', d '+d)
+    const g = grid.slice()
+    for (let x = 0; x < 3; x++)
+      for (let y = 0; y < 3; y++)
+        g[6*(3*qx + x) + 3*qy + y] = grid[6*(3*qx + 1 + d*(y-1)) + 3*qy + 1 - d*(x-1)]
+    return new board_t(g, false)
   }
 
   // Does the given side have 5 in a row?
   const won = side => {
-    const v = side+1
-    for (let i=0;i<win_rays.length;i++) {
-      const s = win_rays[i][0]
-      const d = win_rays[i][1]
+    const v = side + 1
+    for (const r of win_rays) {
+      const s = r[0]
+      const d = r[1]
       if (grid[s]==v && grid[s+d]==v && grid[s+2*d]==v && grid[s+3*d]==v && grid[s+4*d]==v)
         return true
     }
@@ -143,11 +69,11 @@ export function board_t(quads, middle) {
 
   // Start and end for each five in a row
   this.fives = () => {
-    function coord(i) { const x = floor(i/6); return [x,i-6*x] }
+    const coord = (i) => [floor(i/6), i%6]
     const fives = []
-    for (let i=0;i<win_rays.length;i++) {
-      const s = win_rays[i][0]
-      const d = win_rays[i][1]
+    for (const r of win_rays) {
+      const s = r[0]
+      const d = r[1]
       const v = grid[s]
       if (v && grid[s+d]==v && grid[s+2*d]==v && grid[s+3*d]==v && grid[s+4*d]==v)
         fives.push([coord(s), coord(s+d), coord(s+2*d), coord(s+3*d), coord(s+4*d)])
@@ -156,18 +82,9 @@ export function board_t(quads, middle) {
   }
 
   // Is the game over?
-  this.done = () => won(0) || won(1) || (count==36 && !middle)
-
-  // Assuming the game is over, what is the current player's results?  1=win, 0=tie, -1=loss
-  this.immediate_value = () => {
-    const win = won(turn)
-    const lose = won(1-turn)
-    if (win || lose)
-      return win && lose ? 0 : win ? 1 : -1
-    if (count==36)
-      return 0
-    throw Error('board '+name+': immediate_value() called when board isn\'t done')
-  }
+  this.done = won(0) || won(1) || (count==36 && !middle)
+  if (this.done)
+    this.immediate_value = won(turn) - won(1-turn)
 
   // List moves
   this.moves = () => {
@@ -186,29 +103,21 @@ export function board_t(quads, middle) {
   }
 }
 
-// Convert from canonical board name
+// Convert from canonical board name or raw_t
 export function parse_board(name) {
-  const m = name.match(/^(\d+)(m?)$/)
+  const m = (name + '').match(/^(\d+)(m?)$/)
   if (!m)
     throw Error('Invalid board ' + name)
-  return new board_t(str_to_quadrants(m[1]), m[2].length)
-}
 
-// Convert from high_board_t format
-export function from_high(high) {
-  if (high.length != 9)
-    throw Error('Invalid board ' + high)
-  const quads = [0,1,2,3].map(q => pack_quadrant(high[q], high[4+q]))
-  const middle = high[8] & 1
-  return new board_t(quads, middle)
-}
+  // Extract grid
+  const stones = BigInt(m[1])
+  const grid = Array(36)
+  for (let i = 0n; i < 36n; i++) {
+    const x = i / 6n
+    const y = i % 6n
+    grid[i] = Number((stones >> 16n*(x / 3n * 2n + y / 3n)) % 32768n / 3n**(3n*(x % 3n) + y % 3n) % 3n)
+  }
 
-// Convert from stringified high_board_t format
-export function from_high_str(s) {
-  return from_high(s.split(',').map(n => parseInt(n)))
-}
-
-// Convert a dictionary with high_board_t keys to canonical keys
-export function from_high_map(m) {
-  return Object.fromEntries(Object.entries(m).map(([k,v]) => [from_high_str(k).name,v]))
+  // middle if we have an 'm', or the raw_t middle bit is set
+  return new board_t(grid, m[2].length || stones >> 63n != 0)
 }

@@ -10,7 +10,7 @@
     "build": "make && rollup -c",
     "deploy": "make && rollup -c && firebase deploy",
     "dev": "make && rollup -c -w",
-    "start": "make && sirv public"
+    "start": "make && rollup -c && sirv public"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^24.0.1",

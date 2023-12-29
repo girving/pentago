@@ -71,13 +71,35 @@ high_board_t high_board_t::rotate(const int q, const int d) const {
   return high_board_t(after[0], after[1], s.ply_ + 1);
 }
 
-#ifndef __wasm__
+board_t high_board_t::board() const {
+  board_t board = 0;
+  for (const int q : range(4)) {
+    uint16_t quad = 0;
+    for (int i = 8; i >= 0; i--) {
+      const int j = 16*q + i;
+      quad = 3*quad + (s.side_[0] >> j & 1) + 2*(s.side_[1] >> j & 1);
+    }
+    board |= board_t(quad) << 16*q;
+  }
+  return board;
+}
+
 high_board_t high_board_t::from_board(const board_t board, const bool middle) {
-  const auto side0 = unpack(board, 0);
-  const auto side1 = unpack(board, 1);
+  side_t side0 = 0, side1 = 0;
+  for (const int q : range(4)) {
+    uint16_t quad = board >> 16*q;
+    for (const int i : range(9)) {
+      const int s = quad % 3;
+      quad /= 3;
+      const int j = 16*q + i;
+      side0 |= side_t(s == 1) << j;
+      side1 |= side_t(s == 2) << j;
+    }
+  }
   return high_board_t(side0, side1, 2*popcount(side0 | side1) - middle);
 }
 
+#ifndef __wasm__
 Array<const high_board_t> high_board_t::moves() const {
   vector<high_board_t> moves;
   if (!middle()) { // Place a stone

@@ -142,13 +142,13 @@ int midsolve_traverse(const high_board_t board, const halfsupers_t* supers, mid_
       const int q = s >> 1;
       const int d = s & 1 ? -1 : 1;
       const auto v = PENTAGO_NAMESPACE::value(r, (d & 3) << 2*q);
-      results.append(make_tuple(board.rotate(q, d), v));
+      results.append(make_tuple(board.rotate(q, d).raw(), v));
       value = max(value, -v);
     }
   }
 
   // Store and return value
-  results.append(make_tuple(board, value));
+  results.append(make_tuple(board.raw(), value));
   return value;
 }
 
@@ -163,12 +163,13 @@ mid_values_t midsolve(const high_board_t board, RawArray<halfsuper_s> workspace)
   return results;
 }
 #else  // if __wasm__
-WASM_EXPORT void midsolve(const high_board_t* board, mid_values_t* results) {
+WASM_EXPORT void midsolve(const raw_t raw, mid_values_t* results) {
   NON_WASM_ASSERT(board && results);
   results->clear();
-  const auto workspace = wasm_buffer<halfsuper_s>(midsolve_workspace_size(board->count()));
-  const auto supers = midsolve_internal(*board, workspace);
-  midsolve_traverse(*board, supers.data(), *results);
+  const auto board = high_board_t::from_raw(raw);
+  const auto workspace = wasm_buffer<halfsuper_s>(midsolve_workspace_size(board.count()));
+  const auto supers = midsolve_internal(board, workspace);
+  midsolve_traverse(board, supers.data(), *results);
 }
 #endif  // __wasm__
 
