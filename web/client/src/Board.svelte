@@ -254,7 +254,7 @@
     // Start asynchronous lookup / local computation as required
     status = ''
     loading = null
-    const has = c => lru_get(c.name) !== undefined
+    const has = c => lru_get(c.name) !== null
     if (!b.done && !(has(b) && b.moves().every(has))) {
       const start = Date.now()
       function absorb(op, values) {
@@ -285,7 +285,7 @@
       if (child.done)
         return child.immediate_value
       const v = lru_get(child.name)
-      if (v !== undefined)
+      if (v !== null)
         return v
       await status
       return lru_get(child.name)

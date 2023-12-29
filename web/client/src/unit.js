@@ -7,7 +7,7 @@ import { readFileSync } from 'fs'
 import { midsolve, instantiate } from './mid_sync.js'
 import all_games from './games.js'
 import pending from './pending.js'
-import { size as lru_size, get as lru_get, set as lru_set, peek as lru_peek, set_lohi } from './local_lru.js'
+import { get as lru_get, set as lru_set } from './local_lru.js'
 const min = Math.min
 const pow = Math.pow
 
@@ -42,34 +42,22 @@ async function test_done() {
 }
 
 async function test_lru() {
-  assert.equal(lru_size(), 0)
-  const top = 40
-  const lo = 13
-  const hi = 17
-  set_lohi(lo, hi)
-  const all = []
-  const f = n => n * n * n + 7
-  let filled = false
-  for (let i = 0; i < 2000; i++) {
-    const k = Math.floor(Math.random() * top)
-    if (Math.random() < 0.5) { // get
-      if (lru_get(k)) all.push(k)
-    } else { // set
-      all.push(k)
-      lru_set(k, f(k))
-      filled = filled || lru_size() >= lo
+  const limit = 10000
+  for (let e = 0; e < 2; e++) {
+    for (let i = 0; i < limit; i++) {
+      if (e == 0 || i != 5)
+        assert(lru_get(i) === null)
+      lru_set(i, 2*i)
+      assert.equal(lru_get(i), 2*i)
     }
-    const size = lru_size()
-    if (filled)
-      assert(lo <= size)
-    assert(size <= hi)
-    for (let j = 0; j < size; j++) {
-      const k = all[all.length-1-j]
-      const v = lru_peek(k)
-      assert.equal(v, f(k), 'key ' + k +', f(k) ' + f(k) + ', v ' + v)
-    }
+    for (let i = 0; i < limit; i++)
+      assert.equal(lru_get(i), 2*i)
+    lru_set(5, 7) 
+    assert.equal(lru_get(5), 7)
+    for (let i = 0; i < limit; i++)
+      if (i != 5)
+        assert(lru_get(i) === null)
   }
-  assert(filled)
 }
 
 async function test_wasm() {

@@ -5,7 +5,7 @@ export default get_storage => {
   try {
     // Test persistent storage
     const storage = get_storage()
-    const test = "__some_random_key_you_are_not_going_to_use__"
+    const test = "__an_unused_key"
     storage.setItem(test, test)
     storage.removeItem(test)
 
