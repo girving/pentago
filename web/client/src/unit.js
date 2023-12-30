@@ -7,7 +7,6 @@ import { readFileSync } from 'fs'
 import { midsolve, instantiate } from './mid_sync.js'
 import all_games from './games.js'
 import pending from './pending.js'
-import { get as lru_get, set as lru_set } from './local_lru.js'
 const min = Math.min
 const pow = Math.pow
 
@@ -35,28 +34,15 @@ async function test_done() {
     const board = parse_board(name)
     if (board.name != name)
       throw Error('name inconsistency: name '+name+', board.name '+board.name)
-    const v = board.done ? board.immediate_value : 2
+    const v = board.done ? board.value : 2
     if (v != done[name])
       throw Error('done check failed: board '+name+', correct '+done[name]+', got '+v)
-  }
-}
-
-async function test_lru() {
-  const limit = 10000
-  for (let e = 0; e < 2; e++) {
-    for (let i = 0; i < limit; i++) {
-      if (e == 0 || i != 5)
-        assert(lru_get(i) === null)
-      lru_set(i, 2*i)
-      assert.equal(lru_get(i), 2*i)
+    if (v == -1 || v == 1)
+      assert(board.fives.length > 0)
+    for (const f of board.fives) {
+      const s = f.map(([x,y]) => board.grid[6*x+y])
+      assert(s[0] && s[0] == s[1] && s[0] == s[2] && s[0] == s[3] && s[0] == s[4])
     }
-    for (let i = 0; i < limit; i++)
-      assert.equal(lru_get(i), 2*i)
-    lru_set(5, 7) 
-    assert.equal(lru_get(5), 7)
-    for (let i = 0; i < limit; i++)
-      if (i != 5)
-        assert(lru_get(i) === null)
   }
 }
 
@@ -156,7 +142,7 @@ const clear = '\x1b[00m'
 
 // Run all tests in series
 async function toplevel() {
-  let tests = [test_moves, test_done, test_lru, test_wasm, test_mid, test_path]
+  let tests = [test_moves, test_done, test_wasm, test_mid, test_path]
 
   // Restrict to specific tests if desired
   if (process.argv.length > 2) {
