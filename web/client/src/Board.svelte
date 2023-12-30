@@ -123,8 +123,8 @@
     vector-effect: non-scaling-stroke;
   }
   .empty,.emptyblack,.emptywhite { fill: tan }
-  .emptyblack:hover, .emptyblack:hover + .emptyblack { fill: black }
-  .emptywhite:hover, .emptywhite:hover + .emptywhite { fill: white }
+  .emptyblack:hover { fill: black }
+  .emptywhite:hover { fill: white }
   .black { fill: black }
   .white { fill: white }
   .board { fill: tan }
