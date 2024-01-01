@@ -44,14 +44,14 @@
         Unlike chess and go, pentago is small enough for a computer to play perfectly: with symmetries removed,
         there are a mere 3,009,081,623,421,558 (3e15) possible positions.  Thus, with the help of several hours
         on 98304 threads of <a href="https://www.nersc.gov/users/computational-systems/edison">Edison</a>, a
-        Cray supercomputer at <a href="https://www.nersc.gov">NERSC</a>, pentago is now strongly solved.
+        Cray supercomputer at <a href="https://www.nersc.gov">NERSC</a>, Pentago is now strongly solved.
         "Strongly" means that perfect play is efficiently computable for any position.  For example,
         <a href="/#0">the first player wins</a>.
         </p><p>
         This site demonstrates the strong solution.  For boards with 17 or fewer stones, the result is read out
         of a 4 terabyte database.  Since the number of positions increases exponentially with the number of stones,
-        the database stops after this, and the result must be computed from scratch.  This takes about 15-20 seconds
-        for an 18 stone board if the server is below full load, much less for boards with 19 or more stones.
+        the database stops after this, and the result must be computed from scratch.  This takes about 8 seconds
+        in the client (using WebAssembly) for an 18 stone board, much less for boards with 19 or more stones.
         </p>
       </section>
 
@@ -77,11 +77,10 @@
 
       <section id="algorithms"><h2>Algorithms: brute force + symmetry</h2>
         <p>
-        I will be writing up more details of the computation in paper form soon, but here is a brief summary.
-        For background on the complexity of pentago and the applicability of a variety of solution algorithms,
-        see Niklas Büscher's 2011 thesis,
-        <a href="https://www.ke.tu-darmstadt.de/lehre/arbeiten/bachelor/2011/Buescher_Niklas.pdf">"On Solving Pentago"</a>,
-        which analyzed the game but did not solve it.
+        <a href="https://arxiv.org/abs/1404.0743">Irving 2014, Pentago is a first-player win</a> has full details
+        of the algorithms used.  We give a brief summary here.  For background on the complexity of pentago and
+        the applicability of a variety of solution algorithms, see Niklas Büscher's 2011 thesis,
+        <a href="https://www.ke.tu-darmstadt.de/lehre/arbeiten/bachelor/2011/Buescher_Niklas.pdf">"On Solving Pentago"</a>.
         </p><p>
         As mentioned above, pentago has 3,009,081,623,421,558 (3e15) possible positions once symmetries
         are taken out.  The number of positions increases exponentially up to 24 stones (where there are
@@ -95,7 +94,7 @@
         are four ways to rotate each of four quadrants, one bit per position becomes a 4-dimensional array with
         4<sup>4</sup> = 256 bits total.  These 256 bits are packed into two 128-bit SSE registers,
         allowing us to compute 256 values at a time using SSE bit twiddling.  The resulting code is
-        <a href="https://github.com/girving/pentago/blob/b1aaaa2850492a1a310913a963c2c5b44cddd2a7/pentago/base/symmetry.cpp#L233">fairly hairy</a>,
+        <a href="https://github.com/girving/pentago/blob/b1aaaa2850492a1a310913a963c2c5b44cddd2a7/pentago/base/symmetry.cpp#L233">involved</a>,
         but is much faster than operating on one position at a time.
         </p><p>
         With the branching factor under control, we solve the game by traversing every possible position, starting
@@ -105,7 +104,7 @@
         <a href="https://www.nersc.gov/users/computational-systems/edison">Edison</a>,
         a Cray supercomputer at NERSC (the National Energy Research Supercomputing Center).  Positions with more
         than 18 stones were discarded after use, and those with 18 or fewer were written to disk using lzma
-        compression to reduce down to 4 TB total.  The large scale computation took less than four hours, plus
+        compression to reduce down to 3.7 TB total.  The large scale computation took less than four hours, plus
         a few more hours on fewer nodes to finish up.
         </p><p>
         In the majority of existing supercomputer codes, all processes operate in lockstep performing the same
@@ -123,25 +122,25 @@
         <a href="https://www.nersc.gov/users/computational-systems/hopper">Hopper</a> due to unexpectedly
         high latency, possibly exacerbated by the asynchronous structure of the communication.
         </p><p>
-        The above discussion applies to the full solve required to compute the 4 TB database, which this website
+        The above discussion applies to the full solve required to compute the 3.7 TB database, which this website
         uses to lookup perfect play for positions with 17 or fewer stones.
         If the site sees a position with 18 or more stones, its children are outside the database, so we perform
         a much smaller traversal over all downstream positions.  The set of downstream positions is much easier to
         deal with thanks to abstracting away the rotations, as the set of empty spots does not
-        move around.  These smaller solves have the same structure as the full solve, but require only 1 GB of RAM
-        and 15-20 seconds on a single thread.  As a perk, we can take advantage of parity to store only half of
-        the 256 possible rotations at each step since the rotation parity flips every move.
+        move around.  These smaller solves have the same structure as the full solve, but require only 1/2 GB of RAM
+        and 8 seconds on a single thread.  We take advantage of parity to store only half of the 256 possible rotations
+        at each step since the rotation parity flips every move, and do two passes to compute "whether we win" and
+        "whether we don't lose" to cut memory in half (from 1 GB to 1/2 GB).
         </p>
       </section>
 
       <section id="server"><h2>Server setup</h2>
         <p>
-        The 4 TB data set, this website, and the backend server is hosted on Google Cloud.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 17 or fewer stones.  For positions with more stones, the server used to compute the value from scratch, but this functionality has been ported to WebAssembly and moved into the client.
+        The 3.7 TB data set, this website, and the backend server is hosted on <a href="https://cloud.google.com">Google Cloud</a>.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 17 or fewer stones.  For positions with 18 or more stones, a
+        specialized retrograde solver computes the value from scratch; this solver has been ported to WebAssembly and runs in the client.
         </p><p>
         The backend server is
-        <a href="https://us-central1-naml-148801.cloudfunctions.net/pentago">
-          https://us-central1-naml-148801.cloudfunctions.net/pentago
-        </a>.  The API is fairly simple: give it the code for a pentago board and it replies with json containing the values of all child positions.  For example,
+        <a href="https://us-central1-naml-148801.cloudfunctions.net/pentago">https://us-central1-naml-148801.cloudfunctions.net/pentago</a>.  The API is fairly simple: give it the code for a pentago board and it replies with json containing the values of all child positions.  For example,
         <a href="https://us-central1-naml-148801.cloudfunctions.net/pentago/0">here is the start position</a>.  You are welcome to use the server directly for small numbers of queries, but please email me if you want to use it
         more intensively.
         </p>
@@ -180,7 +179,7 @@
         Jed Brown provided numerous helpful suggestions, in particular the initial suggestion that supercomputer
         time might be a possibility.  Thanks for helping me tilt at this rather strange windmill!
         </p><p>
-        Prior to 2020, hosting for the 4 TB data set and compute servers for this site were generously donated by
+        Prior to 2020, hosting for the 3.7 TB data set and compute servers for this site were generously donated by
         <a href="https://rackspace.com">Rackspace</a>; thanks especially to Jesse Noller at Rackspace for offering
         to host this open source project!  Cloud storage may seem less shiny than supercomputer time, but is just
         as essential in order to make the results available to anyone curious.  Solving a game and forgetting the
