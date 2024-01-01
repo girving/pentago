@@ -138,6 +138,7 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT
   const int s1p = index / (I.spots-k0);
   const int j = index - s1p * (I.spots-k0);
   uint16_t c = s1p;
+  WASM_NOUNROLL
   for (int a = 0; a < k1; a++) {
     const int s1p_a = sets1p[s1p]>>5*a&0x1f;
     if (j<s1p_a)
@@ -189,6 +190,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
   {
     const auto free = side_mask & ~side0;
     int next = 0;
+    WASM_NOUNROLL
     for (int i = 0; i < I.spots; i++)
       if (free&side_t(1)<<I.empty.empty[i])
         empty1[next++] = i;
@@ -244,6 +246,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-k0; q++) {
       uint16_t offset = a ? 0 : s0;
+      WASM_NOUNROLL
       for (int i = empty1[q]-q; i < k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)

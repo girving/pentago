@@ -390,9 +390,10 @@ string halfsuper_wins() {
     }
     const auto mask = format("m%d", counter);
     const auto fmt = "0%o";
-    string leading, loop, ith, init;
+    string leading, nounroll, loop, ith, init;
     if (pats.size() > 1) {
       leading = format("[%d]", pats.size());
+      nounroll = "WASM_NOUNROLL\n  ";
       loop = format("for (int i = 0; i < %d; i++) ", pats.size());
       ith = format("%s[i]", mask);
       init = cpp_init(fmt, masks);
@@ -401,7 +402,7 @@ string halfsuper_wins() {
       init = cpp_init(fmt, masks[0]);
     }
     line("  const quadrant_t %s%s[%d][4] = %s;", mask, leading, quads.size(), init);
-    line("  %swins |= %s;", loop, joins(" & ", quads.size(),
+    line("  %s%swins |= %s;", nounroll, loop, joins(" & ", quads.size(),
         [&](int iq) { return format("M(%s[%d],%d)", ith, iq, quads[iq]); }));
     counter++;
   }

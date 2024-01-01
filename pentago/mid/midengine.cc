@@ -60,6 +60,7 @@ static void midsolve_loop(const info_t& I, const int n, halfsuper_s* results,
 
   // Precompute subsets of player 1 relative to player 0's stones
   const auto sets1p_ = H.sets1p();
+  WASM_NOUNROLL
   for (const int s1p : range(sets1p_.size))
     sets1p[s1p] = get(sets1p_, s1p);
 
@@ -69,6 +70,7 @@ static void midsolve_loop(const info_t& I, const int n, halfsuper_s* results,
 
   // Lookup table for converting s1p to cs1p (s1 relative to one more black stone):
   //   cs1p = cs1ps[s1p].x[j] if we place a black stone at empty1[j]
+  WASM_NOUNROLL
   for (const int i : range(H.cs1ps_size()))
     cs1ps[i] = make_cs1ps(I, sets1p, n, i);
 
