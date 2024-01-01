@@ -13,12 +13,23 @@ typedef Vector<double,2> TV;
 typedef Vector<int,2> IV;
 using std::string;
 
-string tag(const string& name, const vector<tuple<string,string>>& attrs, const string& body = "") {
-  string start = name;
+string start_tag(const string& name, const vector<tuple<string,string>>& attrs, const bool close = false) {
+  string tag = "<" + name;
   for (const auto& [k,v] : attrs)
     if (v.size())
-      start += format(" %s=\"%s\"", k, v);
-  return format("<%s%s", start, body.size() ? format(">%s</%s>", body, name) : "/>");
+      tag += format(" %s=\"%s\"", k, v);
+  tag += close ? "/>" : ">";
+  return tag;
+}
+
+string close_tag(const string& name) {
+  return format("</%s>", name); 
+}
+
+string tag(const string& name, const vector<tuple<string,string>>& attrs, const string& body = "") {
+  string tag = start_tag(name, attrs, body.empty());
+  if (body.size()) tag += body + close_tag(name);
+  return tag;
 }
 
 string svg(const int width, const int height, const string& body) {
@@ -26,15 +37,16 @@ string svg(const int width, const int height, const string& body) {
                      {"xmlns", "http://www.w3.org/2000/svg"}}, body);
 }
 
+// Change to "\n" for easier reading
+const string sep = "";
+
 void counts() {
   // Preliminaries
   const Box<TV> box = {{161, 50}, {1163, 449}};
   const TV axes(36, 15);
-  const auto snap = [=](const TV X) {
-    const auto size = box.shape();
-    return IV(rint(box.min[0] + size[0]*X[0]/axes[0]), rint(box.max[1] - size[1]*X[1]/axes[1]));
-  };
-  const string sep = "";  // Change to "\n" for easier reading
+  const auto snap_x = [=](const T x) { return int(rint(box.min[0] + box.shape()[0]*x/axes[0])); };
+  const auto snap_y = [=](const T y) { return int(rint(box.max[1] - box.shape()[1]*y/axes[1])); };
+  const auto snap = [=](const TV X) { return IV(snap_x(X[0]), snap_y(X[1])); };
 
   // Draw polygonal lines
   const auto lines = [=](const vector<TV>& Xs, const string& style, const string& marker = "") {
@@ -66,6 +78,15 @@ void counts() {
     return marker(name, 8, format(R"(<circle cx="5" cy="5" r="4" fill="%s"/>)", color));
   };
 
+  // Scoped tags
+  struct Scope {
+    string& body;
+    const string name;
+    Scope(string& body, const string& name, const vector<tuple<string,string>>& attrs)
+      : body(body), name(name) { body += sep + start_tag(name, attrs); }
+    ~Scope() { body += sep + close_tag(name); }
+  };
+
   // Move (0,0) to the desired coordinates
   const auto translate = [=](const TV X) {
     const IV I = snap(X);
@@ -78,9 +99,13 @@ void counts() {
   };
 
   // Text
-  const auto text = [=](const TV X, const string& text, const string& style = "") {
-    const auto I = snap(X);
-    return sep + tag("text", {{"x", format("%d", I[0])}, {"y", format("%d", I[1])}, {"style", style}}, text);
+  const auto text = [=](const IV I, const string& text, const string& style = "") {
+    vector<tuple<string,string>> attrs;
+    for (const int d : range(2))
+      if (I[d])
+        attrs.emplace_back(d ? "y" : "x", format("%d", I[d]));
+    attrs.emplace_back("style", style);
+    return sep + tag("text", attrs, text);
   };
 
   // Start our SVG!
@@ -107,48 +132,53 @@ void counts() {
   );
 
   // Axes
-  body += sep + format(R"(<g class="ax">)");
   {
-    // y-axis
-    vector<TV> Xs;
-    for (int y = 15; y >= 0; y--)
-      Xs.emplace_back(0, y);
-    body += lines(Xs, "stroke:#000000", "ytick");
-    for (const int y : range(15+1))
-      body += text(TV(-.85, y-.17), format(R"(10<tspan>%d</tspan>)", y));
-  } {
-    // x-axis
-    vector<TV> Xs;
-    for (const int x : range(36+1))
-      Xs.emplace_back(x, 0);
-    body += lines(Xs, ";stroke:#000000", "xtick");
-    for (const int x : range(36+1))
-      body += text(TV(x, -.77), format("%d", x));
-  }
-  body += sep + "</g>";
-  body += sep + format(R"(<g class="rest">)");
-  body += sep + tag("g", {{"transform", translate(TV(-1.7, 15./2)) + degrees(-90)}},
-    tag("text", {{"x", "0"}, {"y", "0"}}, "positions"));
-  body += text(TV(18, -1.8), "stones on the board");
-    
-  // All bound counts
-  {
-    vector<TV> all;
-    for (const int n : range(36+1))
-      all.emplace_back(n, log10(T(count_boards(n, 8))));
-    body += lines(all, "stroke:" + blue, "bl");
-    body += text(all[24] - TV(0, 1.2), "all boards");
+    Scope axes_g(body, "g", {{"class", "ax"}});
+    {
+      // y-axis
+      vector<TV> Xs;
+      for (int y = 15; y >= 0; y--)
+        Xs.emplace_back(0, y);
+      body += lines(Xs, "stroke:#000000", "ytick");
+      Scope left(body, "g", {{"transform", format("translate(%d,0)", snap_x(-.85))}});
+      for (const int y : range(15+1))
+        body += text(IV(0, snap_y(y-.17)), format(R"(10<tspan>%d</tspan>)", y));
+    } {
+      // x-axis
+      vector<TV> Xs;
+      for (const int x : range(36+1))
+        Xs.emplace_back(x, 0);
+      body += lines(Xs, ";stroke:#000000", "xtick");
+      Scope left(body, "g", {{"transform", format("translate(0,%d)", snap_y(-.77))}});
+      for (const int x : range(36+1))
+        body += text(IV(snap_x(x), 0), format("%d", x));
+    }
   }
 
-  // Midsolve counts
   {
-    vector<TV> mid;
-    for (const int n : range(18+1))
-      mid.emplace_back(n+18, log10(T(choose(18, n) * choose(n, n/2))));
-    body += lines(mid, "stroke:" + green, "gr");
-    body += text(mid[12] - TV(0, 1.6), R"(descendents of<tspan dx="-6.5em" dy="1.2em">an 18 stone board</tspan>)");
+    Scope rest_g(body, "g", {{"class", "rest"}});
+    body += sep + tag("g", {{"transform", translate(TV(-1.7, 15./2)) + degrees(-90)}},
+      tag("text", {{"x", "0"}, {"y", "0"}}, "positions"));
+    body += text(snap(TV(18, -1.8)), "stones on the board");
+      
+    // All bound counts
+    {
+      vector<TV> all;
+      for (const int n : range(36+1))
+        all.emplace_back(n, log10(T(count_boards(n, 8))));
+      body += lines(all, "stroke:" + blue, "bl");
+      body += text(snap(all[24] - TV(0, 1.2)), "all boards");
+    }
+
+    // Midsolve counts
+    {
+      vector<TV> mid;
+      for (const int n : range(18+1))
+        mid.emplace_back(n+18, log10(T(choose(18, n) * choose(n, n/2))));
+      body += lines(mid, "stroke:" + green, "gr");
+      body += text(snap(mid[12] - TV(0, 1.6)), R"(descendents of<tspan dx="-6.5em" dy="1.2em">an 18 stone board</tspan>)");
+    }
   }
-  body += sep + "</g>";
 
   // Print the result
   slog(svg(1292, 498, body));
