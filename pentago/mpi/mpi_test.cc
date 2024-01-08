@@ -16,6 +16,7 @@ void run(const string& cmd) {
   slog(cmd);
   fflush(stdout);
   if (not nop) {
+    setenv("HOME", "/not-a-real-directory", 0);  // OpenMPI insists on HOME being set, so fake it
     const int status = system(cmd.c_str());
     if (status)
       throw OSError(format("Command '%s' failed with status %d", cmd, status));
