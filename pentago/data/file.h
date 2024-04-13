@@ -4,6 +4,7 @@
 #include "pentago/utility/debug.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/noncopyable.h"
+#include <functional>
 namespace pentago {
 
 using std::function;

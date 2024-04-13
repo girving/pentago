@@ -30,6 +30,7 @@
 #include "pentago/end/config.h"
 #include "pentago/utility/spinlock.h"
 #include "pentago/utility/array.h"
+#include <functional>
 namespace pentago {
 namespace end {
 
