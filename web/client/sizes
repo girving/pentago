@@ -9,7 +9,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Various types of files
 ignore = ('main.js.map', 'mid_worker.js.map')
 details = ('details.html', 'counts.svg')
-main = ('index.html', 'favicon.png', 'main.css', 'main.js', 'mid_worker.js', 'mid.wasm')
+main = ('index.html', 'favicon.svg', 'main.css', 'main.js', 'mid_worker.js', 'mid.wasm')
 def invert(name, paths):
   return {p:name for p in paths}
 map = {**invert('main', main), **invert('details', details), **invert('ignore', ignore)}

@@ -160,7 +160,7 @@ void counts() {
     body += sep + tag("g", {{"transform", translate(TV(-1.7, 15./2)) + degrees(-90)}},
       tag("text", {{"x", "0"}, {"y", "0"}}, "positions"));
     body += text(snap(TV(18, -1.8)), "stones on the board");
-      
+
     // All bound counts
     {
       vector<TV> all;
@@ -184,17 +184,88 @@ void counts() {
   slog(svg(1292, 498, body));
 }
 
+void favicon() {
+  // Sizes
+  const T spot_size = 1;
+  const T spot_radius = 0.4;
+  const T value_radius = 0.2;
+  const T quad_size = 3*spot_size;
+  const T bar_width = 0.1 * 0;
+  const T bar_extra = 0.1 * 0;
+  const T bar_length = 2*bar_extra + 2*quad_size + bar_width;
+  const T scale = 10;
+
+  // Start our svg
+  string body;
+
+  // Utilities
+  const auto pos = [=](const T z) { return tfm::format("%g", scale*z); };
+  const auto rect = [&](const string& fill, const T x, const T y, const T width, const T height) {
+    body += sep + tag("rect", {{"fill", fill}, {"x", pos(x)}, {"y", pos(y)}, {"width", pos(width)}, {"height", pos(height)}});
+  };
+
+  // CSS
+  body += sep + tag("style", {}, string() +
+    ".b,.w,.e{stroke:black;stroke-width:0.3}" +
+    ".b{fill:black}" +
+    ".w{fill:white}" +
+    ".e{fill:tan}" +
+    ".v{fill:green}" +
+    ".t{fill:blue}"
+  );
+
+  // Quadrants, as a single rectangle
+  rect("tan", bar_extra, bar_extra, 2*quad_size + bar_width, 2*quad_size + bar_width);
+
+  // Separators
+  if (bar_width) {
+    rect("darkgray", 0, bar_extra + quad_size, bar_length, bar_width);
+    rect("darkgray", bar_extra + quad_size, 0, bar_width, bar_length);
+  }
+
+  // Circles: b = black, w = white, t = tie (blue), v = win (green)
+  const string board[6][6] = {
+    {"b", "w", "w", "t", "b", "t"},
+    {"w", "t", "t", "b", "v", "t"},
+    {"v", "b", "w", "t", "v", "b"},
+    {"t", "b", "v", "t", "w", "t"},
+    {"v", "t", "w", "b", "b", "v"},
+    {"t", "w", "b", "w", "w", "t"}};
+  const auto sx = [=](const int z) { return pos(bar_extra + spot_size*(z + 0.5) + bar_width*(z > 2)); };
+  for (const int x : range(6)) {
+    for (const int y : range(6)) {
+      const auto cls = board[x][y];
+      const auto outer = cls == "b" || cls == "w" ? cls : "e";
+      body += sep + tag("circle", {{"class", outer}, {"cx", sx(y)}, {"cy", sx(x)}, {"r", pos(spot_radius)}});
+      if (outer == "e")
+        body += sep + tag("circle", {{"class", cls}, {"cx", sx(y)}, {"cy", sx(x)}, {"r", pos(value_radius)}});
+    }
+  }
+
+  // Print the result
+  const T total = scale * (2*bar_extra + 2*quad_size + bar_width);
+  slog(svg(total, total, body));
+}
+
+int toplevel(int argc, char** argv) {
+  const string name = argc == 2 ? argv[1] : "";
+  if (name == "counts")
+    pentago::counts();
+  else if (name == "favicon")
+    pentago::favicon();
+  else {
+    std::cerr << "Usage: svgs (counts|favicon)" << std::endl;
+    return 1;
+  }
+  return 0;
+}
+
 }  // namespace
 }  // namespace pentago
 
 int main(int argc, char** argv) {
-  if (argc != 2 || std::string(argv[1]) != "counts") {
-    std::cerr << "Usage: svgs counts" << std::endl;
-    return 1;
-  }
   try {
-    pentago::counts();
-    return 0;
+    return pentago::toplevel(argc, argv);
   } catch (const std::exception& e) {
     std::cerr << e.what() << std::endl;
     return 1;
