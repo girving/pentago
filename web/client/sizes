@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+import collections
+import os
+
+# Change directory to script dir
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Various types of files
+ignore = ('main.js.map', 'mid_worker.js.map')
+details = ('details.html', 'counts.svg')
+main = ('index.html', 'favicon.png', 'main.css', 'main.js', 'mid_worker.js', 'mid.wasm')
+def invert(name, paths):
+  return {p:name for p in paths}
+map = {**invert('main', main), **invert('details', details), **invert('ignore', ignore)}
+
+# Collect sizes
+sizes = collections.defaultdict(dict)
+for p in os.listdir('public'):
+  sizes[map[p]][p] = os.path.getsize(os.path.join('public', p))
+
+# Print
+blue = '\033[94m'
+reset = '\033[0m'
+def show(name, size, pre=''):
+  size = f'{size:,}'
+  spaces = ' '*(27 - len(size) - len(name))
+  print(f'{pre}{name}:{spaces}{size}{reset}')
+for k in ('main', 'details', 'ignore'):
+  total = sum(sizes[k].values())
+  show(k, total, pre=blue)
+  for p, s in sorted(sizes[k].items(), key=lambda x: x[1]):
+    show('  '+p, s)
+  print()
