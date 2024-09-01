@@ -1,3 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf8">
+  <title>Pentago is a first player win</title>
+  <link rel="stylesheet" href="/main.css">
+  <link rel="shortcut icon" type="image/svg+xml" href="favicon.svg">
+  <meta name="description" content="pentago strongly solved">
+  <meta http-equiv="content-type" content="text/html;charset=UTF-8">
+</head>
+<body>
+
+<!--<script type="module" src="/main.js"></script>-->
+
 <div class="all">
   <header>
     <h2>Pentago is a first player win</h2>
@@ -15,21 +29,17 @@
       <a href="details.html#useful">Usefulness</a>
       <a href="details.html#thanks">Acknowledgements</a>
       <a href="details.html#contact">Contact</a>
-      {#if window.location.pathname == '/'}
-        <a class="back" href="{back}">Back</a>
-      {/if}
+      <a class="back" href="/">Back</a>
     </nav>
 
     <div class="content">
       <nav class="back">
-        <a class="back" href="{back}">Back</a>
+        <a class="back" href="/">Back</a>
       </nav>
-      <Board bind:back/>
+      %board
     </div>
   </div>
 </div>
 
-<script>
-  import Board from './Board.svelte'
-  let back = null
-</script>
+</body>
+</html>

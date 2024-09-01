@@ -146,3 +146,94 @@ section h2 {
   nav.back { visibility: hidden; }
   .contents .back { visibility: visible; }
 }
+
+/*** Pentago board css ***/
+
+#board {
+  width: 400px;
+  aspect-ratio: 47/60;
+  max-width: 100%;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  /* Improve animations on iOS, following
+   * https://chrissilich.com/blog/fix-css-animation-slow-or-choppy-in-mobile-browsers */
+  -webkit-transform: translateZ(0);
+}
+
+.black,.white,.empty,.emptyblack,.emptywhite {
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.empty,.emptyblack,.emptywhite { fill: tan }
+.emptyblack:hover { fill: black }
+.emptywhite:hover { fill: white }
+.black { fill: black }
+.white { fill: white }
+.board { fill: tan }
+.separators { fill: darkgray }
+
+.rotateselect { opacity: 0 }
+.rotateselect:hover + .rotateblack { fill: black }
+.rotateselect:hover + .rotatewhite { fill: white }
+.norotate { visibility: hidden }
+.rotateblack,.rotatewhite {
+  fill: tan;
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.rotateblack:hover { fill: black }
+.rotatewhite:hover { fill: white }
+
+.cvalue,.rvalue,.tvalue {
+  stroke: gray;
+  stroke-width: .5;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.fvalue {
+  stroke: gray;
+  stroke-width: .5;
+  vector-effect: non-scaling-stroke;
+}
+.rvalue {
+  stroke: black;
+  stroke-width: 1;
+}
+
+.turnlabel,.valuelabel {
+  text-anchor: middle;
+}
+
+.five {
+  stroke: black;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.mask {
+  fill: white;
+}
+
+.quadrant {
+  transition: transform 0.5s ease-in-out;
+}
+
+.status {
+  text-align: center;
+  width: 100%;
+  height: 3em;
+}
+
+#error { color: red; }
+
+.load {
+  display: inline;
+  animation: spin 2s infinite ease;
+}
+@keyframes spin {
+  0% { color: black; text-shadow: none; }
+  20% { color: purple; text-shadow: 0px 0px 6px purple; }
+  40% { color: black; text-shadow: none; }
+}

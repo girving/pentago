@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Inline SVG with JavaScript</title>
+  <style>
+    .empty { fill: green; }
+    .highlight { fill: red; }
+  </style>
+</head>
+<body>
+  <svg width="1000">
+    <!-- https://tympanus.net/codrops/2015/07/16/styling-svg-use-content-css -->
+    <defs><rect id="blah" width="100" height="100"/></defs>
+    <!--<symbol id="blah"><rect width="100" height="100"/></symbol>-->
+
+    <g class="empty">
+      <use id="rect1" href="#blah" x="50" y="50"/>
+      <use id="rect2" href="#blah" x="200" y="50"/>
+      <rect id="rect3" x="350" y="50" width="100" height="100"/>
+      <rect id="rect4" x="500" y="50" width="100" height="100"/>
+    </g>
+  </svg>
+
+  <script>
+    // Get the <use> elements by their IDs
+    const rect1 = document.getElementById('rect1')
+    const rect2 = document.getElementById('rect2')
+    const rect3 = document.getElementById('rect3')
+    const rect4 = document.getElementById('rect4')
+
+    rect1.classList.add('highlight')
+    rect3.classList.add('highlight')
+  </script>
+</body>
+</html>
