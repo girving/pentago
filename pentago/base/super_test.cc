@@ -226,7 +226,7 @@ TEST(super, meaningless) {
     string s = "static const tuple<board_t,bool> golden[] = {";
     for (const int i : range(20)) {
       const auto board = random_board(random);
-      s += format("{%d,%d}%s", board, meaningless(board), i<19 ? "," : "};");
+      s += tfm::format("{%d,%d}%s", board, meaningless(board), i<19 ? "," : "};");
     }
     slog(s);
   } else {

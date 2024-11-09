@@ -9,7 +9,7 @@ string str(uint128_t n) {
   const auto lo = uint64_t(n),
              hi = uint64_t(n>>64);
   // For now, we lazily produce hexadecimal to avoid having to divide.
-  return hi ? format("0x%x%016x",hi,lo) : format("0x%x",lo);
+  return hi ? tfm::format("0x%x%016x",hi,lo) : tfm::format("0x%x",lo);
 }
 
 }

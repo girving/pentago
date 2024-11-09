@@ -64,8 +64,8 @@ void midsolve_internal_test(const high_board_t board) {
     for (const int s : range(128)) {
       // Assert win implies notlose
       GEODE_ASSERT(pentago::get(rs.notlose, s) >= pentago::get(rs.win, s),
-                   format("slice %d, board %d, s %d, notlose %d, win %d", s,
-                          slice, rboard, pentago::get(rs.notlose, s), pentago::get(rs.win, s)));
+                   tfm::format("slice %d, board %d, s %d, notlose %d, win %d", s,
+                               slice, rboard, pentago::get(rs.notlose, s), pentago::get(rs.win, s)));
     }
     for (const int a : range(2)) {
       const auto exp = [=](const halfsuper_t h) { return rparity ? merge(0,h) : merge(h,0); };
@@ -74,7 +74,7 @@ void midsolve_internal_test(const high_board_t board) {
       for (const int s : range(256))
         if (known[s])
           ASSERT_EQ(correct[s], value(rs, s) >= a);
-      GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known), format("slice %d, board %s, a %d", slice, rboard, a));
+      GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known), tfm::format("slice %d, board %s, a %d", slice, rboard, a));
     }
   }
 }
@@ -336,8 +336,8 @@ TEST(mid, cs0ps) {
             const auto cs0p = make_cs0ps(sets0p, s0p, m++);
             const auto cmask = mask | 1<<i;
             ASSERT_EQ(cmask, subset_mask(csets0p, cs0p))
-              << format("n %d, k %d, s0p %d, mask %d, i %d, m %d, cs0p %d, cmask %d",
-                        n, k, s0p, mask, i, m-1, cs0p, cmask);
+              << tfm::format("n %d, k %d, s0p %d, mask %d, i %d, m %d, cs0p %d, cmask %d",
+                             n, k, s0p, mask, i, m-1, cs0p, cmask);
           }
         }
       }

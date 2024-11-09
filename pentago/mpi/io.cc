@@ -522,7 +522,7 @@ void read_sections_test(const MPI_Comm comm, const string& filename, const parti
       if (!(   blob_range.size()
             && UI(blob_range.lo)  <UI(total_size)
             && UI(blob_range.hi-1)<UI(total_size)))
-        GEODE_ASSERT(false,format("b %d, offset %lld, cs %lld, br %lld %lld",
+        GEODE_ASSERT(false,tfm::format("b %d, offset %lld, cs %lld, br %lld %lld",
           b,blob.offset,blob.compressed_size,blob_range.lo,blob_range.hi));
       for (const int r : range(partition_loop_inverse(total_size,ranks,blob_range.lo),
                                partition_loop_inverse(total_size,ranks,blob_range.hi-1)+1)) {
@@ -546,7 +546,7 @@ void check_directory(const MPI_Comm comm, const string& dir) {
   const auto partition = empty_partition(comm_size(comm),slice);
   const auto store = make_shared<compacting_store_t>(0);
   const auto blocks = make_block_store(partition, rank, samples_per_section, store);
-  write_sections(comm, format("%s/empty.pentago",dir), *blocks, 0);
+  write_sections(comm, tfm::format("%s/empty.pentago",dir), *blocks, 0);
 }
 
 void write_counts(const MPI_Comm comm, const string& filename, const accumulating_block_store_t& blocks) {

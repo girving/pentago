@@ -116,7 +116,7 @@ Array<const high_board_t> high_board_t::moves() const {
 }
 
 string high_board_t::name() const {
-  return format("%d%s", board(), middle() ? "m" : "");
+  return tfm::format("%d%s", board(), middle() ? "m" : "");
 }
 
 ostream& operator<<(ostream& output, const high_board_t board) {

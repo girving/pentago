@@ -40,7 +40,7 @@ void die_helper(const string& msg) __attribute__((noreturn, cold));
 // Print a message and abort
 template<class... Args> static inline void __attribute__((noreturn, cold))
 die(const char* msg, const Args&... args) {
-  die_helper(format(msg, args...));
+  die_helper(tfm::format(msg, args...));
 }
 
 #define GEODE_ASSERT(condition, ...) \
@@ -97,7 +97,7 @@ maybe_throw(const char* fmt, const First& first, const Rest&... rest) {
 #ifdef __wasm__
   maybe_throw<Error>(fmt);  // Throw away arguments for now
 #else
-  maybe_throw<Error>(format(fmt, first, rest...).c_str());
+  maybe_throw<Error>(tfm::format(fmt, first, rest...).c_str());
 #endif
 }
 

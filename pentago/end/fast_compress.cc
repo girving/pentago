@@ -27,8 +27,8 @@ int fast_compress(RawArray<Vector<super_t,2>> uncompressed, RawArray<uint8_t> co
   const size_t input_size = sizeof(Vector<super_t,2>)*uncompressed.size();
   const size_t max_output = 1 + snappy::MaxCompressedLength(input_size);
   GEODE_ASSERT(size_t(compressed.size()) >= max_output,
-               format("fast_compress: compressed.size = %d < 1 + snappy_max_output(%d) = %d",
-                      compressed.size(), input_size, max_output));
+               tfm::format("fast_compress: compressed.size = %d < 1 + snappy_max_output(%d) = %d",
+                           compressed.size(), input_size, max_output));
   size_t output_size;
   compressed[0] = 1; // Set compressed flag
   snappy::RawCompress((const char*)uncompressed.data(),input_size,(char*)compressed.data()+1,&output_size);

@@ -45,7 +45,7 @@ compact_blob_t supertensor_index_t::blob_location(const block_t block) const {
   const auto section = get<0>(block);
   const auto shape = section_blocks(get<0>(block));
   const auto I = Vector<int,4>(get<1>(block));
-  GEODE_ASSERT(valid(shape, I), format("section %s, shape %s, invalid block %s", section, shape, I));
+  GEODE_ASSERT(valid(shape, I), tfm::format("section %s, shape %s, invalid block %s", section, shape, I));
   const uint64_t base = section_offset[check_get(sections->section_id, section)];
   const uint64_t offset = base+sizeof(compact_blob_t)*index(shape, I);
   compact_blob_t b;
@@ -56,8 +56,8 @@ compact_blob_t supertensor_index_t::blob_location(const block_t block) const {
 
 compact_blob_t supertensor_index_t::block_location(RawArray<const uint8_t> blob) {
   compact_blob_t b;
-  GEODE_ASSERT(blob.size() == sizeof(b), format("expected size %d, got size %d, data %s",
-                                                sizeof(b), blob.size(), blob));
+  GEODE_ASSERT(blob.size() == sizeof(b), tfm::format("expected size %d, got size %d, data %s",
+                                                     sizeof(b), blob.size(), blob));
   memcpy(&b,blob.data(),sizeof(b));
   return b;
 }
@@ -87,7 +87,7 @@ void write_supertensor_index(const string& name,
   // Write index
   FILE* file = fopen(name.c_str(),"wb");
   if (!file)
-    throw IOError(format("write_supertensor_index: can't open '%s' for writing",name));
+    throw IOError(tfm::format("write_supertensor_index: can't open '%s' for writing",name));
   fwrite("pentago index      \n",1,20,file);
   fwrite(&slice,sizeof(uint32_t),1,file);
   GEODE_ASSERT(ftell(file)==24);

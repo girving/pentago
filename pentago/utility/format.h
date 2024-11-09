@@ -3,9 +3,4 @@
 
 #ifndef __wasm__
 #include "tinyformat.h"
-namespace pentago {
-
-using tinyformat::format;
-
-}
 #endif

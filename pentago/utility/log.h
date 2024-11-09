@@ -27,7 +27,7 @@ void slog(const string& msg);
 
 // Log a message, using scope-based indentation.  A newline is added.
 template<class... Args> static inline void slog(const char* msg, const Args&... args) {
-  slog(format(msg, args...));
+  slog(tfm::format(msg, args...));
 }
 
 }

@@ -322,11 +322,11 @@ symmetry_t random_symmetry(Random& random) {
 }
 
 ostream& operator<<(ostream& output, symmetry_t s) {
-  return output<<format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
+  return output<<tfm::format("(%d,%d,%d=%d%d%d%d)",s.global>>2,s.global&3,s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
 
 ostream& operator<<(ostream& output, local_symmetry_t s) {
-  return output<<format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
+  return output<<tfm::format("(%d=%d%d%d%d)",s.local,s.local&3,s.local>>2&3,s.local>>4&3,s.local>>6);
 }
 
 }  // namespace pentago

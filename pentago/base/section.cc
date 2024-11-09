@@ -168,14 +168,14 @@ static string show_quadrant_rmins(const quadrant_t quadrant) {
   const auto c = count(quadrant);
   const auto rmin = rotation_minimal_quadrants(c);
   const int ir = rotation_minimal_quadrants_inverse[quadrant];
-  return format("%d%d-%03d-%d%c",c[0],c[1],ir/4,ir&3,ir/4<get<1>(rmin)?"ur"[(ir/4)&1]:'i');
+  return tfm::format("%d%d-%03d-%d%c",c[0],c[1],ir/4,ir&3,ir/4<get<1>(rmin)?"ur"[(ir/4)&1]:'i');
 }
 
 string show_board_rmins(const board_t board) {
-  return format("%s %s\n%s %s",show_quadrant_rmins(quadrant(board,1)),
-                               show_quadrant_rmins(quadrant(board,3)),
-                               show_quadrant_rmins(quadrant(board,0)),
-                               show_quadrant_rmins(quadrant(board,2)));
+  return tfm::format("%s %s\n%s %s",show_quadrant_rmins(quadrant(board,1)),
+                                    show_quadrant_rmins(quadrant(board,3)),
+                                    show_quadrant_rmins(quadrant(board,0)),
+                                    show_quadrant_rmins(quadrant(board,2)));
 }
 
 }

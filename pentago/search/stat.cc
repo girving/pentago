@@ -31,37 +31,37 @@ void clear_stats() {
 
 void print_stats() {
   const auto elapsed = wall_time()-start_time;
-  string s = format("expanded nodes = %d (", total_expanded_nodes);
+  string s = tfm::format("expanded nodes = %d (", total_expanded_nodes);
   int found = 0;
   for (int d=36;d>0;d--)
     if (expanded_nodes[d])
-      s += format("%s%d", found++?" ":"", expanded_nodes[d]);
+      s += tfm::format("%s%d", found++?" ":"", expanded_nodes[d]);
   s += ")";
   if (total_lookups) {
-    s += format(", total lookups = %d", total_lookups);
+    s += tfm::format(", total lookups = %d", total_lookups);
     STAT_DETAIL(
       s += " (";
       int found = 0;
       for (int d=36;d>0;d--)
         if (lookup_detail[d])
-          s += format("%s%d:%d", found++?" ":"", d, lookup_detail[d]);
+          s += tfm::format("%s%d:%d", found++?" ":"", d, lookup_detail[d]);
       s += ")";
     )
   }
   if (successful_lookups) {
-    s += format(", successful lookups = %d", successful_lookups);
+    s += tfm::format(", successful lookups = %d", successful_lookups);
     STAT_DETAIL(
       s += " (";
       int found = 0;
       for (int d=36;d>0;d--)
         if (successful_lookup_detail[d])
-          s += format("%s%d:%d", found++?" ":"", d, successful_lookup_detail[d]);
+          s += tfm::format("%s%d:%d", found++?" ":"", d, successful_lookup_detail[d]);
       s += ")";
     )
   }
-  if (distance_prunes) s += format(", distance prunes = %d", distance_prunes);
-  s += format(", elapsed time = %g s", elapsed.seconds());
-  s += format(", speed = %d nodes/s", uint64_t(total_expanded_nodes/elapsed.seconds()));
+  if (distance_prunes) s += tfm::format(", distance prunes = %d", distance_prunes);
+  s += tfm::format(", elapsed time = %g s", elapsed.seconds());
+  s += tfm::format(", speed = %d nodes/s", uint64_t(total_expanded_nodes/elapsed.seconds()));
   slog(s);
 }
 
