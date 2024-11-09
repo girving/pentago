@@ -10,7 +10,7 @@ namespace pentago {
 using std::abs;
 
 string large(uint64_t x) {
-  const string s = format("%d", x);
+  const string s = tfm::format("%d", x);
   const auto n = s.size();
   string r;
   for (const auto i : range(n)) {

@@ -23,8 +23,8 @@ void toplevel() {
   Random random(183111);
   init_threads(-1, -1);
   for (const int slice : range(19)) {
-    const auto name = format("../all/slice-%d.pentago", slice);
-    const auto index_name = format("slice-%d.pentago.index", slice);
+    const auto name = tfm::format("../all/slice-%d.pentago", slice);
+    const auto index_name = tfm::format("slice-%d.pentago.index", slice);
     const auto readers = open_supertensors(name);
     if (!exists(index_name))
       write_supertensor_index(index_name, readers);

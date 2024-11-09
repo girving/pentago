@@ -24,8 +24,8 @@ void breakpoint() {
 
 void assertion_failed(const char* function, const char* file, unsigned int line,
                       const char* condition, const char* message) {
-  const string error = format("%s:%d:%s: %s, condition = %s", file, line, function,
-                              message ? message : "Assertion failed", condition);
+  const string error = tfm::format("%s:%d:%s: %s, condition = %s", file, line, function,
+                                   message ? message : "Assertion failed", condition);
   static const bool break_on_assert = getenv("GEODE_BREAK_ON_ASSERT") != 0;
   if (break_on_assert) {
     std::cout << std::flush;
@@ -59,7 +59,7 @@ template<class Error> void __attribute__ ((noreturn)) maybe_throw() {
 
 template<class Error> void __attribute__ ((noreturn)) maybe_throw(const char* msg) {
   if (throw_callback)
-    throw_callback(format("%s: %s",error_name_t<Error>::name,msg));
+    throw_callback(tfm::format("%s: %s",error_name_t<Error>::name,msg));
   else
     throw Error(msg);
 }

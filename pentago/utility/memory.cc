@@ -35,7 +35,7 @@ void report_large_alloc(ssize_t change) {
     }
   }
   if (show)
-    cout << format("(peak %.1fG)\n",show*10/(1<<30)*.1);
+    cout << tfm::format("(peak %.1fG)\n",show*10/(1<<30)*.1);
 }
 
 // Returns (total,peak)
@@ -72,7 +72,8 @@ string memory_report(RawArray<const uint64_t> info) {
   if (!info.size())
     return "failed to parse /proc/self/statm";
   GEODE_ASSERT(info.size()==7);
-  return format("virtual %s, resident %s, share %s, text %s, peak known %s, known %s, data %s",large(info[0]),large(info[1]),large(info[2]),large(info[3]),large(info[4]),large(info[5]),large(info[6]));
+  return tfm::format("virtual %s, resident %s, share %s, text %s, peak known %s, known %s, data %s",
+                     large(info[0]),large(info[1]),large(info[2]),large(info[3]),large(info[4]),large(info[5]),large(info[6]));
 }
 
 #elif defined(__APPLE__)
@@ -96,7 +97,8 @@ string memory_report(RawArray<const uint64_t> info) {
   if (!info.size())
     return "failed";
   GEODE_ASSERT(info.size()==5);
-  return format("virtual %s, peak %s, peak known %s, known %s, resident %s",large(info[0]),large(info[1]),large(info[2]),large(info[3]),large(info[4]));
+  return tfm::format("virtual %s, peak %s, peak known %s, known %s, resident %s",
+                     large(info[0]),large(info[1]),large(info[2]),large(info[3]),large(info[4]));
 }
 
 #else

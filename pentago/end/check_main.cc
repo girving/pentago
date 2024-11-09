@@ -92,7 +92,7 @@ void toplevel(int argc, char** argv) {
   init_threads(-1, -1);
   slog("dirs = %s", join(" ", o.dirs));
   for (const auto& dir : o.dirs) {
-    Scope scope(format("dir %s", dir));
+    Scope scope(tfm::format("dir %s", dir));
 
     // Check whether the data is meaningless
     int meaningless = 0;
@@ -105,7 +105,7 @@ void toplevel(int argc, char** argv) {
 
     if (o.reader_test >= 0) {
       // Load given slice and treat as ground truth
-      const auto cache_file = format("%s/slice-%d.pentago", dir, o.reader_test);
+      const auto cache_file = tfm::format("%s/slice-%d.pentago", dir, o.reader_test);
       slog("loading reader test data from %s", cache_file);
       const auto cache = reader_block_cache(open_supertensors(cache_file), 1<<30);
       set_block_cache(cache);
@@ -151,11 +151,11 @@ void toplevel(int argc, char** argv) {
           slog("sha1sum %s = %s", file, h2);
           const auto h = hs[pad_io];
           if (h != h2)
-            throw ValueError(format("%s: expected sha1sum %s, got %s", file, h, h2));
+            throw ValueError(tfm::format("%s: expected sha1sum %s, got %s", file, h, h2));
           return;
         }
       }
-      throw ValueError(format("don't know correct sha1sum for %s", file));
+      throw ValueError(tfm::format("don't know correct sha1sum for %s", file));
     };
 
     // Prepare to read data for high level test if necessary
@@ -173,17 +173,17 @@ void toplevel(int argc, char** argv) {
     unordered_set<string> unchecked;
     for (const auto& f : listdir(dir))
       if (!regex_match(f, skip_pattern))
-        unchecked.insert(format("%s/%s", dir, f));
+        unchecked.insert(tfm::format("%s/%s", dir, f));
     Random random(8183131);
     init_supertable(16);
     for (int slice = 35; slice >= 0; slice--) {
-      const auto empty_file = format("%s/empty.pentago", dir);
-      const auto counts_file = format("%s/counts-%d.npy", dir, slice);
-      const auto sparse_file = format("%s/sparse-%d.npy", dir, slice);
-      const auto slice_file = format("%s/slice-%d.pentago", dir, slice);
-      const auto restart_file = format("%s/slice-%d-restart.pentago", dir, slice);
+      const auto empty_file = tfm::format("%s/empty.pentago", dir);
+      const auto counts_file = tfm::format("%s/counts-%d.npy", dir, slice);
+      const auto sparse_file = tfm::format("%s/sparse-%d.npy", dir, slice);
+      const auto slice_file = tfm::format("%s/slice-%d.pentago", dir, slice);
+      const auto restart_file = tfm::format("%s/slice-%d-restart.pentago", dir, slice);
       if (exists(counts_file)) {
-        Scope scope(format("check slice %d", slice));
+        Scope scope(tfm::format("check slice %d", slice));
 
         // Read sparse samples
         const auto samples = read_numpy<uint64_t,9>(sparse_file);
@@ -209,7 +209,7 @@ void toplevel(int argc, char** argv) {
         {
           string s = "sections =";
           for (const auto& section : sections)
-            s += format(" %s", section);
+            s += tfm::format(" %s", section);
           slog(s);
         }
         unchecked.erase(counts_file);
@@ -253,7 +253,7 @@ void toplevel(int argc, char** argv) {
               const auto count = counts[i];
               GEODE_ASSERT(reader->header.section == section);
               const auto old_reader = meaningless || o.old.empty() ? nullptr :
-                  make_shared<supertensor_reader_t>(format("%s/section-%s.pentago", o.old, section));
+                  make_shared<supertensor_reader_t>(tfm::format("%s/section-%s.pentago", o.old, section));
               const auto [count2, samples_found] = compare_readers_and_samples(
                   *reader, old_reader, sample_boards, sample_wins);
               GEODE_ASSERT(count == count2);

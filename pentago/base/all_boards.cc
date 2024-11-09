@@ -248,7 +248,7 @@ uint64_t all_boards_stats(const int n, const int symmetries) {
   const double inv_exact = exact ? 1./exact : 0;
   slog("%s, simple count = %18s, ratio = %5.3f (unreduced %5.3f), sections = %6d (unreduced %6d), "
        "blocks = %10lld %10lld, lines = %9lld %9lld, max section = %14s, mean = %.4g",
-    n < 0 ? "   all" : format("n = %2d",n),
+    n < 0 ? "   all" : tfm::format("n = %2d",n),
     large(reduced_total), inv_exact*reduced_total, inv_exact*total, reduced_sections, sections.size(),
     blocks.min, blocks.max, lines.min, lines.max, large(max_section),
     reduced_sections ? (double)reduced_total/reduced_sections : 0);

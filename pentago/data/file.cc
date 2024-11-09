@@ -20,7 +20,7 @@ bool exists(const string& path) {
 vector<string> listdir(const string& path) {
   DIR* dir = opendir(path.c_str());
   if (!dir)
-    throw IOError(format("can't list directory '%s': %s", path, strerror(errno)));
+    throw IOError(tfm::format("can't list directory '%s': %s", path, strerror(errno)));
   vector<string> paths;
   while (const dirent* d = readdir(dir))
     paths.push_back(d->d_name);
@@ -69,8 +69,8 @@ public:
     const auto r = ::pread(fd, data.data(), data.size(), offset);
     if (r < data.size())
       return r < 0 ? strerror(errno)
-                   : format("incomplete read of [%d,%d): got %d < %d",
-                            offset, offset+data.size(), r, data.size());
+                   : tfm::format("incomplete read of [%d,%d): got %d < %d",
+                                 offset, offset+data.size(), r, data.size());
     return "";
   }
 };
@@ -93,7 +93,7 @@ public:
   string pread(RawArray<uint8_t> data, const uint64_t offset) const {
     const auto data_ = pread_(offset,data.size());
     if (data_.size() < data.size())
-      return format("incomplete read: got %d < %d", data_.size(), data.size());
+      return tfm::format("incomplete read: got %d < %d", data_.size(), data.size());
     GEODE_ASSERT(data_.size()==data.size());
     data.copy(data_);
     return "";
@@ -117,7 +117,7 @@ public:
   string pwrite(RawArray<const uint8_t> data, const uint64_t offset) {
     const auto w = ::pwrite(fd,data.data(),data.size(),offset);
     if (w<data.size())
-      return w<0 ? strerror(errno) : format("incomplete write: wrote %d < %d", w, data.size());
+      return w<0 ? strerror(errno) : tfm::format("incomplete write: wrote %d < %d", w, data.size());
     return "";
   }
 };

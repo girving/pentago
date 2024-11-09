@@ -31,7 +31,7 @@ options_t parse_options(int argc, char** argv, const int ranks = -1, const int r
 
 // Signal an option parsing error
 #define PENTAGO_OPTION_ERROR(...) \
-  die_helper(rank ? "" : format("%s: %s", argv[0], format(__VA_ARGS__)))
+  die_helper(rank ? "" : tfm::format("%s: %s", argv[0], tfm::format(__VA_ARGS__)))
 
 // Macro for parsing integer arguments with getopt_long
 #define PENTAGO_INT_ARG(short_opt, long_opt, var) \

@@ -19,9 +19,9 @@ static void remove_dir(const string& path) {
 }
 
 tempdir_t::tempdir_t(const string& name) {
-  string path = format("/tmp/%s.XXXXXX", name); 
+  string path = tfm::format("/tmp/%s.XXXXXX", name); 
   if (!mkdtemp(path.data()))
-    throw OSError(format("mkdtemp(%s) failed: %s", path, strerror(errno)));
+    throw OSError(tfm::format("mkdtemp(%s) failed: %s", path, strerror(errno)));
   const_cast_(this->path) = path;
 }
 

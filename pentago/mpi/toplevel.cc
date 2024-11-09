@@ -66,7 +66,7 @@ static void report_mpi_times(const MPI_Comm comm, const options_t& o, const thre
     if (!rank) {
       Scope scope("per rank times");
       for (int r=0;r<ranks;r++)
-        report_thread_times(all_times[r],format("%d",r));
+        report_thread_times(all_times[r],tfm::format("%d",r));
     }
   }
   const auto times = local.times.copy();
@@ -117,7 +117,7 @@ make_random_partition(const uint128_t key, const int ranks,
 static void write_meaningless(const MPI_Comm comm, const string& dir, const int meaningless) {
   if (meaningless && !comm_rank(comm)) {
     // touch meaningless-<n>
-    const auto name = format("%s/meaningless-%d", dir, meaningless);
+    const auto name = tfm::format("%s/meaningless-%d", dir, meaningless);
     FILE* file = fopen(name.c_str(), "wb");
     if (!file)
       die("failed to touch '%s': %s", name, strerror(errno));
@@ -164,7 +164,7 @@ int toplevel(int argc, char** argv) {
   if (rank)
     suppress_log();
   if (!rank || o.log_all)
-    copy_log_to_file(o.log_all ? format("%s/log-%d", o.dir, rank) : format("%s/log", o.dir));
+    copy_log_to_file(o.log_all ? tfm::format("%s/log-%d", o.dir, rank) : tfm::format("%s/log", o.dir));
   Scope scope("endgame");
   report(comm, "mpi");
 
@@ -195,18 +195,18 @@ int toplevel(int argc, char** argv) {
       const auto sections = make_shared<sections_t>(slice, all_boards_sections(slice,8));
       const auto partition = partition_factory(ranks, sections);
       const auto store = make_shared<compacting_store_t>(estimate_block_heap_size(*partition, rank));
-      const auto sections_file = format("%s/slice-%d.pentago", o.dir, slice);
+      const auto sections_file = tfm::format("%s/slice-%d.pentago", o.dir, slice);
       {
         const auto blocks = meaningless_block_store(partition, rank, o.samples, store);
         Scope scope("write");
-        write_counts(comm, format("%s/counts-%d.npy", o.dir, slice), *blocks);
-        write_sparse_samples(comm, format("%s/sparse-%d.npy", o.dir, slice), *blocks);
+        write_counts(comm, tfm::format("%s/counts-%d.npy", o.dir, slice), *blocks);
+        write_sparse_samples(comm, tfm::format("%s/sparse-%d.npy", o.dir, slice), *blocks);
         write_sections(comm, sections_file, *blocks, o.level);
       } {
         Scope scope("restart");
         const auto restart = read_sections(comm, sections_file, store, partition_factory);
         Scope write_scope("write");
-        write_sections(comm, format("%s/slice-%d-restart.pentago", o.dir, slice), *restart, o.level);
+        write_sections(comm, tfm::format("%s/slice-%d-restart.pentago", o.dir, slice), *restart, o.level);
       }
     } else if (o.test == "restart") {
       read_sections_test(comm, o.restart, partition_factory);
@@ -336,7 +336,7 @@ int toplevel(int argc, char** argv) {
     for (int slice=first_slice;slice>=o.stop_after;slice--) {
       if (!slices[slice]->sections.size())
         break;
-      Scope scope(format("slice %d",slice));
+      Scope scope(tfm::format("slice %d",slice));
       const auto start = wall_time();
 
       // Partition work among processors
@@ -407,10 +407,10 @@ int toplevel(int argc, char** argv) {
       // Write various information to disk
       {
         Scope scope("write");
-        write_counts(comm, format("%s/counts-%d.npy", o.dir, slice), *blocks);
-        write_sparse_samples(comm, format("%s/sparse-%d.npy", o.dir, slice), *blocks);
+        write_counts(comm, tfm::format("%s/counts-%d.npy", o.dir, slice), *blocks);
+        write_sparse_samples(comm, tfm::format("%s/sparse-%d.npy", o.dir, slice), *blocks);
         if (slice <= o.save)
-          write_sections(comm, format("%s/slice-%d.pentago", o.dir, slice), *blocks, o.level);
+          write_sections(comm, tfm::format("%s/slice-%d.pentago", o.dir, slice), *blocks, o.level);
       }
 
       // Dump timing
@@ -424,7 +424,7 @@ int toplevel(int argc, char** argv) {
   report_mpi_times(comm, o, total_thread_times(), total_elapsed, total_local_outputs,
                    total_local_inputs);
   report(comm, "final");
-  write_thread_history(format("%s/history-r%d", o.dir, rank));
+  write_thread_history(tfm::format("%s/history-r%d", o.dir, rank));
   return 0;
 }
 

@@ -113,7 +113,7 @@ string sha1(RawArray<const uint8_t> data) {
   }
 
   /* Format digest */
-  return format("%08x%08x%08x%08x%08x", H[0], H[1], H[2], H[3], H[4]);
+  return tfm::format("%08x%08x%08x%08x%08x", H[0], H[1], H[2], H[3], H[4]);
 }
 
 }  // namespace pentago

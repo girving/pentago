@@ -17,13 +17,13 @@ string start_tag(const string& name, const vector<tuple<string,string>>& attrs, 
   string tag = "<" + name;
   for (const auto& [k,v] : attrs)
     if (v.size())
-      tag += format(" %s=\"%s\"", k, v);
+      tag += tfm::format(" %s=\"%s\"", k, v);
   tag += close ? "/>" : ">";
   return tag;
 }
 
 string close_tag(const string& name) {
-  return format("</%s>", name); 
+  return tfm::format("</%s>", name); 
 }
 
 string tag(const string& name, const vector<tuple<string,string>>& attrs, const string& body = "") {
@@ -33,7 +33,7 @@ string tag(const string& name, const vector<tuple<string,string>>& attrs, const 
 }
 
 string svg(const int width, const int height, const string& body) {
-  return tag("svg", {{"viewBox", format("0 0 %d %d", width, height)},
+  return tag("svg", {{"viewBox", tfm::format("0 0 %d %d", width, height)},
                      {"xmlns", "http://www.w3.org/2000/svg"}}, body);
 }
 
@@ -52,30 +52,30 @@ void counts() {
   const auto lines = [=](const vector<TV>& Xs, const string& style, const string& marker = "") {
     GEODE_ASSERT(Xs.size());
     IV prev = snap(Xs[0]);
-    string path = format("M%d %d", prev[0], prev[1]);
+    string path = tfm::format("M%d %d", prev[0], prev[1]);
     for (const TV X : asarray(Xs).slice(1, Xs.size())) {
       const IV next = snap(X);
       const IV diff = next - prev;
-      path += !diff[1] ? format("h%d", diff[0])
-            : !diff[0] ? format("v%d", diff[1])
-                       : format("l%d %d", diff[0], diff[1]);
+      path += !diff[1] ? tfm::format("h%d", diff[0])
+            : !diff[0] ? tfm::format("v%d", diff[1])
+                       : tfm::format("l%d %d", diff[0], diff[1]);
       prev = next;
     }
     vector<tuple<string,string>> attrs = {{"d", path}, {"style", style}};
     if (marker.size())
       for (const string& m : {"marker-start", "marker-mid", "marker-end"})
-        attrs.emplace_back(m, format("url(#%s)", marker));
+        attrs.emplace_back(m, tfm::format("url(#%s)", marker));
     return sep + tag("path", attrs);
   };
 
   // Markers
   const auto marker = [=](const string& name, const int size, const string& element) {
-    const auto s = format("%d", size);
+    const auto s = tfm::format("%d", size);
     return sep + tag("marker", {{"id", name}, {"viewBox", "0 0 10 10"}, {"refX", "5"}, {"refY", "5"},
                                 {"markerWidth", s}, {"markerHeight", s}}, element);
   };
   const auto circles = [=](const string& name, const string& color) {
-    return marker(name, 8, format(R"(<circle cx="5" cy="5" r="4" fill="%s"/>)", color));
+    return marker(name, 8, tfm::format(R"(<circle cx="5" cy="5" r="4" fill="%s"/>)", color));
   };
 
   // Scoped tags
@@ -90,12 +90,12 @@ void counts() {
   // Move (0,0) to the desired coordinates
   const auto translate = [=](const TV X) {
     const IV I = snap(X);
-    return format("translate(%d,%d)", I[0], I[1]);
+    return tfm::format("translate(%d,%d)", I[0], I[1]);
   };
 
   // Rotate by degrees
   const auto degrees = [=](const int degrees) {
-    return format("rotate(%d)", degrees);
+    return tfm::format("rotate(%d)", degrees);
   };
 
   // Text
@@ -103,7 +103,7 @@ void counts() {
     vector<tuple<string,string>> attrs;
     for (const int d : range(2))
       if (I[d])
-        attrs.emplace_back(d ? "y" : "x", format("%d", I[d]));
+        attrs.emplace_back(d ? "y" : "x", tfm::format("%d", I[d]));
     attrs.emplace_back("style", style);
     return sep + tag("text", attrs, text);
   };
@@ -127,8 +127,8 @@ void counts() {
   body += sep + tag("defs", {},
     circles("bl", blue) +
     circles("gr", green) +
-    marker("xtick", 8, format(R"(<path d="M5 5v-7" style="%s"/>)", tick)) +
-    marker("ytick", 8, format(R"(<path d="M5 5h7" style="%s"/>)", tick))
+    marker("xtick", 8, tfm::format(R"(<path d="M5 5v-7" style="%s"/>)", tick)) +
+    marker("ytick", 8, tfm::format(R"(<path d="M5 5h7" style="%s"/>)", tick))
   );
 
   // Axes
@@ -140,18 +140,18 @@ void counts() {
       for (int y = 15; y >= 0; y--)
         Xs.emplace_back(0, y);
       body += lines(Xs, "stroke:#000000", "ytick");
-      Scope left(body, "g", {{"transform", format("translate(%d,0)", snap_x(-.85))}});
+      Scope left(body, "g", {{"transform", tfm::format("translate(%d,0)", snap_x(-.85))}});
       for (const int y : range(15+1))
-        body += text(IV(0, snap_y(y-.17)), format(R"(10<tspan>%d</tspan>)", y));
+        body += text(IV(0, snap_y(y-.17)), tfm::format(R"(10<tspan>%d</tspan>)", y));
     } {
       // x-axis
       vector<TV> Xs;
       for (const int x : range(36+1))
         Xs.emplace_back(x, 0);
       body += lines(Xs, ";stroke:#000000", "xtick");
-      Scope left(body, "g", {{"transform", format("translate(0,%d)", snap_y(-.77))}});
+      Scope left(body, "g", {{"transform", tfm::format("translate(0,%d)", snap_y(-.77))}});
       for (const int x : range(36+1))
-        body += text(IV(snap_x(x), 0), format("%d", x));
+        body += text(IV(snap_x(x), 0), tfm::format("%d", x));
     }
   }
 

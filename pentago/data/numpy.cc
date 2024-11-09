@@ -30,7 +30,7 @@ static tuple<int,char> dtype_info(const int dtype) {
     CASE(double,             NPY_DOUBLE,     'f')
     CASE(long double,        NPY_LONGDOUBLE, 'f')
     #undef CASE
-    default: throw ValueError(format("Unknown dtype %d", dtype));
+    default: throw ValueError(tfm::format("Unknown dtype %d", dtype));
   }
   return make_tuple(bytes, letter);
 }
@@ -40,9 +40,9 @@ static const char endian = std::endian::native == std::endian::little ? '<' : '>
 tuple<string,size_t> numpy_header(RawArray<const int> shape, const int dtype) {
   const auto [bytes, letter] = dtype_info(dtype);
   string header("\x93NUMPY\x01\x00??", 10);
-  header += format("{'descr': '%c%c%d', 'fortran_order': False, 'shape': (", endian, letter, bytes);
+  header += tfm::format("{'descr': '%c%c%d', 'fortran_order': False, 'shape': (", endian, letter, bytes);
   for (const int n : shape)
-    header += format("%d,", n);
+    header += tfm::format("%d,", n);
   header += "), }";
   while ((header.size()+1) & 15)
     header.push_back(' ');
@@ -60,7 +60,7 @@ Array<const uint8_t> read_numpy_helper(const string& path, const int d, const in
   const std::regex pattern(R"(^\x93NUMPY\x01\x00(..)\{'descr': '([<>])(.)(\d+)', 'fortran_order': (\w+), 'shape': \((\d+),\s*(\d+),\), \})");
   std::smatch m;
   if (!regex_search(header, m, pattern))
-    throw ValueError(format("'%s' has an invalid header for a rank 2 .npy file", path));
+    throw ValueError(tfm::format("'%s' has an invalid header for a rank 2 .npy file", path));
   const uint16_t header_size = little_to_native_endian(
       *reinterpret_cast<const uint16_t*>(m[1].str().data()));
   const char got_endian = m[2].str()[0];
@@ -70,22 +70,22 @@ Array<const uint8_t> read_numpy_helper(const string& path, const int d, const in
   const string shape0 = m[6].str();
   const string shape1 = m[7].str();
   if (endian != got_endian)
-    throw NotImplementedError(format("'%s' has endian %c, but native endian is %c",
-                                     path, got_endian, endian));
+    throw NotImplementedError(tfm::format("'%s' has endian %c, but native endian is %c",
+                                          path, got_endian, endian));
   if (letter != got_letter || str(bytes) != got_bytes)
-    throw ValueError(format("'%s' has type %c%s; we wanted type %c%d",
-                            path, got_letter, got_bytes, letter, bytes));
+    throw ValueError(tfm::format("'%s' has type %c%s; we wanted type %c%d",
+                                 path, got_letter, got_bytes, letter, bytes));
   if (fortran_order != "False")
-    throw NotImplementedError(format("'%s': fortran order %s not implemented", path, fortran_order));
+    throw NotImplementedError(tfm::format("'%s': fortran order %s not implemented", path, fortran_order));
   if (shape1 != str(d))
-    throw ValueError(format("'%s' has shape[1] = %s, expected %d", path, shape1, d));
+    throw ValueError(tfm::format("'%s' has shape[1] = %s, expected %d", path, shape1, d));
   char* end;
   const auto len = strtol(shape0.c_str(), &end, 0);
   if (*end || len < 0)
-    throw ValueError(format("'%s' has invalid shape[0] = %s", path, shape0));
+    throw ValueError(tfm::format("'%s' has invalid shape[0] = %s", path, shape0));
   const int expected_size = CHECK_CAST_INT(uint64_t(10) + header_size + len * d * bytes);
   if (data.size() != expected_size)
-    throw ValueError(format("'%s' has size %d, expected %d", data.size(), expected_size));
+    throw ValueError(tfm::format("'%s' has size %d, expected %d", data.size(), expected_size));
   return data.slice_own(10 + header_size, data.size());
 }
 
