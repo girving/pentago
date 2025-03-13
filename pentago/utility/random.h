@@ -6,6 +6,9 @@
 #include "pentago/utility/threefry.h"
 namespace pentago {
 
+using std::enable_if_t;
+using std::is_floating_point_v;
+using std::is_integral_v;
 using std::swap;
 
 class Random {
@@ -35,11 +38,16 @@ public:
     return uniform(I(0), n);
   }
 
-  template<class I> I uniform(const I a, const I b) {  // in [a,b)
-    static_assert(std::is_integral<I>::value);
+  // Integer version for [a,b)
+  template<class I> enable_if_t<is_integral_v<I>,I> uniform(const I a, const I b) {
     static_assert(sizeof(I) <= 8, "uint128_t values would require rejection sampling");
     typedef std::make_unsigned_t<I> UI;
     return a + I(bits<UI>() % UI(b - a));
+  }
+  
+  // Floating point version for [a,b)
+  template<class F> enable_if_t<is_floating_point_v<F>,F> uniform(const F a, const F b) {
+    return a + uniform<F>() * (b - a);
   }
 
   template<class I,int d> Vector<I,d> uniform(const Vector<I,d>& min, const Vector<I,d>& max) {
