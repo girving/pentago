@@ -57,7 +57,7 @@ Array<const uint8_t> read_numpy_helper(const string& path, const int d, const in
   const auto [bytes, letter] = dtype_info(dtype);
   const auto data = mmap_file(path);
   const string header(data.data(), data.data() + min(1023, data.size()));
-  const std::regex pattern(R"(^\x93NUMPY\x01\x00(..)\{'descr': '([<>])(.)(\d+)', 'fortran_order': (\w+), 'shape': \((\d+),\s*(\d+),\), \})");
+  const std::regex pattern(R"(^\x93NUMPY\x01\x00(..)\{'descr': '([<>])(.)(\d+)', 'fortran_order': (\w+), 'shape': \((\d+),\s*(\d+),?\), \})");
   std::smatch m;
   if (!regex_search(header, m, pattern))
     throw ValueError(tfm::format("'%s' has an invalid header for a rank 2 .npy file", path));
