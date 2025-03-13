@@ -121,7 +121,7 @@ fewer positions.  Pentago is divergent: the number of positions increases expone
 all the way to ply 24, but the total number of positions is only $3 \times 10^{15}$.
 
 Unfortunately, the computation required 80 TB of memory at peak.  Since the arithmetic
-intensity of computing pentago positions is fairly low, shuffling all of this data in
+intensity of computing pentago positions is low, shuffling all of this data in
 and out of disks would have destroyed performance.  Therefore, the endgame solver was
 implemented in-core, parallelized using MPI for use on a supercomputer.
 Like the final forward solver, the endgame solver takes advantage of symmetry
@@ -176,7 +176,7 @@ The code is organized into the following directories:
 * `web/server`: <a href="https://nodejs.org">node.js</a> lookup server for access to the 3.7 TB database
 * `web/client`: <a href="https://svelte.dev">svelte</a> + <a href="https://webassembly.org">wasm</a> client
 
-Most files have summarizing comments at the top, but otherwise documentation is fairly scant.
+Most files have summarizing comments at the top, but otherwise documentation is scant.
 Email me if you have questions at <irving@naml.us>!
 
 ### Data
