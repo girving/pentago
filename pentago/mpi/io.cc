@@ -606,7 +606,7 @@ static inline void semiswap(Vector<super_t,2>& s) {
 void write_sparse_samples(const MPI_Comm comm, const string& filename, accumulating_block_store_t& blocks) {
   thread_time_t time(write_sparse_kind,unevent);
   const int rank = comm_rank(comm);
-  const bool turn = blocks.sections->slice&1;
+  const bool turn = blocks.sections->slice & 1;
 
   // Mangle samples into correct output format in place
   typedef accumulating_block_store_t::sample_t sample_t;
