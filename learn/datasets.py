@@ -42,7 +42,7 @@ class SuperData:
     assert data.shape == (len(data), 9, 2)
     self._data = jnp.asarray(data)
 
-    @partial(jax.jit, static_argnums=1)
+    @partial(jax.jit, static_argnums=1, device=jax.devices('cpu')[0])  # CPU-only to dodge a Metal bug
     def epoch(e, batch):
       # Shuffle differently per epoch
       key = jax.random.PRNGKey(17)
@@ -107,4 +107,5 @@ def dataset_correctness_test(dataset, *, correct, steps, batch):
         assert np.all(boards.Board.parse(str(board)).quad_grid == quads)
         yield board, value
   correctness_test(gen(), correct=correct)
-  assert len(correct) == steps * batch
+  if correct is not None:
+    assert len(correct) == steps * batch

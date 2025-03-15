@@ -163,7 +163,8 @@ class SupertensorIndex:
 
 class Supertensors:
   def __init__(self, *, index_path, super_path, max_slice):
-    self.sections = sections = descendent_sections(max_slice)
+    with jax.default_device(jax.devices('cpu')[0]):  # Dodge a Metal bug
+      self.sections = sections = descendent_sections(max_slice)
     self._indices = tuple(SupertensorIndex(s) for s in sections)
     self._file = cache(lambda path: open(path, 'rb'))
     self._index = lambda n: f'{index_path}/slice-{n}.pentago.index'
@@ -182,7 +183,7 @@ class Supertensors:
   @scoped
   async def read_block(self, section, I, *, client=None):
     assert section.shape == (4,2)
-    n = np.asscalar(section_sum(section))
+    n = section_sum(section)
     index = self._indices[n]
     with scope('read'):
       blob = await self._read(self._index(n), **index.blob_location(section, I), client=client)

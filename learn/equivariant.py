@@ -61,38 +61,43 @@ class Embed(hk.Module):
 
 
 def fourier(s, *, axis, scale=0.5):
-  """Size 4 Fourier transform"""
+  """Size 4 Fourier transform, returning the complex middle result as a tuple"""
   assert s.dtype == np.float32
   s0, s1, s2, s3 = scale * jnp.moveaxis(s, axis, 0)
   s02 = s0 + s2
   s13 = s1 + s3
   t0 = s02 + s13
-  t1 = jax.lax.complex(s0 - s2, s3 - s1)
+  t1 = s0 - s2, s3 - s1
   t2 = s02 - s13
   return t0, t1, t2
 
 
 def unfourier(t, *, axis, scale=0.5):
   """Size 4 inverse Fourier transform"""
-  t0, t1, t2 = t
+  t0, (t1r, t1i), t2 = t
   t0 = scale * t0
   t2 = scale * t2
-  t1 = 2 * scale * t1
+  scale2 = 2 * scale
+  t1r = scale2 * t1r
+  t1i = scale2 * t1i
   s02 = t0 + t2
   s13 = t0 - t2
-  s0 = s02 + t1.real
-  s2 = s02 - t1.real
-  s1 = s13 - t1.imag
-  s3 = s13 + t1.imag
+  s0 = s02 + t1r
+  s2 = s02 - t1r
+  s1 = s13 - t1i
+  s3 = s13 + t1i
   return jnp.stack([s0, s1, s2, s3], axis=axis)
 
 
 def convolve(x, y, *, axis, mul=jnp.matmul):
   """Convolve tensors of shape [a,4,b], [b,4,c] → shape [a,4,c]"""
-  x = fourier(x, axis=axis, scale=1)
-  y = fourier(y, axis=axis, scale=1)
-  z = jax.tree_multimap(mul, x, y)
-  return unfourier(z, axis=axis, scale=0.25)
+  x0, (x1r, x1i), x2 = fourier(x, axis=axis, scale=1)
+  y0, (y1r, y1i), y2 = fourier(y, axis=axis, scale=1)
+  z0 = mul(x0, y0)
+  z1r = mul(x1r, y1r) - mul(x1i, y1i)
+  z1i = mul(x1r, y1i) + mul(x1i, y1r)
+  z2 = mul(x2, y2)
+  return unfourier((z0, (z1r, z1i), z2), axis=axis, scale=0.25)
 
 
 def sws_standardize(w, *, gain, eps=1e-4, scale=1):

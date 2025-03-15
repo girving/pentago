@@ -34,7 +34,7 @@ def logits_fn(quads):
 def train(*,
           logits_fn,
           dataset,
-          batch=64,
+          batch=1024 * 4,
           lr=1e-3,
           slog=print_info,
           log_every=100,
@@ -55,7 +55,7 @@ def train(*,
   # Initialize
   key, key_ = jax.random.split(key)
   params = loss_fn.init(key_, next(dataset.forever(batch=batch)))
-  print(f'params = {sum(p.size for p in jax.tree_leaves(params)):,}')
+  print(f'params = {sum(p.size for p in jax.tree.leaves(params)):,}')
 
   # Optimizer
   opt = optax.adamw(lr)
@@ -65,7 +65,7 @@ def train(*,
   @jax.jit
   def update(params, opt_state, data):
     grads, metrics = jax.grad(lambda p: loss_fn.apply(p, None, data), has_aux=True)(params)
-    updates, opt_state = opt.update(grads, opt_state)
+    updates, opt_state = opt.update(grads, opt_state, params)
     params = optax.apply_updates(params, updates)
     return params, opt_state, metrics
 
@@ -104,7 +104,7 @@ def main():
     slog = print_info
 
   # Train
-  dataset = datasets.SparseData(seed=7, counts=(16,17,18))
+  dataset = datasets.sparse_dataset(counts=(16,17,18))
   train(logits_fn=logits_fn, dataset=dataset, slog=slog)
 
 

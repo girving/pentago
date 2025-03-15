@@ -29,7 +29,7 @@ def block_key(key, section, I):
 
 
 def safe_bernoulli(key, p, *, shape=None):
-  """Bernoulli distribution that's accurate even for p ~ 1e5"""
+  """Bernoulli distribution that's accurate even for p ~ 1e-5"""
   assert key.shape == (2,)
   p = jnp.asarray(p)
   if shape is None:
