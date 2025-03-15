@@ -39,7 +39,7 @@
           <a href="{rotate_link(r)}" on:click={spin(r)}>
             <path class="rotateselect" d="{r.select}"/>
             <path class="rotate{turncolor}" d="{r.path}"/>
-            {#if board.middle && !board.done()}
+            {#if board.middle && !board.done}
               {#await child_value(board.rotate(r.qx, r.qy, r.d)) then v}
                 <path class="rvalue" d="{r.value}" style="fill: {value_colors[-v]}"/>
               {/await}
@@ -58,7 +58,7 @@
             <g transform="translate({s.x%3-1},{s.y%3-1})">
               <a href="{spot_link(s)}">
                 <circle class="{spot_class(spinning[q.q], board.grid[s.s])}" r={spot_radius}/>
-                {#if !(board.middle || board.done() || board.grid[s.s])}
+                {#if !(board.middle || board.done || board.grid[s.s])}
                   {#await child_value(board.place(s.x, s.y)) then v}
                     <circle class="cvalue" r={value_radius} style="fill: {value_colors[v]}"/>
                   {/await}
@@ -87,7 +87,7 @@
     <div id="error">{error}</div>
   {:else if done}
     Game complete<br>
-    {immediate ? (immediate > 0) == board.turn ? 'White wins!' : 'Black wins!' : 'Tie!'}
+    {board.value ? (board.value > 0) == board.turn ? 'White wins!' : 'Black wins!' : 'Tie!'}
   {:else}
     {#await status}
       {#each loading.split('') as c, i}
@@ -123,8 +123,8 @@
     vector-effect: non-scaling-stroke;
   }
   .empty,.emptyblack,.emptywhite { fill: tan }
-  .emptyblack:hover, .emptyblack:hover + .emptyblack { fill: black }
-  .emptywhite:hover, .emptywhite:hover + .emptywhite { fill: white }
+  .emptyblack:hover { fill: black }
+  .emptywhite:hover { fill: white }
   .black { fill: black }
   .white { fill: white }
   .board { fill: tan }
@@ -199,7 +199,7 @@
   import { parse_board } from './board.js'
   import pending from './pending.js'
   import { midsolve } from './mid_async.js'
-  import { get as lru_get, set as lru_set } from './local_lru.js'
+  import { get as cache_get, set as cache_set } from './cache.js'
   import { onMount } from 'svelte'
 
   // Pull in math stuff
@@ -239,13 +239,12 @@
   $: back = history.length > 1 ? '#'+history.slice(0, -1).join(',') : null
 
   // Derived board information
-  let turncolor, spot_class, base, done, immediate, spot_link, rotate_link, loading, status, child_value, turn_label
+  let turncolor, spot_class, base, done, spot_link, rotate_link, loading, status, child_value, turn_label
   $: {
     // Basics
     const b = board
     turncolor = b.turn ? 'white' : 'black'
-    done = b.done()
-    immediate = done ? b.immediate_value() : null
+    done = b.done
     spot_class = (sp, v) => v ? v == 1 ? 'black' : 'white' : 'empty' + (done || b.middle || sp ? '' : turncolor)
     base = '#' + history.join(',') + ','
     spot_link = s => done || b.middle || b.grid[s.s] ? null : base + b.place(s.x, s.y).name
@@ -254,13 +253,13 @@
     // Start asynchronous lookup / local computation as required
     status = ''
     loading = null
-    const has = c => lru_get(c.name) !== undefined
-    if (!b.done() && !(has(b) && b.moves().every(has))) {
+    const has = c => cache_get(c.name) !== null
+    if (!b.done && !(has(b) && b.moves().every(has))) {
       const start = Date.now()
       function absorb(op, values) {
         const elapsed = (Date.now() - start) / 1000
-        for (const [name, value] of Object.entries(values))
-          lru_set(name, value)
+        for (const [raw, value] of Object.entries(values))
+          cache_set(parse_board(raw).name, value)
         return [op + ' ' + board.count + ' stone board', 'elapsed = ' + elapsed + ' s']
       }
       if (board.count <= 17) {  // Look up via server
@@ -282,16 +281,16 @@
 
     // Value promises
     child_value = async child => {
-      if (child.done())
-        return child.immediate_value()
-      const v = lru_get(child.name)
-      if (v !== undefined)
+      if (child.done)
+        return child.value
+      const v = cache_get(child.name)
+      if (v !== null)
         return v
       await status
-      return lru_get(child.name)
+      return cache_get(child.name)
     }
-    turn_label = b.done() ? {'1': 'wins!', '0': 'ties!', '-1': 'loses!'}[b.immediate_value()]
-                          : child_value(b).then(v => ({'1': 'to win', '0': 'to tie', '-1': 'to lose'}[v]))
+    turn_label = b.done ? {'1': 'wins!', '0': 'ties!', '-1': 'loses!'}[b.value]
+                        : child_value(b).then(v => ({'1': 'to win', '0': 'to tie', '-1': 'to lose'}[v]))
   }
 
   // Swivel state (how far we've rotated each quadrant)
@@ -316,7 +315,7 @@
 
   // Fives
   let fives
-  $: fives = board.fives().filter(f => !f.some(([x,y]) => spinning[2*floor(x/3)+floor(y/3)]))
+  $: fives = board.fives.filter(f => !f.some(([x,y]) => spinning[2*floor(x/3)+floor(y/3)]))
 
   // Drawing parameters
   const bar_size = .1

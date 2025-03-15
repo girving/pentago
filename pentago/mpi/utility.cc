@@ -52,7 +52,7 @@ static string str_thread_support(const int support) {
     case MPI_THREAD_FUNNELED: return "funneled";
     case MPI_THREAD_SERIALIZED: return "serialized";
     case MPI_THREAD_MULTIPLE: return "multiple";
-    default: return format("unknown (%d)",support);
+    default: return tfm::format("unknown (%d)",support);
   }
 }
 

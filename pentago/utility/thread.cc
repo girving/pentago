@@ -76,7 +76,7 @@ static void init_papi() {
   const int version = PAPI_library_init(PAPI_VER_CURRENT);
   if (version != PAPI_VER_CURRENT)
     die("PAPI_library_init failed: %s",
-        version>0 ? format("version mismatch: expected %d, got %d",PAPI_VER_CURRENT,version)
+        version>0 ? tfm::format("version mismatch: expected %d, got %d",PAPI_VER_CURRENT,version)
                   : PAPI_strerror(version));
   if (const int r = PAPI_thread_init(pthread_self))
     die("PAPI_thread_init failed: %s",PAPI_strerror(r));
@@ -267,7 +267,7 @@ namespace {
 
 typedef std::unique_lock<std::mutex> lock_t;
 
-class thread_pool_t : private boost::noncopyable {
+class thread_pool_t : private noncopyable_t {
 public:
   const thread_type_t type;
   const int count;
@@ -717,7 +717,7 @@ vector<const char*> time_kind_names() {
   FIELD(cpu_idle)
   FIELD(io_idle)
   for (const int k : range((int)master_missing_kind))
-    GEODE_ASSERT(names[k],format("missing name for kind %d",k));
+    GEODE_ASSERT(names[k],tfm::format("missing name for kind %d",k));
   return names;
 }
 
@@ -748,16 +748,16 @@ void report_papi_counts(RawArray<const papi_t,2> papi) {
 
   // Print times
   {
-    string s = format("%-22s", "papi");
+    string s = tfm::format("%-22s", "papi");
     for (const int p : range(papi_count))
-      s += format(" %14s", papi_event_name(papi_events[p]));
+      s += tfm::format(" %14s", papi_event_name(papi_events[p]));
     slog(s);
   }
   for (const int k : range((int)master_idle_kind))
     if (!papi[k].contains_only(0)) {
-      string s = format("  %-20s", names[k]);
+      string s = tfm::format("  %-20s", names[k]);
       for (const int p : range(papi_count))
-        s += format(" %14lld", papi(k,p));
+        s += tfm::format(" %14lld", papi(k,p));
       slog(s);
     }
 #endif

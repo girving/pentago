@@ -12,6 +12,7 @@
 #include "pentago/utility/curry.h"
 #include "pentago/utility/str.h"
 #include "pentago/utility/endian.h"
+#include <unistd.h>
 namespace pentago {
 
 using std::make_shared;
@@ -97,7 +98,7 @@ void supertensor_header_t::pack(RawArray<uint8_t> buffer) const {
   int next = 0;
   #define FIELD(f) ({ \
     GEODE_ASSERT(next+sizeof(f)<=size_t(header_size)); \
-    const auto le = boost::endian::native_to_little(f); \
+    const auto le = native_to_little_endian(f); \
     memcpy(buffer.data()+next,&le,sizeof(le)); \
     next += sizeof(le); });
   HEADER_FIELDS()
@@ -113,7 +114,7 @@ supertensor_header_t supertensor_header_t::unpack(RawArray<const uint8_t> buffer
     GEODE_ASSERT(next+sizeof(h.f)<=size_t(header_size)); \
     decltype(h.f) le; \
     memcpy(&le,buffer.data()+next,sizeof(le)); \
-    h.f = boost::endian::little_to_native(le); \
+    h.f = little_to_native_endian(le); \
     next += sizeof(le); });
   HEADER_FIELDS()
   #undef FIELD
@@ -401,7 +402,7 @@ open_supertensors(const shared_ptr<const read_file_t>& fd, const thread_type_t i
               path, error);
     }
     for (auto& h : header)
-      h = boost::endian::little_to_native(h);
+      h = little_to_native_endian(h);
     if (header[0] != 3)
       THROW(IOError,"multiple supertensor file \"%s\" has unknown version %d",path,header[0]);
     if (header[1] >= 8239)
@@ -498,7 +499,7 @@ Array<uint8_t> multiple_supertensor_header(
     memcpy(headers.data()+offset, pointer, size); \
     offset += size;
   #define LE_HEADER(value) \
-    value = boost::endian::native_to_little(value); \
+    value = native_to_little_endian(value); \
     HEADER(&value, sizeof(value));
   uint32_t version = 3;
   uint32_t section_count = sections.size();

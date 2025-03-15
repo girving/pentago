@@ -157,7 +157,7 @@ template<bool black> static score_t simple_evaluate_recurse(int depth, side_t si
       string s = black ? "order black =" : "order white =";
       for (int i=0;i<total;i++) {
         int o = black?-order[i]:order[i];
-        s += format(" %d,%d", 6-(o>>16), o&0xffff);
+        s += tfm::format(" %d,%d", 6-(o>>16), o&0xffff);
       }
       slog(s);
     }

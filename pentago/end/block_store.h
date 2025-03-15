@@ -54,15 +54,14 @@ struct block_info_t {
 static_assert(sizeof(block_info_t)==32-8*PENTAGO_MPI_COMPRESS,"");
 
 // A readable block store, not including counts and samples
-class readable_block_store_t : public boost::noncopyable {
+class readable_block_store_t : public noncopyable_t {
 public:
   const shared_ptr<const sections_t> sections;
   const shared_ptr<const block_partition_t> partition;
   const int rank;
   const int total_nodes; // Total number of nodes
   const unordered_map<local_id_t,block_info_t> block_infos; // Local id to info about each block we own
-  const unordered_map<tuple<section_t,Vector<uint8_t,4>>,local_id_t, // Block to local id
-                      boost::hash<tuple<section_t,Vector<uint8_t,4>>>> block_to_local_id;
+  const unordered_map<tuple<section_t,Vector<uint8_t,4>>,local_id_t> block_to_local_id;  // Block to local id
   const int required_contributions;
   compacting_store_t::group_t store; // Underlying data storage
 

@@ -14,8 +14,11 @@
 #include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/sqr.h"
+#include <cmath>
 namespace pentago {
 
+using std::ceil;
+using std::floor;
 using std::get;
 using std::max;
 using std::min;

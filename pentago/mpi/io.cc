@@ -78,10 +78,10 @@ static void filter_and_compress_and_store(Array<uint8_t>* dst, RawArray<const Ve
 #endif
     if (!turn)
       for (int i=0;i<data.size();i++)
-        filtered[i] = boost::endian::native_to_little(interleave_super(vec(data[i][0],~data[i][1])));
+        filtered[i] = native_to_little_endian(interleave_super(vec(data[i][0],~data[i][1])));
     else
       for (int i=0;i<data.size();i++)
-        filtered[i] = boost::endian::native_to_little(interleave_super(vec(~data[i][1],data[i][0])));
+        filtered[i] = native_to_little_endian(interleave_super(vec(~data[i][1],data[i][0])));
   }
   // Compress
   *dst = compress(char_view(filtered),level,event);
@@ -475,7 +475,7 @@ shared_ptr<const readable_block_store_t> read_sections(
         for (const int i : range(unfiltered.size())) {
           Vector<super_t,2> s;
           memcpy(&s,&filtered[sizeof(s)*i],sizeof(s));
-          s = uninterleave_super(boost::endian::little_to_native(s));
+          s = uninterleave_super(little_to_native_endian(s));
           unfiltered[i] = !turn ? vec(s[0],~s[1]) : vec(s[1],~s[0]);
         }
         blocks->set(local_blocks[b].local_id,unfiltered);
@@ -522,7 +522,7 @@ void read_sections_test(const MPI_Comm comm, const string& filename, const parti
       if (!(   blob_range.size()
             && UI(blob_range.lo)  <UI(total_size)
             && UI(blob_range.hi-1)<UI(total_size)))
-        GEODE_ASSERT(false,format("b %d, offset %lld, cs %lld, br %lld %lld",
+        GEODE_ASSERT(false,tfm::format("b %d, offset %lld, cs %lld, br %lld %lld",
           b,blob.offset,blob.compressed_size,blob_range.lo,blob_range.hi));
       for (const int r : range(partition_loop_inverse(total_size,ranks,blob_range.lo),
                                partition_loop_inverse(total_size,ranks,blob_range.hi-1)+1)) {
@@ -546,7 +546,7 @@ void check_directory(const MPI_Comm comm, const string& dir) {
   const auto partition = empty_partition(comm_size(comm),slice);
   const auto store = make_shared<compacting_store_t>(0);
   const auto blocks = make_block_store(partition, rank, samples_per_section, store);
-  write_sections(comm, format("%s/empty.pentago",dir), *blocks, 0);
+  write_sections(comm, tfm::format("%s/empty.pentago",dir), *blocks, 0);
 }
 
 void write_counts(const MPI_Comm comm, const string& filename, const accumulating_block_store_t& blocks) {
@@ -606,7 +606,7 @@ static inline void semiswap(Vector<super_t,2>& s) {
 void write_sparse_samples(const MPI_Comm comm, const string& filename, accumulating_block_store_t& blocks) {
   thread_time_t time(write_sparse_kind,unevent);
   const int rank = comm_rank(comm);
-  const bool turn = blocks.sections->slice&1;
+  const bool turn = blocks.sections->slice & 1;
 
   // Mangle samples into correct output format in place
   typedef accumulating_block_store_t::sample_t sample_t;

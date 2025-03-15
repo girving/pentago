@@ -15,7 +15,7 @@ namespace mpi {
 using namespace pentago::end;
 
 // The various communications used by compute_lines, and their associated messages
-struct flow_comms_t : public boost::noncopyable {
+struct flow_comms_t : public noncopyable_t {
   const int rank;
   MPI_Comm barrier_comm; // Barrier synchronization messages passed down to ibarrier_t.  Tag = barrier_tag, no data.
   MPI_Comm request_comm; // Requests for one of our local input blocks.  Tag = request_id, data = int dimensions, int response_tag.

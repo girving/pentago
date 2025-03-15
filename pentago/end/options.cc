@@ -4,10 +4,12 @@
 #include "pentago/end/options.h"
 #include "pentago/utility/log.h"
 #include <getopt.h>
+#include <cmath>
 namespace pentago {
 namespace end {
 
 using std::max;
+using std::pow;
 using namespace pentago::end;
 #define error PENTAGO_OPTION_ERROR
 

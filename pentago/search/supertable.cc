@@ -8,9 +8,11 @@
 #include "pentago/utility/array.h"
 #include "pentago/utility/random.h"
 #include "pentago/utility/log.h"
+#include <cmath>
 namespace pentago {
 
 using std::max;
+using std::pow;
 using std::tie;
 
 static const int hash_bits = 54;

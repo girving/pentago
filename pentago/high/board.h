@@ -17,6 +17,9 @@
 #endif
 NAMESPACE_PENTAGO
 
+// See raw() for format
+typedef uint64_t raw_t;
+
 struct high_board_t {
   high_board_s s;
 
@@ -68,10 +71,13 @@ struct high_board_t {
 
   side_t empty_mask() const { return side_mask ^ s.side_[0] ^ s.side_[1]; }
 
-#if PENTAGO_CPP && !defined(__wasm__)
+  // Conversion to/from other formats
+  board_t board() const;
+  raw_t raw() const { return board() | raw_t(middle()) << 63; }
   static high_board_t from_board(const board_t board, const bool middle);
-  board_t board() const { return pack(s.side_[0], s.side_[1]); }
+  static high_board_t from_raw(const raw_t raw) { return from_board(raw << 1 >> 1, raw >> 63); }
 
+#if PENTAGO_CPP && !defined(__wasm__)
   // Moves which follow this one.  Note that high level moves are "half" of a regular move:
   // there is one move to place a stone and one move to rotate it.
   Array<const high_board_t> moves() const;

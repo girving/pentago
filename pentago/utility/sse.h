@@ -8,20 +8,19 @@
 #endif  // !__wasm__
 #endif  // PENTAGO_CPP
 
-#if defined(__SSE__)
+// Decide whether or not to use SSE
+#if !defined(__SSE__)
+#define PENTAGO_SSE 0
+#else  // defined(__SSE__)
+#define PENTAGO_SSE 1
+
 #include <xmmintrin.h>
 #include <emmintrin.h>
 #include <immintrin.h>
 #include <smmintrin.h>
 
-// Decide whether or not to use SSE
-#if !defined(__SSE__)
-#define PENTAGO_SSE 0
-#else
-#define PENTAGO_SSE 1
 #ifdef PENTAGO_BIG_ENDIAN
 #error "SSE is supported only in little endian mode"
-#endif
 #endif
 
 #if PENTAGO_CPP

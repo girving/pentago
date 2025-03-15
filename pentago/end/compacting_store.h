@@ -30,12 +30,13 @@
 #include "pentago/end/config.h"
 #include "pentago/utility/spinlock.h"
 #include "pentago/utility/array.h"
+#include <functional>
 namespace pentago {
 namespace end {
 
 using std::function;
 
-class compacting_store_t : public boost::noncopyable {
+class compacting_store_t : public noncopyable_t {
 public:
   class lock_t;
 
@@ -80,7 +81,7 @@ public:
 
   // For simplicity, arrays are divided into group, and arrays within each group
   // are numbered from 0 to n-1.  Under the hood, there are at most two groups.
-  class group_t : public boost::noncopyable {
+  class group_t : public noncopyable_t {
     friend class compacting_store_t::lock_t;
     const shared_ptr<compacting_store_t> store;
     int group;
@@ -97,7 +98,7 @@ public:
   };
 
   // Lock access to a given array
-  class lock_t : public boost::noncopyable {
+  class lock_t : public noncopyable_t {
     compacting_store_t& store;
     array_t* array;
   public:

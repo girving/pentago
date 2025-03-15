@@ -138,6 +138,7 @@ static inline uint16_t make_cs1ps(METAL_CONSTANT const info_t& I, METAL_CONSTANT
   const int s1p = index / (I.spots-k0);
   const int j = index - s1p * (I.spots-k0);
   uint16_t c = s1p;
+  WASM_NOUNROLL
   for (int a = 0; a < k1; a++) {
     const int s1p_a = sets1p[s1p]>>5*a&0x1f;
     if (j<s1p_a)
@@ -189,6 +190,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
   {
     const auto free = side_mask & ~side0;
     int next = 0;
+    WASM_NOUNROLL
     for (int i = 0; i < I.spots; i++)
       if (free&side_t(1)<<I.empty.empty[i])
         empty1[next++] = i;
@@ -244,6 +246,7 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
   for (int a = 0; a < k1; a++) {
     for (int q = 0; q < I.spots-k0; q++) {
       uint16_t offset = a ? 0 : s0;
+      WASM_NOUNROLL
       for (int i = empty1[q]-q; i < k0; i++) {
         const int v = set0>>5*i&0x1f;
         if (v>a)
@@ -313,20 +316,20 @@ static inline set1_info_t make_set1_info(METAL_CONSTANT const transposed_t& I, c
 }
 
 #ifdef __METAL_VERSION__
-// iOS has an unfortunate 256 MB buffer size limit, so we need to split workspace into up to four buffers
-constant int chunk_size = (uint64_t(256) << 20) / sizeof(halfsupers_t);
-constant int chunk_bits = 23;
+// iOS has an unfortunate 256 MB buffer size limit, so we need to split workspace into up to two buffers
+constant int chunk_size = (uint64_t(256) << 20) / sizeof(halfsuper_s);
+constant int chunk_bits = 24;
 static_assert(chunk_size == 1 << chunk_bits, "");
 
 struct workspace_t {
-  METAL_DEVICE halfsupers_t* chunks[4];
+  METAL_DEVICE halfsuper_s* chunks[2];
 };
 
 struct io_t {
   workspace_t w;
   int offset, stride;
 
-  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const {
+  METAL_DEVICE halfsuper_s& operator()(const int i, const int j) const {
     const int r = i * stride + j + offset;
     return w.chunks[r >> chunk_bits][r & (chunk_size - 1)];
   }
@@ -338,24 +341,24 @@ io_t slice(const workspace_t w, const grab_t g) {
 
 #else  // !__METAL_VERSION
 
-typedef halfsupers_t* workspace_t;
+typedef halfsuper_s* workspace_t;
 
 struct io_t {
-  METAL_DEVICE halfsupers_t* data;
+  METAL_DEVICE halfsuper_s* data;
   int stride;
 
-  METAL_DEVICE halfsupers_t& operator()(const int i, const int j) const { return data[i * stride + j]; }
+  METAL_DEVICE halfsuper_s& operator()(const int i, const int j) const { return data[i * stride + j]; }
 };
 
-static inline io_t slice(METAL_DEVICE halfsupers_t* workspace, const grab_t g) {
+static inline io_t slice(METAL_DEVICE halfsuper_s* workspace, const grab_t g) {
   return io_t{workspace + g.lo, g.ny};
 }
 #endif  // __METAL_VERSION__
 
 static inline void
 inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, METAL_CONSTANT const set_t* sets1p,
-      METAL_CONSTANT const wins1_t* all_wins1, METAL_DEVICE halfsupers_t* results, const workspace_t workspace,
-      METAL_CONSTANT const set0_info_t& I0, const int s1p) {
+      METAL_CONSTANT const wins1_t* all_wins1, METAL_DEVICE halfsuper_s* results, const workspace_t workspace,
+      METAL_CONSTANT const set0_info_t& I0, const int s1p, const bool aggressive) {
   const auto set1p = sets1p[s1p];
   const auto input = slice(workspace, I.input);
   const auto output = slice(workspace, I.output);
@@ -366,6 +369,9 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   const bool done = spots == n;
   const int k0 = n >> 1;
   const int k1 = n - k0;
+
+  // The aggressive input is for the player to start.  This one is for the player to move.
+  const bool turn_aggressive = aggressive ^ (n & 1);
 
   // Convert indices
   uint32_t filled1p = 0;
@@ -379,9 +385,9 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   }
 
   // Consider each move in turn
-  halfsupers_t us = {{0}, {0}};
-  if (done)
-    us.notlose = ~halfsuper_t(0);
+  halfsuper_t us = {0};
+  if (done && !turn_aggressive)
+    us = ~halfsuper_t(0);
   for (int unmoved = ~filled1p, m = 0; m < spots-n; m++) {
     const int i = pop_bit(unmoved);
     us |= input(I0.child_s0s[i], cs1ps[s1p*(spots-k0)+i]);
@@ -390,15 +396,15 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
   // Account for immediate results
   const auto wins1 = all_wins1[s1];
   const auto inplay = ~(I0.wins0 | wins1.after);
-  us.win = (inplay & us.win) | (I0.wins0 & ~wins1.after);
-  us.notlose = (inplay & us.notlose) | I0.wins0;
+  const auto mask = turn_aggressive ? ~wins1.after : ~halfsuper_t(0);
+  us = (inplay & us) | (I0.wins0 & mask);
 
   // If we're far enough along, remember results
   if (n <= 1)
     results[n + s1p] = us;
 
   // Prepare for the slice above
-  output(s1,s0p) = rmax(~us) | wins1.before;;
+  output(s1,s0p) = rmax(~us) | wins1.before;
 }
 
 END_NAMESPACE_PENTAGO

@@ -33,8 +33,7 @@ using std::unordered_set;
 void partition_test(const partition_t& partition) {
   // Extract all information from partition
   unordered_set<event_t> all_lines;
-  unordered_map<tuple<section_t,Vector<uint8_t,4>>,tuple<int,local_id_t>,
-                boost::hash<tuple<section_t,Vector<uint8_t,4>>>> block_info;
+  unordered_map<tuple<section_t,Vector<uint8_t,4>>,tuple<int,local_id_t>> block_info;
   for (const int rank : range(partition.ranks)) {
     const auto lines = partition.rank_lines(rank);
     ASSERT_EQ(partition.rank_count_lines(rank), uint64_t(lines.size()));
@@ -96,7 +95,7 @@ TEST(end, partition) {
   for (const auto& sections : slices) {
     for (const int ranks : {1,2,3,5}) {
       for (const int key : {0,1,17}) {
-        Scope scope(format("partition test: slice %d, ranks %d, key %d", sections->slice, ranks, key));
+        Scope scope(tfm::format("partition test: slice %d, ranks %d, key %d", sections->slice, ranks, key));
         if (key) {
           partition_test(random_partition_t(key, ranks, sections));
         } else {
@@ -123,7 +122,7 @@ TEST(end, simple_partition) {
   uint64_t other = -1;
   Random random(877411);
   for (int ranks=3<<2;ranks<=(3<<18);ranks<<=2) {
-    Scope scope(format("ranks %d",ranks));
+    Scope scope(tfm::format("ranks %d",ranks));
     const simple_partition_t partition(ranks, sections, true);
 
     // Check totals
@@ -171,8 +170,7 @@ TEST(end, simple_partition) {
       for (int i=0;i<100;i++) {
         const int rank = random.uniform<int>(0,ranks);
         // We should own all blocks in lines we own
-        unordered_set<tuple<section_t,Vector<uint8_t,4>>,
-                      boost::hash<tuple<section_t,Vector<uint8_t,4>>>> blocks;
+        unordered_set<tuple<section_t,Vector<uint8_t,4>>> blocks;
         const auto owned = partition.rank_lines(rank,true);
         ASSERT_EQ((uint64_t)owned.size(), partition.rank_count_lines(rank,true));
         const auto first_offsets = partition.rank_offsets(rank),
@@ -221,7 +219,7 @@ TEST(end, simple_partition) {
 TEST(end, counts) {
   init_threads(-1, -1);
   for (const int slice : range(5)) {
-    Scope scope(format("counting slice %d", slice));
+    Scope scope(tfm::format("counting slice %d", slice));
     const auto sections = make_shared<const sections_t>(slice, all_boards_sections(slice,8));
     const auto good_counts = meaningless_counts(all_boards(slice, 1));
     uint64_t good_nodes = 0;
@@ -229,7 +227,7 @@ TEST(end, counts) {
       good_nodes += s.shape().product();
     }
     for (const int key : {0,1,17}) {
-      Scope scope(format("partition key %d", key));
+      Scope scope(tfm::format("partition key %d", key));
       const auto partition = key ? shared_ptr<const partition_t>(
                                        make_shared<random_partition_t>(key, 1, sections))
                                  : make_shared<simple_partition_t>(1, sections, false);
@@ -326,7 +324,7 @@ struct thrasher_t {
   static string hex(RawArray<const uint8_t> data) {
     string s;
     for (const uint8_t c : data)
-      s += format("%x%x",c&15,c>>4);
+      s += tfm::format("%x%x",c&15,c>>4);
     return s;
   }
 

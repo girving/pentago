@@ -22,7 +22,7 @@ int midsolve_workspace_size(const int min_slice);
 
 #ifndef __wasm__
 // Allocate enough memory for midsolves with at least the given number of stones
-Array<halfsupers_t> midsolve_workspace(const int min_slice);
+Array<halfsuper_s> midsolve_workspace(const int min_slice);
 #endif  // !__wasm__
 
 static inline int value(const halfsupers_t& I, const int s) {
@@ -33,15 +33,16 @@ static inline int mid_supers_size(const high_board_t board) {
   return 1 + (36 - board.count());
 }
 
-struct mid_values_t : pile<tuple<high_board_t,int>,1+18+8*18> {};
+struct mid_values_t : pile<tuple<raw_t,int>,1+18+8*18> {};
 
 // Compute the values of a board and its children, assuming the board has at least 18 stones.
-Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsupers_t> workspace);
-int midsolve_traverse(const high_board_t board, const halfsupers_t* supers, mid_values_t& results);
+// Results are {whether we don't lose, whether we win}
+Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsuper_s> workspace);
+int midsolve_traverse(const high_board_t board, const halfsuper_s* wins, const halfsuper_s* notloses, mid_values_t& results);
 
 #if !defined(__wasm__) || defined(__APPLE__)
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)
-mid_values_t midsolve(const high_board_t board, RawArray<halfsupers_t> workspace);
+mid_values_t midsolve(const high_board_t board, RawArray<halfsuper_s> workspace);
 #endif
 
 END_NAMESPACE_PENTAGO

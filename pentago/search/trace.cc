@@ -30,8 +30,7 @@ struct situation_t {
 
 // Persistent trace information
 static unordered_set<board_t> board_flags; // Map from traced boards to depth
-static unordered_map<tuple<int,board_t>,superinfo_t,
-                     boost::hash<tuple<int,board_t>>> known; // Known information at various depths
+static unordered_map<tuple<int,board_t>,superinfo_t> known; // Known information at various depths
 static vector<situation_t> errors; // Potentially problematic aggressive,depth,boards triples
 static vector<situation_t> dependencies; // Aggressive,depth,board triples that we depend on
 static int stone_depth; // Current search depth + stone count
@@ -48,7 +47,7 @@ bool traced(bool aggressive, board_t board) {
 static int trace_verbose_depth = 0;
 
 string trace_verbose_prefix() {
-  return format("%*strace verbose: ",trace_verbose_depth,"");
+  return tfm::format("%*strace verbose: ",trace_verbose_depth,"");
 }
 
 Array<uint8_t> trace_verbose_start(int depth, board_t board) {
@@ -122,7 +121,7 @@ void trace_check(bool aggressive, int depth, board_t board, superinfo_t info, co
       slog("trace check failed in %s: depth %d, board %lld, aggressive %d, stones %d, rotation %d, "
            "correct %d, got %d", context, depth, board, aggressive, count_stones(board), r,
            known_info->wins(r), info.wins(r));
-      trace_error(aggressive,depth,board,format("%s.trace_check",context).c_str());
+      trace_error(aggressive,depth,board,tfm::format("%s.trace_check",context).c_str());
     }
   }
 }
@@ -157,11 +156,11 @@ static super_t known_wins(int depth, board_t board) {
 static string str_move(side_t move) {
   int n = integer_log_exact(move);
   if (move!=((side_t)1<<n))
-    return format("bad(%d)",move);
+    return tfm::format("bad(%d)",move);
   int q = n/16, i = n%16;
   int x = 3*(q/2)+i/3,
       y = 3*(q%2)+i%3;
-  return format("%c%c","fedcba"[y],"123456"[x]);
+  return tfm::format("%c%c","fedcba"[y],"123456"[x]);
 }
 
 // Do a clean evaluation of each board involved in an error or dependency

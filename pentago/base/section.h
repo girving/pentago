@@ -118,7 +118,7 @@ static inline size_t hash_value(const section_t& s) {
   size_t h = 0;
   for (const auto& x : s.counts)
     for (const auto& y : x)
-      boost::hash_combine(h, y);
+      hash_combine(h, y);
   return h;
 }
 

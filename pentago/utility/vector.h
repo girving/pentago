@@ -1,12 +1,10 @@
 // Fixed size vectors
 #pragma once
 
+#include "hash.h"
 #include "wasm.h"
 #include <algorithm>
 #include <cassert>
-#ifndef __wasm__
-#include <boost/functional/hash.hpp>
-#endif
 NAMESPACE_PENTAGO
 
 #ifndef __wasm__
@@ -254,7 +252,7 @@ template<class T,int d> ostream& operator<<(ostream& out, const Vector<T,d>& v) 
 
 template<class T,int d> static inline size_t hash_value(const Vector<T,d>& v) {
   size_t h = 0;
-  for (const auto& x : v) boost::hash_combine(h, x);
+  for (const auto& x : v) hash_combine(h, x);
   return h;
 }
 #endif  // !__wasm__

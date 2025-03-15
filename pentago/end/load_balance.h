@@ -12,7 +12,7 @@
 namespace pentago {
 namespace end {
 
-struct load_balance_t : public boost::noncopyable {
+struct load_balance_t : public noncopyable_t {
   Box<int64_t> lines, line_blocks, line_nodes; // Compute counts
   Box<int64_t> blocks, block_nodes, block_local_ids; // Owned block counts
 

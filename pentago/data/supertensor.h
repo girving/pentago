@@ -53,10 +53,10 @@
 #include "pentago/data/file.h"
 #include "pentago/base/superscore.h"
 #include "pentago/base/section.h"
+#include "pentago/utility/endian.h"
 #include "pentago/utility/thread.h"
 #include "pentago/utility/spinlock.h"
 #include "pentago/utility/array.h"
-#include <boost/endian/conversion.hpp>
 namespace pentago {
 
 struct supertensor_blob_t {
@@ -98,7 +98,7 @@ struct supertensor_header_t {
   static supertensor_header_t unpack(RawArray<const uint8_t> buffer);
 };
 
-struct supertensor_reader_t : public boost::noncopyable {
+struct supertensor_reader_t : public noncopyable_t {
   const shared_ptr<const read_file_t> fd;
   const supertensor_header_t header;
 
@@ -139,7 +139,7 @@ struct supertensor_reader_t : public boost::noncopyable {
 };
 
 // Locked allocation of space at the end of a file
-struct next_offset_t : public boost::noncopyable {
+struct next_offset_t : public noncopyable_t {
  private:
   mutable spinlock_t lock;
   uint64_t offset;
@@ -152,7 +152,7 @@ struct next_offset_t : public boost::noncopyable {
   uint64_t reserve(const uint64_t size);
 };
 
-struct supertensor_writer_t : public boost::noncopyable {
+struct supertensor_writer_t : public noncopyable_t {
   typedef supertensor_writer_t Self;
 
   const string path;
@@ -208,7 +208,6 @@ Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array
 
 // Endian conversion
 static inline supertensor_blob_t endian_reverse(supertensor_blob_t blob) {
-  using boost::endian::endian_reverse;
   blob.uncompressed_size = endian_reverse(blob.uncompressed_size);
   blob.compressed_size = endian_reverse(blob.compressed_size);
   blob.offset = endian_reverse(blob.offset);

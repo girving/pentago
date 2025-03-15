@@ -4,7 +4,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 #cc_binary(
 #    name = "libpentago_ops.so",
 #    srcs = ["ops.cc"],
-#    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+#    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
 #    deps = [
 #        "//pentago/base",
 #        "//pentago/end",

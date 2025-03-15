@@ -11,7 +11,7 @@ namespace pentago {
 namespace end {
 
 // Given a set of sections, distribute all blocks amongst a number of processors
-struct block_partition_t : public boost::noncopyable {
+struct block_partition_t : public noncopyable_t {
   const int ranks;
   const shared_ptr<const sections_t> sections;
 

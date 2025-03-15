@@ -20,8 +20,7 @@ struct store_block_cache_t : public block_cache_t {
   const shared_ptr<const readable_block_store_t> blocks;
 #if PENTAGO_MPI_COMPRESS
   const uint64_t memory_limit;
-  mutable unordered_map<tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>,
-                        boost::hash<tuple<section_t,Vector<uint8_t,4>>>> block_cache;
+  mutable unordered_map<tuple<section_t,Vector<uint8_t,4>>,Array<const Vector<super_t,2>,4>> block_cache;
   mutable uint64_t free_memory;
 #endif
 

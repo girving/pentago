@@ -9,10 +9,10 @@ load("//third_party:tensorflow.bzl", "tensorflow_repository")
 http_archive(
     name = "random123",
     urls = [
-        "https://github.com/girving/random123/archive/35ff9a55323e6de5d4284895f44721366e535e55.tar.gz",
+        "https://github.com/DEShawResearch/random123/archive/9545ff6413f258be2f04c1d319d99aaef7521150.tar.gz",
     ],
-    sha256 = "9ee9db7bef212bd050bcdf22cf0f282dd9eccfeda25f35d8790380049bdeead8",
-    strip_prefix = "random123-35ff9a55323e6de5d4284895f44721366e535e55",
+    sha256 = "306f3bf8d9a11298f77ed9a548f524d135b45a722836889f27e05e1acff24676",
+    strip_prefix = "random123-9545ff6413f258be2f04c1d319d99aaef7521150",
     build_file = "//third_party:random123.BUILD",
 )
 
@@ -39,12 +39,11 @@ http_archive(
 http_archive(
     name = "lzma",
     urls = [
-        "https://tukaani.org/xz/xz-5.2.3.tar.gz",
-        "https://fossies.org/linux/misc/xz-5.2.3.tar.gz",
-        "https://drive.google.com/uc?export=download&id=0Bxgu9m44g9qRNWVJcEZhUDJZVlU",
+        "https://tukaani.org/xz/xz-5.2.5.tar.gz",
+        "https://fossies.org/linux/misc/xz-5.2.5.tar.gz",
     ],
-    sha256 = "71928b357d0a09a12a4b4c5fafca8c31c19b0e7d3b8ebb19622e96f26dbf28cb",
-    strip_prefix = "xz-5.2.3/src",
+    sha256 = "f6f4910fd033078738bd82bfba4f49219d03b17eb0794eb91efbae419f4aba10",
+    strip_prefix = "xz-5.2.5/src",
     build_file = "//third_party:lzma.BUILD",
 )
 
@@ -58,18 +57,10 @@ http_archive(
 
 http_archive(
     name = "zlib",
-    urls = ["https://www.zlib.net/zlib-1.2.11.tar.gz"],
-    sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
-    strip_prefix = "zlib-1.2.11",
+    urls = ["https://www.zlib.net/fossils/zlib-1.2.12.tar.gz"],
+    sha256 = "91844808532e5ce316b3c010929493c0244f3d37593afd6de04f71821d5136d9",
+    strip_prefix = "zlib-1.2.12",
     build_file = "//third_party:zlib.BUILD",
-)
-
-http_archive(
-    name = "boost",
-    urls = ["https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.gz"],
-    sha256 = "a13de2c8fbad635e6ba9c8f8714a0e6b4264b60a29b964b940a22554705b6b60",
-    strip_prefix = "boost_1_65_1",
-    build_file = "//third_party:boost.BUILD",
 )
 
 mpi_repository(name = "mpi")

@@ -8,16 +8,16 @@ namespace pentago {
 // Learn about alignment
 static_assert(alignof(int) == 4);
 static_assert(alignof(uint64_t) == 8);
-static_assert(alignof(high_board_t) == 8);
-static_assert(alignof(tuple<high_board_t,int>) == 8);
+static_assert(alignof(raw_t) == 8);
+static_assert(alignof(tuple<raw_t,int>) == 8);
 static_assert(alignof(mid_values_t) == 8);
 
 // Learn about sizes
 static_assert(sizeof(int) == 4);
 static_assert(sizeof(uint64_t) == 8);
-static_assert(sizeof(high_board_t) == 24);
-static_assert(sizeof(tuple<high_board_t,int>) == 32);
-static_assert(sizeof(mid_values_t) == 8 + 32 * mid_values_t::limit);
+static_assert(sizeof(raw_t) == 8);
+static_assert(sizeof(tuple<raw_t,int>) == 16);
+static_assert(sizeof(mid_values_t) == 8 + 16 * mid_values_t::limit);
 
 WASM_EXPORT int sqr_test(const int n) {
   return n * n;
@@ -33,6 +33,11 @@ WASM_EXPORT uint32_t sum_test(const int num, const uint64_t* data) {
 
 WASM_EXPORT void die_test() {
   die("An informative message");
+}
+
+// int64_t roundtrips via BigInt
+WASM_EXPORT int64_t int64_test(const int64_t n) {
+  return n;
 }
 
 }  // namespace pentago

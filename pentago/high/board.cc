@@ -50,34 +50,56 @@ high_board_t high_board_t::place(const int x, const int y) const {
   return place(3*(x%3) + y%3 + 16*(2*(x/3) + y/3));
 }
 
-// Avoid a dependence on general board transformation for wasm
-// TODO: Can we compress this using bit twiddling trickery?
-static quadrant_t slow_rotate_quadrant_side(const quadrant_t side, const int d) {
-  quadrant_t result = 0;
-  for (const int x : range(3))
-    for (const int y : range(3))
-      if (side & 1<<(3*x+y))
-        result |= 1<<(d==1 ? 3*(2-y)+x : 3*y+2-x);
-  return result;
-}
-
 high_board_t high_board_t::rotate(const int q, const int d) const {
   NON_WASM_ASSERT(middle() && 0 <= q && q < 4 && d==1 || d==-1);
   side_t after[2] = {side(0), side(1)};
+  WASM_NOUNROLL
   for (const int s : range(2)) {
     const auto old = quadrant(after[s], q);
-    after[s] ^= side_t(old ^ slow_rotate_quadrant_side(old, d)) << 16*q;
+    quadrant_t quad = 0;
+    for (const int i : range(9)) {
+      if (old >> i & 1) {
+        const int x = i / 3;
+        const int y = i % 3;
+        quad |= 1 << (4-d*(3*y-x-2));
+      }
+    }
+    after[s] ^= side_t(old ^ quad) << 16*q;
   }
   return high_board_t(after[0], after[1], s.ply_ + 1);
 }
 
-#ifndef __wasm__
+board_t high_board_t::board() const {
+  board_t board = 0;
+  WASM_NOUNROLL
+  for (const int q : range(4)) {
+    uint16_t quad = 0;
+    WASM_NOUNROLL
+    for (int i = 8; i >= 0; i--) {
+      const int j = 16*q + i;
+      quad = 3*quad + (s.side_[0] >> j & 1) + 2*(s.side_[1] >> j & 1);
+    }
+    board |= board_t(quad) << 16*q;
+  }
+  return board;
+}
+
 high_board_t high_board_t::from_board(const board_t board, const bool middle) {
-  const auto side0 = unpack(board, 0);
-  const auto side1 = unpack(board, 1);
+  side_t side0 = 0, side1 = 0;
+  for (const int q : range(4)) {
+    uint16_t quad = board >> 16*q;
+    for (const int i : range(9)) {
+      const int s = quad % 3;
+      quad /= 3;
+      const int j = 16*q + i;
+      side0 |= side_t(s == 1) << j;
+      side1 |= side_t(s == 2) << j;
+    }
+  }
   return high_board_t(side0, side1, 2*popcount(side0 | side1) - middle);
 }
 
+#ifndef __wasm__
 Array<const high_board_t> high_board_t::moves() const {
   vector<high_board_t> moves;
   if (!middle()) { // Place a stone
@@ -94,7 +116,7 @@ Array<const high_board_t> high_board_t::moves() const {
 }
 
 string high_board_t::name() const {
-  return format("%d%s", board(), middle() ? "m" : "");
+  return tfm::format("%d%s", board(), middle() ? "m" : "");
 }
 
 ostream& operator<<(ostream& output, const high_board_t board) {

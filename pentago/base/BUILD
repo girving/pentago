@@ -4,7 +4,7 @@ load("//pentago:pentago.bzl", "cc_tests")
 cc_binary(
     name = "precompute",
     srcs = ["precompute.cc"],
-    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/utility",
     ],
@@ -31,7 +31,7 @@ cc_library(
 cc_library(
     name = "base",
     srcs = glob(["*.h", "*.cc"], exclude=["precompute.cc", "*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
-    copts = ["-std=c++1z", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/utility",
     ],

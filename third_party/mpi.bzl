@@ -18,7 +18,7 @@ cc_library(
 def mpi_repository_impl(ctx):
   # Collect headers
   base = None
-  for p in ['/usr/include', '/usr/local/include']:
+  for p in ['/usr/include', '/usr/local/include', '/opt/homebrew/include']:
     p = ctx.path(p)
     if p.get_child('mpi.h').exists:
       base = p

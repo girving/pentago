@@ -26,7 +26,7 @@ using std::function;
  * 4. It is safe to add requests during the callbacks.
  */
 
-class requests_t : public boost::noncopyable {
+class requests_t : public noncopyable_t {
   vector<MPI_Request> requests;
   vector<function<void(MPI_Status* status)>> callbacks;
   vector<bool> cancellables;

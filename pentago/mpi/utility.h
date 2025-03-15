@@ -33,7 +33,7 @@ MPI_Comm comm_dup(MPI_Comm comm);
 int get_count(MPI_Status* status, MPI_Datatype datatype);
 
 // Init and finalize
-struct mpi_world_t : public boost::noncopyable {
+struct mpi_world_t : public noncopyable_t {
   mpi_world_t(int& argc, char**& argv);
   ~mpi_world_t();
 };

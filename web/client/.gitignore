@@ -5,4 +5,8 @@
 /public/mid_worker.js
 /public/mid_worker.js.map
 /public/main.css
+/public/counts.svg
+/public/favicon.svg
+/build/stats.html
+/build/tests.wasm
 .DS_Store

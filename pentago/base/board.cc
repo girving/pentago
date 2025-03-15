@@ -144,7 +144,7 @@ board_t random_board(Random& random, int n) {
 
 string str_board(board_t board) {
   string s;
-  s += format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));
+  s += tfm::format("counts: 0s = %d, 1s = %d\n\n",popcount(unpack(board,0)),popcount(unpack(board,1)));
   const Array<const int,2> table = to_table(board);
   for (int i=0;i<6;i++) {
     int y = 5-i;
