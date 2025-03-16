@@ -1,5 +1,7 @@
 """Pentago data for neural net training"""
 
+from batching import batch_vmap
+from bernoulli import safe_bernoulli
 from functools import partial
 import boards
 import jax
@@ -15,6 +17,30 @@ def super_extract(g, values):
   assert values.dtype == np.uint32
   b, w = jax.vmap(lambda v: (v[g >> 5 & 7] >> (g & 31)) & 1)(values.reshape(2, 8)).astype(np.int32)
   return b - w
+
+
+@batch_vmap(256)
+@partial(jnp.vectorize, signature='(2)->()')
+def board_is_validation(board):
+  """Fixed pseudorandom function categorising boards as either 'validation' or 'train'."""
+  assert board.dtype == np.uint32
+  assert board.shape == (2,)
+  b0, b1 = board
+  key = jax.random.PRNGKey(19)
+  key = jax.random.fold_in(key, b0)
+  key = jax.random.fold_in(key, b1)
+  return safe_bernoulli(key, p=0.01)  # Mark 1% of boards as validation
+
+
+def train_valid_split(data):
+  """Split some super data into train and validation sets."""
+  assert data.dtype == np.uint32
+  assert data.shape == (len(data), 9, 2)
+  is_valid = board_is_validation(data[:, 0])
+  train = jnp.asarray(data[~is_valid])
+  valid = jnp.asarray(data[is_valid])
+  print(f'split {len(data)} into {len(train)} train, {len(valid)} valid')
+  return dict(train=train, valid=valid)
 
 
 @jax.jit
@@ -74,13 +100,17 @@ class SuperData:
 def sparse_dataset(*, counts, base='../data/edison/project/all'):
   # Concatenate and shuffle all data
   data = []
+  print('sparse dataset:')
   for count in counts:
     sparse = np.load(f'{base}/sparse-{count}.npy')
+    print(f'  slice {count}: shape {sparse.shape}')
     assert sparse.dtype == np.uint64
     assert sparse.shape[1] == 9
     data.append(sparse)
   data = np.concatenate(data, axis=0)
-  return SuperData(data.view(np.uint32).reshape(len(data), 9, 2))
+  print(f'  total: shape {data.shape}')
+  data = data.view(np.uint32).reshape(len(data), 9, 2)
+  return {k: SuperData(v) for k,v in train_valid_split(data).items()}
 
 
 def correctness_test(boards_and_values, *, correct):
