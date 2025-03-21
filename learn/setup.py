@@ -21,6 +21,7 @@ setup(name='pentago',
           'pytest>=8.3.5',
           'pytest-asyncio>=0.15.1',
           'requests>=2.25.1',
+          'wandb',
       ] + [
           'jax-metal>=0.1.1',
       ] * (platform.system() == 'Darwin'),

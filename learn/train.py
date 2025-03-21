@@ -2,6 +2,7 @@
 """Pentago neural net training"""
 
 import argparse
+from dataclasses import dataclass
 import datasets
 from functools import partial
 import equivariant as ev
@@ -11,8 +12,11 @@ import jax.numpy as jnp
 import numpy as np
 import numbers
 import optax
+import os
+import pickle
 import platform
 import timeit
+import wandb
 
 
 def pretty_info(info):
@@ -30,23 +34,49 @@ def gpu_device():
   return jax.devices('METAL' if platform.system() == 'Darwin' else 'gpu')[0]
 
 
-def logits_fn(quads):
-  layers = 4 * 1
-  width = 128 * 1
-  mid = 128 * 1
-  layer_scale = 1
-  return ev.nf_net(quads, layers=layers, width=width, mid=mid, layer_scale=layer_scale)
+@dataclass
+class Config:
+  # Architecture
+  layers: int = 4
+  width: int = 128
+  mid: int = 128
+  layer_scale: float = 1
+
+  # Dataset
+  slices: tuple[int] = (16,17,18)
+
+  # Training
+  batch: int = 1024 * 4
+  valid_batch: int = 1024 * 16
+  lr: float = 1e-3
+  valid_every: int = 100
+  save_every: int = 1000
+
+
+def logits_fn(quads, *, config: Config):
+  return ev.nf_net(quads, layers=config.layers, width=config.width, mid=config.mid, layer_scale=config.layer_scale)
+
+
+def save(name, data, *, run):
+  """Save some binary data to wandb."""
+  path = os.path.join(run.dir, name)
+  with open(path, 'wb') as f:
+    pickle.dump(data, f)
+  wandb.save(path, base_path=run.dir)
+
+
+def exact_div(x, y):
+  d = x // y
+  assert x == d * y
+  return d
 
 
 def train(*,
           logits_fn,
           dataset,
-          batch=1024 * 4,
-          valid_batch=1024 * 16,
-          lr=1e-3,
-          slog=print_info,
-          log_every=100,
+          run,
           key=jax.random.PRNGKey(7)):
+  config = run.config
   gpu = gpu_device()
 
   # Define network
@@ -66,11 +96,11 @@ def train(*,
   # Initialize
   key, key_ = jax.random.split(key)
   with jax.default_device(gpu):
-    params = loss_fn.init(key_, next(dataset['train'].forever(batch=batch)))
+    params = loss_fn.init(key_, next(dataset['train'].forever(batch=config.batch)))
   print(f'params = {sum(p.size for p in jax.tree.leaves(params)):,}')
 
   # Optimizer
-  opt = optax.adamw(lr)
+  opt = optax.adamw(config.lr)
   opt_state = opt.init(params)
 
   # Update step
@@ -82,52 +112,49 @@ def train(*,
     return params, opt_state, metrics
 
   # Prepare for validation loss
-  valid_data = next(dataset['valid'].forever(batch=valid_batch))
+  valid_data = next(dataset['valid'].forever(batch=config.valid_batch))
   @partial(jax.jit, device=gpu)
   def valid_metrics(params):
     _, metrics = loss_fn.apply(params, None, valid_data)
     return metrics
 
+  # Estimate flops per board (see https://docs.jax.dev/en/latest/aot.html)
+  if 0:  # Doesn't work with Metal, so probably need to build on CPU
+    valid_metrics = valid_metrics.trace(params).lower().compile()
+    flops = exact_div(valid_metrics.cost_analysis()['flops'], len(valid_metrics))
+    print(f'flops/board = {flops}')
+
   # Train
-  metrics = dict(sps=[], loss=[], accuracy=[])
-  for step, data in enumerate(dataset['train'].forever(batch=batch)):
-    start = timeit.default_timer()
+  for step, data in enumerate(dataset['train'].forever(batch=config.batch)):
+    e = dataset['train'].step_to_epoch(step, batch=config.batch)
+    info = dict(epoch=e, samples=step*config.batch, time=timeit.default_timer())
     params, opt_state, ms = update(params, opt_state, data)
-    ms['sps'] = batch / (timeit.default_timer() - start)
-    for s in metrics:
-      metrics[s].append(ms[s])
-    if step % log_every == 0:
-      e = dataset['train'].step_to_epoch(step, batch=batch)
-      info = dict(step=step, epochs=e, samples=step*batch)
-      for s, xs in metrics.items():
-        info[s] = np.mean(xs)
-        xs.clear()
-      vms = valid_metrics(params)
-      for s in 'loss', 'accuracy':
-        info['valid_' + s] = np.mean(vms[s])
-      slog(info)
+    for s,xs in ms.items():
+      info['train/' + s] = np.mean(xs)
+    if step % config.valid_every == 0:
+      for s,xs in valid_metrics(params).items():
+        info['valid/' + s] = np.mean(xs)
+    run.log(info, step=step)
+    if step % config.save_every == 0:
+      save(f'params-{step}.pkl', params, run=run)
+      save(f'opt-state-{step}.pkl', opt_state, run=run)
 
 
 def main():
   # Parse arguments
   parser = argparse.ArgumentParser(description='Pentago train')
-  parser.add_argument('--log', type=str, help='log file')
   options = parser.parse_args()
 
-  # Logging
-  if options.log:
-    log_file = open(options.log, 'w')
-    def slog(info):
-      s = pretty_info(info)
-      print(s)
-      print(s, file=log_file)
-      log_file.flush()
-  else:
-    slog = print_info
+  # Configuration
+  config = Config(save_every=2000)
+  run = wandb.init(
+      entity='irving-personal',
+      project='pentago',
+      config=config)
 
   # Train
-  dataset = datasets.sparse_dataset(counts=(16,17,18))
-  train(logits_fn=logits_fn, dataset=dataset, slog=slog)
+  dataset = datasets.sparse_dataset(counts=config.slices)
+  train(logits_fn=partial(logits_fn, config=config), dataset=dataset, run=run)
 
 
 if __name__ == '__main__':
