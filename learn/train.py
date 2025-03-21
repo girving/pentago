@@ -2,7 +2,7 @@
 """Pentago neural net training"""
 
 import argparse
-from dataclasses import dataclass
+import dataclasses
 import datasets
 from functools import partial
 import equivariant as ev
@@ -34,7 +34,7 @@ def gpu_device():
   return jax.devices('METAL' if platform.system() == 'Darwin' else 'gpu')[0]
 
 
-@dataclass
+@dataclasses.dataclass
 class Config:
   # Architecture
   layers: int = 4
@@ -159,18 +159,26 @@ def main():
   # Parse arguments
   parser = argparse.ArgumentParser(description='Pentago train')
   parser.add_argument('-f', '--fast', action='store_true')
-  parser.add_argument('--lr', type=float, help='learning rate')
+  for f in dataclasses.fields(Config):
+    parser.add_argument(f'--{f.name}', type=f.type)
   options = parser.parse_args()
 
   # Configuration
   config = Config(save_every=2000)
+  for f in dataclasses.fields(Config):
+    x = getattr(options, f.name)
+    if x is not None:
+      setattr(config, f.name, x)
   if options.fast:
     config.slices = 4,5,6
     config.layers = 1
     config.width = 16
     config.batch = config.valid_batch = 7
-  if options.lr:
-    config.lr = options.lr
+  print('config:')
+  for f in dataclasses.fields(Config):
+    v = getattr(config, f.name)
+    d = '' if v == f.default else f' (was {f.default})'
+    print(f'  {f.name}: {v}{d}')
 
   # Wandb setup
   run = wandb.init(
