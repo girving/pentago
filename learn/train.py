@@ -159,6 +159,7 @@ def main():
   # Parse arguments
   parser = argparse.ArgumentParser(description='Pentago train')
   parser.add_argument('-f', '--fast', action='store_true')
+  parser.add_argument('--lr', type=float, help='learning rate')
   options = parser.parse_args()
 
   # Configuration
@@ -168,6 +169,10 @@ def main():
     config.layers = 1
     config.width = 16
     config.batch = config.valid_batch = 7
+  if options.lr:
+    config.lr = options.lr
+
+  # Wandb setup
   run = wandb.init(
       entity='irving-personal',
       project='pentago',
