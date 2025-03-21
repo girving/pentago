@@ -51,6 +51,7 @@ class Config:
   lr: float = 1e-3
   valid_every: int = 100
   save_every: int = 1000
+  polyak: int = 100
 
 
 def logits_fn(quads, *, config: Config):
@@ -69,6 +70,15 @@ def exact_div(x, y):
   d = x // y
   assert x == d * y
   return d
+
+
+def polyak_update(average, recent, *, polyak: int):
+  """Update a Polyak average."""
+  if not polyak:
+    return recent
+  b = jnp.asarray(1 / polyak)
+  a = 1 - b
+  return jax.tree.map(lambda x, y: a*x + b*y, average, recent)
 
 
 def train(*,
@@ -102,6 +112,7 @@ def train(*,
   # Optimizer
   opt = optax.adamw(config.lr)
   opt_state = opt.init(params)
+  polyak_params = params
 
   # Update step
   @partial(jax.jit, device=gpu)
@@ -129,24 +140,34 @@ def train(*,
     e = dataset['train'].step_to_epoch(step, batch=config.batch)
     info = dict(epoch=e, samples=step*config.batch, time=timeit.default_timer())
     params, opt_state, ms = update(params, opt_state, data)
+    polyak_params = polyak_update(polyak_params, params, polyak=config.polyak)
     for s,xs in ms.items():
       info['train/' + s] = np.mean(xs)
     if step % config.valid_every == 0:
       for s,xs in valid_metrics(params).items():
         info['valid/' + s] = np.mean(xs)
+      for s,xs in valid_metrics(polyak_params).items():
+        info['valid-polyak/' + s] = np.mean(xs)
     run.log(info, step=step)
     if step % config.save_every == 0:
       save(f'params-{step}.pkl', params, run=run)
+      save(f'polyak-params-{step}.pkl', polyak_params, run=run)
       save(f'opt-state-{step}.pkl', opt_state, run=run)
 
 
 def main():
   # Parse arguments
   parser = argparse.ArgumentParser(description='Pentago train')
+  parser.add_argument('-f', '--fast', action='store_true')
   options = parser.parse_args()
 
   # Configuration
   config = Config(save_every=2000)
+  if options.fast:
+    config.slices = 4,5,6
+    config.layers = 1
+    config.width = 16
+    config.batch = config.valid_batch = 7
   run = wandb.init(
       entity='irving-personal',
       project='pentago',
