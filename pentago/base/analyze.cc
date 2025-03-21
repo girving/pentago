@@ -1,5 +1,6 @@
 // Various analysis code
 
+#include "pentago/base/all_boards.h"
 #include "pentago/base/score.h"
 #include "pentago/base/section.h"
 #include "pentago/base/superscore.h"
@@ -10,21 +11,31 @@
 #include "pentago/utility/wall_time.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/box.h"
-#include "pentago/utility/uint128.h"
+#include "pentago/utility/large.h"
+#include "pentago/utility/log.h"
 #include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/sqr.h"
+#include "pentago/utility/uint128.h"
 #include <cmath>
 namespace pentago {
+namespace {
 
 using std::ceil;
 using std::floor;
 using std::get;
 using std::max;
 using std::min;
+using std::string;
+using std::unordered_map;
+
+// Command registration
+struct unusable {};
+unordered_map<string, function<void()>> commands;
+#define COMMAND(name, ...) const auto name = []() { commands.emplace(#name, []() { __VA_ARGS__; }); return unusable(); }();
 
 // Generate n random boards, and count the number of (boring positions, immediate black wins, immediate wins white, and ties)
-Vector<int,4> sample_immediate_endings(Random& random, section_t section, int samples) {
+__attribute__((unused)) Vector<int,4> sample_immediate_endings(Random& random, section_t section, int samples) {
   Vector<int,4> counts;
   for (int i=0;i<samples;i++) {
     const board_t board = random_board(random,section);
@@ -85,7 +96,7 @@ static int orbit_size(const board_t board) {
 //   r = reachable(board)
 // we return the sum and sum of squares of (c,cr,c(1-r))
 typedef tuple<Vector<uint64_t,3>,Vector<uint64_t,3>> reachable_t;
-reachable_t sample_reachable_boards(const int slice, const int samples) {
+__attribute__((unused)) reachable_t sample_reachable_boards(const int slice, const int samples) {
   spinlock_t lock;
   reachable_t total;
   const int blocks = ceil_div(samples,100000);
@@ -113,7 +124,7 @@ reachable_t sample_reachable_boards(const int slice, const int samples) {
 }
 
 // Merge consecutive time intervals separated by at most a threshold
-Array<Vector<wall_time_t,2>> simplify_history(RawArray<const history_t> history, int threshold) {
+__attribute__((unused)) Array<Vector<wall_time_t,2>> simplify_history(RawArray<const history_t> history, int threshold) {
   vector<Vector<wall_time_t,2>> merged;
   for (int i=0;i<history.size();i++) {
     const wall_time_t start = history[i].start;
@@ -126,8 +137,9 @@ Array<Vector<wall_time_t,2>> simplify_history(RawArray<const history_t> history,
 }
 
 // Rasterize a piece of history data into an rgba image
-void rasterize_history(RawArray<Vector<float,4>,2> image, const Box<Vector<float,2>> box,
-                       RawArray<const history_t> history, const Box<float> y_range, const Vector<float,4> color) {
+__attribute__((unused)) void rasterize_history(
+    RawArray<Vector<float,4>,2> image, const Box<Vector<float,2>> box,
+    RawArray<const history_t> history, const Box<float> y_range, const Vector<float,4> color) {
   typedef Vector<float,2> TV;
   typedef Vector<int,2> IV;
   const auto prescales = TV(image.shape()) / box.shape();
@@ -151,7 +163,7 @@ void rasterize_history(RawArray<Vector<float,4>,2> image, const Box<Vector<float
 }
 
 // A benchmark for threefish random numbers
-uint128_t threefry_benchmark(int n) {
+__attribute__((unused)) uint128_t threefry_benchmark(int n) {
   GEODE_ASSERT(n>=0);
   uint128_t result = n;
   for (int i=0;i<n;i++)
@@ -159,4 +171,42 @@ uint128_t threefry_benchmark(int n) {
   return result;
 }
 
+COMMAND(arith,
+  slog("Estimating database size up to 18 stones...");
+  uint64_t total = 0;
+  for (const int n : range(0, 18+1))
+    total += all_boards_stats(n, 8);
+  slog("total = %s", large(total));
+  slog("256 * total = %s", large(256 * total));
+)
+
+void usage() {
+  slog("usage: analyze <command>");
+  slog("commands:");
+  for (const auto& p : commands)
+    slog("  %s", p.first);
+}
+
+}  // namespace
+}  // namespace pentago
+using namespace pentago;
+
+int main(int argc, char** argv) {
+  try {
+    if (argc != 2) {
+      usage();
+      return 1;
+    }
+    const string cmd = argv[1];
+    const auto it = commands.find(cmd); 
+    if (it == commands.end()) {
+      std::cerr << "command '" << cmd << "' not found" << std::endl;
+      usage();
+      return 1;
+    }
+    it->second();
+  } catch (const std::exception& e) {
+    std::cerr << e.what() << std::endl;
+    return 1;
+  }
 }

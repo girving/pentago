@@ -3,9 +3,10 @@
 #include "pentago/base/hash.h"
 #include "pentago/base/symmetry.h"
 #include "pentago/utility/array.h"
+#include "pentago/utility/large.h"
+#include "pentago/utility/log.h"
 #include "pentago/utility/portable_hash.h"
 #include "pentago/utility/range.h"
-#include "pentago/utility/log.h"
 #include "gtest/gtest.h"
 #include <unordered_map>
 #include <unordered_set>

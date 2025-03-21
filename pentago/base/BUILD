@@ -30,7 +30,7 @@ cc_library(
 
 cc_library(
     name = "base",
-    srcs = glob(["*.h", "*.cc"], exclude=["precompute.cc", "*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
+    srcs = glob(["*.h", "*.cc"], exclude=["precompute.cc", "analyze.cc", "*_test.cc"]) + ["gen/tables.h", "gen/tables.cc"],
     copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         "//pentago/utility",
@@ -43,6 +43,16 @@ cc_tests(
         "pentago_test",
         "super_test",
     ],
+    deps = [
+        ":base",
+        "//pentago/utility",
+    ],
+)
+
+cc_binary(
+    name = "analyze",
+    srcs = ["analyze.cc"],
+    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
     deps = [
         ":base",
         "//pentago/utility",
