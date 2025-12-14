@@ -1,0 +1,3 @@
+# Enable WORKSPACE file (disabled by default in Bazel 8)
+common --enable_workspace=true
+

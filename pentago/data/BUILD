@@ -1,10 +1,10 @@
 package(default_visibility = ["//visibility:public"])
-load("//pentago:pentago.bzl", "cc_tests")
+load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 
 cc_library(
     name = "data",
     srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "*_test.cc"]),
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         "//pentago/base",
         "//pentago/utility",
@@ -32,7 +32,7 @@ cc_tests(
 cc_binary(
     name = "roundtrip",
     srcs = ["roundtrip.cc"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         ":data",
         "//pentago/end:options",
