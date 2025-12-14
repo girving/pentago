@@ -1,10 +1,10 @@
 package(default_visibility = ["//visibility:public"])
-load("//pentago:pentago.bzl", "cc_tests")
+load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 
 cc_library(
     name = "mid",
     srcs = ["internal.h", "internal_c.h", "midengine.h", "subsets.h", "subsets_c.h", "midengine.cc"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         ":halfsuper",
         "//pentago/base",
@@ -16,7 +16,7 @@ cc_library(
 cc_library(
     name = "halfsuper",
     srcs = ["halfsuper.h", "halfsuper_c.h", "halfsuper.cc"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         "//pentago/base",
         "//pentago/base:halfsuper_wins",

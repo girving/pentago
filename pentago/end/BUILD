@@ -1,10 +1,10 @@
 package(default_visibility = ["//visibility:public"])
-load("//pentago:pentago.bzl", "cc_tests")
+load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 
 cc_library(
     name = "end",
     srcs = glob(["*.h", "*.cc"], exclude=["check*.*", "options.*", "meaningless.cc", "make-indices.cc", "*_test.cc"]),
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         "//pentago/base",
         "//pentago/data",
@@ -17,7 +17,7 @@ cc_library(
 cc_library(
     name = "config",
     srcs = ["config.h"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [],
 )
 
@@ -27,7 +27,7 @@ cc_library(
         "check.h",
         "check.cc",
     ],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         ":end",
     ],
@@ -48,7 +48,7 @@ cc_tests(
 cc_binary(
     name = "meaningless",
     srcs = ["meaningless.cc"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         ":end",
     ],
@@ -58,7 +58,7 @@ cc_library(
     name = "options",
     srcs = ["options.cc"],
     hdrs = ["options.h"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         ":config",
         "//pentago/base",
@@ -69,7 +69,7 @@ cc_library(
 cc_binary(
     name = "check",
     srcs = ["check_main.cc"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         ":check_lib",
         ":end",
@@ -82,7 +82,7 @@ cc_binary(
 cc_binary(
     name = "make-indices",
     srcs = ["make-indices.cc"],
-    copts = ["-std=c++20", "-Wall", "-Werror", "-fno-stack-check"],
+    copts = COPTS,
     deps = [
         "//pentago/data",
         "//pentago/high",
