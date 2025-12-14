@@ -8,6 +8,7 @@ cc_binary(
         "//pentago/base",
         "//pentago/data",
         "//pentago/utility",
+        "@cudd//:cplusplus",
     ],
 )
 

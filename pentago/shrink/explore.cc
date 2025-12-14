@@ -6,7 +6,9 @@
 #include "pentago/utility/array.h"
 #include "pentago/utility/const_cast.h"
 #include "pentago/utility/memory.h"
+#include "pentago/utility/permute.h"
 #include "pentago/utility/random.h"
+#include "cuddObj.hh"
 #include <iostream>
 #include <vector>
 #include <string>
@@ -48,8 +50,8 @@ public:
   // Predict outcome for a board (1 for win, -1 for loss, 0 for tie)
   virtual int predict(board_t board) = 0;
 
-  // Evaluate accuracy on test data
-  void evaluate(RawArray<const sample_t> test_data) {
+  // Evaluate accuracy on test data with optional random subsampling
+  void evaluate(RawArray<const sample_t> test_data, int eval_subsample = 0) {
     int correct = 0;
     int total = 0;
     int win_correct = 0;
@@ -59,7 +61,20 @@ public:
     int tie_correct = 0;
     int tie_total = 0;
 
-    for (const auto& data : test_data) {
+    // Use random subsample if requested
+    const uint64_t n = test_data.size();
+    const uint64_t eval_count = eval_subsample > 0 ? std::min(static_cast<uint64_t>(eval_subsample), n) : n;
+    const uint128_t key = 0xdeadbeef12345678ULL;  // Fixed key for reproducibility
+
+    if (eval_subsample > 0) {
+      cout << "  Evaluating on random subsample of " << eval_count << " / " << n << " samples..." << endl;
+    }
+
+    for (uint64_t i = 0; i < eval_count; i++) {
+      // Use random_permute to pick a random sample index
+      const uint64_t sample_idx = eval_subsample > 0 ? random_permute(n, key, i) : i;
+      const auto& data = test_data[sample_idx];
+
       // Check all 256 possible rotations
       for (const int r : range(256)) {
         // Get actual outcome (1 for black win, -1 for white win, 0 for tie)
@@ -263,7 +278,176 @@ private:
   }
 };
 
-// Strategy 3: Machine learning approach using feature engineering
+// Strategy 3: BDD-based predictor using CUDD
+class BDDStrategy : public CompressionStrategy {
+public:
+  BDDStrategy(int subsample_rate = 100) : mgr(0), subsample_rate_(subsample_rate) {
+    // Initialize CUDD manager with default settings
+    // We'll use 72 variables: 36 for black stones, 36 for white stones
+  }
+
+  string name() const override {
+    return "BDD Predictor (1/" + std::to_string(subsample_rate_) + " subsample)";
+  }
+
+  void train(RawArray<const sample_t> data) override {
+    cout << "  Building BDDs from " << data.size() << " samples (1/" << subsample_rate_ << " subsample)..." << endl;
+
+    // Create BDD variables for each board position
+    // Variables 0-35: black stones at each position
+    // Variables 36-71: white stones at each position
+    vector<BDD> black_vars(36);
+    vector<BDD> white_vars(36);
+    for (int i = 0; i < 36; i++) {
+      black_vars[i] = mgr.bddVar(i);
+      white_vars[i] = mgr.bddVar(36 + i);
+    }
+
+    // Build separate BDDs for wins, losses, and ties
+    win_bdd = mgr.bddZero();
+    loss_bdd = mgr.bddZero();
+    tie_bdd = mgr.bddZero();
+
+    int samples_processed = 0;
+    int samples_used = 0;
+    int win_count = 0;
+    int loss_count = 0;
+    int tie_count = 0;
+
+    for (const int sample_idx : range(data.size())) {
+      // Subsample: only use every nth sample
+      if (sample_idx % subsample_rate_ != 0) continue;
+
+      const auto& sample = data[sample_idx];
+      samples_used++;
+
+      // For each rotation
+      for (const int r : range(256)) {
+        // Get outcome
+        int outcome = sample.wins[0](r) - sample.wins[1](r);
+
+        // Apply rotation to the board
+        const symmetry_t sym(0, r);
+        board_t rotated = transform_board(sym, sample.board);
+
+        // Build a minterm (conjunction of literals) for this board position
+        BDD minterm = board_to_minterm(rotated, black_vars, white_vars);
+
+        // Add to appropriate BDD based on outcome
+        if (outcome > 0) {
+          win_bdd = win_bdd | minterm;
+          win_count++;
+        } else if (outcome < 0) {
+          loss_bdd = loss_bdd | minterm;
+          loss_count++;
+        } else {
+          tie_bdd = tie_bdd | minterm;
+          tie_count++;
+        }
+
+        samples_processed++;
+
+        // Progress reporting
+        if (samples_processed % 1000000 == 0) {
+          cout << "    Processed " << samples_processed << " samples, "
+               << "BDD nodes: " << mgr.ReadNodeCount() << endl;
+        }
+      }
+    }
+
+    cout << "  Training complete:" << endl;
+    cout << "    Samples used: " << samples_used << " / " << data.size() << endl;
+    cout << "    Total rotations processed: " << samples_processed << endl;
+    cout << "    Win samples: " << win_count << ", Loss samples: " << loss_count << ", Tie samples: " << tie_count << endl;
+    cout << "    Final BDD nodes: " << mgr.ReadNodeCount() << endl;
+    cout << "    Win BDD nodes: " << win_bdd.nodeCount()
+         << ", Loss BDD nodes: " << loss_bdd.nodeCount()
+         << ", Tie BDD nodes: " << tie_bdd.nodeCount() << endl;
+  }
+
+  int predict(board_t board) override {
+    // Extract sides
+    side_t black = unpack(board, 0);
+    side_t white = unpack(board, 1);
+
+    // Build assignment vector
+    vector<int> assignment(72);
+    for (int i = 0; i < 36; i++) {
+      int q = i / 9;
+      int bit = i % 9;
+      assignment[i] = (quadrant(black, q) >> bit) & 1;
+      assignment[36 + i] = (quadrant(white, q) >> bit) & 1;
+    }
+
+    // Evaluate all three BDDs
+    bool is_win = evaluate_bdd(win_bdd, assignment);
+    bool is_loss = evaluate_bdd(loss_bdd, assignment);
+    bool is_tie = evaluate_bdd(tie_bdd, assignment);
+
+    // Return based on which BDD matches (prefer more specific matches)
+    if (is_win && !is_loss && !is_tie) return 1;
+    if (is_loss && !is_win && !is_tie) return -1;
+    if (is_tie && !is_win && !is_loss) return 0;
+
+    // If multiple match or none match, use majority class (loss)
+    // In a real implementation, we might want smarter conflict resolution
+    return -1;
+  }
+
+private:
+  Cudd mgr;
+  BDD win_bdd;
+  BDD loss_bdd;
+  BDD tie_bdd;
+  int subsample_rate_;
+
+  // Evaluate a BDD for a given assignment
+  bool evaluate_bdd(BDD bdd, const vector<int>& assignment) {
+    BDD result = bdd;
+    for (int i = 0; i < 72; i++) {
+      BDD var = mgr.bddVar(i);
+      if (assignment[i]) {
+        result = result.Cofactor(var);
+      } else {
+        result = result.Cofactor(~var);
+      }
+    }
+    return result == mgr.bddOne();
+  }
+
+  // Convert a board to a minterm (product of literals)
+  BDD board_to_minterm(board_t board, const vector<BDD>& black_vars,
+                       const vector<BDD>& white_vars) {
+    side_t black = unpack(board, 0);
+    side_t white = unpack(board, 1);
+
+    BDD minterm = mgr.bddOne();
+
+    for (int i = 0; i < 36; i++) {
+      int q = i / 9;
+      int bit = i % 9;
+
+      int black_bit = (quadrant(black, q) >> bit) & 1;
+      int white_bit = (quadrant(white, q) >> bit) & 1;
+
+      if (black_bit) {
+        minterm = minterm & black_vars[i];
+      } else {
+        minterm = minterm & ~black_vars[i];
+      }
+
+      if (white_bit) {
+        minterm = minterm & white_vars[i];
+      } else {
+        minterm = minterm & ~white_vars[i];
+      }
+    }
+
+    return minterm;
+  }
+};
+
+// Strategy 4: Machine learning approach using feature engineering
 class FeatureBasedStrategy : public CompressionStrategy {
 public:
   string name() const override {
@@ -454,8 +638,9 @@ int toplevel(int argc, char** argv) {
     // Create and evaluate different compression strategies
     vector<unique_ptr<CompressionStrategy>> strategies;
     //strategies.push_back(make_unique<StoneCountingStrategy>());
-    strategies.push_back(make_unique<PatternStrategy>());
+    //strategies.push_back(make_unique<PatternStrategy>());
     //strategies.push_back(make_unique<FeatureBasedStrategy>());
+    strategies.push_back(make_unique<BDDStrategy>());
 
     // Train and evaluate each strategy
     for (auto& strategy : strategies) {
@@ -463,7 +648,7 @@ int toplevel(int argc, char** argv) {
       strategy->train(board_data);
 
       cout << "Evaluating " << strategy->name() << "..." << endl;
-      strategy->evaluate(board_data);
+      strategy->evaluate(board_data, 1000);  // Subsample to 1000 entries
       cout << endl;
     }
 

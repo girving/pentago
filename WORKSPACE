@@ -63,5 +63,13 @@ http_archive(
     build_file = "//third_party:zlib.BUILD",
 )
 
+http_archive(
+    name = "cudd",
+    urls = ["https://github.com/cuddorg/cudd/archive/refs/tags/cudd-3.0.0.tar.gz"],
+    sha256 = "5fe145041c594689e6e7cf4cd623d5f2b7c36261708be8c9a72aed72cf67acce",
+    strip_prefix = "cudd-cudd-3.0.0",
+    build_file = "//third_party:cudd.BUILD",
+)
+
 mpi_repository(name = "mpi")
 tensorflow_repository(name = "tensorflow")
