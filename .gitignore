@@ -4,3 +4,4 @@ history-*.try
 sparse-*.try
 /bazel-*
 xcuserdata
+/learn
