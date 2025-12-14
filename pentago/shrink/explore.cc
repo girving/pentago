@@ -141,7 +141,7 @@ public:
   }
 };
 
-// Strategy 2: Pattern-based heuristic
+// Strategy 2: Pattern-based heuristic using deviation from baseline
 class PatternStrategy : public CompressionStrategy {
 public:
   string name() const override {
@@ -149,7 +149,10 @@ public:
   }
 
   void train(RawArray<const sample_t> data) override {
-    // Analyze training data to find winning patterns
+    // First pass: collect pattern statistics and compute baseline
+    int total_wins = 0;
+    int total_samples = 0;
+
     for (const auto& sample : data) {
       // For each rotation
       for (const int r : range(256)) {
@@ -163,24 +166,40 @@ public:
 
         // Determine outcome and update patterns
         int outcome = sample.wins[0](r) - sample.wins[1](r);
+        bool win = outcome > 0;
 
-        // Update pattern frequencies (true for black win, false for white win or tie)
-        update_patterns(black, white, outcome > 0);
+        // Update pattern frequencies
+        update_patterns(black, white, win);
+
+        // Track global statistics for baseline
+        total_samples++;
+        if (win) total_wins++;
       }
     }
 
-    // Calculate pattern weights based on frequencies
+    // Calculate baseline win rate
+    baseline_win_rate = static_cast<double>(total_wins) / total_samples;
+    cout << "  Baseline win rate: " << (baseline_win_rate * 100) << "%" << endl;
+
+    // Calculate pattern deviations from baseline
+    const int min_count = 100;  // Require minimum samples for reliable deviation estimate
+    int patterns_used = 0;
     for (auto& [pattern, stats] : pattern_stats) {
-      if (stats.total > 0) {
-        stats.weight = static_cast<double>(stats.wins) / stats.total;
+      if (stats.total >= min_count) {
+        double pattern_win_rate = static_cast<double>(stats.wins) / stats.total;
+        stats.deviation = pattern_win_rate - baseline_win_rate;
+        patterns_used++;
+      } else {
+        stats.deviation = 0.0;  // Not enough data, assume baseline
       }
     }
+    cout << "  Patterns with enough data: " << patterns_used << " / " << pattern_stats.size() << endl;
   }
 
   int predict(board_t board) override {
     if (pattern_stats.empty()) {
       // Fallback if no patterns learned
-      return 0;
+      return -1;  // Predict majority class (loss)
     }
 
     // Extract sides
@@ -199,28 +218,30 @@ public:
       uint32_t pattern_key = (q_black << 16) | q_white;
 
       auto it = pattern_stats.find(pattern_key);
-      if (it != pattern_stats.end()) {
-        score += it->second.weight * 2 - 1; // Convert [0,1] to [-1,1]
+      if (it != pattern_stats.end() && it->second.total >= 100) {
+        score += it->second.deviation;
         count++;
       }
     }
 
-    // Check for patterns across quadrants too (diagonals, etc)
-    // This is a simplistic approach - real implementation would be more complex
+    if (count == 0) {
+      return -1;  // No pattern info, predict majority class
+    }
 
-    if (count == 0) return 0;
-
-    // Normalize score and convert to prediction
-    double avg_score = score / count;
-    return (avg_score > 0.1) ? 1 : (avg_score < -0.1 ? -1 : 0);
+    // Sum of deviations: positive means above baseline (favor win), negative means below
+    // Use a threshold to decide; threshold of 0 means: if evidence suggests above baseline, predict win
+    const double threshold = 0.0;
+    return (score > threshold) ? 1 : (score < -threshold ? -1 : 0);
   }
 
 private:
   struct PatternStats {
     int wins = 0;
     int total = 0;
-    double weight = 0.0;
+    double deviation = 0.0;  // Deviation from baseline win rate
   };
+
+  double baseline_win_rate = 0.0;
 
   // Map from pattern hash to stats (using uint32_t to combine black and white pieces)
   unordered_map<uint32_t, PatternStats> pattern_stats;
@@ -239,8 +260,6 @@ private:
       stats.total++;
       if (win) stats.wins++;
     }
-
-    // We could add more complex patterns here (across quadrants, etc.)
   }
 };
 
