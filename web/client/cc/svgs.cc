@@ -5,6 +5,7 @@
 #include "pentago/utility/format.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/vector.h"
+#include <cmath>
 namespace pentago {
 namespace {
 
@@ -63,7 +64,7 @@ void counts() {
     }
     vector<tuple<string,string>> attrs = {{"d", path}, {"style", style}};
     if (marker.size())
-      for (const string& m : {"marker-start", "marker-mid", "marker-end"})
+      for (const auto& m : {"marker-start", "marker-mid", "marker-end"})
         attrs.emplace_back(m, tfm::format("url(#%s)", marker));
     return sep + tag("path", attrs);
   };

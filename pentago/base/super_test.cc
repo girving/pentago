@@ -5,6 +5,7 @@
 #include "pentago/utility/range.h"
 #include "pentago/utility/log.h"
 #include "gtest/gtest.h"
+#include <cmath>
 #include <numeric>
 #include <unordered_set>
 namespace pentago {

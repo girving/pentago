@@ -18,5 +18,5 @@ typedef struct halfsupers_t_ {
   halfsuper_s win, notlose;
 } halfsupers_t;
 
-_Static_assert(sizeof(halfsuper_s) == 16, "");
-_Static_assert(sizeof(halfsupers_t) == 32, "");
+PENTAGO_STATIC_ASSERT(sizeof(halfsuper_s) == 16, "");
+PENTAGO_STATIC_ASSERT(sizeof(halfsupers_t) == 32, "");

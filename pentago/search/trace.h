@@ -55,7 +55,7 @@ extern string subset(super_t s, RawArray<const uint8_t> w);
 #endif
 
 #define TRACE_VERBOSE_START(depth,board) TRACE(const Array<const uint8_t> verbose = trace_verbose_start(depth,board); TraceVerbose ender(verbose.size()>0))
-#define TRACE_VERBOSE(...) TRACE(if (verbose.size()) std::cout << trace_verbose_prefix() << format(__VA_ARGS__) << std::endl)
+#define TRACE_VERBOSE(...) TRACE(if (verbose.size()) std::cout << trace_verbose_prefix() << tfm::format(__VA_ARGS__) << std::endl)
 
 // Do a clean evaluation of each board involved in an error or dependency
 bool trace_learn();

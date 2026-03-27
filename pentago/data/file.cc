@@ -3,6 +3,7 @@
 #include "pentago/data/file.h"
 #include "pentago/utility/format.h"
 #include "pentago/utility/range.h"
+#include <cstring>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

@@ -12,6 +12,7 @@
 #include "pentago/utility/const_cast.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/str.h"
+#include <cstring>
 namespace pentago {
 namespace end {
 

@@ -28,6 +28,7 @@
 #include <fnmatch.h>
 #include <getopt.h>
 
+#include <cstring>
 namespace pentago {
 namespace end {
 namespace {
@@ -192,7 +193,7 @@ void toplevel(int argc, char** argv) {
         for (const int i : range(samples.size())) {
           sample_boards[i] = samples[i][0];
           static_assert(sizeof(Vector<super_t,2>) == 8*sizeof(uint64_t));
-          memcpy(&sample_wins[i], &samples[i][1], 8*sizeof(uint64_t));
+          memcpy(static_cast<void*>(&sample_wins[i]), &samples[i][1], 8*sizeof(uint64_t));
         }
         unchecked.erase(sparse_file);
 
@@ -203,8 +204,8 @@ void toplevel(int argc, char** argv) {
         const Array<Vector<uint64_t,3>> counts(sections.size(), uninit);
         for (const int i : range(sections.size())) {
           static_assert(sizeof(section_t) == sizeof(uint64_t));
-          memcpy(&sections[i], &sections_and_counts[i][0], sizeof(uint64_t));
-          memcpy(&counts[i], &sections_and_counts[i][1], 3*sizeof(uint64_t));
+          memcpy(static_cast<void*>(&sections[i]), &sections_and_counts[i][0], sizeof(uint64_t));
+          memcpy(static_cast<void*>(&counts[i]), &sections_and_counts[i][1], 3*sizeof(uint64_t));
         }
         {
           string s = "sections =";

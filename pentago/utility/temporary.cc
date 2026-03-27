@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ftw.h>
+#include <cstring>
 namespace pentago {
 
 // From https://stackoverflow.com/questions/5467725

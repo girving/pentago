@@ -72,8 +72,9 @@ void midsolve_internal_test(const high_board_t board) {
       const auto known = exp(~halfsuper_t(0));
       const super_t correct = super_evaluate_all(a, 100, flip_board(rboard, turn));
       for (const int s : range(256))
-        if (known[s])
+        if (known[s]) {
           ASSERT_EQ(correct[s], value(rs, s) >= a);
+        }
       GEODE_ASSERT(!((correct ^ exp(a ? rs.win : rs.notlose)) & known), tfm::format("slice %d, board %s, a %d", slice, rboard, a));
     }
   }
@@ -288,15 +289,17 @@ TEST(mid, subsets) {
         case 2:
           for (const int i0 : range(n))
             for (const int i1 : range(n))
-              if (i0 > i1)
+              if (i0 > i1) {
                 ASSERT_EQ(get(sets, a++), i1|i0<<5);
+              }
           break;
         case 3:
           for (const int i0 : range(n))
             for (const int i1 : range(n))
               for (const int i2 : range(n))
-                if (i0 > i1 && i1 > i2)
+                if (i0 > i1 && i1 > i2) {
                   ASSERT_EQ(get(sets, a++), i2|i1<<5|i0<<10);
+                }
           break;
       }
       ASSERT_EQ(sets.size, a);

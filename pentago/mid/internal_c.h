@@ -75,5 +75,5 @@ typedef struct set1_info_t_ {
   uint8_t empty0[18];
 } set1_info_t;
 
-_Static_assert(sizeof(wins1_t) == 32, "");
-_Static_assert(sizeof(set0_info_t) == 256, "");
+PENTAGO_STATIC_ASSERT(sizeof(wins1_t) == 32, "");
+PENTAGO_STATIC_ASSERT(sizeof(set0_info_t) == 256, "");

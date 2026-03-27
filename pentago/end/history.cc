@@ -12,6 +12,8 @@
 #include "pentago/utility/str.h"
 #include "pentago/utility/sqr.h"
 #include "pentago/utility/log.h"
+#include <cmath>
+#include <cstring>
 #include <unordered_map>
 namespace pentago {
 namespace end {
@@ -89,7 +91,7 @@ static section_t parse_section(const event_t event) {
   for (int i=0;i<8;i++)
     counts[i] = microsig>>4*i&0xf;
   section_t section;
-  memcpy(&section,counts,sizeof(section));
+  memcpy(static_cast<void*>(&section),counts,sizeof(section));
   return section;
 }
 
@@ -115,16 +117,16 @@ string str_event(const event_t event) {
     case unevent:
       return "unevent";
     case block_ekind:
-      return format("s%s b%d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
+      return tfm::format("s%s b%d,%d,%d,%d",str(section),block[0],block[1],block[2],block[3]);
     case line_ekind: {
       string b[4];
       for (int i=0;i<4;i++)
         b[i] = i==dimensions?"_":str(int(block[i-(i>=dimensions)]));
-      return format("s%s d%d b%s,%s,%s,%s",str(section),dimensions,b[0],b[1],b[2],b[3]); }
+      return tfm::format("s%s d%d b%s,%s,%s,%s",str(section),dimensions,b[0],b[1],b[2],b[3]); }
     case block_line_ekind:
-      return format("s%s d%d b%d,%d,%d,%d",str(section),dimensions,block[0],block[1],block[2],block[3]);
+      return tfm::format("s%s d%d b%d,%d,%d,%d",str(section),dimensions,block[0],block[1],block[2],block[3]);
     case block_lines_ekind:
-      return format("s%s ss%d cd%d b%d,%d,%d,%d",str(section),dimensions>>2,dimensions&3,block[0],block[1],block[2],block[3]);
+      return tfm::format("s%s ss%d cd%d b%d,%d,%d,%d",str(section),dimensions>>2,dimensions&3,block[0],block[1],block[2],block[3]);
     default:
       return "<error>";
   }

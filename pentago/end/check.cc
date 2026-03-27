@@ -12,6 +12,7 @@
 #include "pentago/utility/memory.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/log.h"
+#include <cstring>
 namespace pentago {
 namespace end {
 
@@ -86,7 +87,7 @@ shared_ptr<accumulating_block_store_t> meaningless_block_store(
   const auto self = make_block_store(partition, rank, samples_per_section, store);
 
   // Replace data with meaninglessness
-  memset(self->section_counts.data(),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
+  memset(static_cast<void*>(self->section_counts.data()),0,sizeof(Vector<uint64_t,3>)*self->section_counts.size());
   for (const auto& info : self->block_infos)
     threads_schedule(CPU, curry(meaningless_helper, &*self, get<0>(info)));
   threads_wait_all_help();

@@ -3,8 +3,9 @@
 #include "pentago/end/config.h"
 #include "pentago/end/options.h"
 #include "pentago/utility/log.h"
-#include <getopt.h>
 #include <cmath>
+#include <cstring>
+#include <getopt.h>
 namespace pentago {
 namespace end {
 

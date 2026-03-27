@@ -18,6 +18,7 @@
 #include "pentago/utility/curry.h"
 #include "pentago/utility/log.h"
 #include <sys/stat.h>
+#include <cstring>
 namespace pentago {
 namespace mpi {
 
@@ -232,7 +233,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
     for (const int sid : section_range) {
       const auto section_blocks = pentago::mpi::section_blocks(sections[sid]);
       Array<supertensor_blob_t,4> block_index(section_blocks,uninit);
-      memset(block_index.data(),0,sizeof(supertensor_blob_t)*block_index.flat().size());
+      memset(static_cast<void*>(block_index.data()),0,sizeof(supertensor_blob_t)*block_index.flat().size());
       block_indexes[sid-section_range.lo] = block_index;
       for (const int i : range(section_blocks.product())) {
         const Vector<uint8_t,4> block(decompose(section_blocks, i));
@@ -284,7 +285,7 @@ void write_sections(const MPI_Comm comm, const string& filename, const readable_
 
   // Send all block index blobs to root
   Array<supertensor_blob_t> index_blobs(sections.size(), uninit);
-  memset(index_blobs.data(), 0, sizeof(supertensor_blob_t)*sections.size());
+  memset(static_cast<void*>(index_blobs.data()), 0, sizeof(supertensor_blob_t)*sections.size());
   {
     uint64_t next_block_index_offset = local_block_index_start;
     for (const int sid : section_range) {
@@ -474,7 +475,7 @@ shared_ptr<const readable_block_store_t> read_sections(
             filtered.size() / sizeof(Vector<super_t,2>), uninit);
         for (const int i : range(unfiltered.size())) {
           Vector<super_t,2> s;
-          memcpy(&s,&filtered[sizeof(s)*i],sizeof(s));
+          memcpy(static_cast<void*>(&s),&filtered[sizeof(s)*i],sizeof(s));
           s = uninterleave_super(little_to_native_endian(s));
           unfiltered[i] = !turn ? vec(s[0],~s[1]) : vec(s[1],~s[0]);
         }

@@ -9,6 +9,7 @@
 #include "pentago/utility/random.h"
 #include "pentago/utility/log.h"
 #include <cmath>
+#include <cstring>
 namespace pentago {
 
 using std::max;
@@ -35,7 +36,7 @@ static_assert(sizeof(superentry_t)==72,"");
 template<class D,class S> static inline D mcast(const S& src) {
   static_assert(sizeof(S)==sizeof(D),"");
   D dst;
-  memcpy(&dst,&src,sizeof(S));
+  memcpy(static_cast<void*>(&dst),&src,sizeof(S));
   return dst;
 }
 
@@ -57,7 +58,7 @@ void init_supertable(const int bits, const bool verbose) {
 }
 
 void clear_supertable() {
-  memset(table.data(),0,sizeof(superentry_t)*table.size());
+  memset(static_cast<void*>(table.data()),0,sizeof(superentry_t)*table.size());
   TRACE(trace_restart());
 }
 

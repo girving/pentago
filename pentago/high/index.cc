@@ -8,6 +8,7 @@
 #include "pentago/utility/endian.h"
 #include "pentago/utility/log.h"
 #ifdef PENTAGO_LITTLE_ENDIAN
+#include <cstring>
 namespace pentago {
 
 using namespace pentago::end;
@@ -58,7 +59,7 @@ compact_blob_t supertensor_index_t::block_location(RawArray<const uint8_t> blob)
   compact_blob_t b;
   GEODE_ASSERT(blob.size() == sizeof(b), tfm::format("expected size %d, got size %d, data %s",
                                                      sizeof(b), blob.size(), blob));
-  memcpy(&b,blob.data(),sizeof(b));
+  memcpy(static_cast<void*>(&b),blob.data(),sizeof(b));
   return b;
 }
 

@@ -4,7 +4,10 @@ load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 cc_library(
     name = "mpi",
     srcs = glob(["*.h", "*.cc"], exclude=["main.cc", "*_test.cc"]),
-    copts = COPTS + ["-Wno-deprecated-volatile"],
+    copts = COPTS + select({
+        "@bazel_tools//tools/cpp:clang": ["-Wno-deprecated-volatile"],
+        "//conditions:default": ["-Wno-volatile"],
+    }),
     deps = [
         "//pentago/base",
         "//pentago/end",

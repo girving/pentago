@@ -57,7 +57,7 @@ template<class A> void write_numpy(const string& filename, const A& data) {
 
   // Write npy file
   FILE* file = fopen(filename.c_str(), "wb");
-  if (!file) throw OSError(format("Can't open %s for writing", filename));
+  if (!file) throw OSError(tfm::format("Can't open %s for writing", filename));
   fwrite(header.data(), 1, header.size(), file);
   fwrite(chars.data(), 1, size, file);
   fclose(file);

@@ -54,12 +54,12 @@ TEST(supertensor, supertensor) {
   writer->finalize();
 
   // Test exact hash to verify endian safety.  This relies on deterministic
-  // compression, and therefore may fail in future.  These hashes are for zlib-1.2.11
-  // on Mac and Linux, respectively.
+  // compression, and therefore may fail in future.
   const string hash = sha1(mmap_file(path));
-  GEODE_ASSERT(hash == "c0e71ffcb78564039f1e7ca62d385c0628b1687c" ||
-               hash == "4499aa7221309f97065525ae4c162a4b0649a54c",
-               format("unexpected hash '%s'", hash));
+  GEODE_ASSERT(hash == "c0e71ffcb78564039f1e7ca62d385c0628b1687c" ||  // zlib-1.2.11, Mac
+               hash == "4499aa7221309f97065525ae4c162a4b0649a54c" ||  // zlib-1.2.11, Linux
+               hash == "576aff29e6ea484d89feed1d8a86d516eb7046c3",    // zlib-1.3.1, Linux
+               tfm::format("unexpected hash '%s'", hash));
 
   // Prepare for reading
   const auto reader0 = make_shared<const supertensor_reader_t>(path);

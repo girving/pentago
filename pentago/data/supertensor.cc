@@ -12,6 +12,7 @@
 #include "pentago/utility/curry.h"
 #include "pentago/utility/str.h"
 #include "pentago/utility/endian.h"
+#include <cstring>
 #include <unistd.h>
 namespace pentago {
 
@@ -259,7 +260,7 @@ supertensor_header_t::supertensor_header_t(section_t section, int block_size, in
   , block_size(block_size)
   , blocks((shape+block_size-1)/block_size)
   , filter(filter) {
-  memcpy(&magic,single_supertensor_magic,20);
+  memcpy(static_cast<void*>(&magic),single_supertensor_magic,20);
   index.uncompressed_size = index.compressed_size = index.offset = 0;
   // valid and index must be filled in later
 }
@@ -290,7 +291,7 @@ supertensor_writer_t::~supertensor_writer_t() {
     // File wasn't finished (due to an error or a failure to call finalize), so delete it
     int r = unlink(path.c_str());
     if (r < 0 && errno != ENOENT)
-      std::cerr << format("failed to remove incomplete supertensor file \"%s\": %s",
+      std::cerr << tfm::format("failed to remove incomplete supertensor file \"%s\": %s",
                           path, strerror(errno)) << std::endl;
   }
 }

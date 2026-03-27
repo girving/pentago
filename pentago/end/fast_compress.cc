@@ -11,6 +11,7 @@
 #include "pentago/utility/array.h"
 #include "pentago/utility/sqr.h"
 #include "snappy.h"
+#include <cstring>
 namespace pentago {
 namespace end {
 

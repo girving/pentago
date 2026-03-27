@@ -6,6 +6,7 @@
 #ifdef __APPLE__
 #include <os/lock.h>
 #else
+#include <unistd.h>
 #include <pthread.h>
 #endif
 namespace pentago {

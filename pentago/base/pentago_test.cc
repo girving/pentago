@@ -9,6 +9,7 @@
 #include "pentago/utility/threefry.h"
 #include "pentago/utility/log.h"
 #include "gtest/gtest.h"
+#include <functional>
 #include <unordered_set>
 namespace pentago {
 namespace {

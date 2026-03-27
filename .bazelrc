@@ -1,3 +1,4 @@
 # Enable WORKSPACE file (disabled by default in Bazel 8)
 common --enable_workspace=true
+common --repository_cache=.cache/bazel-repos
 

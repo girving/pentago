@@ -4,8 +4,9 @@
 #include "pentago/utility/thread.h"
 #include "pentago/utility/aligned.h"
 #include "pentago/utility/debug.h"
-#include <zlib.h>
+#include <cstring>
 #include <lzma.h>
+#include <zlib.h>
 namespace pentago {
 
 static const char* zlib_error(int z) {

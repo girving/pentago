@@ -9,6 +9,7 @@
 #include "pentago/utility/range.h"
 #include "pentago/utility/sse.h"
 #include "pentago/utility/log.h"
+#include <cstring>
 namespace pentago {
 
 using std::min;
@@ -227,7 +228,7 @@ static inline void compact_chunk(uint8_t dst[256], const Vector<super_t,2> src[5
 // Inverse of compact_chunk
 static inline void uncompact_chunk(Vector<super_t,2> dst[5], const uint8_t src[256]) {
   super_t d[2][5];
-  memset(d,0,sizeof(d));
+  memset(static_cast<void*>(d),0,sizeof(d));
   uint8_t* c0 = (uint8_t*)d[0]; // size 5*32
   uint8_t* c1 = (uint8_t*)d[1]; // size 5*32
   #define SET_FIVE(c,i,v) ({ \
@@ -255,7 +256,7 @@ Array<uint8_t> compact(Array<Vector<super_t,2>> src) {
     compact_chunk(&dst[256*i],&src[5*i]);
   if (extra) {
     Vector<super_t,2> rest[5];
-    memset(rest,0,sizeof(rest));
+    memset(static_cast<void*>(rest),0,sizeof(rest));
     memcpy(rest,src.data()+5*chunks,sizeof(Vector<super_t,2>)*extra);
     compact_chunk((uint8_t*)rest,rest);
     memcpy(dst.data()+256*chunks,rest,dst.size()-256*chunks);

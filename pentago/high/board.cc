@@ -51,7 +51,7 @@ high_board_t high_board_t::place(const int x, const int y) const {
 }
 
 high_board_t high_board_t::rotate(const int q, const int d) const {
-  NON_WASM_ASSERT(middle() && 0 <= q && q < 4 && d==1 || d==-1);
+  NON_WASM_ASSERT(middle() && 0 <= q && q < 4 && (d==1 || d==-1));
   side_t after[2] = {side(0), side(1)};
   WASM_NOUNROLL
   for (const int s : range(2)) {

@@ -4,6 +4,7 @@
 #include "pentago/utility/endian.h"
 #include "pentago/utility/mmap.h"
 #include "pentago/utility/str.h"
+#include <cstring>
 #include <regex>
 namespace pentago {
 

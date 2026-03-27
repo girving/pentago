@@ -107,7 +107,7 @@ void requests_t::cancel_and_waitall() {
   GEODE_ASSERT(!immediate_count);
 #endif
   callbacks.clear();
-  for (int i=0;i<requests.size();i++) {
+  for (size_t i=0;i<requests.size();i++) {
     GEODE_ASSERT(cancellables[i]);
     CHECK(MPI_Cancel(&requests[i]));
   }

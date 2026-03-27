@@ -7,6 +7,8 @@
 #include "pentago/utility/uint128.h"
 #include "pentago/utility/random.h"
 #include "pentago/utility/sqr.h"
+#include <cmath>
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>

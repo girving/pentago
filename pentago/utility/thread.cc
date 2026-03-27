@@ -7,6 +7,7 @@
 #include "pentago/utility/spinlock.h"
 #include "pentago/utility/wall_time.h"
 #include "pentago/utility/log.h"
+#include <cstring>
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -644,7 +645,7 @@ thread_times_t clear_thread_times() {
     wall_time_t missing = now-time_info.local_start;
     for (int k : range((int)master_missing_kind))
       missing -= table->times[k].local;
-    const int missing_kind = master_missing_kind+table->type;
+    const int missing_kind = int(master_missing_kind)+int(table->type);
     times[missing_kind] += missing;
     table->times[missing_kind].total += missing;
     // Clear local times

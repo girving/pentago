@@ -6,7 +6,10 @@ load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 cc_library(
     name = "utility",
     srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc"]),
-    copts = COPTS + ["-Wno-deprecated-volatile"],
+    copts = COPTS + select({
+        "@bazel_tools//tools/cpp:clang": ["-Wno-deprecated-volatile"],
+        "//conditions:default": ["-Wno-volatile"],
+    }),
     linkopts = ["-lpthread"],
     deps = [
         "@random123//:random123",

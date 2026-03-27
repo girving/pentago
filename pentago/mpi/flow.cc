@@ -16,6 +16,7 @@
 #include "pentago/utility/const_cast.h"
 #include "pentago/utility/curry.h"
 #include "pentago/utility/sqr.h"
+#include <cstring>
 namespace pentago {
 namespace mpi {
 
@@ -481,7 +482,7 @@ static void absorb_response(block_request_t* request, const int recv_size) {
       const auto line = request->dependent_lines[i];
       const auto block_data = line->input_block_data(request->block);
       GEODE_ASSERT(block_data.size()==nodes+PENTAGO_MPI_COMPRESS);
-      memcpy(block_data.data(),first_block_data.data(),sizeof(Vector<super_t,2>)*nodes);
+      memcpy(static_cast<void*>(block_data.data()),first_block_data.data(),sizeof(Vector<super_t,2>)*nodes);
       line->decrement_missing_input_blocks();
     }
 

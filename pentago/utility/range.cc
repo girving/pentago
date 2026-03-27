@@ -1,5 +1,6 @@
 #include "pentago/utility/range.h"
 #include "pentago/utility/debug.h"
+#include <cstdint>
 namespace pentago {
 
 using std::min;

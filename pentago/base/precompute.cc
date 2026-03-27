@@ -18,6 +18,7 @@
 #include "pentago/utility/scalar_view.h"
 #include "pentago/utility/sqr.h"
 #include <fstream>
+#include <functional>
 #include <map>
 #include <unordered_map>
 namespace pentago {

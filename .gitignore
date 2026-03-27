@@ -3,5 +3,22 @@ section-*.pentago
 history-*.try
 sparse-*.try
 /bazel-*
+/.cache
+.claude/settings.local.json
+.claude/agents
+.claude/commands
+.claude/skills
 xcuserdata
 /learn
+
+# For Claude sandbox purposes
+.bash_profile
+.bashrc
+.gitconfig
+.gitmodules
+.idea
+.profile
+.ripgreprc
+.vscode
+.zprofile
+.zshrc

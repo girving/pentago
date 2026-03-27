@@ -1,0 +1,7 @@
+#!/bin/bash
+# Wrapper around bazelisk that sets up writable cache directories within the repo
+root="$(dirname "$0")/.."
+export BAZELISK_HOME="$root/.cache/bazelisk"
+mkdir -p "$BAZELISK_HOME"
+unset TMPDIR
+exec bazelisk --output_base="$root/.cache/bazel" --install_base="$root/.cache/bazel-install" "$@"

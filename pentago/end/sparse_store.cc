@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <unistd.h>
+#include <cstring>
 namespace pentago {
 namespace end {
 

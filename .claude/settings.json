@@ -1,0 +1,27 @@
+{
+  "attribution": {
+    "commit": ""
+  },
+  "permissions": {
+    "ask": [
+      "Edit(WORKSPACE)",
+      "Edit(bin/bazel)"
+    ]
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "www.googleapis.com",
+        "releases.bazel.build",
+        "bcr.bazel.build",
+        "github.com",
+        "release-assets.githubusercontent.com",
+        "mirror.bazel.build",
+        "codeload.github.com",
+        "tukaani.org",
+        "www.zlib.net",
+        "sourceforge.net"
+      ]
+    }
+  }
+}

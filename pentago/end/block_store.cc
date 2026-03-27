@@ -14,6 +14,7 @@
 #include "pentago/utility/str.h"
 #include "pentago/utility/sqr.h"
 #include "pentago/utility/log.h"
+#include <cmath>
 namespace pentago {
 namespace end {
 

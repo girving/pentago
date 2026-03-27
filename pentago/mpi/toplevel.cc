@@ -40,6 +40,7 @@
 #include <getopt.h>
 #include <errno.h>
 #include <stdio.h>
+#include <cstring>
 namespace pentago {
 namespace mpi {
 

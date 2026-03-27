@@ -1,6 +1,7 @@
 #include "pentago/utility/mmap.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/memory.h"
+#include <cstring>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>

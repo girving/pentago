@@ -29,21 +29,19 @@ http_archive(
 http_archive(
     name = "com_google_googletest",
     urls = [
-        "https://github.com/google/googletest/archive/d175c8bf823e709d570772b038757fadf63bc632.tar.gz",
+        "https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz",
     ],
-    sha256 = "39a708e81cf68af02ca20cad879d1dbd055364f3ae5588a5743c919a51d7ad46",
-    strip_prefix = "googletest-d175c8bf823e709d570772b038757fadf63bc632",
-    build_file = "//third_party:googletest.BUILD",
+    sha256 = "7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926",
+    strip_prefix = "googletest-1.15.2",
 )
 
 http_archive(
     name = "lzma",
     urls = [
-        "https://tukaani.org/xz/xz-5.2.5.tar.gz",
-        "https://fossies.org/linux/misc/xz-5.2.5.tar.gz",
+        "https://github.com/tukaani-project/xz/releases/download/v5.2.13/xz-5.2.13.tar.gz",
     ],
-    sha256 = "f6f4910fd033078738bd82bfba4f49219d03b17eb0794eb91efbae419f4aba10",
-    strip_prefix = "xz-5.2.5/src",
+    sha256 = "2942a1a8397cd37688f79df9584947d484dd658db088d51b790317eb3184827b",
+    strip_prefix = "xz-5.2.13/src",
     build_file = "//third_party:lzma.BUILD",
 )
 

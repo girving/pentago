@@ -11,6 +11,7 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include <string_view>
+#include <cstring>
 namespace pentago {
 namespace {
 
@@ -57,7 +58,7 @@ struct all_blocks_t {
   // Blocks for slices [0, slice]
   int blocks(const int slice) const {
     GEODE_ASSERT(section_offsets.valid(slice + 1),
-                 format("max slice = %d < slice %d", max_slice, slice));
+                 tfm::format("max slice = %d < slice %d", max_slice, slice));
     return block_offsets[section_offsets[slice + 1]];
   }
 

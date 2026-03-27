@@ -11,6 +11,7 @@
 #include "pentago/utility/curry.h"
 #include <sys/mman.h>
 #include <errno.h>
+#include <cstring>
 namespace pentago {
 namespace end {
 

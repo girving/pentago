@@ -10,7 +10,7 @@ using std::string;
 
 #if PENTAGO_MPI_TRACING
 void mpi_trace(const string& msg);
-#define PENTAGO_MPI_TRACE(...) mpi_trace(format(__VA_ARGS__))
+#define PENTAGO_MPI_TRACE(...) mpi_trace(tfm::format(__VA_ARGS__))
 #else
 #define PENTAGO_MPI_TRACE(...) ((void)0)
 #endif

@@ -2,6 +2,12 @@
 #pragma once
 
 #ifdef __cplusplus
+#define PENTAGO_STATIC_ASSERT static_assert
+#else
+#define PENTAGO_STATIC_ASSERT _Static_assert
+#endif
+
+#ifdef __cplusplus
 namespace pentago {
 
 #if defined(__wasm__) && !defined(__APPLE__)
