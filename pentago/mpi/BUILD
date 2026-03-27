@@ -6,7 +6,7 @@ cc_library(
     name = "mpi",
     srcs = glob(["*.h", "*.cc"], exclude=["main.cc", "*_test.cc"]),
     copts = COPTS + select({
-        "@bazel_tools//tools/cpp:clang": ["-Wno-deprecated-volatile"],
+        "@platforms//os:macos": ["-Wno-deprecated-volatile"],
         "//conditions:default": ["-Wno-volatile"],
     }),
     deps = [

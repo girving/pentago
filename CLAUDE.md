@@ -11,6 +11,8 @@ Use `bin/bazel` which wraps bazelisk with sandbox-friendly cache directories:
 
 Always use `-c opt` for tests — some are slow without optimizations.
 
+On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDisableSandbox: true`. Claude Code's `permissions.allow` doesn't bypass the OS-level macOS sandbox (`sandbox-exec`), which blocks Bazel from writing to its output base and binding to localhost.
+
 ## Project structure
 
 - `pentago/utility/` — general utilities (threads, arrays, memory, etc.)
@@ -29,7 +31,7 @@ Always use `-c opt` for tests — some are slow without optimizations.
 ## Build conventions
 
 - C++20, `-Wall -Werror`
-- Compiler-specific flags use `select()` on `@bazel_tools//tools/cpp:clang` vs `//conditions:default` (GCC)
+- Compiler-specific flags use `select()` on `@platforms//os:macos` (Clang) vs `//conditions:default` (GCC)
 - Common copts in `pentago/pentago.bzl` (`COPTS`), test helper `cc_tests()`
 - Use `tfm::format` (tinyformat), not bare `format`
 - Prefer fixing root causes over suppressing warnings

@@ -10,6 +10,7 @@ sparse-*.try
 .claude/skills
 xcuserdata
 /learn
+MODULE.bazel.lock
 
 # For Claude sandbox purposes
 .bash_profile

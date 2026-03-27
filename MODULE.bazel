@@ -4,8 +4,15 @@ module(
 )
 
 # BCR dependencies
+bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.17")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
+single_version_override(
+    module_name = "googletest",
+    version = "1.17.0.bcr.2",
+    patches = ["//third_party:googletest_char8t.patch"],
+    patch_strip = 1,
+)
 bazel_dep(name = "zlib", version = "1.3.1.bcr.8")
 bazel_dep(name = "xz", version = "5.4.5.bcr.8", repo_name = "lzma")
 bazel_dep(name = "snappy", version = "1.2.2.bcr.3")

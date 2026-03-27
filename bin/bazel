@@ -4,4 +4,8 @@ root="$(dirname "$0")/.."
 export BAZELISK_HOME="$root/.cache/bazelisk"
 mkdir -p "$BAZELISK_HOME"
 unset TMPDIR
-exec bazelisk --output_base="$root/.cache/bazel" --install_base="$root/.cache/bazel-install" "$@"
+if command -v bazelisk &>/dev/null; then
+  exec bazelisk --output_base="$root/.cache/bazel" --install_base="$root/.cache/bazel-install" "$@"
+else
+  exec bazel --output_base="$root/.cache/bazel" --install_base="$root/.cache/bazel-install" "$@"
+fi

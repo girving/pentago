@@ -8,10 +8,13 @@ cc_library(
     name = "utility",
     srcs = glob(["*.h", "*.cc"], exclude=["*_test.cc"]),
     copts = COPTS + select({
-        "@bazel_tools//tools/cpp:clang": ["-Wno-deprecated-volatile"],
+        "@platforms//os:macos": ["-Wno-deprecated-volatile"],
         "//conditions:default": ["-Wno-volatile"],
     }),
-    linkopts = ["-lpthread"],
+    linkopts = select({
+        "@platforms//os:macos": [],
+        "//conditions:default": ["-lpthread"],
+    }),
     deps = [
         "@random123//:random123",
         "@tinyformat//:tinyformat",

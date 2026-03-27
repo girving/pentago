@@ -4,7 +4,7 @@ load("@rules_cc//cc:defs.bzl", "cc_test")
 
 # Common copts for all pentago targets
 COPTS = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"] + select({
-    "@bazel_tools//tools/cpp:clang": ["-Wno-vla-cxx-extension"],
+    "@platforms//os:macos": ["-Wno-vla-cxx-extension"],
     "//conditions:default": [],
 })
 
@@ -12,7 +12,7 @@ def cc_tests(names, deps, data=[], size="medium"):
   deps = deps + ["@com_google_googletest//:gtest", "@com_google_googletest//:gtest_main"]
   copts = COPTS + ["-Wsign-compare"]
   linkopts = select({
-      "@bazel_tools//tools/cpp:clang": ["-Wno-unused-command-line-argument"],
+      "@platforms//os:macos": ["-Wno-unused-command-line-argument"],
       "//conditions:default": [],
   })
   for name in names:

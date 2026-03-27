@@ -3,6 +3,9 @@
     "commit": ""
   },
   "permissions": {
+    "allow": [
+      "Bash(bin/bazel:*)"
+    ],
     "ask": [
       "Edit(WORKSPACE)",
       "Edit(bin/bazel)"
