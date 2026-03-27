@@ -30,7 +30,7 @@ void check(const string& dir, const string& options = "") {
 string mpirun() {
   if (nop)
     return "mpirun";
-  const string cmds[] = {"mpirun", "aprun", "/usr/local/bin/mpirun"};
+  const string cmds[] = {"mpirun", "aprun", "/usr/local/bin/mpirun", "/opt/amazon/openmpi/bin/mpirun"};
   for (const auto& cmd : cmds)
     if (!system(tfm::format("/usr/bin/which %s >/dev/null 2>/dev/null", cmd).c_str()))
       return cmd;

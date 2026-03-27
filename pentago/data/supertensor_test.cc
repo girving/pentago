@@ -7,6 +7,7 @@
 #include "pentago/utility/log.h"
 #include "pentago/utility/temporary.h"
 #include "gtest/gtest.h"
+#include "pentago/utility/test_assert.h"
 #include <unordered_map>
 namespace pentago {
 namespace {
@@ -64,12 +65,12 @@ TEST(supertensor, supertensor) {
   // Prepare for reading
   const auto reader0 = make_shared<const supertensor_reader_t>(path);
   const auto readers = open_supertensors(path);
-  ASSERT_EQ(readers.size(), 1);
+  PENTAGO_ASSERT_EQ(readers.size(), 1);
   const auto reader1 = readers[0];
   for (const auto& reader : {reader0, reader1}) {
     ASSERT_EQ(reader->header.section, section);
-    ASSERT_EQ(reader->header.block_size, block_size);
-    ASSERT_EQ(reader->header.filter, filter);
+    PENTAGO_ASSERT_EQ(reader->header.block_size, block_size);
+    PENTAGO_ASSERT_EQ(reader->header.filter, filter);
     ASSERT_EQ(reader->header.blocks, blocks);
   }
 

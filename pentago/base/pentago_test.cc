@@ -9,6 +9,7 @@
 #include "pentago/utility/threefry.h"
 #include "pentago/utility/log.h"
 #include "gtest/gtest.h"
+#include "pentago/utility/test_assert.h"
 #include <functional>
 #include <unordered_set>
 namespace pentago {
@@ -156,7 +157,7 @@ void win_test(const string& rotations) {
       for (const auto b : old_moves(board, 0, true))
         if (distance(b) < distance(board))
           options.push_back(b);
-      ASSERT_GT(options.size(), 0);
+      PENTAGO_ASSERT_GT(options.size(), 0);
       board = choose(random, options);
       log("after black", board);
       // Verify that we've won iff distance==0

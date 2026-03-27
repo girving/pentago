@@ -1,7 +1,8 @@
 # Pentago utility code
 
-package(default_visibility = ["//visibility:public"])
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//pentago:pentago.bzl", "cc_tests", "COPTS")
+package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "utility",

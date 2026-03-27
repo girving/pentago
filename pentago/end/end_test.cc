@@ -15,6 +15,7 @@
 #include "pentago/utility/curry.h"
 #include "pentago/utility/arange.h"
 #include "gtest/gtest.h"
+#include "pentago/utility/test_assert.h"
 #include <unordered_set>
 
 namespace pentago {
@@ -67,7 +68,7 @@ void partition_test(const partition_t& partition) {
     if (!contains(all_lines, event))
       THROW(RuntimeError,"missing line: %s",str_event(event));
   }
-  ASSERT_EQ(correct_lines.size(), all_lines.size());
+  PENTAGO_ASSERT_EQ(correct_lines.size(), all_lines.size());
   for (const auto& info : block_info) {
     // Verify that the block is supposed to exist
     simple.find_block(get<0>(get<0>(info)), get<1>(get<0>(info)));
@@ -234,7 +235,7 @@ TEST(end, counts) {
       const auto store = make_shared<compacting_store_t>(estimate_block_heap_size(*partition, 0));
       const auto blocks = meaningless_block_store(partition, 0, 0, store);
       slog("blocks = %d, correct = %d", blocks->total_nodes, good_nodes);
-      ASSERT_EQ(blocks->total_nodes, good_nodes);
+      PENTAGO_ASSERT_EQ(blocks->total_nodes, good_nodes);
       const auto bad_counts = sum_section_counts(sections->sections, blocks->section_counts);
       slog("bad counts  = %s", bad_counts);
       slog("good counts = %s", good_counts);
@@ -277,7 +278,7 @@ void test_fast_compress(const bool local) {
     }
     const auto compressed = compress_check(bad, local);
     ASSERT_EQ(compressed[0], 0);
-    ASSERT_EQ(compressed.size(), memory_usage(bad)+1);
+    PENTAGO_ASSERT_EQ(compressed.size(), memory_usage(bad)+1);
   }
 }
 

@@ -1,6 +1,20 @@
-###############################################################################
-# Bazel now uses Bzlmod by default to manage external dependencies.
-# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
-#
-# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
-###############################################################################
+module(
+    name = "pentago",
+    version = "0.0.0",
+)
+
+# BCR dependencies
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
+bazel_dep(name = "zlib", version = "1.3.1.bcr.8")
+bazel_dep(name = "xz", version = "5.4.5.bcr.8", repo_name = "lzma")
+bazel_dep(name = "snappy", version = "1.2.2.bcr.3")
+
+# Non-BCR dependencies
+bazel_dep(name = "bazel_skylib", version = "1.8.2")
+deps = use_extension("//third_party:deps.bzl", "deps")
+use_repo(deps, "random123", "tinyformat")
+
+# System MPI
+mpi = use_extension("//third_party:mpi.bzl", "mpi_ext")
+use_repo(mpi, "mpi")

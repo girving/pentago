@@ -1,5 +1,7 @@
 # Pentago build extensions
 
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
 # Common copts for all pentago targets
 COPTS = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"] + select({
     "@bazel_tools//tools/cpp:clang": ["-Wno-vla-cxx-extension"],
@@ -14,5 +16,5 @@ def cc_tests(names, deps, data=[], size="medium"):
       "//conditions:default": [],
   })
   for name in names:
-    native.cc_test(name=name, srcs=[name + ".cc"], copts=copts, linkopts=linkopts, deps=deps,
-                   data=data, size=size)
+    cc_test(name=name, srcs=[name + ".cc"], copts=copts, linkopts=linkopts, deps=deps,
+            data=data, size=size)

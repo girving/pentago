@@ -2,6 +2,7 @@
 
 
 MPI_BUILD = """
+load("@rules_cc//cc:defs.bzl", "cc_library")
 package(default_visibility = ["//visibility:public"])
 
 licenses(["restricted"])
@@ -15,7 +16,7 @@ cc_library(
 """
 
 
-def mpi_repository_impl(ctx):
+def _mpi_repository_impl(ctx):
   # Collect headers
   base = None
   for p in ['/usr/include', '/usr/local/include', '/opt/homebrew/include',
@@ -47,4 +48,10 @@ def mpi_repository_impl(ctx):
   ctx.file('BUILD', MPI_BUILD.format(lib=lib, hdrs=', '.join(hdrs)))
 
 
-mpi_repository = repository_rule(mpi_repository_impl)
+_mpi_repository = repository_rule(_mpi_repository_impl)
+
+
+def _mpi_ext_impl(ctx):
+  _mpi_repository(name = "mpi")
+
+mpi_ext = module_extension(implementation = _mpi_ext_impl)

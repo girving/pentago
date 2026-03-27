@@ -7,6 +7,7 @@
 #include "pentago/utility/range.h"
 #include "pentago/utility/log.h"
 #include "gtest/gtest.h"
+#include "pentago/utility/test_assert.h"
 #include <unordered_map>
 #include <unordered_set>
 namespace pentago {
@@ -65,9 +66,9 @@ void helper(const int symmetries) {
     ASSERT_EQ(hashes[n], h);
     if (symmetries == 2048 && size_t(n) < all_sizes.size()) {
       std::sort(boards.begin(), boards.end());
-      ASSERT_EQ(boards.size(), count_boards(n, 2048));
+      PENTAGO_ASSERT_EQ(boards.size(), count_boards(n, 2048));
       const unordered_set<board_t> boards_set(boards.begin(), boards.end());
-      ASSERT_EQ(boards_set.size(), boards.size());
+      PENTAGO_ASSERT_EQ(boards_set.size(), boards.size());
       const auto approx = all_boards_list(n);
       const auto h = portable_hash(approx);
       slog("approx: count = %d, hash = %s, ratio %g",

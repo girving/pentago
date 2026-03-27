@@ -5,6 +5,7 @@
 #include "pentago/utility/range.h"
 #include "pentago/utility/log.h"
 #include "gtest/gtest.h"
+#include "pentago/utility/test_assert.h"
 #include <cmath>
 #include <numeric>
 #include <unordered_set>
@@ -130,8 +131,8 @@ TEST(super, group) {
           break;
       }
     }
-  ASSERT_EQ(generated.size(), symmetries.size());
-  ASSERT_LE(generators.size(), integer_log(symmetries.size())+2);
+  PENTAGO_ASSERT_EQ(generated.size(), symmetries.size());
+  PENTAGO_ASSERT_LE(generators.size(), integer_log(symmetries.size())+2);
   // Check associativity on the generators.  This is sufficient thanks to cancellativity.
   for (auto a : generators)
     for (auto b : generators)
@@ -215,7 +216,7 @@ TEST(super, count) {
   for (const int n : range(counts.size())) {
     const int count = counts[n];
     slog("n %d, correct %d, computed %d", n, count, count_boards(n, 2048));
-    ASSERT_EQ(count_boards(n, 2048), count);
+    PENTAGO_ASSERT_EQ(count_boards(n, 2048), count);
   }
 }
 
