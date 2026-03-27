@@ -4,7 +4,7 @@ A massively parallel solver for the board game Pentago. Results at https://perfe
 
 ## Build
 
-Builds with Bazel 8 via bazelisk. Use the wrapper script which sets up cache directories:
+Use `bin/bazel` which wraps bazelisk with sandbox-friendly cache directories:
 
     bin/bazel build -c opt //pentago/...
     bin/bazel test -c opt //pentago/...

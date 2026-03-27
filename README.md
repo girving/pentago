@@ -1,6 +1,8 @@
 A massively parallel pentago solver
 ===================================
 
+[![build](https://github.com/girving/pentago/actions/workflows/build.yml/badge.svg)](https://github.com/girving/pentago/actions/workflows/build.yml)
+
 This project implements a strong solution of the board game pentago, which means
 that perfect play can be efficiently computed starting from any position.  The
 results can be explored at https://perfect-pentago.net.  The associated paper
@@ -37,14 +39,19 @@ The code is C++, with node.js for the backend server.  The main dependencies are
 * [mpi](http://en.wikipedia.org/wiki/Message_Passing_Interface): OpenMPI, MPICH2, etc.
 * [node.js >= 8.9](http://nodejs.org): Asynchronous javascript framework
 
-Bazel handles a few extra dependencies automatically (see `WORKSPACE` for details).
+Bazel handles a few extra dependencies automatically (see `MODULE.bazel` for details).
 
 ### Installation
 
 On Mac:
 
-    # Install dependencies
     brew install bazel openmpi node llvm
+
+On Ubuntu:
+
+    sudo apt-get install libopenmpi-dev
+
+Then build and test:
 
     # Build and test C++
     bazel test -c opt --copt=-march=native ...
@@ -57,8 +64,6 @@ On Mac:
     # Build frontend webpage
     cd web/client
     make public
-
-On Ubuntu: to be written once I have clean Bazel handling of MPI.
 
 ### Website
 
