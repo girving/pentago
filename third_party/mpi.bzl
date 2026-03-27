@@ -20,7 +20,8 @@ def _mpi_repository_impl(ctx):
   # Collect headers
   base = None
   for p in ['/usr/include', '/usr/local/include', '/opt/homebrew/include',
-            '/opt/amazon/openmpi/include', '/opt/amazon/openmpi5/include']:
+            '/opt/amazon/openmpi/include', '/opt/amazon/openmpi5/include',
+            '/usr/lib/x86_64-linux-gnu/openmpi/include']:
     p = ctx.path(p)
     if p.get_child('mpi.h').exists:
       base = p
