@@ -16,11 +16,14 @@ cc_library(
 
 cc_tests(
     names = [
+        "arithmetic_test",
         "compress_test",
         "filter_test",
         "lru_test",
         "numpy_test",
+        "shard_test",
         "supertensor_test",
+        "ternary_test",
     ],
     deps = [
         ":data",

@@ -37,3 +37,10 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Prefer fixing root causes over suppressing warnings
 - Don't add includes speculatively — only if the build actually fails
 - System includes go after project includes, sorted alphabetically
+- Mark const arguments as const
+- In tests, use `PENTAGO_ASSERT_EQ/LT/GT/LE/GE` instead of gtest `ASSERT_EQ` etc. to avoid sign-compare and dangling-else warnings
+- Never use `std::` prefix when a `using` declaration suffices
+- Prefer `Array`/`RawArray` over `vector` for POD types
+- Even trivial destructors should be declared in the header and defined in the .cc to reduce code size
+- Order function arguments with slowly-varying parameters first
+- Use unnamed namespaces for file-local types; use `static` for file-local functions

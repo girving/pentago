@@ -35,6 +35,29 @@ template<int d> static inline Vector<int,d> decompose(const Vector<int,d>& shape
   return r;
 }
 
+// Flatten a multidimensional index with uint64_t result (for shapes whose product overflows int)
+template<int d> static inline uint64_t index64(const Vector<int,d>& shape, const Vector<int,d>& I) {
+  assert(valid(shape, I));
+  if (d == 0) return 0;
+  uint64_t index = I[0];
+  for (int i = 1; i < d; i++)
+    index = index * shape[i] + I[i];
+  return index;
+}
+
+// Unpack a uint64_t flat index into its multidimensional source
+template<int d> static inline Vector<int,d> decompose64(const Vector<int,d>& shape, uint64_t I) {
+  Vector<int,d> r;
+  for (int i = d-1; i > 0; i--) {
+    const uint64_t s = shape[i];
+    const uint64_t j = I / s;
+    r[i] = int(I - j * s);
+    I = j;
+  }
+  r[0] = int(I);
+  return r;
+}
+
 // Compute strides for a flat multidimensional array
 template<int d> static inline Vector<int,d> strides(const Vector<int,d>& shape) {
   Vector<int,d> strides;
