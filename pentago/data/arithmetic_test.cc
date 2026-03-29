@@ -113,16 +113,16 @@ TEST(arithmetic, determinism) {
     ternaries_t t(20);
     for (const int i : range(20))
       t.set(i, i % 3);
-    check(t, "b4e206fd75925fc0e35024c02d55fb368288a928");
+    check(t, "d0cfb7b23cf47a5e91954b5a852a4164c1ebd872");
   }
   // All zeros
-  check(ternaries_t(100), "94f86ed2756400378ab22ffd5b2937df942b7054");
+  check(ternaries_t(100), "c7f47e797d6b9a7b26b0b8558b04368ff43c6753");
   // Skewed
   {
     ternaries_t t(1000);
     for (const int i : range(1000))
       t.set(i, int(threefry(7, i) % 3));
-    check(t, "a20a8481b336c4944055a5cb5e4cb454e41903b2");
+    check(t, "7b96ab6666a3c1603653bec07c94f0e4f90856a4");
   }
 }
 
@@ -148,67 +148,92 @@ TEST(arithmetic, finish_overflow) {
 }
 
 TEST(arithmetic, malformed_empty_data) {
-  // Decode with counts but no compressed data
-  const arithmetic_t bad{vec<uint64_t>(10, 10, 10), Array<const uint8_t>()};
+  // Nonzero counts but no compressed data — streams are all empty
+  const Vector<uint32_t,8> no_lens;
+  const arithmetic_t bad{1, vec<uint64_t>(10, 10, 10), no_lens, Array<const uint8_t>()};
   const auto decoded = arithmetic_decode(bad);
   PENTAGO_ASSERT_EQ(decoded.size, 30);
-  // Should not crash; values are garbage but bounded to {0,1,2}
-  for (const uint64_t i : range(decoded.size))
-    ASSERT_LT(decoded[i], 3);
-}
-
-TEST(arithmetic, malformed_truncated) {
-  // Encode valid data, then truncate the compressed output
-  Random random(111);
-  const auto input = random_ternaries(random, 1000, vec<uint64_t>(1, 1, 1));
-  const auto encoded = arithmetic_encode(input);
-  // Truncate to half
-  const int half = encoded.data.size() / 2;
-  Array<uint8_t> truncated(half, uninit);
-  for (const int i : range(half))
-    truncated[i] = encoded.data[i];
-  const arithmetic_t bad{encoded.counts, truncated};
-  const auto decoded = arithmetic_decode(bad);
-  // Should not crash; values bounded to {0,1,2}
-  for (const uint64_t i : range(decoded.size))
-    ASSERT_LT(decoded[i], 3);
-}
-
-TEST(arithmetic, malformed_garbage) {
-  // Decode random garbage bytes
-  Random random(222);
-  Array<uint8_t> garbage(256, uninit);
-  for (const int i : range(garbage.size()))
-    garbage[i] = uint8_t(threefry(222, i));
-  const arithmetic_t bad{vec<uint64_t>(100, 100, 100), garbage};
-  const auto decoded = arithmetic_decode(bad);
-  // Should not crash; values bounded to {0,1,2}
   for (const uint64_t i : range(decoded.size))
     ASSERT_LT(decoded[i], 3);
 }
 
 TEST(arithmetic, malformed_zero_counts) {
-  // All counts zero
-  const arithmetic_t bad{vec<uint64_t>(0, 0, 0), Array<const uint8_t>()};
+  const Vector<uint32_t,8> no_lens;
+  const arithmetic_t bad{1, vec<uint64_t>(0, 0, 0), no_lens, Array<const uint8_t>()};
   const auto decoded = arithmetic_decode(bad);
   PENTAGO_ASSERT_EQ(decoded.size, 0);
 }
 
-TEST(arithmetic, malformed_not_multiple_of_lanes) {
-  // Compressed data size not a multiple of 8
-  Array<uint8_t> odd(13, uninit);
-  odd.fill(0);
-  const arithmetic_t bad{vec<uint64_t>(5, 5, 5), odd};
-  // bytes_per_stream = 13/8 = 1, which truncates — should not crash
+TEST(arithmetic, malformed_garbage) {
+  // Valid stream_lengths summing to data size, but garbage content
+  Array<uint8_t> garbage(256, uninit);
+  for (const int i : range(garbage.size()))
+    garbage[i] = uint8_t(threefry(222, i));
+  Vector<uint32_t,8> lens;
+  for (int i = 0; i < 8; i++) lens[i] = 32;
+  const arithmetic_t bad{1, vec<uint64_t>(100, 100, 100), lens, garbage};
   const auto decoded = arithmetic_decode(bad);
   for (const uint64_t i : range(decoded.size))
     ASSERT_LT(decoded[i], 3);
 }
 
-TEST(arithmetic, malformed_overflow_counts) {
-  // Counts that overflow uint64_t when summed
-  const arithmetic_t bad{vec(UINT64_MAX, UINT64_MAX, uint64_t(1)), Array<const uint8_t>()};
+TEST(arithmetic, malformed_truncated) {
+  // Encode valid data, then truncate — stream_lengths won't match
+  Random random(111);
+  const auto input = random_ternaries(random, 1000, vec<uint64_t>(1, 1, 1));
+  const auto encoded = arithmetic_encode(input);
+  const int half = encoded.data.size() / 2;
+  Array<uint8_t> truncated(half, uninit);
+  for (const int i : range(half))
+    truncated[i] = encoded.data[i];
+  const arithmetic_t bad{1, encoded.counts, encoded.stream_lengths, truncated};
   ASSERT_THROW(arithmetic_decode(bad), RuntimeError);
+}
+
+TEST(arithmetic, malformed_overflow_counts) {
+  const Vector<uint32_t,8> no_lens;
+  const arithmetic_t bad{1, vec(UINT64_MAX, UINT64_MAX, uint64_t(1)), no_lens, Array<const uint8_t>()};
+  ASSERT_THROW(arithmetic_decode(bad), RuntimeError);
+}
+
+TEST(arithmetic, malformed_stream_lengths) {
+  Array<uint8_t> data(32);
+  data.fill(0);
+  // Lengths that don't sum to data size
+  Vector<uint32_t,8> big_lens;
+  for (int i = 0; i < 8; i++) big_lens[i] = 1000;
+  const arithmetic_t bad1{1, vec<uint64_t>(10, 10, 10), big_lens, data};
+  ASSERT_THROW(arithmetic_decode(bad1), RuntimeError);
+  // Lengths that overflow uint64 when summed
+  Vector<uint32_t,8> huge_lens;
+  for (int i = 0; i < 8; i++) huge_lens[i] = UINT32_MAX / 4;
+  const arithmetic_t bad2{1, vec<uint64_t>(10, 10, 10), huge_lens, data};
+  ASSERT_THROW(arithmetic_decode(bad2), RuntimeError);
+}
+
+TEST(arithmetic, malformed_huge_counts) {
+  // Individual count large enough that count * 0x3fff would overflow uint64
+  const Vector<uint32_t,8> no_lens;
+  const arithmetic_t bad{1, vec(uint64_t(1) << 52, uint64_t(1), uint64_t(1)), no_lens, Array<const uint8_t>()};
+  ASSERT_THROW(arithmetic_decode(bad), RuntimeError);
+}
+
+TEST(arithmetic, one_per_lane) {
+  // Exactly 8 symbols — one per lane
+  ternaries_t t(8);
+  for (const int i : range(8))
+    t.set(i, i % 3);
+  roundtrip(t);
+}
+
+TEST(arithmetic, fewer_than_lanes) {
+  // 1..7 symbols — some lanes get no symbols
+  for (const int n : range(1, 8)) {
+    ternaries_t t(n);
+    for (const int i : range(n))
+      t.set(i, i % 3);
+    roundtrip(t);
+  }
 }
 
 }  // namespace

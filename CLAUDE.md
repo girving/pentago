@@ -44,3 +44,4 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Even trivial destructors should be declared in the header and defined in the .cc to reduce code size
 - Order function arguments with slowly-varying parameters first
 - Use unnamed namespaces for file-local types; use `static` for file-local functions
+- Do not commit until the user has reviewed the code

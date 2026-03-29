@@ -1,24 +1,26 @@
-// Arithmetic coding of ternary arrays using 8 interleaved streams
+// Arithmetic coding of ternary arrays using 8 concatenated streams
 //
 // Format: 8 independent byte-renormalized arithmetic coders whose output bytes
-// are interleaved: [s0_b0][s1_b0]...[s7_b0][s0_b1][s1_b1]..., padded to 8 bytes.
+// are concatenated. Stream lengths are stored in arithmetic_t::stream_lengths.
 
 #include "pentago/data/arithmetic.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/range.h"
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 namespace pentago {
 
 using std::max;
+using std::min;
 
-static const int lanes = 8;
+static const int lanes = arithmetic_lanes;
 
 static Vector<uint32_t,3> make_cumulative(const Vector<uint64_t,3> counts) {
-  // Check for overflow, then renormalize so total fits in 14 bits with each weight at least 1
-  constexpr auto M = numeric_limits<uint64_t>::max();
-  GEODE_ASSERT(counts[0] <= M - counts[1] && counts[0] + counts[1] <= M - counts[2]);
+  // Validate and renormalize so total fits in 14 bits with each weight at least 1
+  constexpr uint64_t max_total = numeric_limits<uint64_t>::max() / 0x3fff;
   const uint64_t total = counts[0] + counts[1] + counts[2];
+  GEODE_ASSERT(counts[0] <= total && counts[1] <= total && total <= max_total);
   const uint32_t w0 = total ? uint32_t(counts[0] * 0x3fff / total + 1) : 1;
   const uint32_t w1 = total ? uint32_t(counts[1] * 0x3fff / total + 1) : 1;
   const uint32_t w2 = total ? uint32_t(counts[2] * 0x3fff / total + 1) : 1;
@@ -72,9 +74,8 @@ arithmetic_t arithmetic_encode(const ternaries_t data) {
     counts[data[i]]++;
   const auto cum = make_cumulative(counts);
 
-  // Encode with 8 interleaved streams
+  // Encode with 8 streams
   stream_t streams[lanes];
-  // Temporary per-stream output buffers
   vector<uint8_t> buffers[lanes];
 
   for (uint64_t i = 0; i < data.size; i++) {
@@ -95,20 +96,21 @@ arithmetic_t arithmetic_encode(const ternaries_t data) {
       buffers[lane].push_back(bytes[j]);
   }
 
-  // Interleave: find max buffer length, pad shorter ones
-  int max_len = 0;
-  for (int lane = 0; lane < lanes; lane++)
-    max_len = max(max_len, int(buffers[lane].size()));
-  for (int lane = 0; lane < lanes; lane++)
-    buffers[lane].resize(max_len, 0);
+  // Concatenate streams
+  Vector<uint32_t,lanes> stream_lengths;
+  uint64_t total_bytes = 0;
+  for (int lane = 0; lane < lanes; lane++) {
+    stream_lengths[lane] = CHECK_CAST_INT(uint64_t(buffers[lane].size()));
+    total_bytes += stream_lengths[lane];
+  }
+  Array<uint8_t> output(CHECK_CAST_INT(total_bytes), uninit);
+  int offset = 0;
+  for (int lane = 0; lane < lanes; lane++) {
+    memcpy(output.data() + offset, buffers[lane].data(), stream_lengths[lane]);
+    offset += stream_lengths[lane];
+  }
 
-  // Write interleaved output
-  Array<uint8_t> output(max_len * lanes, uninit);
-  for (int j = 0; j < max_len; j++)
-    for (int lane = 0; lane < lanes; lane++)
-      output[j * lanes + lane] = buffers[lane][j];
-
-  return {counts, output};
+  return {1, counts, stream_lengths, output};
 }
 
 namespace {
@@ -118,14 +120,14 @@ struct decode_stream_t {
   uint32_t lo = 0;
   uint32_t hi = 0xffffffff;
   uint32_t value = 0;
-  const uint8_t* ptr;
-  const uint8_t* end;
+  RawArray<const uint8_t> data;
+  int pos = 0;
 
-  uint8_t next() { return ptr < end ? *ptr++ : 0; }
+  uint8_t next() { return pos < data.size() ? data[pos++] : 0; }
 
-  void init(const uint8_t* data, const uint8_t* end) {
-    ptr = data;
-    this->end = end;
+  void init(const RawArray<const uint8_t> data) {
+    this->data = data;
+    pos = 0;
     for (int i = 0; i < 4; i++)
       value = (value << 8) | next();
   }
@@ -154,24 +156,25 @@ struct decode_stream_t {
 }  // namespace
 
 ternaries_t arithmetic_decode(const arithmetic_t encoded) {
+  GEODE_ASSERT(encoded.version == 1);
   const auto cum = make_cumulative(encoded.counts);
   const uint64_t n = encoded.total();
   ternaries_t result(n);
 
-  // De-interleave into per-stream buffers
-  const int total_bytes = encoded.data.size();
-  const int bytes_per_stream = total_bytes / lanes;
-  Array<uint8_t> buffers[lanes];
-  for (int lane = 0; lane < lanes; lane++) {
-    buffers[lane] = Array<uint8_t>(bytes_per_stream, uninit);
-    for (int j = 0; j < bytes_per_stream; j++)
-      buffers[lane][j] = encoded.data[j * lanes + lane];
-  }
-
-  // Initialize decoder streams
+  // Validate and initialize decoder streams from concatenated data
   decode_stream_t streams[lanes];
-  for (int lane = 0; lane < lanes; lane++)
-    streams[lane].init(buffers[lane].data(), buffers[lane].data() + bytes_per_stream);
+  {
+    uint64_t total_len = 0;
+    for (int lane = 0; lane < lanes; lane++)
+      total_len += encoded.stream_lengths[lane];
+    GEODE_ASSERT(total_len == uint64_t(encoded.data.size()));
+  }
+  int offset = 0;
+  for (int lane = 0; lane < lanes; lane++) {
+    const int len = encoded.stream_lengths[lane];
+    streams[lane].init(encoded.data.slice(offset, offset + len));
+    offset += len;
+  }
 
   // Decode
   for (uint64_t i = 0; i < n; i++) {
