@@ -3,7 +3,7 @@
 load("@rules_cc//cc:defs.bzl", "cc_test")
 
 # Common copts for all pentago targets
-COPTS = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check"] + select({
+COPTS = ["-std=c++20", "-Wall", "-Werror", "-fPIC", "-fno-stack-check", "-march=native"] + select({
     "@platforms//os:macos": ["-Wno-vla-cxx-extension"],
     "//conditions:default": [],
 })

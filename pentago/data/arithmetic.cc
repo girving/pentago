@@ -81,10 +81,10 @@ namespace {
 // Scalar encode/decode
 
 static void rans_put(uint32_t& state, const rans_freq_t& tab, const int sym,
-                     vector<uint8_t>& out) {
+                     uint8_t*& cursor) {
   assert(unsigned(sym) < 3);
   while (state >= tab.x_max[sym]) {
-    out.push_back(state & 0xff);
+    *cursor++ = state & 0xff;
     state >>= 8;
   }
   const uint32_t freq = tab.freq[sym];
@@ -101,18 +101,20 @@ static int rans_get(uint32_t& state, const rans_freq_t& tab,
   return sym;
 }
 
-static arithmetic_t concat_streams(const Vector<uint64_t,3> counts, vector<uint8_t> buffers[lanes]) {
+static arithmetic_t concat_streams(const Vector<uint64_t,3> counts,
+                                   const uint8_t* const ptrs[lanes],
+                                   const int lengths[lanes]) {
   Vector<uint32_t,lanes> stream_lengths;
   uint64_t total_bytes = 0;
   for (int lane = 0; lane < lanes; lane++) {
-    stream_lengths[lane] = CHECK_CAST_INT(uint64_t(buffers[lane].size()));
-    total_bytes += stream_lengths[lane];
+    stream_lengths[lane] = lengths[lane];
+    total_bytes += lengths[lane];
   }
   Array<uint8_t> output(CHECK_CAST_INT(total_bytes), uninit);
   int offset = 0;
   for (int lane = 0; lane < lanes; lane++) {
-    memcpy(output.data() + offset, buffers[lane].data(), stream_lengths[lane]);
-    offset += stream_lengths[lane];
+    memcpy(output.data() + offset, ptrs[lane], lengths[lane]);
+    offset += lengths[lane];
   }
   return {2, counts, stream_lengths, output};
 }
@@ -151,7 +153,25 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
   const __m256i one8 = _mm256_set1_epi32(1);
 
   __m256i state8 = _mm256_set1_epi32(rans_lower);
-  vector<uint8_t> buffers[lanes];
+
+  // Pre-allocate output buffers with raw cursors for zero-overhead writes.
+  // Max output per lane ≈ n/8 * 1.5 bytes + 4 (state flush).
+  const int buf_capacity = int(n / lanes * 2) + 64;
+  Array<uint8_t> buf_storage[lanes];
+  uint8_t* cursors[lanes];
+  for (int lane = 0; lane < lanes; lane++) {
+    buf_storage[lane] = Array<uint8_t>(buf_capacity, uninit);
+    cursors[lane] = buf_storage[lane].data();
+  }
+  auto finish = [&]() {
+    const uint8_t* ptrs[lanes];
+    int lengths[lanes];
+    for (int lane = 0; lane < lanes; lane++) {
+      ptrs[lane] = buf_storage[lane].data();
+      lengths[lane] = int(cursors[lane] - buf_storage[lane].data());
+    }
+    return concat_streams(counts, ptrs, lengths);
+  };
 
   // Handle tail (symbols not covered by 160-symbol batches)
   // 160 = 32 bytes * 5 digits = 20 groups of 8 lanes
@@ -161,7 +181,7 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
     alignas(32) uint32_t st[8];
     _mm256_store_si256((__m256i*)st, state8);
     for (int64_t i = int64_t(n) - 1; i >= full_batches; i--)
-      rans_put(st[i % lanes], tab, data[i], buffers[i % lanes]);
+      rans_put(st[i % lanes], tab, data[i], cursors[i % lanes]);
     state8 = _mm256_load_si256((const __m256i*)st);
   }
 
@@ -212,7 +232,7 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
           const int lane = (31 - __builtin_clz(mask)) / 4;
           const uint32_t val = _mm256_cvtsi256_si32(
               _mm256_permutevar8x32_epi32(state8, _mm256_set1_epi32(lane)));
-          buffers[lane].push_back(val & 0xff);
+          *cursors[lane]++ = val & 0xff;
           mask &= ~(0xf << (lane * 4));
         }
         state8 = _mm256_blendv_epi8(state8, _mm256_srli_epi32(state8, 8), need);
@@ -235,13 +255,13 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
     alignas(32) uint32_t st[8];
     _mm256_store_si256((__m256i*)st, state8);
     for (int lane = 0; lane < lanes; lane++) {
-      auto& buf = buffers[lane];
-      for (int j = 0; j < 4; j++) { buf.push_back(st[lane] & 0xff); st[lane] >>= 8; }
-      reverse(buf.begin(), buf.end());
+      for (int j = 0; j < 4; j++) { *cursors[lane]++ = st[lane] & 0xff; st[lane] >>= 8; }
+      const int len = int(cursors[lane] - buf_storage[lane].data());
+      reverse(buf_storage[lane].data(), buf_storage[lane].data() + len);
     }
   }
 
-  return concat_streams(counts, buffers);
+  return finish();
 }
 
 // AVX2 decoder
@@ -254,10 +274,8 @@ static ternaries_t arithmetic_decode_avx2(const rans_freq_t& tab, const uint64_t
   const __m256i mask_total = _mm256_set1_epi32(rans_total - 1);
   const __m256i cum1 = _mm256_set1_epi32(tab.cum[1]);
   const __m256i cum2 = _mm256_set1_epi32(tab.cum[2]);
-  const __m256i freq_tab = _mm256_setr_epi32(tab.freq[0], tab.freq[1], tab.freq[2], 0,
-                                              tab.freq[0], tab.freq[1], tab.freq[2], 0);
-  const __m256i cum_tab = _mm256_setr_epi32(tab.cum[0], tab.cum[1], tab.cum[2], 0,
-                                             tab.cum[0], tab.cum[1], tab.cum[2], 0);
+  const __m256i freq_tab = make_table8(tab.freq[0], tab.freq[1], tab.freq[2]);
+  const __m256i cum_tab = make_table8(tab.cum[0], tab.cum[1], tab.cum[2]);
 
   ternary_writer_t writer(result);
   uint64_t i = 0;
@@ -291,7 +309,6 @@ static ternaries_t arithmetic_decode_avx2(const rans_freq_t& tab, const uint64_t
         const __m256i need = _mm256_cmpgt_epi32(lower8, state8);
         int mask = _mm256_movemask_epi8(need);
         if (!mask) break;
-        // Read one byte per needing lane that has data, building vectors in registers
         __m256i got8 = _mm256_setzero_si256();
         __m256i bytes8 = _mm256_setzero_si256();
         while (mask) {
@@ -338,19 +355,31 @@ arithmetic_t arithmetic_encode(const ternaries_t data) {
   // Scalar fallback
   uint32_t states[lanes];
   for (int lane = 0; lane < lanes; lane++) states[lane] = rans_lower;
-  vector<uint8_t> buffers[lanes];
+  const int buf_capacity = int(n / lanes * 2) + 64;
+  Array<uint8_t> buf_storage[lanes];
+  uint8_t* cursors[lanes];
+  for (int lane = 0; lane < lanes; lane++) {
+    buf_storage[lane] = Array<uint8_t>(buf_capacity, uninit);
+    cursors[lane] = buf_storage[lane].data();
+  }
 
   for (int64_t i = int64_t(n) - 1; i >= 0; i--)
-    rans_put(states[i % lanes], tab, data[i], buffers[i % lanes]);
+    rans_put(states[i % lanes], tab, data[i], cursors[i % lanes]);
 
   // Flush and reverse
   for (int lane = 0; lane < lanes; lane++) {
-    auto& buf = buffers[lane];
-    for (int j = 0; j < 4; j++) { buf.push_back(states[lane] & 0xff); states[lane] >>= 8; }
-    reverse(buf.begin(), buf.end());
+    for (int j = 0; j < 4; j++) { *cursors[lane]++ = states[lane] & 0xff; states[lane] >>= 8; }
+    const int len = int(cursors[lane] - buf_storage[lane].data());
+    reverse(buf_storage[lane].data(), buf_storage[lane].data() + len);
   }
 
-  return concat_streams(counts, buffers);
+  const uint8_t* ptrs[lanes];
+  int lengths[lanes];
+  for (int lane = 0; lane < lanes; lane++) {
+    ptrs[lane] = buf_storage[lane].data();
+    lengths[lane] = int(cursors[lane] - buf_storage[lane].data());
+  }
+  return concat_streams(counts, ptrs, lengths);
 }
 
 ternaries_t arithmetic_decode(const arithmetic_t encoded) {

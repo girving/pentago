@@ -276,7 +276,8 @@ TEST(arithmetic, benchmark) {
   //                       generate    encode      decode
   //   2026mar30 scalar:    94.5 M/s    36.4 M/s    77.1 M/s
   //   2026mar30 AVX2:      81.4 M/s   170.0 M/s   187.7 M/s
-  //   AVX2 speedup:         0.9x        4.7x        2.4x
+  //   2026mar30 AVX2+opt: 106.7 M/s   208.2 M/s   200.3 M/s
+  //   opt/scalar speedup:   1.1x        5.7x        2.6x
   const int n = 10000000;
   const auto weights = vec<uint64_t>(60, 30, 10);
   const double total_w = 100.0;
