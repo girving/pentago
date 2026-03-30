@@ -8,6 +8,7 @@
 #include "pentago/utility/test_assert.h"
 #include "pentago/utility/threefry.h"
 #include "gtest/gtest.h"
+#include <chrono>
 #include <cmath>
 namespace pentago {
 namespace {
@@ -265,6 +266,62 @@ TEST(arithmetic, two_zero_counts) {
 TEST(arithmetic, large_n) {
   Random random(333);
   roundtrip(random_ternaries(random, 100000, vec<uint64_t>(1, 1, 1)));
+}
+
+TEST(arithmetic, benchmark) {
+  // Benchmark encode/decode with skewed distribution (p ≈ 0.6, 0.3, 0.1)
+  // Target ~1 second total.
+  //
+  // Results (10M symbols, p={60,30,10}):
+  //                       generate    encode      decode
+  //   2026mar30 scalar:    94.5 M/s    36.4 M/s    77.1 M/s
+  //   2026mar30 AVX2:      81.4 M/s   170.0 M/s   187.7 M/s
+  //   AVX2 speedup:         0.9x        4.7x        2.4x
+  const int n = 10000000;
+  const auto weights = vec<uint64_t>(60, 30, 10);
+  const double total_w = 100.0;
+
+  // Generate via fill_random: thresholds for {60%, 90%} of uint16 range
+  auto t0 = std::chrono::high_resolution_clock::now();
+  ternaries_t data(n);
+  data.fill_random(42, Vector<uint16_t,2>(uint16_t(0.6 * 65536), uint16_t(0.9 * 65536)));
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  // Encode
+  const auto encoded = arithmetic_encode(data);
+  auto t2 = std::chrono::high_resolution_clock::now();
+
+  // Decode
+  const auto decoded = arithmetic_decode(encoded);
+  auto t3 = std::chrono::high_resolution_clock::now();
+
+  // Verify roundtrip
+  PENTAGO_ASSERT_EQ(decoded.size, data.size);
+  for (int i = 0; i < 1000; i++) {
+    const int j = int(uint64_t(threefry(99, i)) % n);
+    PENTAGO_ASSERT_EQ(decoded[j], data[j]);
+  }
+
+  // Check compression vs entropy
+  double entropy = 0;
+  for (int i = 0; i < 3; i++) {
+    const double p = weights[i] / total_w;
+    entropy -= p * log2(p);
+  }
+  const double theoretical = entropy * n / 8;
+  const double actual = encoded.data.size();
+  const double ratio = actual / theoretical;
+
+  const double gen_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+  const double enc_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
+  const double dec_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
+  slog("benchmark: n=%d, entropy=%.4f bits/sym", n, entropy);
+  slog("  generate: %.1f ms (%.1f M sym/s)", gen_ms, n / 1e3 / gen_ms);
+  slog("  encode:   %.1f ms (%.1f M sym/s)", enc_ms, n / 1e3 / enc_ms);
+  slog("  decode:   %.1f ms (%.1f M sym/s)", dec_ms, n / 1e3 / dec_ms);
+  slog("  size: %.0f bytes (%.2fx entropy)", actual, ratio);
+  ASSERT_GT(ratio, 0.99);
+  ASSERT_LT(ratio, 1.02);
 }
 
 }  // namespace

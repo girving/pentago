@@ -9,7 +9,7 @@
 #endif  // PENTAGO_CPP
 
 // Decide whether or not to use SSE
-#if !defined(__SSE__)
+#if !defined(__SSE__) || defined(PENTAGO_FORCE_SCALAR)
 #define PENTAGO_SSE 0
 #else  // defined(__SSE__)
 #define PENTAGO_SSE 1

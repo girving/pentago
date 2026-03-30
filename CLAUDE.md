@@ -45,3 +45,8 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Order function arguments with slowly-varying parameters first
 - Use unnamed namespaces for file-local types; use `static` for file-local functions
 - Do not commit until the user has reviewed the code
+- No `__attribute__((target(...)))` — we compile with `-march=native` so AVX2 is always available
+- Always build and test with `--copt=-march=native` (needed for AVX2 SIMD paths)
+- Don't allocate large intermediate buffers when direct access suffices
+- Validate untrusted input upfront (e.g. assert stream lengths sum correctly) rather than clamping during use
+- When changing a serialization format, commit the format change first with determinism hashes, then optimize — hashes must not change during optimization
