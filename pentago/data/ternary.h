@@ -17,4 +17,26 @@ struct ternaries_t {
   void set(const uint64_t i, const int v);
 };
 
+// Sequential reader: unpacks 5 values at a time, avoiding per-element division
+struct ternary_reader_t {
+  const uint8_t* ptr;
+  const uint8_t* end;
+  int buf[5];
+  int pos;
+
+  explicit ternary_reader_t(const ternaries_t& t);
+  int next();
+};
+
+// Sequential writer: packs 5 values at a time
+struct ternary_writer_t {
+  uint8_t* ptr;
+  int buf[5];
+  int pos;
+
+  explicit ternary_writer_t(ternaries_t& t);
+  void put(const int v);
+  void flush();
+};
+
 }  // namespace pentago

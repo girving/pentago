@@ -35,6 +35,7 @@ void roundtrip(const ternaries_t input) {
 
 TEST(arithmetic, roundtrip_uniform) {
   Random random(42);
+  // Encode 8 symbols (one per lane), then decode — simplest multi-symbol test
   roundtrip(random_ternaries(random, 10000, vec<uint64_t>(1, 1, 1)));
 }
 
@@ -113,16 +114,16 @@ TEST(arithmetic, determinism) {
     ternaries_t t(20);
     for (const int i : range(20))
       t.set(i, i % 3);
-    check(t, "d0cfb7b23cf47a5e91954b5a852a4164c1ebd872");
+    check(t, "214a767752ee0ed88e361b42abc90ee05a3be0d1");
   }
   // All zeros
-  check(ternaries_t(100), "c7f47e797d6b9a7b26b0b8558b04368ff43c6753");
+  check(ternaries_t(100), "523749d0496f43a7f8e33bad0c7db2e6edc5b8a6");
   // Skewed
   {
     ternaries_t t(1000);
     for (const int i : range(1000))
       t.set(i, int(threefry(7, i) % 3));
-    check(t, "7b96ab6666a3c1603653bec07c94f0e4f90856a4");
+    check(t, "b3c12598e8201ef562e982f390ae7e6f4fad91af");
   }
 }
 
@@ -139,7 +140,7 @@ TEST(arithmetic, finish_overflow) {
     roundtrip(t);
   }
   // Specifically test heavily skewed data (high lo values)
-  for (const int n : {1, 7, 8, 9, 15, 16, 17, 100, 200}) {
+  for (const int n : {1, 2, 7, 8, 9, 15, 16, 17, 100, 200}) {
     ternaries_t t(n);
     for (const int i : range(n))
       t.set(i, 2);  // all symbol 2 pushes lo high
@@ -150,7 +151,7 @@ TEST(arithmetic, finish_overflow) {
 TEST(arithmetic, malformed_empty_data) {
   // Nonzero counts but no compressed data — streams are all empty
   const Vector<uint32_t,8> no_lens;
-  const arithmetic_t bad{1, vec<uint64_t>(10, 10, 10), no_lens, Array<const uint8_t>()};
+  const arithmetic_t bad{2, vec<uint64_t>(10, 10, 10), no_lens, Array<const uint8_t>()};
   const auto decoded = arithmetic_decode(bad);
   PENTAGO_ASSERT_EQ(decoded.size, 30);
   for (const uint64_t i : range(decoded.size))
@@ -159,7 +160,7 @@ TEST(arithmetic, malformed_empty_data) {
 
 TEST(arithmetic, malformed_zero_counts) {
   const Vector<uint32_t,8> no_lens;
-  const arithmetic_t bad{1, vec<uint64_t>(0, 0, 0), no_lens, Array<const uint8_t>()};
+  const arithmetic_t bad{2, vec<uint64_t>(0, 0, 0), no_lens, Array<const uint8_t>()};
   const auto decoded = arithmetic_decode(bad);
   PENTAGO_ASSERT_EQ(decoded.size, 0);
 }
@@ -171,7 +172,7 @@ TEST(arithmetic, malformed_garbage) {
     garbage[i] = uint8_t(threefry(222, i));
   Vector<uint32_t,8> lens;
   for (int i = 0; i < 8; i++) lens[i] = 32;
-  const arithmetic_t bad{1, vec<uint64_t>(100, 100, 100), lens, garbage};
+  const arithmetic_t bad{2, vec<uint64_t>(100, 100, 100), lens, garbage};
   const auto decoded = arithmetic_decode(bad);
   for (const uint64_t i : range(decoded.size))
     ASSERT_LT(decoded[i], 3);
@@ -186,13 +187,13 @@ TEST(arithmetic, malformed_truncated) {
   Array<uint8_t> truncated(half, uninit);
   for (const int i : range(half))
     truncated[i] = encoded.data[i];
-  const arithmetic_t bad{1, encoded.counts, encoded.stream_lengths, truncated};
+  const arithmetic_t bad{2, encoded.counts, encoded.stream_lengths, truncated};
   ASSERT_THROW(arithmetic_decode(bad), RuntimeError);
 }
 
 TEST(arithmetic, malformed_overflow_counts) {
   const Vector<uint32_t,8> no_lens;
-  const arithmetic_t bad{1, vec(UINT64_MAX, UINT64_MAX, uint64_t(1)), no_lens, Array<const uint8_t>()};
+  const arithmetic_t bad{2, vec(UINT64_MAX, UINT64_MAX, uint64_t(1)), no_lens, Array<const uint8_t>()};
   ASSERT_THROW(arithmetic_decode(bad), RuntimeError);
 }
 
@@ -202,19 +203,19 @@ TEST(arithmetic, malformed_stream_lengths) {
   // Lengths that don't sum to data size
   Vector<uint32_t,8> big_lens;
   for (int i = 0; i < 8; i++) big_lens[i] = 1000;
-  const arithmetic_t bad1{1, vec<uint64_t>(10, 10, 10), big_lens, data};
+  const arithmetic_t bad1{2, vec<uint64_t>(10, 10, 10), big_lens, data};
   ASSERT_THROW(arithmetic_decode(bad1), RuntimeError);
   // Lengths that overflow uint64 when summed
   Vector<uint32_t,8> huge_lens;
   for (int i = 0; i < 8; i++) huge_lens[i] = UINT32_MAX / 4;
-  const arithmetic_t bad2{1, vec<uint64_t>(10, 10, 10), huge_lens, data};
+  const arithmetic_t bad2{2, vec<uint64_t>(10, 10, 10), huge_lens, data};
   ASSERT_THROW(arithmetic_decode(bad2), RuntimeError);
 }
 
 TEST(arithmetic, malformed_huge_counts) {
   // Individual count large enough that count * 0x3fff would overflow uint64
   const Vector<uint32_t,8> no_lens;
-  const arithmetic_t bad{1, vec(uint64_t(1) << 52, uint64_t(1), uint64_t(1)), no_lens, Array<const uint8_t>()};
+  const arithmetic_t bad{2, vec(uint64_t(1) << 52, uint64_t(1), uint64_t(1)), no_lens, Array<const uint8_t>()};
   ASSERT_THROW(arithmetic_decode(bad), RuntimeError);
 }
 
@@ -234,6 +235,36 @@ TEST(arithmetic, fewer_than_lanes) {
       t.set(i, i % 3);
     roundtrip(t);
   }
+}
+
+TEST(arithmetic, extremely_skewed_counts) {
+  // One symbol dominates — tests make_freq adjustment when two freqs are forced to 1
+  for (const int dom : {0, 1, 2}) {
+    ternaries_t t(100000);
+    for (const int i : range(100000))
+      t.set(i, dom);
+    // Sprinkle a few of the other symbols
+    t.set(0, (dom + 1) % 3);
+    t.set(1, (dom + 2) % 3);
+    roundtrip(t);
+  }
+}
+
+TEST(arithmetic, two_zero_counts) {
+  // Only one symbol present
+  for (const int v : {0, 1, 2}) {
+    for (const int n : {1, 8, 100}) {
+      ternaries_t t(n);
+      for (const int i : range(n))
+        t.set(i, v);
+      roundtrip(t);
+    }
+  }
+}
+
+TEST(arithmetic, large_n) {
+  Random random(333);
+  roundtrip(random_ternaries(random, 100000, vec<uint64_t>(1, 1, 1)));
 }
 
 }  // namespace

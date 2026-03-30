@@ -1,4 +1,4 @@
-// Arithmetic coding of ternary arrays using 8 concatenated streams
+// rANS coding of ternary arrays using 8 concatenated streams
 #pragma once
 
 #include "pentago/data/ternary.h"
