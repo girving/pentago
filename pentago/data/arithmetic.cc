@@ -146,7 +146,6 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
   // Build per-symbol lookup tables for shuffle
   const __m256i freq_tab = make_table8(tab.freq[0], tab.freq[1], tab.freq[2]);
   const __m256i cum_tab = make_table8(tab.cum[0], tab.cum[1], tab.cum[2]);
-  const __m256i xmax_tab = make_table8(tab.x_max[0], tab.x_max[1], tab.x_max[2]);
   const __m256i rcp_tab = make_table8(tab.rcp[0], tab.rcp[1], tab.rcp[2]);
   const __m256i shift_tab = make_table8(tab.rcp_shift[0], tab.rcp_shift[1], tab.rcp_shift[2]);
   const __m256i one8 = _mm256_set1_epi32(1);
@@ -185,9 +184,16 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
   }
 
   // Main loop: unpack 160 symbols at a time, process 20 groups of 8.
-  // Unpack ternary bytes into digit_buf[5][32], then transpose into sequential syms[160].
+  // Unpack ternary bytes into digit_buf[5][32], then gather symbols per group via precomputed offsets.
   alignas(32) uint8_t digit_buf[5 * 32];
-  alignas(16) uint8_t syms[160];
+
+  // Precompute gather offsets: group g, lane l → digit_buf[(s%5)*32 + s/5] where s = g*8+l
+  uint8_t gather_off[20][8];
+  for (int g = 0; g < 20; g++)
+    for (int l = 0; l < lanes; l++) {
+      const int s = g * lanes + l;
+      gather_off[g][l] = uint8_t((s % 5) * 32 + s / 5);
+    }
 
   for (int64_t batch_base = full_batches - batch; batch_base >= 0; batch_base -= batch) {
     // Unpack 32 bytes into digit_buf via AVX2 divide-by-3
@@ -198,22 +204,20 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
       _mm256_store_si256((__m256i*)(digit_buf + 32 * d++), _mm256_packus_epi16(rlo, rhi));
     });
 
-    // Transpose digit_buf[d][b] into sequential symbol order: syms[b*5+d] = digit_buf[d*32+b]
-    for (int b = 0; b < 32; b++)
-      for (int dd = 0; dd < 5; dd++)
-        syms[b * 5 + dd] = digit_buf[dd * 32 + b];
-
-    // Process 20 groups of 8 in reverse, loading symbols sequentially
+    // Process 20 groups of 8 in reverse, gathering symbols from digit_buf
     for (int g = 20 - 1; g >= 0; g--) {
-      const __m256i sym8 = _mm256_cvtepu8_epi32(
-          _mm_loadl_epi64((const __m128i*)(syms + g * lanes)));
+      // Gather 8 symbols from scattered digit positions
+      const uint8_t* goff = gather_off[g];
+      const __m256i sym8 = _mm256_setr_epi32(
+          digit_buf[goff[0]], digit_buf[goff[1]], digit_buf[goff[2]], digit_buf[goff[3]],
+          digit_buf[goff[4]], digit_buf[goff[5]], digit_buf[goff[6]], digit_buf[goff[7]]);
 
-      // Shuffle per-symbol values
-      const __m256i xmax8 = shuffle3(xmax_tab, sym8);
+      // Shuffle per-symbol values (xmax = freq << 17, derived instead of looked up)
       const __m256i freq8 = shuffle3(freq_tab, sym8);
       const __m256i cum8 = shuffle3(cum_tab, sym8);
       const __m256i rcp8 = shuffle3(rcp_tab, sym8);
       const __m256i shift8 = shuffle3(shift_tab, sym8);
+      const __m256i xmax8 = _mm256_slli_epi32(freq8, 17);
 
       // Renorm: emit low bytes and shift for lanes where state >= xmax
       for (;;) {
@@ -221,7 +225,6 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
             _mm256_cmpgt_epi32(xmax8, state8), _mm256_set1_epi32(-1));
         int mask = _mm256_movemask_epi8(need);
         if (!mask) break;
-        // Emit one byte per needing lane
         while (mask) {
           const int lane = (31 - __builtin_clz(mask)) / 4;
           const uint32_t val = _mm256_cvtsi256_si32(
