@@ -15,7 +15,6 @@
 namespace pentago {
 
 using std::max;
-using std::reverse;
 
 static const int lanes = arithmetic_lanes;
 static const int total_bits = 14;
@@ -84,7 +83,7 @@ static void rans_put(uint32_t& state, const rans_freq_t& tab, const int sym,
                      uint8_t*& cursor) {
   assert(unsigned(sym) < 3);
   while (state >= tab.x_max[sym]) {
-    *cursor++ = state & 0xff;
+    *--cursor = state & 0xff;
     state >>= 8;
   }
   const uint32_t freq = tab.freq[sym];
@@ -154,21 +153,21 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
 
   __m256i state8 = _mm256_set1_epi32(rans_lower);
 
-  // Pre-allocate output buffers with raw cursors for zero-overhead writes.
-  // Max output per lane ≈ n/8 * 1.5 bytes + 4 (state flush).
+  // Pre-allocate output buffers with cursors starting at the end.
+  // Encoder writes backward (LIFO), producing forward-order bytes directly — no reverse needed.
   const int buf_capacity = int(n / lanes * 2) + 64;
   Array<uint8_t> buf_storage[lanes];
   uint8_t* cursors[lanes];
   for (int lane = 0; lane < lanes; lane++) {
     buf_storage[lane] = Array<uint8_t>(buf_capacity, uninit);
-    cursors[lane] = buf_storage[lane].data();
+    cursors[lane] = buf_storage[lane].data() + buf_capacity;
   }
   auto finish = [&]() {
     const uint8_t* ptrs[lanes];
     int lengths[lanes];
     for (int lane = 0; lane < lanes; lane++) {
-      ptrs[lane] = buf_storage[lane].data();
-      lengths[lane] = int(cursors[lane] - buf_storage[lane].data());
+      ptrs[lane] = cursors[lane];
+      lengths[lane] = int(buf_storage[lane].data() + buf_capacity - cursors[lane]);
     }
     return concat_streams(counts, ptrs, lengths);
   };
@@ -186,18 +185,9 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
   }
 
   // Main loop: unpack 160 symbols at a time, process 20 groups of 8.
-  // digit_buf[d] = 32 bytes of digit d for all 32 input bytes.
-  alignas(32) uint8_t digit_buf[5 * 32 + 4];  // +4 padding for gather overread
-
-  // Precompute gather offsets for each of 20 groups within a 160-symbol batch.
-  // Symbol k within batch is digit_buf[k%5][k/5], at byte offset (k%5)*32 + k/5.
-  alignas(32) int32_t gather_offsets[20][8];
-  for (int g = 0; g < 20; g++)
-    for (int lane = 0; lane < lanes; lane++) {
-      const int s = g * lanes + lane;
-      gather_offsets[g][lane] = (s % 5) * 32 + s / 5;
-    }
-  const __m256i byte_mask = _mm256_set1_epi32(0xff);
+  // Unpack ternary bytes into digit_buf[5][32], then transpose into sequential syms[160].
+  alignas(32) uint8_t digit_buf[5 * 32];
+  alignas(16) uint8_t syms[160];
 
   for (int64_t batch_base = full_batches - batch; batch_base >= 0; batch_base -= batch) {
     // Unpack 32 bytes into digit_buf via AVX2 divide-by-3
@@ -208,11 +198,15 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
       _mm256_store_si256((__m256i*)(digit_buf + 32 * d++), _mm256_packus_epi16(rlo, rhi));
     });
 
-    // Process 20 groups of 8 in reverse, gathering symbols via precomputed offsets
+    // Transpose digit_buf[d][b] into sequential symbol order: syms[b*5+d] = digit_buf[d*32+b]
+    for (int b = 0; b < 32; b++)
+      for (int dd = 0; dd < 5; dd++)
+        syms[b * 5 + dd] = digit_buf[dd * 32 + b];
+
+    // Process 20 groups of 8 in reverse, loading symbols sequentially
     for (int g = 20 - 1; g >= 0; g--) {
-      const __m256i off8 = _mm256_load_si256((const __m256i*)gather_offsets[g]);
-      const __m256i sym8 = _mm256_and_si256(
-          _mm256_i32gather_epi32((const int*)digit_buf, off8, 1), byte_mask);
+      const __m256i sym8 = _mm256_cvtepu8_epi32(
+          _mm_loadl_epi64((const __m128i*)(syms + g * lanes)));
 
       // Shuffle per-symbol values
       const __m256i xmax8 = shuffle3(xmax_tab, sym8);
@@ -227,12 +221,12 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
             _mm256_cmpgt_epi32(xmax8, state8), _mm256_set1_epi32(-1));
         int mask = _mm256_movemask_epi8(need);
         if (!mask) break;
-        // Emit one byte per needing lane, highest lane first (LIFO order)
+        // Emit one byte per needing lane
         while (mask) {
           const int lane = (31 - __builtin_clz(mask)) / 4;
           const uint32_t val = _mm256_cvtsi256_si32(
               _mm256_permutevar8x32_epi32(state8, _mm256_set1_epi32(lane)));
-          *cursors[lane]++ = val & 0xff;
+          *--cursors[lane] = val & 0xff;
           mask &= ~(0xf << (lane * 4));
         }
         state8 = _mm256_blendv_epi8(state8, _mm256_srli_epi32(state8, 8), need);
@@ -250,15 +244,13 @@ static arithmetic_t arithmetic_encode_avx2(const ternaries_t data, const rans_fr
     }  // groups of 8
   }  // batches of 160
 
-  // Flush final state and reverse each buffer
+  // Flush final state (written backward so MSB lands at lowest address)
   {
     alignas(32) uint32_t st[8];
     _mm256_store_si256((__m256i*)st, state8);
-    for (int lane = 0; lane < lanes; lane++) {
-      for (int j = 0; j < 4; j++) { *cursors[lane]++ = st[lane] & 0xff; st[lane] >>= 8; }
-      const int len = int(cursors[lane] - buf_storage[lane].data());
-      reverse(buf_storage[lane].data(), buf_storage[lane].data() + len);
-    }
+    for (int lane = 0; lane < lanes; lane++)
+      for (int j = 0; j < 4; j++)
+        *--cursors[lane] = (st[lane] >> (8 * j)) & 0xff;
   }
 
   return finish();
@@ -360,24 +352,22 @@ arithmetic_t arithmetic_encode(const ternaries_t data) {
   uint8_t* cursors[lanes];
   for (int lane = 0; lane < lanes; lane++) {
     buf_storage[lane] = Array<uint8_t>(buf_capacity, uninit);
-    cursors[lane] = buf_storage[lane].data();
+    cursors[lane] = buf_storage[lane].data() + buf_capacity;
   }
 
   for (int64_t i = int64_t(n) - 1; i >= 0; i--)
     rans_put(states[i % lanes], tab, data[i], cursors[i % lanes]);
 
-  // Flush and reverse
-  for (int lane = 0; lane < lanes; lane++) {
-    for (int j = 0; j < 4; j++) { *cursors[lane]++ = states[lane] & 0xff; states[lane] >>= 8; }
-    const int len = int(cursors[lane] - buf_storage[lane].data());
-    reverse(buf_storage[lane].data(), buf_storage[lane].data() + len);
-  }
+  // Flush final state (written backward so MSB lands at lowest address)
+  for (int lane = 0; lane < lanes; lane++)
+    for (int j = 0; j < 4; j++)
+      *--cursors[lane] = (states[lane] >> (8 * j)) & 0xff;
 
   const uint8_t* ptrs[lanes];
   int lengths[lanes];
   for (int lane = 0; lane < lanes; lane++) {
-    ptrs[lane] = buf_storage[lane].data();
-    lengths[lane] = int(cursors[lane] - buf_storage[lane].data());
+    ptrs[lane] = cursors[lane];
+    lengths[lane] = int(buf_storage[lane].data() + buf_capacity - cursors[lane]);
   }
   return concat_streams(counts, ptrs, lengths);
 }

@@ -272,31 +272,36 @@ TEST(arithmetic, benchmark) {
   // Benchmark encode/decode with skewed distribution (p ≈ 0.6, 0.3, 0.1)
   // Target ~1 second total.
   //
-  // Results (10M symbols, p={60,30,10}):
-  //                       generate    encode      decode
-  //   2026mar30 scalar:    94.5 M/s    36.4 M/s    77.1 M/s
-  //   2026mar30 AVX2:      81.4 M/s   170.0 M/s   187.7 M/s
-  //   2026mar30 AVX2+opt: 106.7 M/s   208.2 M/s   200.3 M/s
-  //   opt/scalar speedup:   1.1x        5.7x        2.6x
+  // Results (10M symbols, p={60,30,10}, min of 10 iters):
+  //                          encode      decode
+  //   2026mar30 scalar:       36.4 M/s    77.1 M/s
+  //   2026mar30 AVX2:        222.4 M/s   203.5 M/s
+  //   2026mar30 no-gather:   243.4 M/s   212.6 M/s
+  //   AVX2/scalar speedup:     6.7x        2.8x
   const int n = 10000000;
   const auto weights = vec<uint64_t>(60, 30, 10);
   const double total_w = 100.0;
 
-  // Generate via fill_random: thresholds for {60%, 90%} of uint16 range
-  auto t0 = std::chrono::high_resolution_clock::now();
+  // Generate
   ternaries_t data(n);
   data.fill_random(42, Vector<uint16_t,2>(uint16_t(0.6 * 65536), uint16_t(0.9 * 65536)));
-  auto t1 = std::chrono::high_resolution_clock::now();
 
-  // Encode
+  // Run 10 iterations, take min time for each phase
+  const int iters = 10;
+  double best_enc = 1e9, best_dec = 1e9;
   const auto encoded = arithmetic_encode(data);
-  auto t2 = std::chrono::high_resolution_clock::now();
-
-  // Decode
-  const auto decoded = arithmetic_decode(encoded);
-  auto t3 = std::chrono::high_resolution_clock::now();
+  for (int iter = 0; iter < iters; iter++) {
+    auto t0 = std::chrono::high_resolution_clock::now();
+    arithmetic_encode(data);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    arithmetic_decode(encoded);
+    auto t2 = std::chrono::high_resolution_clock::now();
+    best_enc = std::min(best_enc, std::chrono::duration<double, std::milli>(t1 - t0).count());
+    best_dec = std::min(best_dec, std::chrono::duration<double, std::milli>(t2 - t1).count());
+  }
 
   // Verify roundtrip
+  const auto decoded = arithmetic_decode(encoded);
   PENTAGO_ASSERT_EQ(decoded.size, data.size);
   for (int i = 0; i < 1000; i++) {
     const int j = int(uint64_t(threefry(99, i)) % n);
@@ -313,13 +318,9 @@ TEST(arithmetic, benchmark) {
   const double actual = encoded.data.size();
   const double ratio = actual / theoretical;
 
-  const double gen_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-  const double enc_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
-  const double dec_ms = std::chrono::duration<double, std::milli>(t3 - t2).count();
-  slog("benchmark: n=%d, entropy=%.4f bits/sym", n, entropy);
-  slog("  generate: %.1f ms (%.1f M sym/s)", gen_ms, n / 1e3 / gen_ms);
-  slog("  encode:   %.1f ms (%.1f M sym/s)", enc_ms, n / 1e3 / enc_ms);
-  slog("  decode:   %.1f ms (%.1f M sym/s)", dec_ms, n / 1e3 / dec_ms);
+  slog("benchmark: n=%d, entropy=%.4f bits/sym, %d iters (min time)", n, entropy, iters);
+  slog("  encode:   %.1f ms (%.1f M sym/s)", best_enc, n / 1e3 / best_enc);
+  slog("  decode:   %.1f ms (%.1f M sym/s)", best_dec, n / 1e3 / best_dec);
   slog("  size: %.0f bytes (%.2fx entropy)", actual, ratio);
   ASSERT_GT(ratio, 0.99);
   ASSERT_LT(ratio, 1.02);
