@@ -269,60 +269,84 @@ static ternaries_t arithmetic_decode_avx2(const rans_freq_t& tab, const uint64_t
   const __m256i freq_tab = make_table8(tab.freq[0], tab.freq[1], tab.freq[2]);
   const __m256i cum_tab = make_table8(tab.cum[0], tab.cum[1], tab.cum[2]);
 
-  ternary_writer_t writer(result);
+  // Process 160 symbols at a time (= 32 output bytes = 20 groups of 8 lanes).
+  // Scatter each group's symbols directly into digit_bytes[d][b] (d = sym_idx%5, b = sym_idx/5),
+  // then pack via Horner's method into 32 ternary-packed bytes.
+  uint8_t* out = result.bytes().data();
+  const uint64_t batch = 160;
+  const uint64_t full_batches = n / batch * batch;
   uint64_t i = 0;
+  const __m256i lower8 = _mm256_set1_epi32(rans_lower);
+  const __m256i two8 = _mm256_set1_epi32(2);
 
-  for (; i + lanes <= n; i += lanes) {
-    // Slot and symbol lookup
-    const __m256i slot8 = _mm256_and_si256(state8, mask_total);
-    const __m256i sym8 = _mm256_add_epi32(_mm256_set1_epi32(2),
-                          _mm256_add_epi32(_mm256_cmpgt_epi32(cum1, slot8),
-                                           _mm256_cmpgt_epi32(cum2, slot8)));
+  // Precompute scatter offsets: for group g, lane l → digit_bytes[d][b] at offset d*32+b
+  // where d = (g*8+l)%5, b = (g*8+l)/5
+  uint8_t scatter_off[20][8];
+  for (int g = 0; g < 20; g++)
+    for (int l = 0; l < lanes; l++) {
+      const int s = g * lanes + l;
+      scatter_off[g][l] = uint8_t((s % 5) * 32 + s / 5);
+    }
 
-    // Shuffle freq and cum per lane
-    const __m256i freq8 = _mm256_permutevar8x32_epi32(freq_tab, sym8);
-    const __m256i gcum8 = _mm256_permutevar8x32_epi32(cum_tab, sym8);
+  for (; i < full_batches; i += batch) {
+    alignas(32) uint8_t digit_bytes[5][32];
 
-    // Decode
-    state8 = _mm256_add_epi32(_mm256_sub_epi32(
-                 _mm256_mullo_epi32(freq8, _mm256_srli_epi32(state8, total_bits)), gcum8), slot8);
+    for (int g = 0; g < 20; g++) {
+      // Slot and symbol lookup
+      const __m256i slot8 = _mm256_and_si256(state8, mask_total);
+      const __m256i sym8 = _mm256_add_epi32(two8,
+                            _mm256_add_epi32(_mm256_cmpgt_epi32(cum1, slot8),
+                                             _mm256_cmpgt_epi32(cum2, slot8)));
 
-    // Extract symbols and write
-    alignas(32) int32_t syms[8];
-    _mm256_store_si256((__m256i*)syms, sym8);
-    for (int lane = 0; lane < lanes; lane++)
-      writer.put(syms[lane]);
+      // Shuffle freq and cum per lane
+      const __m256i freq8 = _mm256_permutevar8x32_epi32(freq_tab, sym8);
+      const __m256i gcum8 = _mm256_permutevar8x32_epi32(cum_tab, sym8);
 
-    // Renorm: read bytes and shift up for lanes where state < rans_lower
-    {
-      const __m256i lower8 = _mm256_set1_epi32(rans_lower);
-      const __m256i lane_ids = _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7);
-      for (;;) {
-        const __m256i need = _mm256_cmpgt_epi32(lower8, state8);
-        int mask = _mm256_movemask_epi8(need);
-        if (!mask) break;
-        __m256i got8 = _mm256_setzero_si256();
-        __m256i bytes8 = _mm256_setzero_si256();
-        while (mask) {
-          const int lane = __builtin_ctz(mask) / 4;
-          if (ptrs[lane] < ends[lane]) {
-            const __m256i lane_mask = _mm256_cmpeq_epi32(_mm256_set1_epi32(lane), lane_ids);
-            bytes8 = _mm256_or_si256(bytes8,
-                _mm256_and_si256(_mm256_set1_epi32(*ptrs[lane]++), lane_mask));
-            got8 = _mm256_or_si256(got8, lane_mask);
-          }
-          mask &= ~(0xf << (lane * 4));
+      // Decode state update
+      state8 = _mm256_add_epi32(_mm256_sub_epi32(
+                   _mm256_mullo_epi32(freq8, _mm256_srli_epi32(state8, total_bits)), gcum8), slot8);
+
+      // Pack symbols to uint8 and scatter into digit_bytes
+      const __m128i lo = _mm256_castsi256_si128(sym8);
+      const __m128i hi = _mm256_extracti128_si256(sym8, 1);
+      const __m128i packed16 = _mm_packs_epi32(lo, hi);
+      alignas(16) uint8_t sym_bytes[16];
+      _mm_store_si128((__m128i*)sym_bytes, _mm_packus_epi16(packed16, packed16));
+      uint8_t* db = (uint8_t*)digit_bytes;
+      for (int l = 0; l < lanes; l++)
+        db[scatter_off[g][l]] = sym_bytes[l];
+
+      // Renorm: spill to scalar, do tight per-lane byte reads, reload
+      const int mask = _mm256_movemask_epi8(_mm256_cmpgt_epi32(lower8, state8));
+      if (mask) {
+        alignas(32) uint32_t st[8];
+        _mm256_store_si256((__m256i*)st, state8);
+        int m = mask;
+        while (m) {
+          const int lane = __builtin_ctz(m) / 4;
+          while (st[lane] < rans_lower && ptrs[lane] < ends[lane])
+            st[lane] = (st[lane] << 8) | *ptrs[lane]++;
+          m &= ~(0xf << (lane * 4));
         }
-        if (_mm256_testz_si256(got8, got8)) break;
-        state8 = _mm256_blendv_epi8(state8,
-            _mm256_or_si256(_mm256_slli_epi32(state8, 8), bytes8), got8);
+        state8 = _mm256_load_si256((const __m256i*)st);
       }
     }
+
+    // Pack via Horner: acc = digit[4]; for d=3..0: acc = acc*3 + digit[d]
+    __m256i acc = _mm256_load_si256((const __m256i*)digit_bytes[4]);
+    for (int d = 3; d >= 0; d--) {
+      acc = _mm256_add_epi8(acc, _mm256_add_epi8(acc, acc));
+      acc = _mm256_add_epi8(acc, _mm256_load_si256((const __m256i*)digit_bytes[d]));
+    }
+    _mm256_storeu_si256((__m256i*)out, acc);
+    out += 32;
   }
 
-  // Tail
+  // Tail: scalar decode remaining symbols
   alignas(32) uint32_t st[8];
   _mm256_store_si256((__m256i*)st, state8);
+  ternary_writer_t writer(result);
+  writer.ptr = out;
   for (; i < n; i++) {
     const int lane = int(i % lanes);
     writer.put(rans_get(st[lane], tab, ptrs[lane], ends[lane]));
