@@ -45,8 +45,29 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Order function arguments with slowly-varying parameters first
 - Use unnamed namespaces for file-local types; use `static` for file-local functions
 - Do not commit until the user has reviewed the code
-- No `__attribute__((target(...)))` — we compile with `-march=native` so AVX2 is always available
-- Always build and test with `--copt=-march=native` (needed for AVX2 SIMD paths)
+- No `__attribute__((target(...)))` — we compile with `-march=native` (in COPTS) so AVX2 is always available
 - Don't allocate large intermediate buffers when direct access suffices
 - Validate untrusted input upfront (e.g. assert stream lengths sum correctly) rather than clamping during use
 - When changing a serialization format, commit the format change first with determinism hashes, then optimize — hashes must not change during optimization
+- `-march=native` is already in COPTS in `pentago/pentago.bzl`, so `--copt=-march=native` is not needed on the command line
+
+## Profiling
+
+Use `perf` for line-level profiling. Requires `sudo sysctl kernel.perf_event_paranoid=-1` first (sandbox blocks this, so the user must run it via `!`). Then:
+
+    perf record -g -o /tmp/claude-1000/perf.data bazel-bin/pentago/data/some_test --gtest_filter='...'
+    perf annotate -i /tmp/claude-1000/perf.data -s 'pentago::function_name' --stdio
+    perf report -i /tmp/claude-1000/perf.data --stdio --sort=symbol --no-children
+
+The `perf record` command must run with `dangerouslyDisableSandbox: true` in Claude Code. `perf report` and `perf annotate` can run inside the sandbox.
+
+## SIMD optimization lessons
+
+- On Cascade Lake (this machine), `vpmulld` (mullo_epi32) is **10 cycles latency** — the dominant bottleneck in rANS encode/decode. On Zen2+ it's 5 cycles.
+- `permutevar8x32` (3c) is better than `cmpeq`+`blendv` chains for 3-element table lookups. Don't try to replace it with comparison-based selection — more ops at lower latency still loses.
+- Derive values instead of looking them up when cheap: e.g. `xmax = freq << 17` saves one permutevar.
+- For encoder renorm (emit bytes), SIMD extract+blend beats scalar spill/reload because state8 feeds directly into the encode step.
+- For decoder renorm (read bytes), scalar spill/reload beats SIMD cmpeq/blend per lane — the byte reads are inherently scalar anyway.
+- Scatter-write to precomputed offsets (8 indexed byte stores per group) is cheaper than a bulk 160-byte transpose pass. Same for scatter-read on the encoder side.
+- Benchmark with min-of-N iterations (N=10) for stable numbers. Single runs have ~15% noise on this machine.
+- Profile with `perf annotate` before guessing at bottlenecks — intuition about what's slow is often wrong (e.g. the 160-byte transpose was assumed cheap but was 15% of decoder time).
