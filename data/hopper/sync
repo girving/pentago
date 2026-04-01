@@ -1,3 +1,0 @@
-#!/bin/bash
-
-rsync -avzP hopper:hopper/scratch/pentago/* .
