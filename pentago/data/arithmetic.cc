@@ -7,6 +7,7 @@
 
 #include "pentago/data/arithmetic.h"
 #include "pentago/utility/debug.h"
+#include "pentago/utility/endian.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/sse.h"
 #include <algorithm>
@@ -445,6 +446,52 @@ ternaries_t arithmetic_decode(const arithmetic_t encoded) {
   }
   writer.flush();
   return result;
+}
+
+// Serialized layout: version(4) + counts(24) + stream_lengths(32) + data
+static const int serial_header_size = 4 + 24 + 32;  // 60 bytes
+
+int arithmetic_t::serialized_size() const { return serial_header_size + data.size(); }
+
+Array<uint8_t> arithmetic_serialize(const arithmetic_t& group) {
+  const uint64_t data_size = group.data.size();
+  Array<uint8_t> buf(CHECK_CAST_INT(uint64_t(serial_header_size) + data_size), uninit);
+  int next = 0;
+  auto put = [&](const auto& v) {
+    const auto le = native_to_little_endian(v);
+    memcpy(buf.data() + next, &le, sizeof(le));
+    next += sizeof(le);
+  };
+  put(group.version);
+  for (const int i : range(3)) put(group.counts[i]);
+  for (const int i : range(lanes)) put(group.stream_lengths[i]);
+  memcpy(buf.data() + next, group.data.data(), data_size);
+  GEODE_ASSERT(buf.size() == group.serialized_size());
+  return buf;
+}
+
+arithmetic_t arithmetic_deserialize(RawArray<const uint8_t> data) {
+  GEODE_ASSERT(data.size() >= serial_header_size);
+  int next = 0;
+  auto get = [&](auto& v) {
+    std::remove_reference_t<decltype(v)> le;
+    memcpy(&le, data.data() + next, sizeof(le));
+    v = little_to_native_endian(le);
+    next += sizeof(le);
+  };
+  arithmetic_t g;
+  get(g.version);
+  GEODE_ASSERT(g.version == 2);
+  for (const int i : range(3)) get(g.counts[i]);
+  for (const int i : range(lanes)) get(g.stream_lengths[i]);
+  const int remaining = data.size() - serial_header_size;
+  uint64_t stream_sum = 0;
+  for (const int i : range(lanes)) stream_sum += g.stream_lengths[i];
+  GEODE_ASSERT(stream_sum == uint64_t(remaining));
+  Array<uint8_t> gdata(remaining, uninit);
+  memcpy(gdata.data(), data.data() + next, remaining);
+  g.data = gdata;
+  return g;
 }
 
 }  // namespace pentago

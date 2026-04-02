@@ -1,10 +1,10 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "data",
-    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "*_test.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "sharder.cc", "shard_sizes.cc", "*_test.cc"]),
     copts = COPTS,
     deps = [
         "//pentago/base",
@@ -41,4 +41,44 @@ cc_binary(
         ":data",
         "//pentago/end:options",
     ],
+)
+
+cc_binary(
+    name = "shard_sizes",
+    srcs = ["shard_sizes.cc"],
+    copts = COPTS,
+    deps = [
+        ":data",
+        "//pentago/base",
+        "//pentago/utility",
+    ],
+)
+
+cc_binary(
+    name = "sharder",
+    srcs = ["sharder.cc"],
+    copts = COPTS,
+    deps = [
+        ":data",
+        "//pentago/base",
+        "//pentago/utility",
+    ],
+)
+
+cc_test(
+    name = "sharder_test",
+    srcs = ["sharder_test.cc"],
+    copts = COPTS + ["-Wsign-compare"],
+    deps = [
+        ":data",
+        "//pentago/base",
+        "//pentago/utility",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+    data = [
+        ":sharder",
+        "//data:slices",
+    ],
+    size = "medium",
 )

@@ -1,6 +1,9 @@
 #include "pentago/utility/range.h"
 #include "pentago/utility/debug.h"
+#include "pentago/utility/exceptions.h"
+#include "pentago/utility/format.h"
 #include <cstdint>
+#include <string>
 namespace pentago {
 
 using std::min;
@@ -38,5 +41,26 @@ partition_loop_inverse(const I loop_steps, const TI threads, const I index) {
   template TI partition_loop_inverse(const I, const TI, const I);
 INSTANTIATE(int, int)
 INSTANTIATE(uint64_t, int)
+
+static int parse_int(const string& s) {
+  try {
+    return std::stoi(s);
+  } catch (const std::exception&) {
+    THROW(ValueError, "invalid integer '%s'", s);
+  }
+}
+
+Range<int> parse_range(const string& s, const int total) {
+  GEODE_ASSERT(total >= 0);
+  const auto colon = s.find(':');
+  GEODE_ASSERT(colon != string::npos, "range must contain ':'");
+  const auto lo_str = s.substr(0, colon);
+  const auto hi_str = s.substr(colon + 1);
+  const int lo = lo_str.empty() ? 0 : parse_int(lo_str);
+  const int hi = hi_str.empty() ? total : parse_int(hi_str);
+  GEODE_ASSERT(0 <= lo && lo <= hi && hi <= total,
+               tfm::format("invalid range %d:%d for total %d", lo, hi, total));
+  return {lo, hi};
+}
 
 }

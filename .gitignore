@@ -23,3 +23,8 @@ MODULE.bazel.lock
 .vscode
 .zprofile
 .zshrc
+HEAD
+config
+hooks
+objects
+refs

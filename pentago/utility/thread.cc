@@ -517,6 +517,10 @@ std::mutex& init_threads_mutex() {
 
 }  // namespace
 
+int default_threads() {
+  return int(sysconf(_SC_NPROCESSORS_ONLN));
+}
+
 unit_t init_threads(int cpu_threads, int io_threads) {
   lock_t lock(init_threads_mutex());
   if (cpu_threads!=-1 || io_threads!=-1 || !cpu_pool) {
@@ -524,7 +528,7 @@ unit_t init_threads(int cpu_threads, int io_threads) {
     init_papi();
     time_info.init_thread(MASTER);
     if (cpu_threads<0)
-      cpu_threads = int(sysconf(_SC_NPROCESSORS_ONLN));
+      cpu_threads = default_threads();
     if (io_threads<0)
       io_threads = 2;
     if (cpu_threads)

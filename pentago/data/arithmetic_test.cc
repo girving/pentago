@@ -326,5 +326,26 @@ TEST(arithmetic, benchmark) {
   ASSERT_LT(ratio, 1.02);
 }
 
+TEST(arithmetic, serialize) {
+  const uint64_t n = 1000;
+  ternaries_t data(n);
+  for (uint64_t i = 0; i < n; i++)
+    data.set(i, int(i * 7 % 3));
+  const auto encoded = arithmetic_encode(data);
+  const auto serialized = arithmetic_serialize(encoded);
+  PENTAGO_ASSERT_EQ(serialized.size(), encoded.serialized_size());
+  const auto decoded_group = arithmetic_deserialize(serialized);
+  PENTAGO_ASSERT_EQ(decoded_group.version, encoded.version);
+  for (const int i : range(3))
+    PENTAGO_ASSERT_EQ(decoded_group.counts[i], encoded.counts[i]);
+  for (const int i : range(8))
+    PENTAGO_ASSERT_EQ(decoded_group.stream_lengths[i], encoded.stream_lengths[i]);
+  PENTAGO_ASSERT_EQ(decoded_group.data.size(), encoded.data.size());
+  const auto result = arithmetic_decode(decoded_group);
+  PENTAGO_ASSERT_EQ(result.size, n);
+  for (uint64_t i = 0; i < n; i++)
+    PENTAGO_ASSERT_EQ(result[i], int(i * 7 % 3));
+}
+
 }  // namespace
 }  // namespace pentago

@@ -7,6 +7,7 @@
 #include "pentago/utility/sse.h"
 #include "pentago/utility/threefry.h"
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 namespace pentago {
 
@@ -46,6 +47,12 @@ void ternaries_t::set(const uint64_t i, const int v) {
   auto& b = bytes()[byte];
   const int old = b / pow3[pos] % 3;
   b += uint8_t((v - old) * pow3[pos]);
+}
+
+void ternaries_t::atomic_set_from_zero(const uint64_t i, const int v) {
+  assert(i < size && unsigned(v) < 3);
+  auto* p = reinterpret_cast<std::atomic<uint8_t>*>(&bytes()[i / 5]);
+  p->fetch_add(uint8_t(v * pow3[i % 5]), std::memory_order_relaxed);
 }
 
 #if PENTAGO_SSE

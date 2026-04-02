@@ -18,6 +18,11 @@ struct ternaries_t {
   int operator[](const uint64_t i) const;
   void set(const uint64_t i, const int v);
 
+  // Atomically set a ternary value in a zero-initialized slot.
+  // Precondition: the slot at position i must be zero.
+  // Safe for concurrent writes to different positions (and even the same byte).
+  void atomic_set_from_zero(const uint64_t i, const int v);
+
   // Count occurrences of each symbol
   Vector<uint64_t,3> counts() const;
 

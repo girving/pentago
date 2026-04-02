@@ -25,6 +25,7 @@ cc_tests(
     names = [
         "aligned_test",
         "random_test",
+        "range_test",
         "thread_test",
     ],
     deps = [

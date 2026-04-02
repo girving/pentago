@@ -50,6 +50,7 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Validate untrusted input upfront (e.g. assert stream lengths sum correctly) rather than clamping during use
 - When changing a serialization format, commit the format change first with determinism hashes, then optimize — hashes must not change during optimization
 - `-march=native` is already in COPTS in `pentago/pentago.bzl`, so `--copt=-march=native` is not needed on the command line
+- Simplify loops: iterate over containers directly instead of indices into them, and avoid intermediate variables when the expression is clear (e.g. `for (const auto& r : readers)` not `for (const int i : range(readers.size())) { ... readers[i] ... }`)
 
 ## Profiling
 

@@ -4,7 +4,8 @@
   },
   "permissions": {
     "allow": [
-      "Bash(bin/bazel:*)"
+      "Bash(bin/bazel:*)",
+      "WebSearch"
     ],
     "ask": [
       "Edit(WORKSPACE)",

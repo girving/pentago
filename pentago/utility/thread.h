@@ -128,6 +128,9 @@ void report_papi_counts(RawArray<const papi_t,2> papi);
 enum thread_type_t { MASTER=0, CPU=1, IO=2, UNKNOWN=3 };
 thread_type_t thread_type();
 
+// Default thread count (number of available CPUs)
+int default_threads();
+
 // Initialize thread pools
 unit_t init_threads(int cpu_threads, int io_threads);
 

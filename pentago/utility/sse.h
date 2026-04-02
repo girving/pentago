@@ -1,6 +1,8 @@
 // SSE helper routines
 #pragma once
 
+#include "metal.h"
+
 #if PENTAGO_CPP
 #include <type_traits>
 #ifndef __wasm__

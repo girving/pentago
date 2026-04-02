@@ -15,6 +15,9 @@ struct arithmetic_t {
   Array<const uint8_t> data;                        // streams concatenated
 
   uint64_t total() const { return counts[0] + counts[1] + counts[2]; }
+
+  // Size of the serialized form in bytes
+  int serialized_size() const;
 };
 
 // Encode: measures distribution internally
@@ -22,5 +25,11 @@ arithmetic_t arithmetic_encode(const ternaries_t data);
 
 // Decode: uses stored counts as weights
 ternaries_t arithmetic_decode(const arithmetic_t encoded);
+
+// Serialize an arithmetic_t to a self-contained byte buffer
+Array<uint8_t> arithmetic_serialize(const arithmetic_t& group);
+
+// Deserialize an arithmetic_t from a byte buffer
+arithmetic_t arithmetic_deserialize(RawArray<const uint8_t> data);
 
 }  // namespace pentago

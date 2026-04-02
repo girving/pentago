@@ -3,6 +3,7 @@
 #include "pentago/data/ternary.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/test_assert.h"
+#include "pentago/utility/thread.h"
 #include "pentago/utility/threefry.h"
 #include "gtest/gtest.h"
 namespace pentago {
@@ -128,6 +129,52 @@ TEST(ternary, fill_random) {
   for (const int i : range(1000))
     diffs += a[i] != c[i];
   ASSERT_GT(diffs, 100);
+}
+
+TEST(ternary, atomic_set_from_zero) {
+  // Sequential: verify it produces the same result as set() on zero-initialized buffers
+  for (const int n : {0, 1, 4, 5, 6, 10, 11, 100, 101, 1000}) {
+    ternaries_t a(n), b(n);
+    for (const int i : range(n)) {
+      const int v = int(threefry(77, i) % 3);
+      a.set(i, v);
+      b.atomic_set_from_zero(i, v);
+    }
+    for (const int i : range(n))
+      PENTAGO_ASSERT_EQ(a[i], b[i]);
+  }
+
+  // Concurrent: many threads writing disjoint positions
+  init_threads(-1, -1);
+  {
+    const int n = 100000;
+    ternaries_t t(n);
+    for (const int i : range(n)) {
+      threads_schedule(CPU, [&, i]() {
+        t.atomic_set_from_zero(i, int(threefry(88, i) % 3));
+      });
+    }
+    threads_wait_all();
+    for (const int i : range(n))
+      PENTAGO_ASSERT_EQ(t[i], int(threefry(88, i) % 3));
+  }
+
+  // Concurrent: multiple threads writing to the same byte (positions sharing a group of 5)
+  {
+    const int groups = 20000;
+    ternaries_t t(groups * 5);
+    for (const int g : range(groups)) {
+      threads_schedule(CPU, [&, g]() {
+        for (const int d : range(5)) {
+          const int v = int(threefry(99, g * 5 + d) % 3);
+          t.atomic_set_from_zero(g * 5 + d, v);
+        }
+      });
+    }
+    threads_wait_all();
+    for (const int i : range(groups * 5))
+      PENTAGO_ASSERT_EQ(t[i], int(threefry(99, i) % 3));
+  }
 }
 
 }  // namespace

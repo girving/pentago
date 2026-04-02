@@ -1,11 +1,13 @@
 #pragma once
 
+#include <string>
 #include <type_traits>
 #include <cassert>
 namespace pentago {
 
 using std::declval;
 using std::enable_if_t;
+using std::string;
 
 template<class Iter, class Enable=void> struct Range {
   typedef decltype(*declval<Iter>()) reference;
@@ -96,5 +98,9 @@ partition_loop(const I loop_steps, const TI threads, const TI thread);
 // Inverse of partition_loop: map an index to the thread that owns it
 template<class I,class TI> TI
 partition_loop_inverse(const I loop_steps, const TI threads, const I index);
+
+// Parse a Python-style range string "lo:hi", ":hi", "lo:", or ":" into Range<int>.
+// Missing lo defaults to 0, missing hi defaults to total.
+Range<int> parse_range(const string& s, const int total);
 
 }
