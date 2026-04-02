@@ -24,7 +24,7 @@ public:
   void operator=(const Random&) = delete;
 
   template<class I> I bits() {
-    static_assert(std::is_integral<I>::value);
+    static_assert(std::is_integral<I>::value || std::is_same<I, uint128_t>::value);
     return static_cast<I>(threefry(seed, counter++));
   }
 

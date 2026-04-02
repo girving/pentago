@@ -11,10 +11,14 @@
 #include "pentago/data/arithmetic.h"
 #include "pentago/data/file.h"
 #include "pentago/utility/array.h"
+#include "pentago/utility/noncopyable.h"
+#include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
+#include <optional>
 #include <unordered_map>
 namespace pentago {
 
+using std::optional;
 using std::unordered_map;
 
 struct shard_mapping_t {
@@ -82,6 +86,52 @@ struct shard_file_t {
 
   // Read and decode one slice's group
   arithmetic_t read_group(const int slice) const;
+};
+
+struct board_value_t {
+  board_t board;
+  int value;  // 0/1/2: black_wins + 2 * white_wins
+};
+
+static inline bool operator==(const board_value_t& a, const board_value_t& b) {
+  return a.board == b.board && a.value == b.value;
+}
+
+static inline bool operator<(const board_value_t& a, const board_value_t& b) {
+  return a.board < b.board || (a.board == b.board && a.value < b.value);
+}
+
+struct shard_iterator_t : noncopyable_t {
+  shard_iterator_t(const string& dir, const int total_shards, const Range<int> shard_range,
+                   const uint128_t seed);
+  ~shard_iterator_t();
+
+  board_value_t next();
+  void next_batch(RawArray<board_value_t> batch);
+
+private:
+  const string dir;
+  const int total_shards;
+  const Range<int> shard_range;
+  Random random;
+
+  // Shard ordering
+  int shard_cursor;
+  uint128_t epoch_key;
+
+  // Per-slice state
+  struct slice_t {
+    shard_mapping_t mapping;
+    optional<ternaries_t> decoded;
+    uint64_t remaining = 0;
+    uint64_t cursor = 0;
+    uint64_t shard_range_lo = 0;
+    explicit slice_t(const int slice) : mapping(slice) {}
+  };
+  vector<slice_t> slices;
+  uint64_t total_remaining;
+
+  void load_next_shard();
 };
 
 }  // namespace pentago

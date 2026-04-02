@@ -12,10 +12,12 @@
 #include "pentago/utility/test_assert.h"
 #include "pentago/utility/thread.h"
 #include "gtest/gtest.h"
+#include <algorithm>
 #include <unordered_map>
 namespace pentago {
 namespace {
 
+using std::sort;
 using std::unordered_map;
 
 static void run(const string& cmd) {
@@ -118,6 +120,113 @@ TEST(sharder, batched_range) {
   run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range 9: --memory 0.00005 data %s",
                    max_slice, total_shards, tmp.path));
   verify_shards(max_slice, total_shards, range(total_shards), tmp.path);
+}
+
+// Shard iterator tests
+
+class shard_iterator_test : public ::testing::Test {
+protected:
+  static void SetUpTestSuite() {
+    init_threads(-1, -1);
+    dir_.reset(new tempdir_t("iter"));
+    run(tfm::format("pentago/data/sharder --max-slice %d --shards %d data %s",
+                     max_slice, total_shards, dir_->path));
+  }
+  static void TearDownTestSuite() {
+    dir_.reset();
+  }
+  static constexpr int max_slice = 5;
+  static constexpr int total_shards = 41;
+  static unique_ptr<tempdir_t> dir_;
+};
+unique_ptr<tempdir_t> shard_iterator_test::dir_;
+
+TEST_F(shard_iterator_test, determinism) {
+  const uint128_t seed = 42;
+  shard_iterator_t it1(dir_->path, total_shards, range(0, 3), seed);
+  shard_iterator_t it2(dir_->path, total_shards, range(0, 3), seed);
+  for (const int i : range(200)) {
+    (void)i;
+    const auto a = it1.next();
+    const auto b = it2.next();
+    PENTAGO_ASSERT_EQ(a.board, b.board);
+    PENTAGO_ASSERT_EQ(a.value, b.value);
+  }
+}
+
+TEST_F(shard_iterator_test, correctness) {
+  const int shard_id = 7;
+  const uint128_t seed = 123;
+
+  // Build expected (board, value) pairs from direct shard decoding
+  const auto path = tfm::format("%s/shard-%05d-of-%05d.pentago.shard",
+                                dir_->path, shard_id, total_shards - 1);
+  const shard_file_t sf(path);
+  vector<board_value_t> expected;
+  for (const int s : range(max_slice + 1)) {
+    const shard_mapping_t mapping(s);
+    const auto sr = mapping.shard_range(total_shards, shard_id);
+    const auto decoded = arithmetic_decode(sf.read_group(s));
+    for (const uint64_t i : range(sr.size()))
+      expected.push_back({mapping.board(sr.lo + i), decoded[i]});
+  }
+  sort(expected.begin(), expected.end());
+
+  // Verify iterator produces the same set
+  shard_iterator_t it(dir_->path, total_shards, range(shard_id, shard_id + 1), seed);
+  vector<board_value_t> actual;
+  actual.reserve(expected.size());
+  for (const uint64_t i : range(uint64_t(expected.size()))) {
+    (void)i;
+    actual.push_back(it.next());
+  }
+  sort(actual.begin(), actual.end());
+  ASSERT_EQ(actual, expected);
+}
+
+TEST_F(shard_iterator_test, batch_equal) {
+  const uint128_t seed = 456;
+  const auto sr = range(0, 2);
+  const int n = 53;
+
+  shard_iterator_t it1(dir_->path, total_shards, sr, seed);
+  shard_iterator_t it2(dir_->path, total_shards, sr, seed);
+  const Array<board_value_t> batch(n, uninit);
+  it2.next_batch(batch);
+  for (const int i : range(n)) {
+    const auto a = it1.next();
+    PENTAGO_ASSERT_EQ(a.board, batch[i].board);
+    PENTAGO_ASSERT_EQ(a.value, batch[i].value);
+  }
+}
+
+TEST_F(shard_iterator_test, epoch) {
+  const auto sr = range(3, 5);  // 2 shards
+  const uint128_t seed = 789;
+  shard_iterator_t it(dir_->path, total_shards, sr, seed);
+
+  // Count total entries across all shards in range
+  uint64_t total_entries = 0;
+  for (const int shard_id : sr)
+    for (const int s : range(max_slice + 1)) {
+      const shard_mapping_t mapping(s);
+      total_entries += mapping.shard_range(total_shards, shard_id).size();
+    }
+
+  // Collect both epochs
+  vector<board_value_t> epoch1, epoch2;
+  epoch1.reserve(total_entries);
+  epoch2.reserve(total_entries);
+  for (const uint64_t i : range(total_entries)) { (void)i; epoch1.push_back(it.next()); }
+  for (const uint64_t i : range(total_entries)) { (void)i; epoch2.push_back(it.next()); }
+
+  // Different order (overwhelmingly likely with random mixing)
+  ASSERT_NE(epoch1, epoch2);
+
+  // Same entries
+  sort(epoch1.begin(), epoch1.end());
+  sort(epoch2.begin(), epoch2.end());
+  ASSERT_EQ(epoch1, epoch2);
 }
 
 }  // namespace

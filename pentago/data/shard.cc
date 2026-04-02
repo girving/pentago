@@ -15,6 +15,7 @@
 namespace pentago {
 
 using std::get;
+using std::make_unique;
 using std::memcpy;
 using std::upper_bound;
 
@@ -202,6 +203,81 @@ arithmetic_t shard_file_t::read_group(const int slice) const {
   const auto err = fd->pread(buf, start);
   GEODE_ASSERT(err.empty(), err);
   return arithmetic_deserialize(buf);
+}
+
+shard_iterator_t::shard_iterator_t(const string& dir, const int total_shards,
+                                   const Range<int> shard_range, const uint128_t seed)
+    : dir(dir), total_shards(total_shards), shard_range(shard_range), random(seed),
+      shard_cursor(0), epoch_key(random.bits<uint128_t>()), total_remaining(0) {
+  GEODE_ASSERT(!shard_range.empty());
+  load_next_shard();
+}
+
+shard_iterator_t::~shard_iterator_t() {}
+
+void shard_iterator_t::load_next_shard() {
+  if (shard_cursor >= shard_range.size()) {
+    epoch_key = random.bits<uint128_t>();
+    shard_cursor = 0;
+  }
+  const int permuted = int(random_permute(uint64_t(shard_range.size()), epoch_key,
+                                          uint64_t(shard_cursor++)));
+  const int shard_id = shard_range.lo + permuted;
+  const auto path = tfm::format("%s/shard-%05d-of-%05d.pentago.shard",
+                                dir, shard_id, total_shards - 1);
+  const shard_file_t sf(path);
+
+  // Initialize slices lazily on first shard load
+  if (slices.empty()) {
+    const int n = sf.header.max_slice + 1;
+    slices.reserve(n);
+    for (const int s : range(n))
+      slices.emplace_back(s);
+  }
+  GEODE_ASSERT(sf.header.max_slice + 1 == uint32_t(slices.size()));
+  GEODE_ASSERT(sf.header.total_shards == uint32_t(total_shards));
+
+  // Decode all groups and set up per-slice state
+  total_remaining = 0;
+  for (auto& slice : slices) {
+    slice.decoded.emplace(arithmetic_decode(sf.read_group(slice.mapping.slice)));
+    const auto sr = slice.mapping.shard_range(total_shards, shard_id);
+    slice.remaining = sr.size();
+    slice.cursor = 0;
+    slice.shard_range_lo = sr.lo;
+    total_remaining += sr.size();
+  }
+}
+
+board_value_t shard_iterator_t::next() {
+  if (total_remaining == 0)
+    load_next_shard();
+
+  // Weighted random selection of slice
+  const int last = int(slices.size()) - 1;
+  uint64_t r = random.uniform(total_remaining);
+  int s = 0;
+  for (; s < last; s++) {
+    if (r < slices[s].remaining) break;
+    r -= slices[s].remaining;
+  }
+
+  // Read entry and reconstruct board
+  auto& slice = slices[s];
+  const int value = (*slice.decoded)[slice.cursor];
+  const board_t board = slice.mapping.board(slice.shard_range_lo + slice.cursor);
+
+  // Advance
+  slice.cursor++;
+  slice.remaining--;
+  total_remaining--;
+
+  return {board, value};
+}
+
+void shard_iterator_t::next_batch(RawArray<board_value_t> batch) {
+  for (const int i : range(batch.size()))
+    batch[i] = next();
 }
 
 }  // namespace pentago
