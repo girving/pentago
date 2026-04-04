@@ -17,6 +17,9 @@ template<class T> static inline Array<T> large_buffer(const int size, Uninit) {
   return aligned_buffer<T>(size);
 }
 
+// Total physical RAM in bytes
+uint64_t total_memory();
+
 // Extract memory usage information
 Array<uint64_t> memory_info();
 

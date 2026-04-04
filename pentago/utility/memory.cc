@@ -10,6 +10,9 @@
 #ifdef __APPLE__
 #include <mach/mach.h>
 #include <mach/task.h>
+#include <sys/sysctl.h>
+#else
+#include <sys/sysinfo.h>
 #endif
 namespace pentago {
 
@@ -46,6 +49,12 @@ static Vector<ssize_t,2> known() {
 
 #ifdef __linux__
 
+uint64_t total_memory() {
+  struct sysinfo si;
+  GEODE_ASSERT(sysinfo(&si) == 0);
+  return uint64_t(si.totalram) * si.mem_unit;
+}
+
 Array<uint64_t> memory_info() {
   FILE* file = fopen("/proc/self/statm","r");
   if (!file)
@@ -77,6 +86,13 @@ string memory_report(RawArray<const uint64_t> info) {
 }
 
 #elif defined(__APPLE__)
+
+uint64_t total_memory() {
+  uint64_t result;
+  size_t size = sizeof(result);
+  GEODE_ASSERT(sysctlbyname("hw.memsize", &result, &size, nullptr, 0) == 0);
+  return result;
+}
 
 Array<uint64_t> memory_info() {
   struct mach_task_basic_info info;

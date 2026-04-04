@@ -134,4 +134,9 @@ private:
   void load_next_shard();
 };
 
+// Convert a shard value (0=tie, 1=black wins, 2=white wins) to the server value
+// (1=current player wins, 0=tie, -1=current player loses).
+// Black is the absolute first player; whose turn it is follows stone count parity.
+int shard_to_server_value(board_t board, int shard_value);
+
 }  // namespace pentago

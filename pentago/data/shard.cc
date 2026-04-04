@@ -280,4 +280,10 @@ void shard_iterator_t::next_batch(RawArray<board_value_t> batch) {
     batch[i] = next();
 }
 
+int shard_to_server_value(const board_t board, const int shard_value) {
+  if (shard_value == 0) return 0;
+  const bool black_to_move = count_stones(board) % 2 == 0;
+  return (shard_value == 1) == black_to_move ? 1 : -1;
+}
+
 }  // namespace pentago
