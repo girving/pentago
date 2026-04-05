@@ -11,6 +11,7 @@
 #include "pentago/data/ternary.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
+#include "pentago/utility/permute.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/thread.h"
 #include <atomic>
@@ -111,6 +112,7 @@ struct block_work_t {
 template<class F>
 static void parallel_for(const int num_threads, const size_t n, const F& f) {
   GEODE_ASSERT(num_threads > 0);
+  const uint128_t key = 42;
   vector<thread> threads;
   threads.reserve(num_threads);
   atomic<size_t> next(0);
@@ -119,7 +121,7 @@ static void parallel_for(const int num_threads, const size_t n, const F& f) {
       for (;;) {
         const size_t i = next.fetch_add(1, std::memory_order_relaxed);
         if (i >= n) break;
-        f(i);
+        f(random_permute(n, key, i));
       }
     });
   for (auto& t : threads) t.join();
@@ -241,7 +243,6 @@ void toplevel(int argc, char** argv) {
                 work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
       GEODE_ASSERT(work.size() == si.total_blocks);
-      Random(slice).shuffle(work);
       parallel_for(threads, work.size(), [&](const size_t wi) {
         const auto& w = work[wi];
         const auto& reader = *si.readers[w.reader_index];
