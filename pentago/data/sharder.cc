@@ -167,7 +167,7 @@ void toplevel(int argc, char** argv) {
       section_to_reader[readers[ri]->header.section] = ri;
     uint32_t total_blocks = 0;
     for (const auto& reader : readers)
-      total_blocks += reader->header.blocks.product();
+      total_blocks += Vector<uint32_t,4>(reader->header.blocks).product();
     slices.emplace_back(shard_mapping_t(slice), std::move(readers),
                         std::move(section_to_reader), total_blocks);
   }
