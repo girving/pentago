@@ -241,6 +241,7 @@ void toplevel(int argc, char** argv) {
                 work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
       GEODE_ASSERT(work.size() == si.total_blocks);
+      Random(slice).shuffle(work);
       parallel_for(threads, work.size(), [&](const size_t wi) {
         const auto& w = work[wi];
         const auto& reader = *si.readers[w.reader_index];
