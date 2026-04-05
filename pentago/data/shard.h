@@ -88,6 +88,9 @@ struct shard_file_t {
   arithmetic_t read_group(const int slice) const;
 };
 
+// Shard filename: shard-NNNNN-of-NNNNN.pentago.shard (width adapts to total_shards)
+string shard_filename(const int shards, const int shard);
+
 struct board_value_t {
   board_t board;
   int value;  // 0/1/2: black_wins + 2 * white_wins

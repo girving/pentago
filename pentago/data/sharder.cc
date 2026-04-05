@@ -82,10 +82,6 @@ static options_t parse_options(int argc, char** argv) {
   return o;
 }
 
-static string shard_filename(const int shard, const int total_shards) {
-  return tfm::format("shard-%05d-of-%05d.pentago.shard", shard, total_shards - 1);
-}
-
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
   Scope scope("sharder");
@@ -99,11 +95,13 @@ void toplevel(int argc, char** argv) {
        shard_range.lo, shard_range.hi);
   slog("threads: %d, memory: %.1f GB", threads, double(o.memory) / (1LL << 30));
 
-  // Compute batch size from the largest slice (max_slice), which dominates memory
+  // Compute batch size from the largest slice (max_slice), which dominates memory.
+  // Peak memory per shard: raw ternary buffer for the current slice, plus compressed
+  // data accumulated across all already-encoded slices (~half the raw size). Use 2x.
   const shard_mapping_t max_mapping(o.max_slice);
   const auto max_range = max_mapping.shard_range(o.total_shards, shard_range.lo);
   const uint64_t max_entries_per_shard = max_range.hi - max_range.lo;
-  const uint64_t mem_per_shard = (max_entries_per_shard + 4) / 5 + 64;
+  const uint64_t mem_per_shard = ((max_entries_per_shard + 4) / 5 + 64) * 2;
   int shards_per_batch;
   if (mem_per_shard == 0) {
     shards_per_batch = target_shards;
@@ -231,7 +229,7 @@ void toplevel(int argc, char** argv) {
         h.max_slice = o.max_slice;
         h.shard_id = abs_shard;
         h.total_shards = o.total_shards;
-        const auto path = tfm::format("%s/%s", o.output_dir, shard_filename(abs_shard, o.total_shards));
+        const auto path = tfm::format("%s/%s", o.output_dir, shard_filename(o.total_shards, abs_shard));
         write_shard(path, h, asarray(batch_groups[b]));
       });
     }

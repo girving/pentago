@@ -67,8 +67,7 @@ static void verify_shards(const int max_slice, const int total_shards,
 
     // Check each shard in the range
     for (const int s : shard_range) {
-      const auto path = tfm::format("%s/shard-%05d-of-%05d.pentago.shard", output_dir, s,
-                                     total_shards - 1);
+      const auto path = tfm::format("%s/%s", output_dir, shard_filename(total_shards, s));
       const shard_file_t sf(path);
       PENTAGO_ASSERT_EQ(sf.header.max_slice, uint32_t(max_slice));
       PENTAGO_ASSERT_EQ(sf.header.shard_id, uint32_t(s));
@@ -164,8 +163,7 @@ TEST_F(shard_iterator_test, correctness) {
   const uint128_t seed = 123;
 
   // Build expected (board, value) pairs from direct shard decoding
-  const auto path = tfm::format("%s/shard-%05d-of-%05d.pentago.shard",
-                                dir_->path, shard_id, total_shards - 1);
+  const auto path = tfm::format("%s/%s", dir_->path, shard_filename(total_shards, shard_id));
   const shard_file_t sf(path);
   vector<board_value_t> expected;
   for (const int s : range(max_slice + 1)) {

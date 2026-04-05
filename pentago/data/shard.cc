@@ -203,6 +203,11 @@ arithmetic_t shard_file_t::read_group(const int slice) const {
   return arithmetic_deserialize(buf);
 }
 
+string shard_filename(const int shards, const int shard) {
+  const int w = int(tfm::format("%d", shards - 1).size());
+  return tfm::format("shard-%0*d-of-%0*d.pentago.shard", w, shard, w, shards - 1);
+}
+
 shard_iterator_t::shard_iterator_t(const string& dir, const int total_shards,
                                    const Range<int> shard_range, const uint128_t seed)
     : dir(dir), total_shards(total_shards), shard_range(shard_range), random(seed),
@@ -221,8 +226,7 @@ void shard_iterator_t::load_next_shard() {
   const int permuted = int(random_permute(uint64_t(shard_range.size()), epoch_key,
                                           uint64_t(shard_cursor++)));
   const int shard_id = shard_range.lo + permuted;
-  const auto path = tfm::format("%s/shard-%05d-of-%05d.pentago.shard",
-                                dir, shard_id, total_shards - 1);
+  const auto path = tfm::format("%s/%s", dir, shard_filename(total_shards, shard_id));
   const shard_file_t sf(path);
 
   // Initialize slices lazily on first shard load
