@@ -78,18 +78,16 @@ board_t shard_mapping_t::board(const uint64_t shuffled) const {
 }
 
 int shard_mapping_t::shard(const int shards, const uint64_t shuffled) const {
-  GEODE_ASSERT(0 < shards && shards <= 100000);  // Prevent overflow
-  // shuffled < total(), and total() * shards must fit in uint64_t (checked in shard_range)
+  GEODE_ASSERT(0 < shards && total() <= numeric_limits<uint64_t>::max() / shards);
   return int(shuffled * shards / total());
 }
 
 Range<uint64_t> shard_mapping_t::shard_range(const int shards, const int shard) const {
-  GEODE_ASSERT(0 < shards && shards <= 100000);  // Prevent overflow
-  GEODE_ASSERT(unsigned(shard) < unsigned(shards));
+  GEODE_ASSERT(0 < shards && unsigned(shard) < unsigned(shards));
   // Use ceiling division to be the exact inverse of shard():
   // shard(i) = floor(i*shards/T), so shard s owns i where i*shards >= s*T, i.e. i >= ceil(s*T/shards).
   const uint64_t T = total();
-  // T * shards must fit in uint64_t
+  // T * shards must fit in uint64_t (max T ~6.5e13 at slice 18, so up to ~283M shards)
   GEODE_ASSERT(T <= numeric_limits<uint64_t>::max() / shards);
   const uint64_t lo = ceil_div(T * shard, uint64_t(shards));
   const uint64_t hi = ceil_div(T * (shard + 1), uint64_t(shards));
@@ -234,8 +232,8 @@ void shard_iterator_t::load_next_shard() {
     for (const int s : range(n))
       slices.emplace_back(s);
   }
-  GEODE_ASSERT(sf.header.max_slice + 1 == uint32_t(slices.size()));
-  GEODE_ASSERT(sf.header.total_shards == uint32_t(total_shards));
+  GEODE_ASSERT(sf.header.max_slice + 1 == uint32_t(slices.size()) &&
+               sf.header.total_shards == uint32_t(total_shards));
 
   // Decode all groups and set up per-slice state
   total_remaining = 0;

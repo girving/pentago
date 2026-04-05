@@ -52,6 +52,7 @@ cc_binary(
         "//pentago/base",
         "//pentago/utility",
     ],
+    data = ["//data:counts"],
 )
 
 cc_binary(

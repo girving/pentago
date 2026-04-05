@@ -47,6 +47,7 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Do not commit until the user has reviewed the code
 - No `__attribute__((target(...)))` — we compile with `-march=native` (in COPTS) so AVX2 is always available
 - Don't allocate large intermediate buffers when direct access suffices
+- Merge consecutive `GEODE_ASSERT`s into one (each assert has overhead, so `GEODE_ASSERT(a && b)` is better than two separate calls)
 - Validate untrusted input upfront (e.g. assert stream lengths sum correctly) rather than clamping during use
 - When changing a serialization format, commit the format change first with determinism hashes, then optimize — hashes must not change during optimization
 - `-march=native` is already in COPTS in `pentago/pentago.bzl`, so `--copt=-march=native` is not needed on the command line

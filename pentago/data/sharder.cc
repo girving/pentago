@@ -76,7 +76,7 @@ static options_t parse_options(int argc, char** argv) {
   o.input_dir = argv[optind];
   o.output_dir = argv[optind + 1];
   GEODE_ASSERT(0 <= o.max_slice && o.max_slice <= 18);
-  GEODE_ASSERT(0 < o.total_shards && o.total_shards <= 100000);
+  GEODE_ASSERT(0 < o.total_shards);
   if (o.memory < 0)
     o.memory = int64_t(total_memory() * 80 / 100);
   return o;
