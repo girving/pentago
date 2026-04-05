@@ -207,6 +207,17 @@ Array<Vector<super_t,2>,4> supertensor_reader_t::read_block(Vector<uint8_t,4> bl
   return data;
 }
 
+Array<Vector<super_t,2>,4> supertensor_reader_t::read_block_sync(Vector<uint8_t,4> block) const {
+  const auto b = blob(block);
+  GEODE_ASSERT(b.compressed_size < (uint64_t)1 << 31 && (!b.uncompressed_size || b.offset));
+  Array<uint8_t> compressed(int(b.compressed_size), uninit);
+  const auto error = fd->pread(compressed, b.offset);
+  if (error.size())
+    THROW(IOError, "read_block_sync pread failed: %s", error);
+  auto raw = decompress(compressed, b.uncompressed_size, unevent);
+  return unfilter(header.filter, header.block_shape(block), raw);
+}
+
 Array<Vector<super_t,2>,4> unfilter(int filter, Vector<int,4> block_shape, Array<uint8_t> raw_data) {
   GEODE_ASSERT(raw_data.size()==(int)sizeof(Vector<super_t,2>)*block_shape.product());
   Array<Vector<super_t,2>,4> data(block_shape, shared_ptr<Vector<super_t,2>>(

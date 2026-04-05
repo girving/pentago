@@ -88,6 +88,21 @@ TEST(supertensor, supertensor) {
       }
     }
   }
+
+  // Verify read_block_sync matches read_block
+  for (const auto& reader : {reader0, reader1}) {
+    for (const auto i : range(uint8_t(blocks[0]))) {
+      for (const auto j : range(uint8_t(blocks[1]))) {
+        for (const auto k : range(uint8_t(blocks[2]))) {
+          for (const auto l : range(uint8_t(blocks[3]))) {
+            const auto b = vec(i,j,k,l);
+            const auto block = reader->read_block_sync(b);
+            ASSERT_EQ(block, data[b]);
+          }
+        }
+      }
+    }
+  }
   report_thread_times(total_thread_times().times);
 }
 

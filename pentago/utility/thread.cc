@@ -540,6 +540,12 @@ unit_t init_threads(int cpu_threads, int io_threads) {
   return unit;
 }
 
+void shutdown_threads() {
+  lock_t lock(init_threads_mutex());
+  io_pool.reset();
+  cpu_pool.reset();
+}
+
 Vector<int,2> thread_counts() {
   return vec(cpu_pool ? cpu_pool->count : 0, io_pool ? io_pool->count : 0);
 }

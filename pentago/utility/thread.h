@@ -134,6 +134,9 @@ int default_threads();
 // Initialize thread pools
 unit_t init_threads(int cpu_threads, int io_threads);
 
+// Shut down and destroy thread pools
+void shutdown_threads();
+
 // Grab thread counts: cpu count, io count
 Vector<int,2> thread_counts();
 

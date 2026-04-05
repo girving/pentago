@@ -9,7 +9,6 @@
 #include "pentago/data/shard.h"
 #include "pentago/data/supertensor.h"
 #include "pentago/data/ternary.h"
-#include "pentago/utility/curry.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/range.h"
@@ -18,6 +17,8 @@
 #include <cstdlib>
 #include <optional>
 #include <cstring>
+#include <thread>
+#include <vector>
 #include <getopt.h>
 #include "pentago/utility/memory.h"
 namespace pentago {
@@ -25,6 +26,8 @@ namespace {
 
 using std::nullopt;
 using std::optional;
+using std::atomic;
+using std::thread;
 
 struct options_t {
   string input_dir;
@@ -82,11 +85,51 @@ static options_t parse_options(int argc, char** argv) {
   return o;
 }
 
+struct progress_t {
+  const char* label;
+  const uint64_t total;
+  atomic<uint64_t> done{0};
+  const wall_time_t start = wall_time();
+
+  progress_t(const char* label, const uint64_t total) : label(label), total(total) {}
+
+  void tick() {
+    const uint64_t d = done.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (d % 100 == 0 || d == total) {
+      const double elapsed = (wall_time() - start).seconds();
+      const double eta = d < total ? elapsed * (double(total) / d - 1) : 0;
+      slog("    %s: %llu / %llu, %.1fs elapsed, %.1fs remaining", label, d, total, elapsed, eta);
+    }
+  }
+};
+
+struct block_work_t {
+  int reader_index;
+  Vector<uint8_t,4> block;
+};
+
+template<class F>
+static void parallel_for(const int num_threads, const size_t n, const F& f) {
+  GEODE_ASSERT(num_threads > 0);
+  vector<thread> threads;
+  threads.reserve(num_threads);
+  atomic<size_t> next(0);
+  for (const int t __attribute__((unused)) : range(num_threads))
+    threads.emplace_back([&]() {
+      for (;;) {
+        const size_t i = next.fetch_add(1, std::memory_order_relaxed);
+        if (i >= n) break;
+        f(i);
+      }
+    });
+  for (auto& t : threads) t.join();
+}
+
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
   Scope scope("sharder");
   const int threads = o.threads >= 0 ? o.threads : default_threads();
-  init_threads(threads, threads);
+  init_threads(1, 1);
 
   const auto shard_range = parse_range(o.shard_range, o.total_shards);
   const int target_shards = shard_range.size();
@@ -102,14 +145,8 @@ void toplevel(int argc, char** argv) {
   const auto max_range = max_mapping.shard_range(o.total_shards, shard_range.lo);
   const uint64_t max_entries_per_shard = max_range.hi - max_range.lo;
   const uint64_t mem_per_shard = ((max_entries_per_shard + 4) / 5 + 64) * 2;
-  int shards_per_batch;
-  if (mem_per_shard == 0) {
-    shards_per_batch = target_shards;
-  } else {
-    shards_per_batch = int(std::min(uint64_t(target_shards),
-                                     uint64_t(o.memory) / mem_per_shard));
-  }
-  if (shards_per_batch < 1) shards_per_batch = 1;
+  const int shards_per_batch = std::max(1, !mem_per_shard ? target_shards :
+      int(std::min(uint64_t(target_shards), uint64_t(o.memory) / mem_per_shard)));
   const int n_batches = (target_shards + shards_per_batch - 1) / shards_per_batch;
   slog("%llu max entries/shard, %d shards/batch, %d batches",
        max_entries_per_shard, shards_per_batch, n_batches);
@@ -134,6 +171,7 @@ void toplevel(int argc, char** argv) {
     slices.emplace_back(shard_mapping_t(slice), std::move(readers),
                         std::move(section_to_reader), total_blocks);
   }
+  shutdown_threads();  // free spinning pool threads before the main computation
 
   // Process batches of shards
   for (const int bi : range(n_batches)) {
@@ -146,8 +184,8 @@ void toplevel(int argc, char** argv) {
     // Accumulated encoded groups for this batch, indexed [shard within batch][slice]
     vector<vector<arithmetic_t>> batch_groups(batch.size(), vector<arithmetic_t>(o.max_slice + 1));
 
-    // Process each slice
-    for (const int slice : range(o.max_slice + 1)) {
+    // Process slices from largest to smallest, since largest is slowest
+    for (int slice = o.max_slice; slice >= 0; slice--) {
       Scope slice_scope(tfm::format("slice %d", slice));
       const auto& si = slices[slice];
 
@@ -164,7 +202,7 @@ void toplevel(int argc, char** argv) {
       const auto shard_los_raw = shard_los.raw();
 
       // Scatter blocks into shard buffers using atomic adds
-      std::atomic<uint32_t> blocks_done(0);
+      progress_t block_progress("blocks", si.total_blocks);
       auto scatter_block = [&, shard_los_raw](const section_t section, const int block_size,
                                Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data) {
         const auto base_index = Vector<int,4>(block) * block_size;
@@ -187,53 +225,51 @@ void toplevel(int argc, char** argv) {
                   buffers[s - abs_lo]->atomic_set_from_zero(pos, black_wins(r) + 2 * white_wins(r));
                 }
               }
-        const uint64_t done = blocks_done.fetch_add(1, std::memory_order_relaxed) + 1;
-        if (done % 100 == 0 || done == si.total_blocks)
-          slog("    blocks: %llu / %llu", done, si.total_blocks);
+        block_progress.tick();
       };
 
-      // Schedule all block reads on IO threads, scatter on CPU threads
+      // Read and scatter blocks using parallel_for with natural backpressure
+      vector<block_work_t> work;
       for (const auto& section : si.mapping.sections) {
-        const auto& reader = *si.readers[si.section_to_reader.at(section)];
-        const int block_size = reader.header.block_size;
+        const int ri = si.section_to_reader.at(section);
+        const auto& reader = *si.readers[ri];
         const auto blocks = Vector<int,4>(reader.header.blocks);
         for (const int b0 : range(blocks[0]))
           for (const int b1 : range(blocks[1]))
             for (const int b2 : range(blocks[2]))
-              for (const int b3 : range(blocks[3])) {
-                const auto block = Vector<uint8_t,4>(vec(b0, b1, b2, b3));
-                reader.schedule_read_block(block,
-                    [&, section, block_size](Vector<uint8_t,4> block,
-                                            Array<Vector<super_t,2>,4> data) {
-                  threads_schedule(CPU, curry(scatter_block, section, block_size, block, data));
-                });
-              }
+              for (const int b3 : range(blocks[3]))
+                work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
-      threads_wait_all();
+      GEODE_ASSERT(work.size() == si.total_blocks);
+      parallel_for(threads, work.size(), [&](const size_t wi) {
+        const auto& w = work[wi];
+        const auto& reader = *si.readers[w.reader_index];
+        scatter_block(reader.header.section, reader.header.block_size, w.block,
+                      reader.read_block_sync(w.block));
+      });
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
-      for (const int b : range(batch.size())) {
-        threads_schedule(CPU, [&, b]() {
-          batch_groups[b][slice] = arithmetic_encode(*buffers[b]);
-          buffers[b] = nullopt;
-        });
-      }
-      threads_wait_all();
+      progress_t encode_progress("encode", batch.size());
+      parallel_for(threads, batch.size(), [&](const size_t b) {
+        batch_groups[b][slice] = arithmetic_encode(*buffers[b]);
+        buffers[b] = nullopt;
+        encode_progress.tick();
+      });
     }  // slice
 
     // Write this batch's shard files in parallel
-    for (const int b : range(batch.size())) {
-      threads_schedule(IO, [&, b]() {
-        const int abs_shard = abs_lo + b;
-        shard_header_t h;
-        h.max_slice = o.max_slice;
-        h.shard_id = abs_shard;
-        h.total_shards = o.total_shards;
-        const auto path = tfm::format("%s/%s", o.output_dir, shard_filename(o.total_shards, abs_shard));
-        write_shard(path, h, asarray(batch_groups[b]));
-      });
-    }
-    threads_wait_all();
+    progress_t write_progress("write", batch.size());
+    parallel_for(threads, batch.size(), [&](const size_t b) {
+      const int abs_shard = abs_lo + int(b);
+      shard_header_t h;
+      h.max_slice = o.max_slice;
+      h.shard_id = abs_shard;
+      h.total_shards = o.total_shards;
+      const auto path = tfm::format("%s/%s", o.output_dir,
+                                    shard_filename(o.total_shards, abs_shard));
+      write_shard(path, h, asarray(batch_groups[b]));
+      write_progress.tick();
+    });
     slog("wrote %d shard files", batch.size());
   }  // batch
 
