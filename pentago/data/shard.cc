@@ -1,6 +1,7 @@
 // Pseudorandom shard mapping for Pentago positions
 
 #include "pentago/data/shard.h"
+#include "pentago/data/shard_permute.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/ceil_div.h"
@@ -19,11 +20,9 @@ using std::make_unique;
 using std::memcpy;
 using std::upper_bound;
 
-// Fixed key for the pseudorandom permutation (digits of e in hex)
-static const uint128_t shard_key = (uint128_t(0xb7e151628aed2a6a) << 64) | 0xbf7158809cf4f3c7;
 
 shard_mapping_t::shard_mapping_t(const int slice)
-    : slice(slice) {
+    : slice(slice), permute(slice) {
   GEODE_ASSERT(0 <= slice && slice <= 18);
   const_cast_(sections) = asarray(all_boards_sections(slice, 8)).copy();
 
@@ -52,12 +51,12 @@ uint64_t shard_mapping_t::forward(const section_t section, const Vector<int,4> i
   GEODE_ASSERT(valid(shape, index));
   const uint64_t pos = index64(shape, index);
   const uint64_t linear = offsets[si] + pos * 256 + rotation.local;
-  return random_permute(total(), shard_key, linear);
+  return permute.forward(linear);
 }
 
 shard_mapping_t::location_t shard_mapping_t::inverse(const uint64_t shuffled) const {
   GEODE_ASSERT(shuffled < total());
-  const uint64_t linear = random_unpermute(total(), shard_key, shuffled);
+  const uint64_t linear = permute.inverse(shuffled);
 
   // Binary search to find section
   const int si = int(upper_bound(offsets.begin(), offsets.end(), linear) - offsets.begin()) - 1;
@@ -305,10 +304,10 @@ void scatter_block(
   // Hoist per-block invariants out of position and rotation loops
   const int si = mapping.section_index(section);
   const auto shape = section.shape();
-  const uint64_t n = mapping.total();
   const uint64_t offset = mapping.offsets[si];
   const auto base_index = Vector<int,4>(block) * block_size;
   const auto block_shape = data.shape();
+  const auto perm = mapping.permute;
   for (const int i0 : range(block_shape[0]))
     for (const int i1 : range(block_shape[1]))
       for (const int i2 : range(block_shape[2]))
@@ -320,14 +319,36 @@ void scatter_block(
           // Hoist per-position index computation out of rotation loop
           const uint64_t pos = index64(shape, index);
           const uint64_t base_linear = offset + pos * 256;
+#if PENTAGO_SSE
+          const __m256i off0 = _mm256_setr_epi64x(0, 1, 2, 3);
+          const __m256i off1 = _mm256_setr_epi64x(4, 5, 6, 7);
+          for (int r = 0; r < 256; r += 8) {
+            const __m256i base = _mm256_set1_epi64x(base_linear + r);
+            const auto shuffled = perm.forward8({_mm256_add_epi64(base, off0),
+                                                  _mm256_add_epi64(base, off1)});
+            alignas(32) uint64_t sv[8];
+            _mm256_store_si256((__m256i*)&sv[0], shuffled.v0);
+            _mm256_store_si256((__m256i*)&sv[4], shuffled.v1);
+            for (int j = 0; j < 8; j++) {
+              const int s = mapping.shard(total_shards, sv[j]);
+              if (s < shard_range.lo || s >= shard_range.hi)
+                continue;
+              const uint64_t p = sv[j] - shard_los[s - shard_range.lo];
+              buffers[s - shard_range.lo].atomic_set_from_zero(
+                  p, black_wins(r + j) + 2 * white_wins(r + j));
+            }
+          }
+#else
           for (const int r : range(256)) {
-            const uint64_t shuffled = random_permute(n, shard_key, base_linear + r);
+            const uint64_t shuffled = perm.forward(base_linear + r);
             const int s = mapping.shard(total_shards, shuffled);
             if (s < shard_range.lo || s >= shard_range.hi)
               continue;
             const uint64_t p = shuffled - shard_los[s - shard_range.lo];
-            buffers[s - shard_range.lo].atomic_set_from_zero(p, black_wins(r) + 2 * white_wins(r));
+            buffers[s - shard_range.lo].atomic_set_from_zero(
+                p, black_wins(r) + 2 * white_wins(r));
           }
+#endif
         }
 }
 

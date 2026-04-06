@@ -1,11 +1,11 @@
-// Microbenchmark for scatter_block and random_permute
+// Microbenchmark for scatter_block and shard_permute
 
 #include "pentago/data/shard.h"
+#include "pentago/data/shard_permute.h"
 #include "pentago/data/ternary.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/base/superscore.h"
 #include "pentago/utility/log.h"
-#include "pentago/utility/permute.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/wall_time.h"
 #include "pentago/utility/test_assert.h"
@@ -16,14 +16,12 @@ namespace {
 // Min-of-N timing for stable results
 static constexpr int timing_iterations = 10;
 
-// Benchmark random_permute in isolation: 256 consecutive calls (one position's worth)
-TEST(shard_bench, random_permute) {
-  const shard_mapping_t mapping(4);
-  const uint64_t n = mapping.total();
-  const uint128_t key = (uint128_t(0xb7e151628aed2a6a) << 64) | 0xbf7158809cf4f3c7;
+// Benchmark shard_permute in isolation: 256 consecutive calls (one position's worth)
+TEST(shard_bench, shard_permute) {
+  const shard_permute_t perm(4);
 
   // Pick a base offset in the middle of the range
-  const uint64_t base = n / 3;
+  const uint64_t base = perm.ab / 3;
   const int reps = 10000;
 
   double best = 1e18;
@@ -32,15 +30,26 @@ TEST(shard_bench, random_permute) {
     const auto start = wall_time();
     for (const int rep : range(reps)) {
       const uint64_t b = base + uint64_t(rep) * 256;
+#if PENTAGO_SSE
+      const __m256i off0 = _mm256_setr_epi64x(0, 1, 2, 3);
+      const __m256i off1 = _mm256_setr_epi64x(4, 5, 6, 7);
+      for (int r = 0; r < 256; r += 8) {
+        const __m256i bv = _mm256_set1_epi64x(b + r);
+        const auto y = perm.forward8({_mm256_add_epi64(bv, off0), _mm256_add_epi64(bv, off1)});
+        // Extract one lane to prevent dead code elimination
+        sink += _mm_cvtsi128_si64(_mm256_castsi256_si128(y.v0));
+      }
+#else
       for (const int r : range(256))
-        sink += random_permute(n, key, b + r);
+        sink += perm.forward(b + r);
+#endif
     }
     const double elapsed = (wall_time() - start).seconds();
     best = std::min(best, elapsed);
   }
   const double ns_per_call = best / (reps * 256) * 1e9;
   const double ns_per_position = best / reps * 1e9;
-  slog("random_permute: %.1f ns/call, %.0f ns/position (256 calls), sink=%llu",
+  slog("shard_permute: %.1f ns/call, %.0f ns/position (256 calls), sink=%llu",
        ns_per_call, ns_per_position, sink);
 }
 

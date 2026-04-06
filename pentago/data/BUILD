@@ -34,6 +34,20 @@ cc_tests(
 )
 
 cc_test(
+    name = "shard_permute_test",
+    srcs = ["shard_permute_test.cc"],
+    copts = COPTS + ["-Wsign-compare"],
+    deps = [
+        ":data",
+        "//pentago/base",
+        "//pentago/utility",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+    ],
+    size = "medium",
+)
+
+cc_test(
     name = "shard_bench",
     srcs = ["shard_bench.cc"],
     copts = COPTS + ["-Wsign-compare"],

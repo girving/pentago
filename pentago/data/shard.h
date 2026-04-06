@@ -11,6 +11,7 @@
 #include "pentago/base/symmetry.h"
 #include "pentago/data/arithmetic.h"
 #include "pentago/data/file.h"
+#include "pentago/data/shard_permute.h"
 #include "pentago/data/ternary.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/noncopyable.h"
@@ -28,6 +29,7 @@ struct shard_mapping_t {
   const Array<const section_t> sections;  // sections for this slice only
   const unordered_map<section_t, int> section_id;  // inverse: section → index
   const Array<const uint64_t> offsets;  // prefix sum of section.size()*256
+  const shard_permute_t permute;  // cached permutation for this slice
 
   shard_mapping_t(const int slice);
   ~shard_mapping_t();
