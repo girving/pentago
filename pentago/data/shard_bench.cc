@@ -1,8 +1,9 @@
 // Microbenchmark for scatter_block and shard_permute
 //
-// Speed log (Cascade Lake, -c opt -march=native, min of 10 iterations):
+// Speed log (Cascade Lake 2.5 GHz, -c opt -march=native, min of 10 iterations):
+// "position" = one board position = 256 ternary values (one per rotation).
 //
-//   shard_permute: 6.5 ns/call, 1670 ns/position
+//   shard_permute: 6.5 ns/call, 1670 ns/position (~16 cycles/value)
 //
 //   scatter_block (131072 shards, 1 shard in range, 4096 positions/block):
 //     slice 16: 1640 ns/position
