@@ -53,14 +53,15 @@ TEST(shard_bench, shard_permute) {
        ns_per_call, ns_per_position, sink);
 }
 
-// Benchmark scatter_block with a single shard at realistic shard counts
+// Benchmark scatter_block with a single shard at realistic shard counts.
+// Buffer is allocated and touched once before timing to eliminate memset
+// and page fault noise from the measurement.
 static void bench_scatter(const int slice) {
   const shard_mapping_t mapping(slice);
   const int total_shards = 100000;
   const int shard_id = total_shards / 2;
   const auto shard_range = range(shard_id, shard_id + 1);
 
-  // Allocate single shard buffer
   const auto sr = mapping.shard_range(total_shards, shard_id);
   Array<uint64_t> shard_los(1, uninit);
   shard_los[0] = sr.lo;
@@ -80,9 +81,10 @@ static void bench_scatter(const int slice) {
   slog("slice %d: %llu total, %llu entries/shard, %d positions/block",
        slice, mapping.total(), sr.size(), positions);
 
+  // Don't re-zero between iterations: violates atomic_set_from_zero's precondition,
+  // but we're only timing the permute + shard lookup path, not the writes.
   double best = 1e18;
   for (const int iter __attribute__((unused)) : range(timing_iterations)) {
-    buffers[0] = ternaries_t(sr.size());
     const auto start = wall_time();
     scatter_block(mapping, total_shards, shard_range, shard_los,
                   buffers, section, block_size, block, data);

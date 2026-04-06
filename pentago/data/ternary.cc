@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <cstring>
 namespace pentago {
 
 using std::min;
@@ -24,6 +25,10 @@ ternaries_t::ternaries_t(const uint64_t size)
     , data(CHECK_CAST_INT(ceil_div(ceil_div(size, uint64_t(5)), uint64_t(8)))) {}
 
 ternaries_t::~ternaries_t() {}
+
+void ternaries_t::clear() {
+  memset(data.data(), 0, data.size() * sizeof(uint64_t));
+}
 
 RawArray<uint8_t> ternaries_t::bytes() {
   return RawArray<uint8_t>(CHECK_CAST_INT(ceil_div(size, uint64_t(5))),

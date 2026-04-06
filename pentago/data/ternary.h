@@ -15,6 +15,9 @@ struct ternaries_t {
   explicit ternaries_t(const uint64_t size);
   ~ternaries_t();
 
+  // Zero all values without reallocating
+  void clear();
+
   int operator[](const uint64_t i) const;
   void set(const uint64_t i, const int v);
 
