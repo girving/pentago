@@ -16,7 +16,6 @@
 #include "pentago/utility/thread.h"
 #include <atomic>
 #include <cstdlib>
-#include <optional>
 #include <cstring>
 #include <thread>
 #include <vector>
@@ -25,8 +24,6 @@
 namespace pentago {
 namespace {
 
-using std::nullopt;
-using std::optional;
 using std::atomic;
 using std::thread;
 
@@ -192,7 +189,7 @@ void toplevel(int argc, char** argv) {
       const auto& si = slices[slice];
 
       // Allocate ternary buffers for this batch and slice
-      vector<optional<ternaries_t>> buffers;
+      vector<ternaries_t> buffers;
       buffers.reserve(batch.size());
       for (const int b : range(batch.size()))
         buffers.emplace_back(si.mapping.shard_range(o.total_shards, abs_lo + b).size());
@@ -201,36 +198,10 @@ void toplevel(int argc, char** argv) {
       Array<uint64_t> shard_los(batch.size(), uninit);
       for (const int b : range(batch.size()))
         shard_los[b] = si.mapping.shard_range(o.total_shards, abs_lo + b).lo;
-      const auto shard_los_raw = shard_los.raw();
-
-      // Scatter blocks into shard buffers using atomic adds
-      progress_t block_progress("blocks", si.total_blocks);
-      auto scatter_block = [&, shard_los_raw](const section_t section, const int block_size,
-                               Vector<uint8_t,4> block, Array<Vector<super_t,2>,4> data) {
-        const auto base_index = Vector<int,4>(block) * block_size;
-        const auto block_shape = data.shape();
-        for (const int i0 : range(block_shape[0]))
-          for (const int i1 : range(block_shape[1]))
-            for (const int i2 : range(block_shape[2]))
-              for (const int i3 : range(block_shape[3])) {
-                const auto index = base_index + vec(i0, i1, i2, i3);
-                const auto& entry = data(i0, i1, i2, i3);
-                const auto& black_wins = entry[0];
-                const auto& white_wins = entry[1];
-                for (const uint8_t r : range(256)) {
-                  const auto rot = local_symmetry_t(r);
-                  const uint64_t shuffled = si.mapping.forward(section, index, rot);
-                  const int s = si.mapping.shard(o.total_shards, shuffled);
-                  if (s < abs_lo || s >= abs_hi)
-                    continue;
-                  const uint64_t pos = shuffled - shard_los_raw[s - abs_lo];
-                  buffers[s - abs_lo]->atomic_set_from_zero(pos, black_wins(r) + 2 * white_wins(r));
-                }
-              }
-        block_progress.tick();
-      };
+      const auto abs_range = range(abs_lo, abs_hi);
 
       // Read and scatter blocks using parallel_for with natural backpressure
+      progress_t block_progress("blocks", si.total_blocks);
       vector<block_work_t> work;
       for (const auto& section : si.mapping.sections) {
         const int ri = si.section_to_reader.at(section);
@@ -246,15 +217,17 @@ void toplevel(int argc, char** argv) {
       parallel_for(threads, work.size(), [&](const size_t wi) {
         const auto& w = work[wi];
         const auto& reader = *si.readers[w.reader_index];
-        scatter_block(reader.header.section, reader.header.block_size, w.block,
-                      reader.read_block_sync(w.block));
+        scatter_block(si.mapping, o.total_shards, abs_range, shard_los,
+                      buffers, reader.header.section, reader.header.block_size,
+                      w.block, reader.read_block_sync(w.block));
+        block_progress.tick();
       });
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
       progress_t encode_progress("encode", batch.size());
       parallel_for(threads, batch.size(), [&](const size_t b) {
-        batch_groups[b][slice] = arithmetic_encode(*buffers[b]);
-        buffers[b] = nullopt;
+        batch_groups[b][slice] = arithmetic_encode(buffers[b]);
+        buffers[b] = ternaries_t();
         encode_progress.tick();
       });
     }  // slice

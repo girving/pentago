@@ -39,14 +39,19 @@ shard_mapping_t::shard_mapping_t(const int slice)
 
 shard_mapping_t::~shard_mapping_t() {}
 
-uint64_t shard_mapping_t::forward(const section_t section, const Vector<int,4> index,
-                                  const local_symmetry_t rotation) const {
+int shard_mapping_t::section_index(const section_t section) const {
   const auto it = section_id.find(section);
   GEODE_ASSERT(it != section_id.end());
+  return it->second;
+}
+
+uint64_t shard_mapping_t::forward(const section_t section, const Vector<int,4> index,
+                                  const local_symmetry_t rotation) const {
+  const int si = section_index(section);
   const auto shape = section.shape();
   GEODE_ASSERT(valid(shape, index));
   const uint64_t pos = index64(shape, index);
-  const uint64_t linear = offsets[it->second] + pos * 256 + rotation.local;
+  const uint64_t linear = offsets[si] + pos * 256 + rotation.local;
   return random_permute(total(), shard_key, linear);
 }
 
@@ -286,6 +291,44 @@ int shard_to_server_value(const board_t board, const int shard_value) {
   if (shard_value == 0) return 0;
   const bool black_to_move = count_stones(board) % 2 == 0;
   return (shard_value == 1) == black_to_move ? 1 : -1;
+}
+
+void scatter_block(
+    const shard_mapping_t& mapping,
+    const int total_shards,
+    const Range<int> shard_range,
+    RawArray<const uint64_t> shard_los,
+    RawArray<ternaries_t> buffers,
+    const section_t section, const int block_size,
+    const Vector<uint8_t,4> block,
+    RawArray<const Vector<super_t,2>,4> data) {
+  // Hoist per-block invariants out of position and rotation loops
+  const int si = mapping.section_index(section);
+  const auto shape = section.shape();
+  const uint64_t n = mapping.total();
+  const uint64_t offset = mapping.offsets[si];
+  const auto base_index = Vector<int,4>(block) * block_size;
+  const auto block_shape = data.shape();
+  for (const int i0 : range(block_shape[0]))
+    for (const int i1 : range(block_shape[1]))
+      for (const int i2 : range(block_shape[2]))
+        for (const int i3 : range(block_shape[3])) {
+          const auto index = base_index + vec(i0, i1, i2, i3);
+          const auto& entry = data(i0, i1, i2, i3);
+          const auto& black_wins = entry[0];
+          const auto& white_wins = entry[1];
+          // Hoist per-position index computation out of rotation loop
+          const uint64_t pos = index64(shape, index);
+          const uint64_t base_linear = offset + pos * 256;
+          for (const int r : range(256)) {
+            const uint64_t shuffled = random_permute(n, shard_key, base_linear + r);
+            const int s = mapping.shard(total_shards, shuffled);
+            if (s < shard_range.lo || s >= shard_range.hi)
+              continue;
+            const uint64_t p = shuffled - shard_los[s - shard_range.lo];
+            buffers[s - shard_range.lo].atomic_set_from_zero(p, black_wins(r) + 2 * white_wins(r));
+          }
+        }
 }
 
 }  // namespace pentago

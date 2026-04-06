@@ -7,9 +7,11 @@
 
 #include "pentago/base/board.h"
 #include "pentago/base/section.h"
+#include "pentago/base/superscore.h"
 #include "pentago/base/symmetry.h"
 #include "pentago/data/arithmetic.h"
 #include "pentago/data/file.h"
+#include "pentago/data/ternary.h"
 #include "pentago/utility/array.h"
 #include "pentago/utility/noncopyable.h"
 #include "pentago/utility/random.h"
@@ -31,6 +33,9 @@ struct shard_mapping_t {
   ~shard_mapping_t();
 
   uint64_t total() const { return offsets.back(); }
+
+  // Lookup section → index in sections array (asserts on missing)
+  int section_index(const section_t section) const;
 
   // Forward: (section, position index, rotation) → shuffled index in [0, total)
   uint64_t forward(const section_t section, const Vector<int,4> index,
@@ -141,5 +146,18 @@ private:
 // (1=current player wins, 0=tie, -1=current player loses).
 // Black is the absolute first player; whose turn it is follows stone count parity.
 int shard_to_server_value(board_t board, int shard_value);
+
+// Scatter one block's entries into shard ternary buffers.
+// For each position in the block, computes all 256 rotation-shuffled indices,
+// filters to shard_range, and atomically sets the corresponding ternary values.
+void scatter_block(
+    const shard_mapping_t& mapping,
+    const int total_shards,
+    const Range<int> shard_range,
+    RawArray<const uint64_t> shard_los,
+    RawArray<ternaries_t> buffers,
+    const section_t section, const int block_size,
+    const Vector<uint8_t,4> block,
+    RawArray<const Vector<super_t,2>,4> data);
 
 }  // namespace pentago

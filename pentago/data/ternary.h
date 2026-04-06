@@ -8,8 +8,8 @@
 namespace pentago {
 
 struct ternaries_t {
-  const uint64_t size;         // number of ternary values
-  const Array<uint64_t> data;  // ceil(size/5) packed bytes, stored as uint64_t for alignment
+  uint64_t size;               // number of ternary values
+  Array<uint64_t> data;        // ceil(size/5) packed bytes, stored as uint64_t for alignment
 
   ternaries_t();
   explicit ternaries_t(const uint64_t size);

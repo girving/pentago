@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "data",
-    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "sharder.cc", "shard_sizes.cc", "*_test.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "sharder.cc", "shard_sizes.cc", "*_test.cc", "*_bench.cc"]),
     copts = COPTS,
     deps = [
         "//pentago/base",
@@ -29,6 +29,20 @@ cc_tests(
         ":data",
         "//pentago/base",
         "//pentago/utility",
+    ],
+    size = "small",
+)
+
+cc_test(
+    name = "shard_bench",
+    srcs = ["shard_bench.cc"],
+    copts = COPTS + ["-Wsign-compare"],
+    deps = [
+        ":data",
+        "//pentago/base",
+        "//pentago/utility",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
     ],
     size = "small",
 )
