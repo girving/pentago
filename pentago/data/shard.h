@@ -53,12 +53,61 @@ struct shard_mapping_t {
 
   // Compute the board_t for a shuffled index
   board_t board(const uint64_t shuffled) const;
+};
 
-  // Shard assignment: shuffled index → shard number in [0, shards)
-  int shard(const int shards, const uint64_t shuffled) const;
+// Precomputed shard locator for power-of-two round-robin assignment.
+// Maps shuffled indices to (shard, position) using bitmask and shift.
+// Assert-free hot path; power-of-two check is in the constructor.
+struct shard_locator_t {
+  const int shard_mask;   // total_shards - 1
+  const int shard_shift;  // __builtin_ctz(total_shards)
+  const Range<int> shard_range;
 
-  // Range of shuffled indices belonging to a given shard
-  Range<uint64_t> shard_range(const int shards, const int shard) const;
+  shard_locator_t(const int total_shards, const Range<int> shard_range)
+    : shard_mask(total_shards - 1),
+      shard_shift(__builtin_ctz(total_shards)),
+      shard_range(shard_range) {
+    GEODE_ASSERT(total_shards > 0 && (total_shards & (total_shards - 1)) == 0);
+  }
+
+  // Shard number for one shuffled value
+  int shard(const uint64_t shuffled) const {
+    return int(shuffled & shard_mask);
+  }
+
+  // Position within shard
+  uint64_t position(const uint64_t shuffled) const {
+    return shuffled >> shard_shift;
+  }
+
+  // Number of entries in shard `shard` given `total` entries overall
+  uint64_t shard_size(const uint64_t total, const int shard) const {
+    return (total + shard_mask - shard) >> shard_shift;
+  }
+
+  // Inverse: (shard, position within shard) → shuffled index
+  uint64_t shuffled_index(const int shard, const uint64_t position) const {
+    return (position << shard_shift) | shard;
+  }
+
+#if PENTAGO_SSE
+  // Returns 8-bit mask of which shuffled values land in [shard_range.lo, shard_range.hi).
+  // Exact: no false positives or negatives. Returns 0 in the common case (no hits).
+  int in_range8(const uint64x8 shuffled) const {
+    const __m256i mask_v = _mm256_set1_epi64x(shard_mask);
+    const __m256i pack = _mm256_setr_epi32(0, 2, 4, 6, 0, 2, 4, 6);
+    // Compute shard numbers via bitmask and pack to 8 x int32
+    const __m256i s0 = _mm256_and_si256(shuffled.v0, mask_v);
+    const __m256i s1 = _mm256_and_si256(shuffled.v1, mask_v);
+    const __m128i s0p = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(s0, pack));
+    const __m128i s1p = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(s1, pack));
+    const __m256i s8 = _mm256_inserti128_si256(_mm256_castsi128_si256(s0p), s1p, 1);
+    // Exact range check: shard in [shard_range.lo, shard_range.hi)
+    const __m256i ge_lo = _mm256_cmpgt_epi32(s8, _mm256_set1_epi32(shard_range.lo - 1));
+    const __m256i lt_hi = _mm256_cmpgt_epi32(_mm256_set1_epi32(shard_range.hi), s8);
+    return _mm256_movemask_ps(_mm256_castsi256_ps(_mm256_and_si256(ge_lo, lt_hi)));
+  }
+#endif  // PENTAGO_SSE
 };
 
 // Shard file header
@@ -123,6 +172,7 @@ private:
   const string dir;
   const int total_shards;
   const Range<int> shard_range;
+  const shard_locator_t locator;
   Random random;
 
   // Shard ordering
@@ -156,7 +206,6 @@ void scatter_block(
     const shard_mapping_t& mapping,
     const int total_shards,
     const Range<int> shard_range,
-    RawArray<const uint64_t> shard_los,
     RawArray<ternaries_t> buffers,
     const section_t section, const int block_size,
     const Vector<uint8_t,4> block,

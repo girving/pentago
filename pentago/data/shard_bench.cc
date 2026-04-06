@@ -1,4 +1,18 @@
 // Microbenchmark for scatter_block and shard_permute
+//
+// Speed log (Cascade Lake, -c opt -march=native, min of 10 iterations):
+//
+//   shard_permute: 6.5 ns/call, 1670 ns/position
+//
+//   scatter_block (131072 shards, 1 shard in range, 4096 positions/block):
+//     slice 16: 1640 ns/position
+//     slice 17: 1640 ns/position
+//     slice 18: 1635 ns/position
+//
+//   Before round-robin (100000 shards, double-reciprocal locator):
+//     scatter_block was ~6600 ns/position (4x slower)
+//   Before Feistel permutation (random_permute via hash):
+//     scatter_block was ~23000 ns/position (3.5x slower than double-reciprocal)
 
 #include "pentago/data/shard.h"
 #include "pentago/data/shard_permute.h"
@@ -58,15 +72,13 @@ TEST(shard_bench, shard_permute) {
 // and page fault noise from the measurement.
 static void bench_scatter(const int slice) {
   const shard_mapping_t mapping(slice);
-  const int total_shards = 100000;
+  const int total_shards = 131072;  // power of two
   const int shard_id = total_shards / 2;
   const auto shard_range = range(shard_id, shard_id + 1);
 
-  const auto sr = mapping.shard_range(total_shards, shard_id);
-  Array<uint64_t> shard_los(1, uninit);
-  shard_los[0] = sr.lo;
+  const shard_locator_t locator(total_shards, shard_range);
   vector<ternaries_t> buffers;
-  buffers.emplace_back(sr.size());
+  buffers.emplace_back(locator.shard_size(mapping.total(), shard_id));
 
   // Pick a representative section and create a synthetic block
   const auto& section = mapping.sections[mapping.sections.size() / 2];
@@ -79,14 +91,14 @@ static void bench_scatter(const int slice) {
   Array<Vector<super_t,2>,4> data(block_shape);  // zero-initialized (all ties)
 
   slog("slice %d: %llu total, %llu entries/shard, %d positions/block",
-       slice, mapping.total(), sr.size(), positions);
+       slice, mapping.total(), locator.shard_size(mapping.total(), shard_id), positions);
 
   // Don't re-zero between iterations: violates atomic_set_from_zero's precondition,
   // but we're only timing the permute + shard lookup path, not the writes.
   double best = 1e18;
   for (const int iter __attribute__((unused)) : range(timing_iterations)) {
     const auto start = wall_time();
-    scatter_block(mapping, total_shards, shard_range, shard_los,
+    scatter_block(mapping, total_shards, shard_range,
                   buffers, section, block_size, block, data);
     const double elapsed = (wall_time() - start).seconds();
     best = std::min(best, elapsed);

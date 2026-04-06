@@ -74,13 +74,14 @@ static void verify_shards(const int max_slice, const int total_shards,
       PENTAGO_ASSERT_EQ(sf.header.total_shards, uint32_t(total_shards));
 
       const auto group = sf.read_group(slice);
-      const auto shard_r = mapping.shard_range(total_shards, s);
-      PENTAGO_ASSERT_EQ(group.total(), shard_r.size());
+      const shard_locator_t locator(total_shards, shard_range);
+      const uint64_t shard_sz = locator.shard_size(mapping.total(), s);
+      PENTAGO_ASSERT_EQ(group.total(), shard_sz);
       const auto decoded = arithmetic_decode(group);
-      PENTAGO_ASSERT_EQ(decoded.size, shard_r.size());
+      PENTAGO_ASSERT_EQ(decoded.size, shard_sz);
 
-      for (const uint64_t i : range(shard_r.size())) {
-        const auto loc = mapping.inverse(shard_r.lo + i);
+      for (const uint64_t i : range(shard_sz)) {
+        const auto loc = mapping.inverse(locator.shuffled_index(s, i));
         const uint64_t flat = index64(loc.section.shape(), loc.index);
         const auto& entry = super_data.at(loc.section).at(flat);
         const int expected = entry[0](loc.rotation.local) + 2 * entry[1](loc.rotation.local);
@@ -96,7 +97,7 @@ static void verify_shards(const int max_slice, const int total_shards,
 TEST(sharder, roundtrip) {
   init_threads(-1, -1);
   const int max_slice = 5;
-  const int total_shards = 41;  // prime to avoid coincidences
+  const int total_shards = 32;
 
   tempdir_t tmp("sharder");
   run(tfm::format("pentago/data/sharder --max-slice %d --shards %d data %s",
@@ -108,24 +109,22 @@ TEST(sharder, roundtrip) {
 TEST(sharder, batched_range) {
   init_threads(-1, -1);
   const int max_slice = 4;
-  const int total_shards = 17;
+  const int total_shards = 16;
 
   tempdir_t tmp("sharder-batched");
 
   // Run two halves with --range, and --memory small enough to force >1 batch
-  // Slice 4 has ~42K entries/shard → ~8.5 KB packed, so 0.00005 GB (~50 KB) fits ~5 shards
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range :9 --memory 0.00005 data %s",
+  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range :8 --memory 0.00005 data %s",
                    max_slice, total_shards, tmp.path));
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range 9: --memory 0.00005 data %s",
+  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range 8: --memory 0.00005 data %s",
                    max_slice, total_shards, tmp.path));
   verify_shards(max_slice, total_shards, range(total_shards), tmp.path);
 }
 
-// Boards sampled from shard 7 (slices 0-5, 41 total shards) and verified against
+// Boards sampled from shard 7 (slices 0-5, 32 total shards) and verified against
 // the pentago server. Values: 1=current player wins, 0=tie, -1=current player loses.
 //
-// These depend on the shard permutation (shard_permute.h). If the permutation changes,
-// regenerate by:
+// These depend on the shard permutation (shard_permute.h) and shard layout. Regenerate by:
 //   1. In the correctness test below, after the ASSERT_EQ(actual, expected) line,
 //      temporarily add a loop to dump ~100 boards:
 //        Random rng(uint128_t(0xfeedface));
@@ -137,7 +136,7 @@ TEST(sharder, batched_range) {
 //        curl https://us-central1-naml-148801.cloudfunctions.net/pentago/{board_id}
 //      The board's own value is at key "{board_id}" in the JSON response.
 //   4. Replace the map below with the new {board_id, value} pairs.
-static const unordered_map<board_t, int> server_values = {{2465,1}, {4487,0}, {4638,1}, {65606,1}, {70658,0}, {466204,0}, {1771013,1}, {3605242,0}, {5310172,-1}, {5312822,-1}, {5315626,0}, {5316684,0}, {5322285,1}, {5323026,1}, {5323730,-1}, {17109306,0}, {26542648,-1}, {32048400,0}, {95622130,0}, {143394231,0}, {143987452,0}, {429995592,0}, {430112782,0}, {433525257,1}, {4295360546,0}, {4327211278,0}, {4470149425,0}, {4470341650,0}, {9307160577,0}, {12890218329,0}, {13061455872,1}, {13840613457,1}, {38702481426,-1}, {38808715426,0}, {51560251392,-1}, {115964510480,-1}, {115969438617,0}, {116190609408,0}, {116397047862,0}, {124570959872,-1}, {141735165961,0}, {155781365760,1}, {231960091797,0}, {232390066188,0}, {244983005184,0}, {347893924092,0}, {347895300125,-1}, {347908279923,0}, {347908290237,0}, {347924201493,1}, {348037841058,-1}, {348180905993,0}, {360904655091,-1}, {386644770816,0}, {695816814673,0}, {695880318985,1}, {696215863566,0}, {696358404177,0}, {696644671914,1}, {708823744512,0}, {1044537016419,1}, {1044547829760,1}, {1047985586176,-1}, {1048290525211,0}, {1404836511744,1}, {1739615764480,0}, {2087355351292,-1}, {2087370424348,-1}, {2091841355776,0}, {3131031882353,0}, {3131036467607,0}, {3131057713986,1}, {3131114520576,0}, {3140528832513,0}, {3156819050496,0}, {3170837790720,1}, {3208771928064,0}, {3826911477841,0}, {5218385723392,0}, {9405988995567,0}, {9509921095680,1}, {12524490915840,0}, {18786338537472,-1}, {28179668140032,1}, {28180140400470,-1}, {28180331495910,0}, {28187887469273,-1}, {28192175947938,1}, {28333909870002,-1}, {28527183855616,1}, {29227284312898,0}, {29261612318774,-1}, {31310312767506,1}, {31311031762944,1}, {31658215735296,-1}, {56706502230016,0}, {7600520166506740,0}, {22799477413839352,0}, {22799821149242820,-1}, {22800168930118014,-1}, {22800517077277575,0}, {205195606057750968,0}, {1846757335083647273,0}};
+static const unordered_map<board_t, int> server_values = {{1723,0}, {2863,-1}, {13170,1}, {147111,0}, {592908,0}, {1839868,1}, {2560296,-1}, {3542025,0}, {7278924,1}, {10619051,-1}, {10624137,-1}, {17708091,0}, {31916053,1}, {37161110,0}, {79639443,1}, {95558238,1}, {100860688,0}, {159253995,0}, {287255952,0}, {433525338,0}, {525533217,1}, {859970361,-1}, {4353360361,0}, {8623751249,-1}, {12934460228,-1}, {13760803659,-1}, {25770199911,0}, {25844121609,0}, {26258178291,0}, {38654773145,0}, {38659227657,0}, {39085867014,1}, {64521832587,0}, {77331103744,0}, {116110393398,-1}, {347893532818,0}, {347894710812,0}, {347898052627,0}, {347908276365,1}, {347988557986,0}, {347989869030,0}, {348020349345,0}, {348328165376,1}, {348752447627,1}, {348864380928,1}, {349038977580,0}, {353057898496,1}, {360787869831,-1}, {695795318893,1}, {1043820382419,-1}, {1048370151424,1}, {1159642546194,0}, {3131082604547,0}, {3131127693393,1}, {3132034843353,0}, {3135469846582,1}, {3156811776081,0}, {3156849197056,1}, {3169781547009,1}, {3169983135987,1}, {5218444247040,1}, {9393173102592,0}, {9398248407337,0}, {9405979559427,0}, {9741018857472,1}, {12524126011446,0}, {18786792112857,0}, {28179567216779,1}, {28179568263169,1}, {28179710804373,0}, {28180204486656,0}, {28411210825728,1}, {28527300771840,1}, {28875065458688,1}, {31310322204933,0}, {46965515288657,0}, {46965642559497,0}, {56358571475683,0}, {56359325859840,0}, {57402269827072,1}, {844772823072840,-1}, {845121144946691,-1}, {7599940340613768,0}, {7599940430860647,0}, {22799627732517026,-1}, {205195953810309390,0}, {205197345379123203,-1}, {205204651147395090,1}, {205214044495740931,0}, {615586121963881560,0}};
 
 // Shard iterator tests
 
@@ -153,7 +152,7 @@ protected:
     dir_.reset();
   }
   static constexpr int max_slice = 5;
-  static constexpr int total_shards = 41;
+  static constexpr int total_shards = 32;
   static unique_ptr<tempdir_t> dir_;
 };
 unique_ptr<tempdir_t> shard_iterator_test::dir_;
@@ -181,10 +180,11 @@ TEST_F(shard_iterator_test, correctness) {
   vector<board_value_t> expected;
   for (const int s : range(max_slice + 1)) {
     const shard_mapping_t mapping(s);
-    const auto sr = mapping.shard_range(total_shards, shard_id);
+    const shard_locator_t loc(total_shards, range(shard_id, shard_id + 1));
+    const uint64_t shard_sz = loc.shard_size(mapping.total(), shard_id);
     const auto decoded = arithmetic_decode(sf.read_group(s));
-    for (const uint64_t i : range(sr.size()))
-      expected.push_back({mapping.board(sr.lo + i), decoded[i]});
+    for (const uint64_t i : range(shard_sz))
+      expected.push_back({mapping.board(loc.shuffled_index(shard_id, i)), decoded[i]});
   }
   sort(expected.begin(), expected.end());
 
@@ -235,7 +235,8 @@ TEST_F(shard_iterator_test, epoch) {
   for (const int shard_id : sr)
     for (const int s : range(max_slice + 1)) {
       const shard_mapping_t mapping(s);
-      total_entries += mapping.shard_range(total_shards, shard_id).size();
+      total_entries += shard_locator_t(total_shards, range(shard_id, shard_id + 1))
+          .shard_size(mapping.total(), shard_id);
     }
 
   // Collect both epochs

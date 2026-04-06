@@ -77,7 +77,7 @@ static options_t parse_options(int argc, char** argv) {
   o.input_dir = argv[optind];
   o.output_dir = argv[optind + 1];
   GEODE_ASSERT(0 <= o.max_slice && o.max_slice <= 18);
-  GEODE_ASSERT(0 < o.total_shards);
+  GEODE_ASSERT(o.total_shards > 0 && (o.total_shards & (o.total_shards - 1)) == 0);
   if (o.memory < 0)
     o.memory = int64_t(total_memory() * 80 / 100);
   return o;
@@ -141,8 +141,8 @@ void toplevel(int argc, char** argv) {
   // Peak memory per shard: raw ternary buffer for the current slice, plus compressed
   // data accumulated across all already-encoded slices (~half the raw size). Use 2x.
   const shard_mapping_t max_mapping(o.max_slice);
-  const auto max_range = max_mapping.shard_range(o.total_shards, shard_range.lo);
-  const uint64_t max_entries_per_shard = max_range.hi - max_range.lo;
+  const shard_locator_t locator(o.total_shards, shard_range);
+  const uint64_t max_entries_per_shard = locator.shard_size(max_mapping.total(), shard_range.lo);
   const uint64_t mem_per_shard = ((max_entries_per_shard + 4) / 5 + 64) * 2;
   const int shards_per_batch = std::max(1, !mem_per_shard ? target_shards :
       int(std::min(uint64_t(target_shards), uint64_t(o.memory) / mem_per_shard)));
@@ -192,12 +192,7 @@ void toplevel(int argc, char** argv) {
       vector<ternaries_t> buffers;
       buffers.reserve(batch.size());
       for (const int b : range(batch.size()))
-        buffers.emplace_back(si.mapping.shard_range(o.total_shards, abs_lo + b).size());
-
-      // Precompute shard range starts for this batch
-      Array<uint64_t> shard_los(batch.size(), uninit);
-      for (const int b : range(batch.size()))
-        shard_los[b] = si.mapping.shard_range(o.total_shards, abs_lo + b).lo;
+        buffers.emplace_back(locator.shard_size(si.mapping.total(), abs_lo + b));
       const auto abs_range = range(abs_lo, abs_hi);
 
       // Read and scatter blocks using parallel_for with natural backpressure
@@ -217,7 +212,7 @@ void toplevel(int argc, char** argv) {
       parallel_for(threads, work.size(), [&](const size_t wi) {
         const auto& w = work[wi];
         const auto& reader = *si.readers[w.reader_index];
-        scatter_block(si.mapping, o.total_shards, abs_range, shard_los,
+        scatter_block(si.mapping, o.total_shards, abs_range,
                       buffers, reader.header.section, reader.header.block_size,
                       w.block, reader.read_block_sync(w.block));
         block_progress.tick();

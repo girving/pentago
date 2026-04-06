@@ -4,6 +4,7 @@
 #include "pentago/data/arithmetic.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/base/symmetry.h"
+#include "pentago/utility/random.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/temporary.h"
@@ -71,22 +72,21 @@ TEST(shard, board_roundtrip) {
 TEST(shard, shard_distribution) {
   for (const int slice : range(4 + 1)) {
     const shard_mapping_t m(slice);
-    const int shards = 17;  // prime to avoid coincidences
-    // Verify shard_range partitions [0, total) exactly
-    uint64_t prev_hi = 0;
-    for (const int s : range(shards)) {
-      const auto r = m.shard_range(shards, s);
-      PENTAGO_ASSERT_EQ(r.lo, prev_hi);
-      ASSERT_LE(r.lo, r.hi);
-      prev_hi = r.hi;
-    }
-    PENTAGO_ASSERT_EQ(prev_hi, m.total());
-    // Verify shard() is consistent with shard_range() for every index
+    const int shards = 16;  // power of two
+    const shard_locator_t loc(shards, range(shards));
+    // Verify round-robin assignment
+    for (const uint64_t i : range(m.total()))
+      PENTAGO_ASSERT_EQ(loc.shard(i), int(i & (shards - 1)));
+    // Verify shard_size sums to total
+    uint64_t sum = 0;
+    for (const int s : range(shards))
+      sum += loc.shard_size(m.total(), s);
+    PENTAGO_ASSERT_EQ(sum, m.total());
+    // Verify shuffled_index roundtrip
     for (const uint64_t i : range(m.total())) {
-      const int s = m.shard(shards, i);
-      const auto r = m.shard_range(shards, s);
-      ASSERT_LE(r.lo, i);
-      ASSERT_LT(i, r.hi);
+      const int s = loc.shard(i);
+      const uint64_t pos = loc.position(i);
+      PENTAGO_ASSERT_EQ(loc.shuffled_index(s, pos), i);
     }
   }
 }
@@ -149,6 +149,107 @@ TEST(shard, file_roundtrip) {
       PENTAGO_ASSERT_EQ(decoded[i], int((i * 11 + s * 3) % 3));
   }
 }
+
+// Verify shard_locator_t::shard() and position() are consistent with shuffled_index()
+TEST(shard, locator_roundtrip) {
+  for (const int slice : range(5)) {
+    const shard_mapping_t m(slice);
+    for (const int shards : {4, 16, 64, 128}) {
+      const shard_locator_t loc(shards, range(shards));
+      for (const uint64_t i : range(m.total())) {
+        const int s = loc.shard(i);
+        const uint64_t p = loc.position(i);
+        PENTAGO_ASSERT_EQ(loc.shuffled_index(s, p), i);
+        PENTAGO_ASSERT_LT(p, loc.shard_size(m.total(), s));
+      }
+    }
+    slog("slice %d: locator roundtrip ok", slice);
+  }
+}
+
+#if PENTAGO_SSE
+// Verify in_range8 is exact: no false positives or negatives
+TEST(shard, locator_in_range8) {
+  Random random(uint128_t(0xa5a5a5a5));
+  for (const int slice : range(5, 19)) {
+    const shard_mapping_t m(slice);
+    const int shards = 64;
+    const int target = shards / 2;
+    const auto sr = range(target, target + 1);
+    const shard_locator_t loc(shards, sr);
+    for (const int i __attribute__((unused)) : range(10000)) {
+      alignas(32) uint64_t xv[8];
+      for (int j = 0; j < 8; j++)
+        xv[j] = random.bits<uint64_t>() % m.total();
+      const uint64x8 x = {_mm256_load_si256((const __m256i*)&xv[0]),
+                           _mm256_load_si256((const __m256i*)&xv[4])};
+      const int mask = loc.in_range8(x);
+      for (int j = 0; j < 8; j++) {
+        const int s = loc.shard(xv[j]);
+        const bool in = s >= sr.lo && s < sr.hi;
+        const bool flagged = (mask >> j) & 1;
+        PENTAGO_ASSERT_EQ(in, flagged);
+      }
+    }
+    slog("slice %d: in_range8 exact", slice);
+  }
+}
+
+// Verify in_range8 with boundary values
+TEST(shard, locator_in_range8_boundaries) {
+  for (const int slice : range(5, 15)) {
+    const shard_mapping_t m(slice);
+    const int shards = 64;
+    const int target = shards / 2;
+    const auto sr = range(target, target + 1);
+    const shard_locator_t loc(shards, sr);
+
+    // Test values at and around shard boundaries
+    const uint64_t boundary_vals[] = {
+      0, 1, m.total() - 1,
+      uint64_t(target), target > 0 ? uint64_t(target - 1) : 0,
+      uint64_t(target + shards), uint64_t(target + 1),
+    };
+    for (const auto val : boundary_vals) {
+      if (val >= m.total()) continue;
+      alignas(32) uint64_t xv[8];
+      for (int j = 0; j < 8; j++) xv[j] = val;
+      const uint64x8 x = {_mm256_load_si256((const __m256i*)&xv[0]),
+                           _mm256_load_si256((const __m256i*)&xv[4])};
+      const int mask = loc.in_range8(x);
+      const bool in = loc.shard(val) >= sr.lo && loc.shard(val) < sr.hi;
+      PENTAGO_ASSERT_EQ(mask == 0xFF, in);
+    }
+    slog("slice %d: in_range8 boundary cases pass", slice);
+  }
+}
+
+// Verify in_range8 with multi-shard ranges
+TEST(shard, locator_in_range8_multi_shard) {
+  Random random(uint128_t(0xdeadbeef));
+  for (const int slice : range(5, 15)) {
+    const shard_mapping_t m(slice);
+    const int shards = 64;
+    const auto sr = range(10, 15);
+    const shard_locator_t loc(shards, sr);
+    for (const int i __attribute__((unused)) : range(10000)) {
+      alignas(32) uint64_t xv[8];
+      for (int j = 0; j < 8; j++)
+        xv[j] = random.bits<uint64_t>() % m.total();
+      const uint64x8 x = {_mm256_load_si256((const __m256i*)&xv[0]),
+                           _mm256_load_si256((const __m256i*)&xv[4])};
+      const int mask = loc.in_range8(x);
+      for (int j = 0; j < 8; j++) {
+        const int s = loc.shard(xv[j]);
+        const bool in = s >= sr.lo && s < sr.hi;
+        const bool flagged = (mask >> j) & 1;
+        PENTAGO_ASSERT_EQ(in, flagged);
+      }
+    }
+    slog("slice %d: multi-shard in_range8 exact", slice);
+  }
+}
+#endif  // PENTAGO_SSE
 
 }  // namespace
 }  // namespace pentago
