@@ -10,6 +10,11 @@
 //     slice 17: 589 ns/position
 //     slice 18: 664 ns/position
 //
+//   forward4 (single __m256i, 4 values) was tried but is 10-15% slower than
+//   forward8 (two __m256i, 8 values): OoO engine overlaps the two independent
+//   dependency chains, filling pipeline bubbles. Measured 2.0 ns/call for forward4
+//   vs 1.8 ns/call for forward8.
+//
 //   Before L/H bit-level permutation (modular Feistel with 32x32->64 multiplies):
 //     shard_permute was 6.5 ns/call, 1670 ns/position (~16 cycles/value)
 //     scatter_block was ~1640 ns/position
