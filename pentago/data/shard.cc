@@ -314,8 +314,8 @@ void scatter_block(
             alignas(32) uint64_t sv[8];
             _mm256_store_si256((__m256i*)&sv[0], shuffled.v0);
             _mm256_store_si256((__m256i*)&sv[4], shuffled.v1);
-            for (int j = 0; j < 8; j++) {
-              if (!(mask & (1 << j))) continue;
+            for (int m = mask; m; m &= m - 1) {
+              const int j = __builtin_ctz(m);
               const int s = locator.shard(sv[j]);
               const uint64_t p = locator.position(sv[j]);
               buffers[s - shard_range.lo].atomic_set_from_zero(
