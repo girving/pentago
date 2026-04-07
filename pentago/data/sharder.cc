@@ -35,6 +35,7 @@ struct options_t {
   string shard_range = ":";  // Python-style lo:hi
   int threads = -1;   // -1 means auto-detect
   int64_t memory = -1;  // -1 means 80% of system RAM
+  double dry_run = 1.0;  // fraction of work to do (1.0 = full run)
 };
 
 static options_t parse_options(int argc, char** argv) {
@@ -46,6 +47,7 @@ static options_t parse_options(int argc, char** argv) {
       {"range", required_argument, 0, 'r'},
       {"threads", required_argument, 0, 't'},
       {"memory", required_argument, 0, 'm'},
+      {"dry-run", required_argument, 0, 'd'},
       {0, 0, 0, 0},
   };
   for (;;) {
@@ -62,12 +64,14 @@ static options_t parse_options(int argc, char** argv) {
         slog("  --range lo:hi           Shard range to generate (default: all)");
         slog("  --threads N             CPU worker threads (default: auto-detect)");
         slog("  --memory N              Memory budget in GB (default: 80%% of system RAM)");
+        slog("  --dry-run F             Do fraction F of work, e.g. 0.01 for 1%% (default: 1.0)");
         exit(0);
       case 's': o.max_slice = atoi(optarg); break;
       case 'n': o.total_shards = atoi(optarg); break;
       case 'r': o.shard_range = optarg; break;
       case 't': o.threads = atoi(optarg); break;
       case 'm': o.memory = int64_t(atof(optarg) * (1LL << 30)); break;
+      case 'd': o.dry_run = atof(optarg); break;
       default: die("impossible option character %d", c);
     }
   }
@@ -78,6 +82,7 @@ static options_t parse_options(int argc, char** argv) {
   o.output_dir = argv[optind + 1];
   GEODE_ASSERT(0 <= o.max_slice && o.max_slice <= 18);
   GEODE_ASSERT(o.total_shards > 0 && (o.total_shards & (o.total_shards - 1)) == 0);
+  GEODE_ASSERT(o.dry_run > 0 && o.dry_run <= 1.0);
   if (o.memory < 0)
     o.memory = int64_t(total_memory() * 80 / 100);
   return o;
@@ -126,6 +131,7 @@ static void parallel_for(const int num_threads, const size_t n, const F& f) {
 
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
+  const auto dry = [&](const size_t n) { return std::max(size_t(1), size_t(n * o.dry_run)); };
   Scope scope("sharder");
   const int threads = o.threads >= 0 ? o.threads : default_threads();
   init_threads(1, 1);
@@ -135,7 +141,8 @@ void toplevel(int argc, char** argv) {
   slog("input: %s, output: %s", o.input_dir, o.output_dir);
   slog("max_slice: %d, shards: %d, range: [%d, %d)", o.max_slice, o.total_shards,
        shard_range.lo, shard_range.hi);
-  slog("threads: %d, memory: %.1f GB", threads, double(o.memory) / (1LL << 30));
+  slog("threads: %d, memory: %.1f GB%s", threads, double(o.memory) / (1LL << 30),
+       o.dry_run < 1.0 ? tfm::format(", dry-run: %.2f%%", o.dry_run * 100).c_str() : "");
 
   // Compute batch size from the largest slice (max_slice), which dominates memory.
   // Peak memory per shard: raw ternary buffer for the current slice, plus compressed
@@ -209,7 +216,7 @@ void toplevel(int argc, char** argv) {
                 work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
       GEODE_ASSERT(work.size() == si.total_blocks);
-      parallel_for(threads, work.size(), [&](const size_t wi) {
+      parallel_for(threads, dry(work.size()), [&](const size_t wi) {
         const auto& w = work[wi];
         const auto& reader = *si.readers[w.reader_index];
         scatter_block(si.mapping, o.total_shards, abs_range,
@@ -220,7 +227,7 @@ void toplevel(int argc, char** argv) {
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
       progress_t encode_progress("encode", batch.size());
-      parallel_for(threads, batch.size(), [&](const size_t b) {
+      parallel_for(threads, dry(batch.size()), [&](const size_t b) {
         batch_groups[b][slice] = arithmetic_encode(buffers[b]);
         buffers[b] = ternaries_t();
         encode_progress.tick();
@@ -229,7 +236,7 @@ void toplevel(int argc, char** argv) {
 
     // Write this batch's shard files in parallel
     progress_t write_progress("write", batch.size());
-    parallel_for(threads, batch.size(), [&](const size_t b) {
+    parallel_for(threads, dry(batch.size()), [&](const size_t b) {
       const int abs_shard = abs_lo + int(b);
       shard_header_t h;
       h.max_slice = o.max_slice;

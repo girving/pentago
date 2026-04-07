@@ -121,6 +121,51 @@ TEST(sharder, batched_range) {
   verify_shards(max_slice, total_shards, range(total_shards), tmp.path);
 }
 
+// Dry-run: run with --dry-run=0.5 and verify output is strictly smaller than full run
+TEST(sharder, dry_run) {
+  init_threads(-1, -1);
+  const int max_slice = 5;
+  const int total_shards = 32;
+
+  // Full run
+  tempdir_t full("sharder-full");
+  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d data %s",
+                   max_slice, total_shards, full.path));
+
+  // Dry run at 50%
+  tempdir_t dry("sharder-dry");
+  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --dry-run 0.5 data %s",
+                   max_slice, total_shards, dry.path));
+
+  // Compare: dry-run should write fewer shards and less data
+  int full_files = 0, dry_files = 0;
+  uint64_t full_total = 0, dry_total = 0;
+  for (const int s : range(total_shards)) {
+    const auto name = shard_filename(total_shards, s);
+    const auto full_path = tfm::format("%s/%s", full.path, name);
+    const auto dry_path = tfm::format("%s/%s", dry.path, name);
+    // Full run should have all files
+    const auto full_sf = shard_file_t(full_path);
+    full_files++;
+    for (const int sl : range(max_slice + 1))
+      full_total += full_sf.read_group(sl).total();
+    // Dry run may not have this file
+    if (FILE* f = fopen(dry_path.c_str(), "r")) {
+      fclose(f);
+      const auto dry_sf = shard_file_t(dry_path);
+      dry_files++;
+      for (const int sl : range(max_slice + 1))
+        dry_total += dry_sf.read_group(sl).total();
+    }
+  }
+  slog("full: %d files, %llu encoded; dry: %d files, %llu encoded (%.0f%% files, %.0f%% data)",
+       full_files, full_total, dry_files, dry_total,
+       double(dry_files) / full_files * 100, double(dry_total) / full_total * 100);
+  ASSERT_LT(dry_files, full_files) << "dry-run should write fewer shard files";
+  ASSERT_LT(dry_total, full_total) << "dry-run should produce less encoded data";
+  ASSERT_GT(dry_files, 0) << "dry-run should write at least one shard file";
+}
+
 // Boards sampled from shard 7 (slices 0-5, 32 total shards) and verified against
 // the pentago server. Values: 1=current player wins, 0=tie, -1=current player loses.
 //
