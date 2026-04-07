@@ -100,7 +100,7 @@ TEST(shard, header_roundtrip) {
   Array<uint8_t> buf(shard_header_t::header_size, uninit);
   h.pack(buf);
   const auto h2 = shard_header_t::unpack(buf);
-  PENTAGO_ASSERT_EQ(h2.version, 1u);
+  PENTAGO_ASSERT_EQ(h2.version, 2u);
   PENTAGO_ASSERT_EQ(h2.max_slice, 18u);
   PENTAGO_ASSERT_EQ(h2.shard_id, 42u);
   PENTAGO_ASSERT_EQ(h2.total_shards, 100000u);
@@ -133,7 +133,7 @@ TEST(shard, file_roundtrip) {
 
   // Read back
   const shard_file_t sf(path);
-  PENTAGO_ASSERT_EQ(sf.header.version, 1u);
+  PENTAGO_ASSERT_EQ(sf.header.version, 2u);
   PENTAGO_ASSERT_EQ(sf.header.max_slice, uint32_t(max_slice));
   PENTAGO_ASSERT_EQ(sf.header.shard_id, 5u);
   PENTAGO_ASSERT_EQ(sf.header.total_shards, 13u);

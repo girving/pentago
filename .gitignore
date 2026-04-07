@@ -11,6 +11,7 @@ sparse-*.try
 xcuserdata
 /learn
 MODULE.bazel.lock
+/tmp
 
 # For Claude sandbox purposes
 .bash_profile

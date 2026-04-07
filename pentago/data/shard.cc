@@ -81,7 +81,7 @@ board_t shard_mapping_t::board(const uint64_t shuffled) const {
 }
 
 shard_header_t::shard_header_t()
-    : version(1), max_slice(0), shard_id(0), total_shards(0) {
+    : version(2), max_slice(0), shard_id(0), total_shards(0) {
   memcpy(magic_bytes.data(), magic, magic_size);
 }
 
@@ -119,7 +119,7 @@ shard_header_t shard_header_t::unpack(RawArray<const uint8_t> buffer) {
   SHARD_HEADER_FIELDS()
   #undef FIELD
   GEODE_ASSERT(next == header_size);
-  GEODE_ASSERT(h.version == 1);
+  GEODE_ASSERT(h.version == 2);
   GEODE_ASSERT(h.max_slice <= 18);
   GEODE_ASSERT(h.shard_id < h.total_shards);
   return h;

@@ -35,6 +35,7 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - Common copts in `pentago/pentago.bzl` (`COPTS`), test helper `cc_tests()`
 - Use `tfm::format` (tinyformat), not bare `format`
 - Prefer fixing root causes over suppressing warnings
+- Preserve existing comments when rewriting files — don't silently delete comments, speed logs, or explanatory notes
 - Don't add includes speculatively — only if the build actually fails
 - System includes go after project includes, sorted alphabetically
 - Mark const arguments as const
@@ -52,6 +53,12 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - When changing a serialization format, commit the format change first with determinism hashes, then optimize — hashes must not change during optimization
 - `-march=native` is already in COPTS in `pentago/pentago.bzl`, so `--copt=-march=native` is not needed on the command line
 - Simplify loops: iterate over containers directly instead of indices into them, and avoid intermediate variables when the expression is clear (e.g. `for (const auto& r : readers)` not `for (const int i : range(readers.size())) { ... readers[i] ... }`)
+
+## Scratch files
+
+Write scratch/throwaway C++ programs to `tmp/` in the repo (not `/tmp`). The sandbox allows writing within the repo but blocks `/tmp/claude-1000` for `g++` output. Compile and run from there:
+
+    g++ -O2 -std=c++20 -march=native -o tmp/foo tmp/foo.cc && tmp/foo
 
 ## Profiling
 
@@ -72,4 +79,6 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
 - For decoder renorm (read bytes), scalar spill/reload beats SIMD cmpeq/blend per lane — the byte reads are inherently scalar anyway.
 - Scatter-write to precomputed offsets (8 indexed byte stores per group) is cheaper than a bulk 160-byte transpose pass. Same for scatter-read on the encoder side.
 - Benchmark with min-of-N iterations (N=10) for stable numbers. Single runs have ~15% noise on this machine.
+- `#pragma GCC unroll N` is critical for loops over `constexpr` arrays in SIMD code — GCC won't constant-fold array indices through unrolled iterations without it. Measured 44% speedup for forward8.
+- Write tests that measure the actual use case, not proxy metrics. E.g. batch diversity (how many distinct positions per training batch) is more relevant than chi-squared uniformity for ML training quality.
 - Profile with `perf annotate` before guessing at bottlenecks — intuition about what's slow is often wrong (e.g. the 160-byte transpose was assumed cheap but was 15% of decoder time).

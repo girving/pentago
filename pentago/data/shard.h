@@ -117,7 +117,7 @@ struct shard_header_t {
   static constexpr int header_size = 20 + 4 + 4 + 4 + 4;  // 36 bytes
 
   Vector<char,20> magic_bytes;
-  uint32_t version;       // = 1
+  uint32_t version;       // = 2 (v1 used modular Feistel permutation, v2 uses L/H bit-level)
   uint32_t max_slice;     // e.g. 18
   uint32_t shard_id;      // this shard's index [0, total_shards)
   uint32_t total_shards;  // total number of shards

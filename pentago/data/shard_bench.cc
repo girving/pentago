@@ -3,12 +3,16 @@
 // Speed log (Cascade Lake 2.5 GHz, -c opt -march=native, min of 10 iterations):
 // "position" = one board position = 256 ternary values (one per rotation).
 //
-//   shard_permute: 6.5 ns/call, 1670 ns/position (~16 cycles/value)
+//   shard_permute (slice 18): 1.8 ns/call, 467 ns/position (~4.5 cycles/value)
 //
 //   scatter_block (131072 shards, 1 shard in range, 4096 positions/block):
-//     slice 16: 1640 ns/position
-//     slice 17: 1640 ns/position
-//     slice 18: 1635 ns/position
+//     slice 16: 591 ns/position
+//     slice 17: 589 ns/position
+//     slice 18: 664 ns/position
+//
+//   Before L/H bit-level permutation (modular Feistel with 32x32->64 multiplies):
+//     shard_permute was 6.5 ns/call, 1670 ns/position (~16 cycles/value)
+//     scatter_block was ~1640 ns/position
 //
 //   Before round-robin (100000 shards, double-reciprocal locator):
 //     scatter_block was ~6600 ns/position (4x slower)
@@ -33,10 +37,10 @@ static constexpr int timing_iterations = 10;
 
 // Benchmark shard_permute in isolation: 256 consecutive calls (one position's worth)
 TEST(shard_bench, shard_permute) {
-  const shard_permute_t perm(4);
+  const shard_permute_t perm(18);
 
   // Pick a base offset in the middle of the range
-  const uint64_t base = perm.ab / 3;
+  const uint64_t base = perm.n / 3;
   const int reps = 10000;
 
   double best = 1e18;

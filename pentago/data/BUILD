@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "data",
-    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "sharder.cc", "shard_sizes.cc", "*_test.cc", "*_bench.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "sharder.cc", "shard_sizes.cc", "shard_permute_search.cc", "*_test.cc", "*_bench.cc"]),
     copts = COPTS,
     deps = [
         "//pentago/base",
@@ -81,6 +81,13 @@ cc_binary(
         "//pentago/utility",
     ],
     data = ["//data:counts"],
+)
+
+cc_binary(
+    name = "shard_permute_search",
+    srcs = ["shard_permute_search.cc"],
+    copts = COPTS,
+    deps = [":data"],
 )
 
 cc_binary(
