@@ -6,9 +6,10 @@
 //   shard_permute (slice 18): 1.8 ns/call, 467 ns/position (~4.5 cycles/value)
 //
 //   scatter_block (131072 shards, 1 shard in range, 4096 positions/block):
-//     slice 16: 591 ns/position
-//     slice 17: 589 ns/position
-//     slice 18: 664 ns/position
+//     slice 18: 569 ns/position
+//
+//   Before shift+or shard merge (permutevar pack in in_range8):
+//     scatter_block slice 18 was ~630 ns/position
 //
 //   forward4 (single __m256i, 4 values) was tried but is 10-15% slower than
 //   forward8 (two __m256i, 8 values): OoO engine overlaps the two independent
@@ -38,7 +39,7 @@ namespace pentago {
 namespace {
 
 // Min-of-N timing for stable results
-static constexpr int timing_iterations = 10;
+static constexpr int timing_iterations = 100;
 
 // Benchmark shard_permute in isolation: 256 consecutive calls (one position's worth)
 TEST(shard_bench, shard_permute) {

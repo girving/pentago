@@ -183,12 +183,13 @@ TEST(shard, locator_in_range8) {
         xv[j] = random.bits<uint64_t>() % m.total();
       const uint64x8 x = {_mm256_load_si256((const __m256i*)&xv[0]),
                            _mm256_load_si256((const __m256i*)&xv[4])};
-      const int mask = loc.in_range8(x);
+      // Collect hits from the mask
+      bool flagged[8] = {};
+      for (auto mask = loc.in_range8(x); mask; mask.advance())
+        flagged[mask.index()] = true;
       for (int j = 0; j < 8; j++) {
-        const int s = loc.shard(xv[j]);
-        const bool in = s >= sr.lo && s < sr.hi;
-        const bool flagged = (mask >> j) & 1;
-        PENTAGO_ASSERT_EQ(in, flagged);
+        const bool in = loc.shard(xv[j]) >= sr.lo && loc.shard(xv[j]) < sr.hi;
+        PENTAGO_ASSERT_EQ(in, flagged[j]);
       }
     }
     slog("slice %d: in_range8 exact", slice);
@@ -204,7 +205,6 @@ TEST(shard, locator_in_range8_boundaries) {
     const auto sr = range(target, target + 1);
     const shard_locator_t loc(shards, sr);
 
-    // Test values at and around shard boundaries
     const uint64_t boundary_vals[] = {
       0, 1, m.total() - 1,
       uint64_t(target), target > 0 ? uint64_t(target - 1) : 0,
@@ -216,9 +216,10 @@ TEST(shard, locator_in_range8_boundaries) {
       for (int j = 0; j < 8; j++) xv[j] = val;
       const uint64x8 x = {_mm256_load_si256((const __m256i*)&xv[0]),
                            _mm256_load_si256((const __m256i*)&xv[4])};
-      const int mask = loc.in_range8(x);
+      const auto mask = loc.in_range8(x);
       const bool in = loc.shard(val) >= sr.lo && loc.shard(val) < sr.hi;
-      PENTAGO_ASSERT_EQ(mask == 0xFF, in);
+      // All 8 lanes have the same value, so mask should be all-set or all-clear
+      PENTAGO_ASSERT_EQ(bool(mask), in);
     }
     slog("slice %d: in_range8 boundary cases pass", slice);
   }
@@ -238,12 +239,12 @@ TEST(shard, locator_in_range8_multi_shard) {
         xv[j] = random.bits<uint64_t>() % m.total();
       const uint64x8 x = {_mm256_load_si256((const __m256i*)&xv[0]),
                            _mm256_load_si256((const __m256i*)&xv[4])};
-      const int mask = loc.in_range8(x);
+      bool flagged[8] = {};
+      for (auto mask = loc.in_range8(x); mask; mask.advance())
+        flagged[mask.index()] = true;
       for (int j = 0; j < 8; j++) {
-        const int s = loc.shard(xv[j]);
-        const bool in = s >= sr.lo && s < sr.hi;
-        const bool flagged = (mask >> j) & 1;
-        PENTAGO_ASSERT_EQ(in, flagged);
+        const bool in = loc.shard(xv[j]) >= sr.lo && loc.shard(xv[j]) < sr.hi;
+        PENTAGO_ASSERT_EQ(in, flagged[j]);
       }
     }
     slog("slice %d: multi-shard in_range8 exact", slice);

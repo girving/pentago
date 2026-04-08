@@ -309,13 +309,13 @@ void scatter_block(
             const __m256i base = _mm256_set1_epi64x(base_linear + r);
             const auto shuffled = perm.forward8({_mm256_add_epi64(base, off0),
                                                   _mm256_add_epi64(base, off1)});
-            const int mask = locator.in_range8(shuffled);
+            auto mask = locator.in_range8(shuffled);
             if (!mask) continue;
             alignas(32) uint64_t sv[8];
             _mm256_store_si256((__m256i*)&sv[0], shuffled.v0);
             _mm256_store_si256((__m256i*)&sv[4], shuffled.v1);
-            for (int m = mask; m; m &= m - 1) {
-              const int j = __builtin_ctz(m);
+            for (; mask; mask.advance()) {
+              const int j = mask.index();
               const int s = locator.shard(sv[j]);
               const uint64_t p = locator.position(sv[j]);
               buffers[s - shard_range.lo].atomic_set_from_zero(

@@ -91,21 +91,28 @@ struct shard_locator_t {
   }
 
 #if PENTAGO_SSE
-  // Returns 8-bit mask of which shuffled values land in [shard_range.lo, shard_range.hi).
+  // 8-bit mask with interleaved bit order: {v0[0], v1[0], v0[1], v1[1], ...}.
+  // Iterate with: for (auto m = mask; m; m.advance()) { int j = m.index(); ... }
+  struct shard_mask_t {
+    int bits;
+    explicit operator bool() const { return bits; }
+    // Deinterleave: bit b maps to index (b>>1) | ((b&1)<<2)
+    int index() const { const int b = __builtin_ctz(bits); return (b >> 1) | ((b & 1) << 2); }
+    void advance() { bits &= bits - 1; }
+  };
+
+  // Returns mask of which shuffled values land in [shard_range.lo, shard_range.hi).
   // Exact: no false positives or negatives. Returns 0 in the common case (no hits).
-  int in_range8(const uint64x8 shuffled) const {
+  shard_mask_t in_range8(const uint64x8 shuffled) const {
     const __m256i mask_v = _mm256_set1_epi64x(shard_mask);
-    const __m256i pack = _mm256_setr_epi32(0, 2, 4, 6, 0, 2, 4, 6);
-    // Compute shard numbers via bitmask and pack to 8 x int32
+    // Merge shard numbers into 8 x uint32 via shift+or (avoids expensive permutevar)
     const __m256i s0 = _mm256_and_si256(shuffled.v0, mask_v);
     const __m256i s1 = _mm256_and_si256(shuffled.v1, mask_v);
-    const __m128i s0p = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(s0, pack));
-    const __m128i s1p = _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(s1, pack));
-    const __m256i s8 = _mm256_inserti128_si256(_mm256_castsi128_si256(s0p), s1p, 1);
+    const __m256i s8 = _mm256_or_si256(s0, _mm256_slli_epi64(s1, 32));
     // Exact range check: shard in [shard_range.lo, shard_range.hi)
     const __m256i ge_lo = _mm256_cmpgt_epi32(s8, _mm256_set1_epi32(shard_range.lo - 1));
     const __m256i lt_hi = _mm256_cmpgt_epi32(_mm256_set1_epi32(shard_range.hi), s8);
-    return _mm256_movemask_ps(_mm256_castsi256_ps(_mm256_and_si256(ge_lo, lt_hi)));
+    return {_mm256_movemask_ps(_mm256_castsi256_ps(_mm256_and_si256(ge_lo, lt_hi)))};
   }
 #endif  // PENTAGO_SSE
 };
