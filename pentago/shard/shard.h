@@ -134,7 +134,11 @@ struct shard_header_t {
   static shard_header_t unpack(RawArray<const uint8_t> buffer);
 };
 
-// Write a complete shard file
+// Serialize a shard to bytes
+Array<uint8_t> serialize_shard(const shard_header_t& header,
+                               RawArray<const arithmetic_t> groups);
+
+// Write a complete shard file to a local path
 void write_shard(const string& path, const shard_header_t& header,
                  RawArray<const arithmetic_t> groups);
 

@@ -125,38 +125,40 @@ shard_header_t shard_header_t::unpack(RawArray<const uint8_t> buffer) {
   return h;
 }
 
-void write_shard(const string& path, const shard_header_t& header,
-                 RawArray<const arithmetic_t> groups) {
+Array<uint8_t> serialize_shard(const shard_header_t& header,
+                               RawArray<const arithmetic_t> groups) {
   const int n = header.max_slice + 1;
   GEODE_ASSERT(groups.size() == n);
 
   // Compute offsets from serialized sizes
-  uint64_t offset = shard_header_t::header_size + (n + 1) * 4;
+  uint64_t total = shard_header_t::header_size + (n + 1) * 4;
   Array<uint32_t> offsets(n + 1, uninit);
   for (const int i : range(n)) {
-    GEODE_ASSERT(offset <= numeric_limits<uint32_t>::max());
-    offsets[i] = uint32_t(offset);
-    offset += groups[i].serialized_size();
+    GEODE_ASSERT(total <= numeric_limits<uint32_t>::max());
+    offsets[i] = uint32_t(total);
+    total += groups[i].serialized_size();
   }
-  GEODE_ASSERT(offset <= numeric_limits<uint32_t>::max());
-  offsets[n] = uint32_t(offset);
+  GEODE_ASSERT(total <= numeric_limits<uint32_t>::max());
+  offsets[n] = uint32_t(total);
 
-  // Write header and offset table
-  const auto fd = write_local_file(path);
-  Array<uint8_t> hbuf(shard_header_t::header_size, uninit);
-  header.pack(hbuf);
-  auto err = fd->pwrite(hbuf, 0);
-  GEODE_ASSERT(err.empty(), err);
+  // Assemble into a single buffer
+  Array<uint8_t> buf(int(total), uninit);
+  header.pack(buf.slice(0, shard_header_t::header_size));
   to_little_endian_inplace(offsets);
-  err = fd->pwrite(char_view(offsets), shard_header_t::header_size);
-  GEODE_ASSERT(err.empty(), err);
-
-  // Serialize and write each group
+  memcpy(buf.data() + shard_header_t::header_size, offsets.data(), (n + 1) * 4);
   for (const int i : range(n)) {
-    const auto buf = arithmetic_serialize(groups[i]);
-    err = fd->pwrite(buf, little_to_native_endian(offsets[i]));
-    GEODE_ASSERT(err.empty(), err);
+    const auto group_buf = arithmetic_serialize(groups[i]);
+    memcpy(buf.data() + little_to_native_endian(offsets[i]), group_buf.data(), group_buf.size());
   }
+  return buf;
+}
+
+void write_shard(const string& path, const shard_header_t& header,
+                 RawArray<const arithmetic_t> groups) {
+  const auto buf = serialize_shard(header, groups);
+  const auto fd = write_local_file(path);
+  const auto err = fd->pwrite(buf, 0);
+  GEODE_ASSERT(err.empty(), err);
 }
 
 shard_file_t::shard_file_t(const string& path)

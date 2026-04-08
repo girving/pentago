@@ -5,6 +5,7 @@
 // a contiguous range of shuffled positions, with per-slice coding.
 
 #include "pentago/base/all_boards.h"
+#include "pentago/gcs/gcs.h"
 #include "pentago/shard/arithmetic.h"
 #include "pentago/shard/shard.h"
 #include "pentago/data/supertensor.h"
@@ -14,6 +15,7 @@
 #include "pentago/shard/parallel.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/thread.h"
+#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
@@ -34,6 +36,7 @@ struct options_t {
   int threads = -1;   // -1 means auto-detect
   int64_t memory = -1;  // -1 means 80% of system RAM
   double dry_run = 1.0;  // fraction of work to do (1.0 = full run)
+  string credentials;    // GCS service account JSON key file (required for gs:// paths)
 };
 
 static options_t parse_options(int argc, char** argv) {
@@ -46,6 +49,7 @@ static options_t parse_options(int argc, char** argv) {
       {"threads", required_argument, 0, 't'},
       {"memory", required_argument, 0, 'm'},
       {"dry-run", required_argument, 0, 'd'},
+      {"credentials", required_argument, 0, 'c'},
       {0, 0, 0, 0},
   };
   for (;;) {
@@ -63,6 +67,7 @@ static options_t parse_options(int argc, char** argv) {
         slog("  --threads N             CPU worker threads (default: auto-detect)");
         slog("  --memory N              Memory budget in GB (default: 80%% of system RAM)");
         slog("  --dry-run F             Do fraction F of work, e.g. 0.01 for 1%% (default: 1.0)");
+        slog("  --credentials FILE      GCS service account JSON key file (required for gs:// paths)");
         exit(0);
       case 's': o.max_slice = atoi(optarg); break;
       case 'n': o.total_shards = atoi(optarg); break;
@@ -70,6 +75,7 @@ static options_t parse_options(int argc, char** argv) {
       case 't': o.threads = atoi(optarg); break;
       case 'm': o.memory = int64_t(atof(optarg) * (1LL << 30)); break;
       case 'd': o.dry_run = atof(optarg); break;
+      case 'c': o.credentials = optarg; break;
       default: die("impossible option character %d", c);
     }
   }
@@ -111,6 +117,10 @@ struct block_work_t {
 
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
+  if (is_gcs_path(o.input_dir) || is_gcs_path(o.output_dir)) {
+    if (o.credentials.empty()) die("gs:// paths require --credentials");
+    gcs_init(o.credentials);
+  }
   const auto dry = [&](const size_t n) { return std::max(size_t(1), size_t(n * o.dry_run)); };
   Scope scope("sharder");
   const int threads = o.threads >= 0 ? o.threads : default_threads();
@@ -147,7 +157,8 @@ void toplevel(int argc, char** argv) {
   vector<slice_info_t> slices;
   slices.reserve(o.max_slice + 1);
   for (const int slice : range(o.max_slice + 1)) {
-    auto readers = open_supertensors(tfm::format("%s/slice-%d.pentago", o.input_dir, slice));
+    const auto path = tfm::format("%s/slice-%d.pentago", o.input_dir, slice);
+    auto readers = open_supertensors(open_file(path));
     unordered_map<section_t, int> section_to_reader;
     for (const int ri : range(int(readers.size())))
       section_to_reader[readers[ri]->header.section] = ri;
@@ -196,6 +207,15 @@ void toplevel(int argc, char** argv) {
                 work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
       GEODE_ASSERT(work.size() == si.total_blocks);
+
+      // Sort blocks by file offset for sequential I/O (critical for GCS chunk cache,
+      // also improves local disk read patterns via OS readahead)
+      std::sort(work.begin(), work.end(), [&](const block_work_t& a, const block_work_t& b) {
+        if (a.reader_index != b.reader_index) return a.reader_index < b.reader_index;
+        return si.readers[a.reader_index]->blob(a.block).offset
+             < si.readers[b.reader_index]->blob(b.block).offset;
+      });
+
       overlapped_parallel_for(threads, dry(work.size()),
         [&](const size_t wi) {
           const auto& w = work[wi];
@@ -209,7 +229,7 @@ void toplevel(int argc, char** argv) {
                         buffers, reader.header.section, reader.header.block_size,
                         w.block, data);
           block_progress.tick();
-        });
+        }, /*sequential=*/true);
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
       progress_t encode_progress("encode", batch.size());
@@ -230,7 +250,12 @@ void toplevel(int argc, char** argv) {
       h.total_shards = o.total_shards;
       const auto path = tfm::format("%s/%s", o.output_dir,
                                     shard_filename(o.total_shards, abs_shard));
-      write_shard(path, h, asarray(batch_groups[b]));
+      if (is_gcs_path(path)) {
+        const auto buf = serialize_shard(h, asarray(batch_groups[b]));
+        gcs_upload(path, buf);
+      } else {
+        write_shard(path, h, asarray(batch_groups[b]));
+      }
       write_progress.tick();
     });
     slog("wrote %d shard files", batch.size());

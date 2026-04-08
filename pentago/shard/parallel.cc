@@ -13,7 +13,8 @@ using std::atomic;
 using std::thread;
 using std::vector;
 
-void parallel_for(const int num_threads, const size_t n, const std::function<void(size_t)>& f) {
+void parallel_for(const int num_threads, const size_t n, const std::function<void(size_t)>& f,
+                  const bool sequential) {
   GEODE_ASSERT(num_threads > 0);
   const uint128_t key = 42;
   vector<thread> threads;
@@ -24,7 +25,7 @@ void parallel_for(const int num_threads, const size_t n, const std::function<voi
       for (;;) {
         const size_t i = next.fetch_add(1, std::memory_order_relaxed);
         if (i >= n) break;
-        f(random_permute(n, key, i));
+        f(sequential ? i : random_permute(n, key, i));
       }
     });
   for (auto& t : threads) t.join();

@@ -28,6 +28,12 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 - `web/server/` — Node.js backend (Google Cloud Functions)
 - `web/client/` — Svelte + WebAssembly frontend
 
+## IMPORTANT: Do not commit until the user has reviewed the code
+
+Always wait for explicit user approval before running `git commit`. Show the
+user what changed and let them review. Never auto-commit after implementing,
+even if all tests pass.
+
 ## Build conventions
 
 - C++20, `-Wall -Werror`

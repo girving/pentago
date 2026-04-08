@@ -84,6 +84,7 @@ cc_binary(
         ":shard",
         "//pentago/base",
         "//pentago/data",
+        "//pentago/gcs",
         "//pentago/utility",
     ],
 )

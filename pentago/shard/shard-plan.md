@@ -20,55 +20,53 @@ gcloud storage objects update gs://pentago-us-central1/slice-18.pentago --storag
 
 The rewrite takes a while (~3.4 TB to read and rewrite). Can run overnight.
 
+## Service account
+
+```bash
+# Create a service account for the sharder
+gcloud iam service-accounts create pentago-sharder --display-name="Pentago sharder"
+SA=pentago-sharder@$(gcloud config get-value project).iam.gserviceaccount.com
+
+# Grant read access to input bucket and write access to output bucket
+gcloud storage buckets add-iam-policy-binding gs://pentago-us-central1 \
+  --member="serviceAccount:$SA" --role=roles/storage.objectViewer
+gcloud storage buckets add-iam-policy-binding gs://pentago-shards \
+  --member="serviceAccount:$SA" --role=roles/storage.objectAdmin
+
+# Download key file
+gcloud iam service-accounts keys create ~/pentago-sharder-key.json --iam-account=$SA
+```
+
 ## Instance setup
 
 ```bash
-# 192 vCPU for fast lzma decompression, 12 TB Titanium SSD (4 × 3 TB NVMe,
-# built into machine type — no --local-ssd flags needed).
-# Auto-terminates after 2 hours as a safety net against forgotten instances.
+# 96 vCPU, 372 GB RAM. Enough RAM for all 8500 shards in one batch (~230 GB).
+# No local SSD needed — data streams directly from/to GCS.
 gcloud compute instances create pentago-sharder \
   --zone=us-central1-a \
-  --machine-type=c4d-standard-192-lssd \
+  --machine-type=c4-standard-96 \
   --boot-disk-size=50GB \
   --image-family=ubuntu-2404-lts-amd64 \
-  --image-project=ubuntu-os-cloud \
-  --max-run-duration=2h \
-  --instance-termination-action=DELETE \
-  --scopes=storage-full
+  --image-project=ubuntu-os-cloud
 
 gcloud compute ssh pentago-sharder --zone=us-central1-a
 ```
 
 ```bash
-# RAID0 the Titanium SSD devices into a single volume.
-# Detect them by their 3T size (avoids hardcoding device names).
-sudo apt-get update && sudo apt-get install -y mdadm git build-essential
+sudo apt-get update && sudo apt-get install -y git build-essential
 sudo curl -Lo /usr/local/bin/bazelisk https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64
 sudo chmod +x /usr/local/bin/bazelisk
 sudo ln -s /usr/local/bin/bazelisk /usr/local/bin/bazel
-DEVICES=$(lsblk -dno NAME,SIZE | awk '$2=="375G"{print "/dev/"$1}')
-echo "Found $(echo $DEVICES | wc -w) SSDs: $DEVICES"  # should be 8
-N=$(echo $DEVICES | wc -w)
-sudo mdadm --create /dev/md0 --level=0 --raid-devices=$N $DEVICES
-sudo mkfs.ext4 -F /dev/md0
-sudo mkdir /mnt/data
-sudo mount /dev/md0 /mnt/data
-sudo chown $USER /mnt/data
-mkdir /mnt/data/input /mnt/data/output
 ```
 
-## Copy input data (~10 min)
+## Copy credentials
 
 ```bash
-# Copy all 19 slice files (~4.3 TB, same-region, auto-parallelized)
-gcloud storage cp 'gs://pentago-us-central1/slice-*.pentago' /mnt/data/input/
-
-# Verify all 19 slices arrived
-ls /mnt/data/input/slice-*.pentago | wc -l  # should be 19
-du -sh /mnt/data/input/  # should be ~4.3 TB
+# From your local machine:
+gcloud compute scp ~/pentago-sharder-key.json pentago-sharder:~/key.json --zone=us-central1-a
 ```
 
-## Build and run (~15 min)
+## Build and run
 
 ```bash
 cd ~
@@ -80,39 +78,41 @@ bazel-bin/pentago/shard/sharder \
   --max-slice 18 \
   --shards 1048576 \
   --range :8500 \
-  /mnt/data/input \
-  /mnt/data/output
+  --credentials ~/key.json \
+  gs://pentago-us-central1 \
+  gs://pentago-shards \
+; sudo shutdown -h now
 ```
 
-With 192 vCPU doing parallel lzma decompression and high-bandwidth Titanium SSD,
-the sharder should process all 4.3 TB in ~10 minutes.
+The `shutdown -h now` stops (not terminates) the instance when the sharder
+finishes, regardless of success or failure. Restart with
+`gcloud compute instances start pentago-sharder` if needed.
+Stopped instances cost only ~$0.04/month for the boot disk.
+
+The sharder reads supertensor files directly from GCS (chunk-cached, ~64 MB chunks)
+and writes shard files directly to GCS. No local disk staging needed.
+Blocks are sorted by file offset for sequential I/O, so the chunk cache streams
+through each supertensor file approximately once.
+
+With 96 vCPU doing parallel lzma decompression, the sharder should process
+all 4.3 TB in ~30–40 minutes (~$3 total at ~$4/hr).
 Progress is logged per-block per-slice.
 
 ## Verify output
 
 ```bash
-# Check shard count and total size
-ls /mnt/data/output/*.pentago.shard | wc -l  # should be 8500
-du -sh /mnt/data/output/  # should be ~100 GB
+# Check shard count
+gcloud storage ls gs://pentago-shards/ | wc -l  # should be 8500
 
-# Spot-check a few shard sizes (should be ~12.5 MB each)
-ls -lh /mnt/data/output/ | head -5
+# Spot-check a shard
+gcloud storage ls -l gs://pentago-shards/shard-0000000-of-1048575.pentago.shard
 ```
 
-## Upload and tear down
-
-```bash
-gcloud storage cp '/mnt/data/output/*.pentago.shard' gs://pentago-shards/
-exit
-```
+## Tear down
 
 ```bash
 gcloud compute instances delete pentago-sharder --zone=us-central1-a
 ```
-
-Local SSDs are automatically destroyed with the instance. The instance also
-auto-terminates after 2 hours (from `--max-run-duration`) as a safety net.
-
 ## Sizing notes
 
 | Parameter | Value |

@@ -11,14 +11,18 @@
 namespace pentago {
 
 using std::function;
-void parallel_for(const int num_threads, const size_t n, const function<void(size_t)>& f);
+// When sequential=false (default), indices are shuffled via random_permute.
+// When sequential=true, indices are processed in order 0..n-1 (for cache-friendly I/O).
+void parallel_for(const int num_threads, const size_t n, const function<void(size_t)>& f,
+                  bool sequential = false);
 
 // Overlap I/O and compute: io_fn(i) runs under an I/O semaphore, then
 // compute_fn(i, data) runs under a compute semaphore, with 2*num_threads
 // threads so both can proceed concurrently.
 template<class IO, class Compute>
 static void overlapped_parallel_for(const int num_threads, const size_t n,
-                                    const IO& io_fn, const Compute& compute_fn) {
+                                    const IO& io_fn, const Compute& compute_fn,
+                                    const bool sequential = false) {
   std::counting_semaphore<> io_sem(num_threads), compute_sem(num_threads);
   parallel_for(2 * num_threads, n, [&](const size_t i) {
     io_sem.acquire();
@@ -27,7 +31,7 @@ static void overlapped_parallel_for(const int num_threads, const size_t n,
     compute_sem.acquire();
     compute_fn(i, std::move(data));
     compute_sem.release();
-  });
+  }, sequential);
 }
 
 }  // namespace pentago
