@@ -14,6 +14,7 @@
 #include "pentago/shard/parallel.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/thread.h"
+#include <atomic>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
