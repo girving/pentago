@@ -250,20 +250,6 @@ static size_t write_to_vector(char* ptr, size_t size, size_t nmemb, void* userda
   return size * nmemb;
 }
 
-struct upload_state_t {
-  const uint8_t* data;
-  size_t remaining;
-};
-
-static size_t read_upload(char* buffer, size_t size, size_t nmemb, void* userdata) {
-  auto* state = static_cast<upload_state_t*>(userdata);
-  const size_t to_copy = std::min(size * nmemb, state->remaining);
-  memcpy(buffer, state->data, to_copy);
-  state->data += to_copy;
-  state->remaining -= to_copy;
-  return to_copy;
-}
-
 static http_response_t gcs_request(const string& url, const string& method,
                                    const string& range_header,
                                    const uint8_t* upload_data, size_t upload_size) {
@@ -288,12 +274,10 @@ static http_response_t gcs_request(const string& url, const string& method,
     if (!range_header.empty())
       headers = curl_slist_append(headers, ("Range: " + range_header).c_str());
 
-    upload_state_t upload_state{upload_data, upload_size};
-    if (method == "PUT") {
-      curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-      curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(upload_size));
-      curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_upload);
-      curl_easy_setopt(curl, CURLOPT_READDATA, &upload_state);
+    if (upload_data) {
+      curl_easy_setopt(curl, CURLOPT_POST, 1L);
+      curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(upload_size));
+      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, upload_data);
       headers = curl_slist_append(headers, "Content-Type: application/octet-stream");
     }
 
@@ -376,7 +360,7 @@ void gcs_upload(const string& path, RawArray<const uint8_t> data) {
   const auto [bucket, object] = parse_gcs_uri(path);
   const string url = "https://storage.googleapis.com/upload/storage/v1/b/" + bucket +
                      "/o?uploadType=media&name=" + url_encode(object);
-  const auto resp = gcs_request(url, "PUT", "", data.data(), data.size());
+  const auto resp = gcs_request(url, "POST", "", data.data(), data.size());
   if (resp.status != 200 && resp.status != 201)
     die("gcs: upload %s returned %ld", path, resp.status);
 }
