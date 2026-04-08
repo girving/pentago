@@ -74,13 +74,14 @@ git clone https://github.com/girving/pentago.git
 cd pentago
 bin/bazel build -c opt //pentago/shard:sharder
 
-bazel-bin/pentago/shard/sharder \
+stdbuf -oL bazel-bin/pentago/shard/sharder \
   --max-slice 18 \
   --shards 1048576 \
   --range :8500 \
   --credentials ~/key.json \
   gs://pentago-us-central1 \
   gs://pentago-shards \
+  2>&1 | tee sharder.log \
 ; sudo shutdown -h now
 ```
 
