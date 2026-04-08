@@ -16,6 +16,7 @@ cc_library(
 cc_tests(
     names = [
         "arithmetic_test",
+        "parallel_test",
         "shard_test",
         "ternary_test",
     ],

@@ -11,13 +11,11 @@
 #include "pentago/shard/ternary.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
-#include "pentago/utility/permute.h"
+#include "pentago/shard/parallel.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/thread.h"
-#include <atomic>
 #include <cstdlib>
 #include <cstring>
-#include <thread>
 #include <vector>
 #include <getopt.h>
 #include "pentago/utility/memory.h"
@@ -25,7 +23,6 @@ namespace pentago {
 namespace {
 
 using std::atomic;
-using std::thread;
 
 struct options_t {
   string input_dir;
@@ -110,24 +107,6 @@ struct block_work_t {
   int reader_index;
   Vector<uint8_t,4> block;
 };
-
-template<class F>
-static void parallel_for(const int num_threads, const size_t n, const F& f) {
-  GEODE_ASSERT(num_threads > 0);
-  const uint128_t key = 42;
-  vector<thread> threads;
-  threads.reserve(num_threads);
-  atomic<size_t> next(0);
-  for (const int t __attribute__((unused)) : range(num_threads))
-    threads.emplace_back([&]() {
-      for (;;) {
-        const size_t i = next.fetch_add(1, std::memory_order_relaxed);
-        if (i >= n) break;
-        f(random_permute(n, key, i));
-      }
-    });
-  for (auto& t : threads) t.join();
-}
 
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
