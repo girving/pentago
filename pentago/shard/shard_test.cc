@@ -1,7 +1,7 @@
 // Shard mapping and file format tests
 
-#include "pentago/data/shard.h"
-#include "pentago/data/arithmetic.h"
+#include "pentago/shard/shard.h"
+#include "pentago/shard/arithmetic.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/base/symmetry.h"
 #include "pentago/utility/random.h"

@@ -1,6 +1,6 @@
 // Arithmetic coding tests
 
-#include "pentago/data/arithmetic.h"
+#include "pentago/shard/arithmetic.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/portable_hash.h"
 #include "pentago/utility/random.h"

@@ -5,19 +5,18 @@
 // a contiguous range of shuffled positions, with per-slice coding.
 
 #include "pentago/base/all_boards.h"
-#include "pentago/data/arithmetic.h"
-#include "pentago/data/shard.h"
+#include "pentago/shard/arithmetic.h"
+#include "pentago/shard/shard.h"
 #include "pentago/data/supertensor.h"
-#include "pentago/data/ternary.h"
+#include "pentago/shard/ternary.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
-#include "pentago/utility/permute.h"
+#include "pentago/shard/parallel.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/thread.h"
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
-#include <thread>
 #include <vector>
 #include <getopt.h>
 #include "pentago/utility/memory.h"
@@ -25,7 +24,6 @@ namespace pentago {
 namespace {
 
 using std::atomic;
-using std::thread;
 
 struct options_t {
   string input_dir;
@@ -110,24 +108,6 @@ struct block_work_t {
   int reader_index;
   Vector<uint8_t,4> block;
 };
-
-template<class F>
-static void parallel_for(const int num_threads, const size_t n, const F& f) {
-  GEODE_ASSERT(num_threads > 0);
-  const uint128_t key = 42;
-  vector<thread> threads;
-  threads.reserve(num_threads);
-  atomic<size_t> next(0);
-  for (const int t __attribute__((unused)) : range(num_threads))
-    threads.emplace_back([&]() {
-      for (;;) {
-        const size_t i = next.fetch_add(1, std::memory_order_relaxed);
-        if (i >= n) break;
-        f(random_permute(n, key, i));
-      }
-    });
-  for (auto& t : threads) t.join();
-}
 
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
@@ -216,14 +196,20 @@ void toplevel(int argc, char** argv) {
                 work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
       GEODE_ASSERT(work.size() == si.total_blocks);
-      parallel_for(threads, dry(work.size()), [&](const size_t wi) {
-        const auto& w = work[wi];
-        const auto& reader = *si.readers[w.reader_index];
-        scatter_block(si.mapping, o.total_shards, abs_range,
-                      buffers, reader.header.section, reader.header.block_size,
-                      w.block, reader.read_block_sync(w.block));
-        block_progress.tick();
-      });
+      overlapped_parallel_for(threads, dry(work.size()),
+        [&](const size_t wi) {
+          const auto& w = work[wi];
+          return si.readers[w.reader_index]->read_block_compressed(w.block);
+        },
+        [&](const size_t wi, auto compressed) {
+          const auto& w = work[wi];
+          const auto& reader = *si.readers[w.reader_index];
+          const auto data = reader.decode_block(w.block, compressed);
+          scatter_block(si.mapping, o.total_shards, abs_range,
+                        buffers, reader.header.section, reader.header.block_size,
+                        w.block, data);
+          block_progress.tick();
+        });
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
       progress_t encode_progress("encode", batch.size());

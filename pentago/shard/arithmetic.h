@@ -1,7 +1,7 @@
 // rANS coding of ternary arrays using 8 concatenated streams
 #pragma once
 
-#include "pentago/data/ternary.h"
+#include "pentago/shard/ternary.h"
 #include "pentago/utility/vector.h"
 namespace pentago {
 

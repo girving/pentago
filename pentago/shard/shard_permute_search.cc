@@ -3,9 +3,9 @@
 // 8-step LL-HH-LL-HH structure, no rotations. Each batch applies RSX then LSA.
 // Uses chi-squared score on consecutive blocks of 256 as the optimization metric.
 //
-// Usage: bazel-bin/pentago/data/shard_permute_search
+// Usage: bazel-bin/pentago/shard/shard_permute_search
 
-#include "pentago/data/shard_permute.h"
+#include "pentago/shard/shard_permute.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>

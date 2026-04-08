@@ -117,6 +117,12 @@ struct supertensor_reader_t : public noncopyable_t {
   // Read a block synchronously in the calling thread (pread + decompress + unfilter)
   Array<Vector<super_t,2>,4> read_block_sync(Vector<uint8_t,4> block) const;
 
+  // I/O only: read raw compressed bytes from disk
+  Array<uint8_t> read_block_compressed(Vector<uint8_t,4> block) const;
+
+  // Compute only: decompress + unfilter previously read compressed bytes
+  Array<Vector<super_t,2>,4> decode_block(Vector<uint8_t,4> block, RawArray<const uint8_t> compressed) const;
+
   // Read a block eventually, and call a (thread safe) function once the read completes
   typedef function<void(Vector<uint8_t,4>,Array<Vector<super_t,2>,4>)> read_cont_t;
   void schedule_read_block(Vector<uint8_t,4> block, const read_cont_t& cont) const;

@@ -5,7 +5,7 @@
 // Each stream's bytes are stored reversed (encoder writes LIFO, decoder reads FIFO).
 // AVX2 path processes all 8 lanes in parallel.
 
-#include "pentago/data/arithmetic.h"
+#include "pentago/shard/arithmetic.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/endian.h"
 #include "pentago/utility/range.h"
