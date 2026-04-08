@@ -6,7 +6,6 @@
 
 #include <cstddef>
 #include <functional>
-#include <limits>
 #include <semaphore>
 #include <utility>
 namespace pentago {
@@ -20,8 +19,7 @@ void parallel_for(const int num_threads, const size_t n, const function<void(siz
 template<class IO, class Compute>
 static void overlapped_parallel_for(const int num_threads, const size_t n,
                                     const IO& io_fn, const Compute& compute_fn) {
-  using sem = std::counting_semaphore<std::numeric_limits<ptrdiff_t>::max()>;
-  sem io_sem(num_threads), compute_sem(num_threads);
+  std::counting_semaphore<> io_sem(num_threads), compute_sem(num_threads);
   parallel_for(2 * num_threads, n, [&](const size_t i) {
     io_sem.acquire();
     auto data = io_fn(i);
