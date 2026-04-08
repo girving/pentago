@@ -196,14 +196,20 @@ void toplevel(int argc, char** argv) {
                 work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
       }
       GEODE_ASSERT(work.size() == si.total_blocks);
-      parallel_for(threads, dry(work.size()), [&](const size_t wi) {
-        const auto& w = work[wi];
-        const auto& reader = *si.readers[w.reader_index];
-        scatter_block(si.mapping, o.total_shards, abs_range,
-                      buffers, reader.header.section, reader.header.block_size,
-                      w.block, reader.read_block_sync(w.block));
-        block_progress.tick();
-      });
+      overlapped_parallel_for(threads, dry(work.size()),
+        [&](const size_t wi) {
+          const auto& w = work[wi];
+          return si.readers[w.reader_index]->read_block_compressed(w.block);
+        },
+        [&](const size_t wi, auto compressed) {
+          const auto& w = work[wi];
+          const auto& reader = *si.readers[w.reader_index];
+          const auto data = reader.decode_block(w.block, compressed);
+          scatter_block(si.mapping, o.total_shards, abs_range,
+                        buffers, reader.header.section, reader.header.block_size,
+                        w.block, data);
+          block_progress.tick();
+        });
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
       progress_t encode_progress("encode", batch.size());
