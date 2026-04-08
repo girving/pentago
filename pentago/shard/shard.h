@@ -149,6 +149,7 @@ struct shard_file_t {
   shared_ptr<const read_file_t> fd;
 
   shard_file_t(const string& path);
+  shard_file_t(const shared_ptr<const read_file_t>& fd);
   ~shard_file_t();
 
   // Read and decode one slice's group

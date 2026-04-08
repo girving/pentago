@@ -161,8 +161,8 @@ void write_shard(const string& path, const shard_header_t& header,
   GEODE_ASSERT(err.empty(), err);
 }
 
-shard_file_t::shard_file_t(const string& path)
-    : fd(read_local_file(path)) {
+shard_file_t::shard_file_t(const shared_ptr<const read_file_t>& fd)
+    : fd(fd) {
   // Read header
   Array<uint8_t> hbuf(shard_header_t::header_size, uninit);
   auto err = fd->pread(hbuf, 0);
@@ -177,6 +177,9 @@ shard_file_t::shard_file_t(const string& path)
   to_little_endian_inplace(offs);
   group_offsets = offs;
 }
+
+shard_file_t::shard_file_t(const string& path)
+    : shard_file_t(read_local_file(path)) {}
 
 shard_file_t::~shard_file_t() {}
 

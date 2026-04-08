@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load("//pentago:pentago.bzl", "COPTS")
 package(default_visibility = ["//visibility:public"])
 
@@ -12,6 +12,22 @@ cc_library(
         "//pentago/utility",
         "@curl",
         "@boringssl//:crypto",
+    ],
+)
+
+cc_binary(
+    name = "gcs_sharder_test",
+    srcs = ["gcs_sharder_test.cc"],
+    copts = COPTS,
+    deps = [
+        ":gcs",
+        "//pentago/data",
+        "//pentago/shard",
+        "//pentago/utility",
+    ],
+    data = [
+        "//pentago/shard:sharder",
+        "//data:slices",
     ],
 )
 
