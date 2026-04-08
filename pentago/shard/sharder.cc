@@ -5,10 +5,10 @@
 // a contiguous range of shuffled positions, with per-slice coding.
 
 #include "pentago/base/all_boards.h"
-#include "pentago/data/arithmetic.h"
-#include "pentago/data/shard.h"
+#include "pentago/shard/arithmetic.h"
+#include "pentago/shard/shard.h"
 #include "pentago/data/supertensor.h"
-#include "pentago/data/ternary.h"
+#include "pentago/shard/ternary.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/permute.h"

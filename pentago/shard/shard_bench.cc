@@ -24,9 +24,9 @@
 //   Before Feistel permutation (random_permute via hash):
 //     scatter_block was ~23000 ns/position (3.5x slower than double-reciprocal)
 
-#include "pentago/data/shard.h"
-#include "pentago/data/shard_permute.h"
-#include "pentago/data/ternary.h"
+#include "pentago/shard/shard.h"
+#include "pentago/shard/shard_permute.h"
+#include "pentago/shard/ternary.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/base/superscore.h"
 #include "pentago/utility/log.h"

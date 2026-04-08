@@ -1,7 +1,7 @@
 // Tests for shard_permute L/H bit-level permutation
 
-#include "pentago/data/shard_permute.h"
-#include "pentago/data/shard.h"
+#include "pentago/shard/shard_permute.h"
+#include "pentago/shard/shard.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/random.h"
 #include "pentago/utility/range.h"

@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "data",
-    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "sharder.cc", "shard_sizes.cc", "shard_permute_search.cc", "*_test.cc", "*_bench.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["roundtrip.cc", "*_test.cc"]),
     copts = COPTS,
     deps = [
         "//pentago/base",
@@ -16,47 +16,16 @@ cc_library(
 
 cc_tests(
     names = [
-        "arithmetic_test",
         "compress_test",
         "filter_test",
         "lru_test",
         "numpy_test",
-        "shard_test",
         "supertensor_test",
-        "ternary_test",
     ],
     deps = [
         ":data",
         "//pentago/base",
         "//pentago/utility",
-    ],
-    size = "small",
-)
-
-cc_test(
-    name = "shard_permute_test",
-    srcs = ["shard_permute_test.cc"],
-    copts = COPTS + ["-Wsign-compare"],
-    deps = [
-        ":data",
-        "//pentago/base",
-        "//pentago/utility",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
-    ],
-    size = "medium",
-)
-
-cc_test(
-    name = "shard_bench",
-    srcs = ["shard_bench.cc"],
-    copts = COPTS + ["-Wsign-compare"],
-    deps = [
-        ":data",
-        "//pentago/base",
-        "//pentago/utility",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
     ],
     size = "small",
 )
@@ -69,52 +38,4 @@ cc_binary(
         ":data",
         "//pentago/end:options",
     ],
-)
-
-cc_binary(
-    name = "shard_sizes",
-    srcs = ["shard_sizes.cc"],
-    copts = COPTS,
-    deps = [
-        ":data",
-        "//pentago/base",
-        "//pentago/utility",
-    ],
-    data = ["//data:counts"],
-)
-
-cc_binary(
-    name = "shard_permute_search",
-    srcs = ["shard_permute_search.cc"],
-    copts = COPTS,
-    deps = [":data"],
-)
-
-cc_binary(
-    name = "sharder",
-    srcs = ["sharder.cc"],
-    copts = COPTS,
-    deps = [
-        ":data",
-        "//pentago/base",
-        "//pentago/utility",
-    ],
-)
-
-cc_test(
-    name = "sharder_test",
-    srcs = ["sharder_test.cc"],
-    copts = COPTS + ["-Wsign-compare"],
-    deps = [
-        ":data",
-        "//pentago/base",
-        "//pentago/utility",
-        "@com_google_googletest//:gtest",
-        "@com_google_googletest//:gtest_main",
-    ],
-    data = [
-        ":sharder",
-        "//data:slices",
-    ],
-    size = "medium",
 )

@@ -1,6 +1,6 @@
 // Flat array of ternary values, packed 5 per byte
 
-#include "pentago/data/ternary.h"
+#include "pentago/shard/ternary.h"
 #include "pentago/utility/ceil_div.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/range.h"

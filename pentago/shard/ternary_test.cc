@@ -1,6 +1,6 @@
 // Ternary array tests
 
-#include "pentago/data/ternary.h"
+#include "pentago/shard/ternary.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/test_assert.h"
 #include "pentago/utility/thread.h"

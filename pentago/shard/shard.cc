@@ -1,7 +1,7 @@
 // Pseudorandom shard mapping for Pentago positions
 
-#include "pentago/data/shard.h"
-#include "pentago/data/shard_permute.h"
+#include "pentago/shard/shard.h"
+#include "pentago/shard/shard_permute.h"
 #include "pentago/base/all_boards.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/const_cast.h"

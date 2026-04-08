@@ -2,8 +2,8 @@
 
 #include "pentago/base/all_boards.h"
 #include "pentago/base/superscore.h"
-#include "pentago/data/arithmetic.h"
-#include "pentago/data/shard.h"
+#include "pentago/shard/arithmetic.h"
+#include "pentago/shard/shard.h"
 #include "pentago/data/supertensor.h"
 #include "pentago/utility/exceptions.h"
 #include "pentago/utility/log.h"
@@ -100,7 +100,7 @@ TEST(sharder, roundtrip) {
   const int total_shards = 32;
 
   tempdir_t tmp("sharder");
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d data %s",
+  run(tfm::format("pentago/shard/sharder --max-slice %d --shards %d data %s",
                    max_slice, total_shards, tmp.path));
   verify_shards(max_slice, total_shards, range(total_shards), tmp.path);
 }
@@ -114,9 +114,9 @@ TEST(sharder, batched_range) {
   tempdir_t tmp("sharder-batched");
 
   // Run two halves with --range, and --memory small enough to force >1 batch
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range :8 --memory 0.00005 data %s",
+  run(tfm::format("pentago/shard/sharder --max-slice %d --shards %d --range :8 --memory 0.00005 data %s",
                    max_slice, total_shards, tmp.path));
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --range 8: --memory 0.00005 data %s",
+  run(tfm::format("pentago/shard/sharder --max-slice %d --shards %d --range 8: --memory 0.00005 data %s",
                    max_slice, total_shards, tmp.path));
   verify_shards(max_slice, total_shards, range(total_shards), tmp.path);
 }
@@ -129,12 +129,12 @@ TEST(sharder, dry_run) {
 
   // Full run
   tempdir_t full("sharder-full");
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d data %s",
+  run(tfm::format("pentago/shard/sharder --max-slice %d --shards %d data %s",
                    max_slice, total_shards, full.path));
 
   // Dry run at 50%
   tempdir_t dry("sharder-dry");
-  run(tfm::format("pentago/data/sharder --max-slice %d --shards %d --dry-run 0.5 data %s",
+  run(tfm::format("pentago/shard/sharder --max-slice %d --shards %d --dry-run 0.5 data %s",
                    max_slice, total_shards, dry.path));
 
   // Compare: dry-run should write fewer shards and less data
@@ -192,7 +192,7 @@ protected:
   static void SetUpTestSuite() {
     init_threads(-1, -1);
     dir_.reset(new tempdir_t("iter"));
-    run(tfm::format("pentago/data/sharder --max-slice %d --shards %d data %s",
+    run(tfm::format("pentago/shard/sharder --max-slice %d --shards %d data %s",
                      max_slice, total_shards, dir_->path));
   }
   static void TearDownTestSuite() {
