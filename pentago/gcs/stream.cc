@@ -80,6 +80,7 @@ struct streamer_t::impl_t {
   }
 
   ~impl_t() {
+    results.cancel();
     for (auto& t : readers) t.join();
   }
 

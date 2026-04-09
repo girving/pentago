@@ -24,6 +24,7 @@ class mpmc_queue_t {
   std::deque<T> items;
   int64_t current_bytes = 0;
   std::atomic<int64_t> unclaimed;
+  std::atomic<bool> cancelled{false};
 
 public:
   mpmc_queue_t(const int64_t max_bytes, const int64_t total_items)
@@ -31,10 +32,17 @@ public:
 
   void push(T item) {
     std::unique_lock<std::mutex> lock(mu);
-    push_cv.wait(lock, [&]() { return current_bytes < max_bytes; });
+    push_cv.wait(lock, [&]() { return cancelled.load(std::memory_order_relaxed) || current_bytes < max_bytes; });
+    if (cancelled.load(std::memory_order_relaxed)) return;
     current_bytes += item.size();
     items.push_back(std::move(item));
     pop_cv.notify_one();
+  }
+
+  // Unblock all producers. Items already in the queue are abandoned.
+  void cancel() {
+    cancelled.store(true, std::memory_order_relaxed);
+    push_cv.notify_all();
   }
 
   optional<T> pop() {

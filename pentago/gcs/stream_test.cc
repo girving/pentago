@@ -246,5 +246,39 @@ TEST(stream, empty_requests) {
   ASSERT_FALSE(bool(s.next()));
 }
 
+TEST(stream, early_destruction) {
+  // Simulate dry-run: many requests, but destroy streamer after consuming only a few.
+  // Without cancel(), reader threads block in push() and destructor deadlocks on join().
+  atomic<int> fetches(0);
+  const auto fetch = make_fake_fetch(100000, fetches);
+
+  vector<streamer_t::request_t> reqs;
+  for (int i = 0; i < 1000; i++)
+    reqs.push_back({int64_t(i * 100), 50, i});
+
+  // Small readahead to ensure producers block quickly
+  streamer_t s(fetch, asarray(reqs), 200, 500, 4);
+
+  // Consume only 3 of 1000, then let destructor run
+  for (int i = 0; i < 3; i++) {
+    auto r = s.next();
+    ASSERT_TRUE(bool(r));
+  }
+  // Destructor runs here — must not deadlock
+}
+
+TEST(stream, early_destruction_no_consume) {
+  // Extreme case: construct streamer but never call next()
+  atomic<int> fetches(0);
+  const auto fetch = make_fake_fetch(10000, fetches);
+
+  vector<streamer_t::request_t> reqs;
+  for (int i = 0; i < 100; i++)
+    reqs.push_back({int64_t(i * 100), 50, i});
+
+  streamer_t s(fetch, asarray(reqs), 200, 200, 4);
+  // Destructor runs here — must not deadlock
+}
+
 }  // namespace
 }  // namespace pentago

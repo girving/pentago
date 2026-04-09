@@ -184,5 +184,62 @@ TEST(mpmc_queue, backpressure_with_multiple_producers_and_consumers) {
   PENTAGO_ASSERT_EQ(consumed.load(), 500);
 }
 
+TEST(mpmc_queue, cancel_unblocks_producers) {
+  // Tiny queue: producers will block on push
+  Q q(10, 100);
+
+  atomic<int> produced(0);
+  vector<thread> producers;
+  for (int t = 0; t < 4; t++)
+    producers.emplace_back([&]() {
+      for (int i = 0; i < 25; i++) {
+        q.push({i, 50});  // 50 bytes each, queue holds 10 → blocks fast
+        produced.fetch_add(1);
+      }
+    });
+
+  // Let producers get stuck
+  std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+  // Cancel should unblock all producers so they can exit
+  q.cancel();
+  for (auto& t : producers) t.join();
+  // Producers finished without deadlock — that's the test
+}
+
+TEST(mpmc_queue, cancel_with_concurrent_consumers) {
+  Q q(200, 1000);
+  atomic<int> next_prod(0);
+
+  vector<thread> producers;
+  for (int t = 0; t < 3; t++)
+    producers.emplace_back([&]() {
+      for (;;) {
+        const int i = next_prod.fetch_add(1);
+        if (i >= 1000) break;
+        q.push({i, 10});
+      }
+    });
+
+  // Consume only half, then cancel
+  atomic<int> consumed(0);
+  vector<thread> consumers;
+  for (int t = 0; t < 4; t++)
+    consumers.emplace_back([&]() {
+      for (;;) {
+        if (!q.pop()) break;
+        consumed.fetch_add(1);
+      }
+    });
+
+  // Let some work happen, then cancel
+  std::this_thread::sleep_for(std::chrono::milliseconds(5));
+  q.cancel();
+
+  for (auto& t : producers) t.join();
+  for (auto& t : consumers) t.join();
+  // All threads exited without deadlock
+}
+
 }  // namespace
 }  // namespace pentago
