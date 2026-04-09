@@ -1,0 +1,16 @@
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -71,7 +71,12 @@
+     srcs = bcm_sources + crypto_sources,
+     hdrs = crypto_headers,
+     asm_srcs = bcm_sources_asm + crypto_sources_asm,
+-    copts = ["-DBORINGSSL_IMPLEMENTATION"],
++    copts = ["-DBORINGSSL_IMPLEMENTATION"] + select({
++        # On macOS with Apple Silicon, -march=native does not detect AES/SHA2 features.
++        # Explicitly specify the architecture so BoringSSL's static feature check passes.
++        "@platforms//os:macos": ["-march=armv8.5-a+crypto+sha2+sha3+crc"],
++        "//conditions:default": [],
++    }),
+     includes = ["include"],
+     internal_hdrs = bcm_internal_headers + crypto_internal_headers,
+     linkopts = select({
