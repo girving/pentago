@@ -110,7 +110,7 @@ static void bench_scatter(const int slice) {
   for (const int iter __attribute__((unused)) : range(timing_iterations)) {
     const auto start = wall_time();
     scatter_block(mapping, total_shards, shard_range,
-                  buffers, section, block_size, block, data);
+                  buffers, section, block, data);
     const double elapsed = (wall_time() - start).seconds();
     best = std::min(best, elapsed);
   }

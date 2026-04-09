@@ -106,7 +106,7 @@ static void verify_shards(const options_t& o) {
     const auto shard_range = range(o.total_shards);
     for (const int s : shard_range) {
       const auto path = tfm::format("%s/%s", o.output, shard_filename(o.total_shards, s));
-      const shard_file_t sf(open_file(path));
+      const shard_file_t sf(gcs_download(path));
       GEODE_ASSERT(sf.header.max_slice == uint32_t(o.max_slice));
       GEODE_ASSERT(sf.header.shard_id == uint32_t(s));
       GEODE_ASSERT(sf.header.total_shards == uint32_t(o.total_shards));
@@ -136,7 +136,7 @@ static void verify_shards(const options_t& o) {
 static void verify_iterator(const options_t& o) {
   const int shard_id = 7;
   const auto path = tfm::format("%s/%s", o.output, shard_filename(o.total_shards, shard_id));
-  const shard_file_t sf(open_file(path));
+  const shard_file_t sf(gcs_download(path));
 
   // Build expected (board, value) pairs from direct shard decoding
   vector<board_value_t> expected;

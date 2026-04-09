@@ -6,16 +6,15 @@
 
 #include "pentago/base/all_boards.h"
 #include "pentago/gcs/gcs.h"
+#include "pentago/gcs/stream.h"
 #include "pentago/shard/arithmetic.h"
 #include "pentago/shard/shard.h"
-#include "pentago/data/supertensor.h"
 #include "pentago/shard/ternary.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
 #include "pentago/shard/parallel.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/thread.h"
-#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
@@ -110,11 +109,6 @@ struct progress_t {
   }
 };
 
-struct block_work_t {
-  int reader_index;
-  Vector<uint8_t,4> block;
-};
-
 void toplevel(int argc, char** argv) {
   const auto o = parse_options(argc, argv);
   if (is_gcs_path(o.input_dir) || is_gcs_path(o.output_dir)) {
@@ -147,27 +141,11 @@ void toplevel(int argc, char** argv) {
   slog("%llu max entries/shard, %d shards/batch, %d batches",
        max_entries_per_shard, shards_per_batch, n_batches);
 
-  // Precompute per-slice data: mappings, readers, section lookup
-  struct slice_info_t {
-    shard_mapping_t mapping;
-    vector<shared_ptr<const supertensor_reader_t>> readers;
-    unordered_map<section_t, int> section_to_reader;
-    uint32_t total_blocks;
-  };
-  vector<slice_info_t> slices;
-  slices.reserve(o.max_slice + 1);
-  for (const int slice : range(o.max_slice + 1)) {
-    const auto path = tfm::format("%s/slice-%d.pentago", o.input_dir, slice);
-    auto readers = open_supertensors(open_file(path));
-    unordered_map<section_t, int> section_to_reader;
-    for (const int ri : range(int(readers.size())))
-      section_to_reader[readers[ri]->header.section] = ri;
-    uint32_t total_blocks = 0;
-    for (const auto& reader : readers)
-      total_blocks += Vector<uint32_t,4>(reader->header.blocks).product();
-    slices.emplace_back(shard_mapping_t(slice), std::move(readers),
-                        std::move(section_to_reader), total_blocks);
-  }
+  // Precompute per-slice shard mappings
+  vector<shard_mapping_t> mappings;
+  mappings.reserve(o.max_slice + 1);
+  for (const int slice : range(o.max_slice + 1))
+    mappings.emplace_back(slice);
   shutdown_threads();  // free spinning pool threads before the main computation
 
   // Process batches of shards
@@ -184,56 +162,34 @@ void toplevel(int argc, char** argv) {
     // Process slices from largest to smallest, since largest is slowest
     for (int slice = o.max_slice; slice >= 0; slice--) {
       Scope slice_scope(tfm::format("slice %d", slice));
-      const auto& si = slices[slice];
+      const auto& mapping = mappings[slice];
 
       // Allocate ternary buffers for this batch and slice
       vector<ternaries_t> buffers;
       buffers.reserve(batch.size());
       for (const int b : range(batch.size()))
-        buffers.emplace_back(locator.shard_size(si.mapping.total(), abs_lo + b));
+        buffers.emplace_back(locator.shard_size(mapping.total(), abs_lo + b));
       const auto abs_range = range(abs_lo, abs_hi);
 
-      // Read and scatter blocks using parallel_for with natural backpressure
-      progress_t block_progress("blocks", si.total_blocks);
-      vector<block_work_t> work;
-      for (const auto& section : si.mapping.sections) {
-        const int ri = si.section_to_reader.at(section);
-        const auto& reader = *si.readers[ri];
-        const auto blocks = Vector<int,4>(reader.header.blocks);
-        for (const int b0 : range(blocks[0]))
-          for (const int b1 : range(blocks[1]))
-            for (const int b2 : range(blocks[2]))
-              for (const int b3 : range(blocks[3]))
-                work.emplace_back(ri, Vector<uint8_t,4>(vec(b0, b1, b2, b3)));
-      }
-      GEODE_ASSERT(work.size() == si.total_blocks);
-
-      // Sort blocks by file offset for sequential I/O (critical for GCS chunk cache,
-      // also improves local disk read patterns via OS readahead)
-      std::sort(work.begin(), work.end(), [&](const block_work_t& a, const block_work_t& b) {
-        if (a.reader_index != b.reader_index) return a.reader_index < b.reader_index;
-        return si.readers[a.reader_index]->blob(a.block).offset
-             < si.readers[b.reader_index]->blob(b.block).offset;
+      // Stream blocks with multi-threaded readahead (works for both local and GCS)
+      const auto input_path = tfm::format("%s/slice-%d.pentago", o.input_dir, slice);
+      supertensor_stream_t stream(input_path, 10LL << 30, 8);
+      const auto dry_blocks = dry(stream.total_blocks());
+      progress_t block_progress("blocks", dry_blocks);
+      parallel_for(threads, dry_blocks, [&](const size_t) {
+        auto block = stream.next();
+        if (!block) return;
+        const auto data = supertensor_stream_t::decompress(block);
+        scatter_block(mapping, o.total_shards, abs_range,
+                      buffers, block.section,
+                      block.block, data);
+        block_progress.tick();
       });
 
-      overlapped_parallel_for(threads, dry(work.size()),
-        [&](const size_t wi) {
-          const auto& w = work[wi];
-          return si.readers[w.reader_index]->read_block_compressed(w.block);
-        },
-        [&](const size_t wi, auto compressed) {
-          const auto& w = work[wi];
-          const auto& reader = *si.readers[w.reader_index];
-          const auto data = reader.decode_block(w.block, compressed);
-          scatter_block(si.mapping, o.total_shards, abs_range,
-                        buffers, reader.header.section, reader.header.block_size,
-                        w.block, data);
-          block_progress.tick();
-        }, /*sequential=*/true);
-
       // Encode each shard's ternary buffer in parallel, freeing as we go
-      progress_t encode_progress("encode", batch.size());
-      parallel_for(threads, dry(batch.size()), [&](const size_t b) {
+      const auto dry_encode = dry(batch.size());
+      progress_t encode_progress("encode", dry_encode);
+      parallel_for(threads, dry_encode, [&](const size_t b) {
         batch_groups[b][slice] = arithmetic_encode(buffers[b]);
         buffers[b] = ternaries_t();
         encode_progress.tick();
@@ -241,8 +197,9 @@ void toplevel(int argc, char** argv) {
     }  // slice
 
     // Write this batch's shard files in parallel
-    progress_t write_progress("write", batch.size());
-    parallel_for(threads, dry(batch.size()), [&](const size_t b) {
+    const auto dry_write = dry(batch.size());
+    progress_t write_progress("write", dry_write);
+    parallel_for(threads, dry_write, [&](const size_t b) {
       const int abs_shard = abs_lo + int(b);
       shard_header_t h;
       h.max_slice = o.max_slice;

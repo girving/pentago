@@ -2,21 +2,18 @@
 
 #include "pentago/gcs/gcs.h"
 #include "pentago/gcs/internal.h"
-#include "pentago/data/lru.h"
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
 #include <curl/curl.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-#include <condition_variable>
 #include <cstring>
 #include <ctime>
 #include <chrono>
 #include <fstream>
 #include <mutex>
 #include <thread>
-#include <unordered_set>
 namespace pentago {
 
 using std::ifstream;
@@ -66,91 +63,6 @@ string base64url_encode(RawArray<const uint8_t> data) {
   return result;
 }
 
-// --- Chunk-cached reader ---
-
-struct read_chunked_file_t final : public read_file_t {
-  const string name_;
-  const int64_t chunk_bytes_;
-  const int64_t max_cache_bytes_;
-  const function<Array<const uint8_t>(int64_t)> fetch_;
-
-  mutable mutex cache_mutex;
-  mutable std::condition_variable cache_cv;
-  mutable lru_t<int64_t, Array<const uint8_t>> cache;
-  mutable std::unordered_set<int64_t> pending;
-  mutable int64_t cache_total = 0;
-
-  read_chunked_file_t(const string& name, const int64_t chunk_bytes,
-                       const int64_t max_cache_bytes,
-                       const function<Array<const uint8_t>(int64_t)>& fetch)
-    : name_(name), chunk_bytes_(chunk_bytes), max_cache_bytes_(max_cache_bytes), fetch_(fetch) {}
-
-  ~read_chunked_file_t() override = default;
-
-  string name() const override { return name_; }
-
-  string pread(RawArray<uint8_t> data, const uint64_t offset) const override {
-    uint64_t pos = offset;
-    uint8_t* dst = data.data();
-    int64_t remaining = data.size();
-
-    while (remaining > 0) {
-      const int64_t ci = pos / chunk_bytes_;
-      const int64_t chunk_offset = pos % chunk_bytes_;
-      const auto chunk = get_chunk(ci);
-
-      // Compute copy size from actual chunk size (last chunk may be short)
-      if (chunk_offset >= int64_t(chunk.size()))
-        return tfm::format("read past end of %s", name_);
-      const int64_t to_copy = std::min(remaining, int64_t(chunk.size()) - chunk_offset);
-      memcpy(dst, chunk.data() + chunk_offset, to_copy);
-
-      dst += to_copy;
-      pos += to_copy;
-      remaining -= to_copy;
-    }
-    return "";
-  }
-
-private:
-  // Get a chunk from cache, or fetch it. If another thread is already fetching
-  // the same chunk, wait for it rather than issuing a duplicate request.
-  // Returns a refcounted copy so the data stays alive after cache eviction.
-  Array<const uint8_t> get_chunk(const int64_t ci) const {
-    std::unique_lock<mutex> lock(cache_mutex);
-
-    if (const auto* p = cache.get(ci)) return *p;
-
-    // Wait if another thread is fetching this chunk
-    while (pending.count(ci)) cache_cv.wait(lock);
-    if (const auto* p = cache.get(ci)) return *p;
-
-    // We'll fetch it
-    pending.insert(ci);
-    lock.unlock();
-
-    auto chunk = fetch_(ci);
-
-    // Insert into cache and notify waiters
-    lock.lock();
-    pending.erase(ci);
-    cache_total += chunk.size();
-    cache.add(ci, chunk);
-    while (cache_total > max_cache_bytes_) {
-      auto [key, val] = cache.drop();
-      cache_total -= val.size();
-    }
-    cache_cv.notify_all();
-    return chunk;
-  }
-};
-
-shared_ptr<const read_file_t> read_chunked_file(
-    const string& name, const int64_t chunk_bytes, const int64_t max_cache_bytes,
-    const function<Array<const uint8_t>(int64_t)>& fetch) {
-  return std::make_shared<read_chunked_file_t>(name, chunk_bytes, max_cache_bytes, fetch);
-}
-
 string base64url_encode(const string& s) {
   return base64url_encode({CHECK_CAST_INT(s.size()), reinterpret_cast<const uint8_t*>(s.data())});
 }
@@ -163,10 +75,6 @@ namespace {
 
 using gcs_internal::json_string;
 using gcs_internal::base64url_encode;
-
-// Default chunk cache configuration
-static constexpr int64_t chunk_bytes = 64 << 20;   // 64 MB per chunk
-static constexpr int64_t max_cache_bytes = 10LL << 30;  // 10 GB total cache
 
 // --- Auth: service account JWT with RS256 ---
 
@@ -237,12 +145,11 @@ static string get_bearer_token() {
   return cached_token;
 }
 
-// --- HTTP helper with retries ---
+}  // namespace
 
-struct http_response_t {
-  long status = 0;
-  vector<uint8_t> body;
-};
+// --- HTTP helper with retries (in gcs_internal for use by stream.cc) ---
+
+namespace gcs_internal {
 
 static size_t write_to_vector(char* ptr, size_t size, size_t nmemb, void* userdata) {
   auto* v = static_cast<vector<uint8_t>*>(userdata);
@@ -250,9 +157,9 @@ static size_t write_to_vector(char* ptr, size_t size, size_t nmemb, void* userda
   return size * nmemb;
 }
 
-static http_response_t gcs_request(const string& url, const string& method,
-                                   const string& range_header,
-                                   const uint8_t* upload_data, size_t upload_size) {
+http_response_t gcs_request(const string& url, const string& method,
+                             const string& range_header,
+                             const uint8_t* upload_data, size_t upload_size) {
   static constexpr int max_retries = 5;
   for (int attempt = 0; attempt <= max_retries; attempt++) {
     if (attempt > 0) {
@@ -299,6 +206,12 @@ static http_response_t gcs_request(const string& url, const string& method,
   die("gcs: unreachable");
 }
 
+}  // namespace gcs_internal
+
+namespace {
+
+using gcs_internal::gcs_request;
+
 static string url_encode(const string& s) {
   CURL* curl = curl_easy_init();
   GEODE_ASSERT(curl);
@@ -338,22 +251,16 @@ pair<string, string> parse_gcs_uri(const string& path) {
   return {path.substr(5, slash - 5), path.substr(slash + 1)};
 }
 
-shared_ptr<const read_file_t> read_gcs_file(const string& path) {
+Array<const uint8_t> gcs_download(const string& path) {
   const auto [bucket, object] = parse_gcs_uri(path);
-  const string base_url = "https://storage.googleapis.com/storage/v1/b/" + bucket +
-                           "/o/" + url_encode(object) + "?alt=media";
-  return gcs_internal::read_chunked_file(path, chunk_bytes, max_cache_bytes,
-      [base_url, path](const int64_t ci) -> Array<const uint8_t> {
-        const int64_t start = ci * chunk_bytes;
-        const int64_t end = start + chunk_bytes - 1;
-        const string range = tfm::format("bytes=%lld-%lld", start, end);
-        const auto resp = gcs_request(base_url, "GET", range, nullptr, 0);
-        if (resp.status != 200 && resp.status != 206)
-          die("gcs: GET %s range %s returned %ld", path, range, resp.status);
-        Array<uint8_t> result(int(resp.body.size()), uninit);
-        memcpy(result.data(), resp.body.data(), resp.body.size());
-        return result;
-      });
+  const string url = "https://storage.googleapis.com/storage/v1/b/" + bucket +
+                     "/o/" + url_encode(object) + "?alt=media";
+  const auto resp = gcs_request(url, "GET", "", nullptr, 0);
+  if (resp.status != 200)
+    die("gcs: GET %s returned %ld", path, resp.status);
+  Array<uint8_t> result(int(resp.body.size()), uninit);
+  memcpy(result.data(), resp.body.data(), resp.body.size());
+  return result;
 }
 
 void gcs_upload(const string& path, RawArray<const uint8_t> data) {
@@ -363,10 +270,6 @@ void gcs_upload(const string& path, RawArray<const uint8_t> data) {
   const auto resp = gcs_request(url, "POST", "", data.data(), data.size());
   if (resp.status != 200 && resp.status != 201)
     die("gcs: upload %s returned %ld", path, resp.status);
-}
-
-shared_ptr<const read_file_t> open_file(const string& path) {
-  return is_gcs_path(path) ? read_gcs_file(path) : read_local_file(path);
 }
 
 }  // namespace pentago

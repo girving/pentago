@@ -10,7 +10,6 @@
 #include "pentago/base/superscore.h"
 #include "pentago/base/symmetry.h"
 #include "pentago/shard/arithmetic.h"
-#include "pentago/data/file.h"
 #include "pentago/shard/shard_permute.h"
 #include "pentago/shard/ternary.h"
 #include "pentago/utility/array.h"
@@ -146,10 +145,10 @@ void write_shard(const string& path, const shard_header_t& header,
 struct shard_file_t {
   shard_header_t header;
   Array<const uint32_t> group_offsets;  // max_slice + 2 entries
-  shared_ptr<const read_file_t> fd;
+  Array<const uint8_t> data;            // entire file contents
 
   shard_file_t(const string& path);
-  shard_file_t(const shared_ptr<const read_file_t>& fd);
+  shard_file_t(Array<const uint8_t> data);
   ~shard_file_t();
 
   // Read and decode one slice's group
@@ -219,7 +218,7 @@ void scatter_block(
     const int total_shards,
     const Range<int> shard_range,
     RawArray<ternaries_t> buffers,
-    const section_t section, const int block_size,
+    const section_t section,
     const Vector<uint8_t,4> block,
     RawArray<const Vector<super_t,2>,4> data);
 

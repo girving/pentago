@@ -3,6 +3,8 @@
 #include "pentago/shard/shard.h"
 #include "pentago/shard/shard_permute.h"
 #include "pentago/base/all_boards.h"
+#include "pentago/base/blocks.h"
+#include "pentago/data/file.h"
 #include "pentago/utility/char_view.h"
 #include "pentago/utility/const_cast.h"
 #include "pentago/utility/debug.h"
@@ -12,6 +14,7 @@
 #include "pentago/utility/range.h"
 #include <algorithm>
 #include <cstring>
+#include <sys/stat.h>
 namespace pentago {
 
 using std::get;
@@ -161,25 +164,30 @@ void write_shard(const string& path, const shard_header_t& header,
   GEODE_ASSERT(err.empty(), err);
 }
 
-shard_file_t::shard_file_t(const shared_ptr<const read_file_t>& fd)
-    : fd(fd) {
-  // Read header
-  Array<uint8_t> hbuf(shard_header_t::header_size, uninit);
-  auto err = fd->pread(hbuf, 0);
-  GEODE_ASSERT(err.empty(), err);
-  header = shard_header_t::unpack(hbuf);
+shard_file_t::shard_file_t(Array<const uint8_t> data)
+    : data(data) {
+  GEODE_ASSERT(data.size() >= shard_header_t::header_size);
+  header = shard_header_t::unpack(data.slice(0, shard_header_t::header_size));
 
   // Read offset table
   const int n = header.max_slice + 1;
+  const int table_size = (n + 1) * 4;
+  GEODE_ASSERT(data.size() >= shard_header_t::header_size + table_size);
   Array<uint32_t> offs(n + 1, uninit);
-  err = fd->pread(char_view(offs), shard_header_t::header_size);
-  GEODE_ASSERT(err.empty(), err);
+  memcpy(offs.data(), data.data() + shard_header_t::header_size, table_size);
   to_little_endian_inplace(offs);
   group_offsets = offs;
 }
 
-shard_file_t::shard_file_t(const string& path)
-    : shard_file_t(read_local_file(path)) {}
+shard_file_t::shard_file_t(const string& path) : shard_file_t([&]() {
+  struct stat st;
+  GEODE_ASSERT(stat(path.c_str(), &st) == 0, path);
+  Array<uint8_t> buf(int(st.st_size), uninit);
+  const auto fd = read_local_file(path);
+  const auto err = fd->pread(buf, 0);
+  GEODE_ASSERT(err.empty(), err);
+  return Array<const uint8_t>(buf);
+}()) {}
 
 shard_file_t::~shard_file_t() {}
 
@@ -187,11 +195,8 @@ arithmetic_t shard_file_t::read_group(const int slice) const {
   GEODE_ASSERT(0 <= slice && slice <= int(header.max_slice));
   const uint32_t start = group_offsets[slice];
   const uint32_t end = group_offsets[slice + 1];
-  GEODE_ASSERT(start < end);
-  Array<uint8_t> buf(int(end - start), uninit);
-  const auto err = fd->pread(buf, start);
-  GEODE_ASSERT(err.empty(), err);
-  return arithmetic_deserialize(buf);
+  GEODE_ASSERT(start < end && end <= uint32_t(data.size()));
+  return arithmetic_deserialize(data.slice(start, end));
 }
 
 string shard_filename(const int shards, const int shard) {
@@ -285,7 +290,7 @@ void scatter_block(
     const int total_shards,
     const Range<int> shard_range,
     RawArray<ternaries_t> buffers,
-    const section_t section, const int block_size,
+    const section_t section,
     const Vector<uint8_t,4> block,
     RawArray<const Vector<super_t,2>,4> data) {
   // Hoist per-block invariants out of position and rotation loops
