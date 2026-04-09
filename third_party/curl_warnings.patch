@@ -1,0 +1,5 @@
+--- a/lib/request.c
++++ b/lib/request.c
+@@ -315 +315 @@
+-    char tmp;
++    char tmp = 0;
