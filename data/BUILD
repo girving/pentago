@@ -6,6 +6,11 @@ filegroup(
 )
 
 filegroup(
+    name = "indexes",
+    srcs = glob(["slice-*.pentago.index"]),
+)
+
+filegroup(
     name = "counts",
     srcs = glob(["counts-*.npy"]),
 )
