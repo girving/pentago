@@ -181,7 +181,7 @@ static void parse_index(section_info_t& si, RawArray<const uint8_t> raw) {
   GEODE_ASSERT(raw.size() == int(sizeof(supertensor_blob_t)) * blocks.product());
   Array<supertensor_blob_t,4> index(blocks,
       shared_ptr<supertensor_blob_t>(reinterpret_cast<supertensor_blob_t*>(
-          const_cast<uint8_t*>(raw.data())), [raw](supertensor_blob_t*) {}));
+          const_cast<uint8_t*>(raw.data())), [](supertensor_blob_t*) {}));
   to_little_endian_inplace(index.flat());
   si.offsets = Array<uint64_t,4>(blocks, uninit);
   si.compressed_sizes = Array<uint32_t,4>(blocks, uninit);
