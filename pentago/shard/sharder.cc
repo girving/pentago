@@ -105,6 +105,8 @@ struct progress_t {
       const double elapsed = (wall_time() - start).seconds();
       const double eta = d < total ? elapsed * (double(total) / d - 1) : 0;
       slog("%s: %llu / %llu, %.1fs elapsed, %.1fs remaining", label, d, total, elapsed, eta);
+      if (d % 100000 == 0)
+        slog("memory: %s", memory_report(memory_info()));
     }
   }
 };
