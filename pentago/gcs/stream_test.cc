@@ -33,33 +33,44 @@ TEST(stream, basic) {
   atomic<int> fetches(0);
   const auto fetch = make_fake_fetch(1000, fetches);
 
-  // Request 3 non-overlapping ranges
+  // 3 requests spanning >chunk_bytes, so multiple groups race across 2 threads.
+  // Delivery order is not guaranteed; collect by id and verify data.
   const streamer_t::request_t reqs[] = {{10, 5, 0}, {500, 10, 1}, {990, 10, 2}};
   streamer_t s(fetch, asarray(reqs), /*chunk_bytes=*/100, /*readahead_bytes=*/1000, /*num_threads=*/2);
 
-  for (int i = 0; i < 3; i++) {
+  streamer_t::result_t results[3];
+  for (int i __attribute__((unused)) = 0; i < 3; i++) {
     auto r = s.next();
     ASSERT_TRUE(bool(r));
-    PENTAGO_ASSERT_EQ(r.id, i);
-    PENTAGO_ASSERT_EQ(r.data.size(), reqs[i].size);
-    for (int j = 0; j < reqs[i].size; j++)
-      PENTAGO_ASSERT_EQ(r.data[j], fake_byte(reqs[i].offset + j));
+    GEODE_ASSERT(r.id >= 0 && r.id < 3);
+    results[r.id] = std::move(r);
   }
   ASSERT_FALSE(bool(s.next()));
+  for (int i = 0; i < 3; i++) {
+    PENTAGO_ASSERT_EQ(results[i].data.size(), reqs[i].size);
+    for (int j = 0; j < reqs[i].size; j++)
+      PENTAGO_ASSERT_EQ(results[i].data[j], fake_byte(reqs[i].offset + j));
+  }
 }
 
 TEST(stream, unsorted_requests) {
   atomic<int> fetches(0);
   const auto fetch = make_fake_fetch(1000, fetches);
 
-  // Submit requests out of order — streamer sorts internally
+  // Submit requests out of order — streamer sorts internally.
+  // offsets: 100 (id=0), 500 (id=1), 900 (id=2); chunk_bytes=100 puts 100+500 in group 0
+  // and 900 in group 1. With 2 threads the groups race, so delivery order is not guaranteed.
   const streamer_t::request_t reqs[] = {{900, 10, 2}, {100, 10, 0}, {500, 10, 1}};
   streamer_t s(fetch, asarray(reqs), 100, 1000, 2);
 
-  // Results come in offset order: 100, 500, 900
-  auto r0 = s.next(); ASSERT_TRUE(bool(r0)); PENTAGO_ASSERT_EQ(r0.id, 0);
-  auto r1 = s.next(); ASSERT_TRUE(bool(r1)); PENTAGO_ASSERT_EQ(r1.id, 1);
-  auto r2 = s.next(); ASSERT_TRUE(bool(r2)); PENTAGO_ASSERT_EQ(r2.id, 2);
+  // Collect all results and verify each id appears exactly once
+  bool seen[3] = {};
+  for (const int i __attribute__((unused)) : range(3)) {
+    auto r = s.next();
+    ASSERT_TRUE(bool(r));
+    GEODE_ASSERT(r.id >= 0 && r.id < 3 && !seen[r.id]);
+    seen[r.id] = true;
+  }
   ASSERT_FALSE(bool(s.next()));
 }
 

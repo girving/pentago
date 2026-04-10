@@ -7,6 +7,7 @@ sparse-*.try
 .claude/settings.local.json
 .claude/agents
 .claude/commands
+.claude/projects
 .claude/skills
 xcuserdata
 /learn
