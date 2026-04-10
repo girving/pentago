@@ -4,10 +4,7 @@
 // from shard 0 of 1,048,576 (max_slice=18), and compares against hardcoded server values.
 //
 // To (re)generate server_values:
-//   bin/bazel test -c opt //pentago/shard:full_test \
-//     --test_arg=--gtest_also_run_disabled_tests \
-//     --test_arg='--gtest_filter=full.DISABLED_query_server' \
-//     --test_output=streamed 2>&1 | grep '^{'
+//   bin/bazel test -c opt //pentago/shard:full_test --test_arg=--gtest_also_run_disabled_tests --test_arg='--gtest_filter=full.DISABLED_query_server' --test_output=streamed 2>&1 | grep '^{'
 // Copy the printed map initializer into server_values below.
 // When these values change, bump the shard file format version in shard.h/shard.cc.
 
@@ -57,10 +54,7 @@ TEST(full, vs_server) {
 // Query the pentago server (or midsolve for 18-stone boards) to generate or verify server_values.
 // When server_values is empty: prints the map initializer to paste into this file.
 // When server_values is populated: verifies each entry against the live server/midsolve.
-// Run with: bin/bazel test -c opt //pentago/shard:full_test
-//             --test_arg=--gtest_also_run_disabled_tests
-//             --test_arg='--gtest_filter=full.DISABLED_query_server'
-//             --test_output=streamed 2>&1 | grep '^{'
+// Run with: bin/bazel test -c opt //pentago/shard:full_test --test_arg=--gtest_also_run_disabled_tests --test_arg='--gtest_filter=full.DISABLED_query_server' --test_output=streamed 2>&1 | grep '^{'
 TEST(full, DISABLED_query_server) {
   curl_global_init(CURL_GLOBAL_DEFAULT);
 
