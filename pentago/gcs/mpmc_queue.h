@@ -24,7 +24,7 @@ class mpmc_queue_t {
   std::deque<T> items;
   int64_t current_bytes = 0;
   std::atomic<int64_t> unclaimed;
-  std::atomic<bool> cancelled{false};
+  bool cancelled = false;
 
 public:
   mpmc_queue_t(const int64_t max_bytes, const int64_t total_items)
@@ -32,24 +32,31 @@ public:
 
   void push(T item) {
     std::unique_lock<std::mutex> lock(mu);
-    push_cv.wait(lock, [&]() { return cancelled.load(std::memory_order_relaxed) || current_bytes < max_bytes; });
-    if (cancelled.load(std::memory_order_relaxed)) return;
+    push_cv.wait(lock, [&]() { return cancelled || current_bytes < max_bytes; });
+    if (cancelled) return;
     current_bytes += item.size();
     items.push_back(std::move(item));
     pop_cv.notify_one();
   }
 
-  // Unblock all producers. Items already in the queue are abandoned.
+  // Unblock all producers and consumers. Items still in the queue are abandoned.
   void cancel() {
-    cancelled.store(true, std::memory_order_relaxed);
+    {
+      std::lock_guard<std::mutex> lock(mu);
+      cancelled = true;
+    }
     push_cv.notify_all();
+    pop_cv.notify_all();
   }
 
   optional<T> pop() {
     // Claim a slot without holding the mutex
     if (unclaimed.fetch_sub(1) <= 0) return {};
     std::unique_lock<std::mutex> lock(mu);
-    pop_cv.wait(lock, [&]() { return !items.empty(); });
+    pop_cv.wait(lock, [&]() {
+      return !items.empty() || cancelled;
+    });
+    if (items.empty()) return {};  // cancelled
     T item = std::move(items.front());
     items.pop_front();
     current_bytes -= item.size();
