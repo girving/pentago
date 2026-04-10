@@ -14,3 +14,8 @@ filegroup(
     name = "counts",
     srcs = glob(["counts-*.npy"]),
 )
+
+filegroup(
+    name = "shard",
+    srcs = glob(["*.pentago.shard"]),
+)

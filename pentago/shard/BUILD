@@ -90,6 +90,23 @@ cc_binary(
 )
 
 cc_test(
+    name = "full_test",
+    srcs = ["full_test.cc"],
+    copts = COPTS + ["-Wsign-compare"],
+    deps = [
+        ":shard",
+        "//pentago/high",
+        "//pentago/mid",
+        "//pentago/utility",
+        "@com_google_googletest//:gtest",
+        "@com_google_googletest//:gtest_main",
+        "@curl",
+    ],
+    data = ["//data:shard"],
+    size = "large",
+)
+
+cc_test(
     name = "sharder_test",
     srcs = ["sharder_test.cc"],
     copts = COPTS + ["-Wsign-compare"],
