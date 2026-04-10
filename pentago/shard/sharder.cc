@@ -104,7 +104,7 @@ struct progress_t {
     if (d % 1000 == 0 || d == total) {
       const double elapsed = (wall_time() - start).seconds();
       const double eta = d < total ? elapsed * (double(total) / d - 1) : 0;
-      slog("    %s: %llu / %llu, %.1fs elapsed, %.1fs remaining", label, d, total, elapsed, eta);
+      slog("%s: %llu / %llu, %.1fs elapsed, %.1fs remaining", label, d, total, elapsed, eta);
     }
   }
 };
