@@ -49,6 +49,7 @@ struct streamer_t::impl_t {
   vector<group_t> groups;
   mpmc_queue_t<queued_result_t> results;
   atomic<int> next_group{0};
+  atomic<bool> cancelled{false};  // set before results.cancel() so reader_loop stops fetching
   vector<thread> readers;
 
   impl_t(const fetch_fn_t& fetch, RawArray<const request_t> reqs,
@@ -80,17 +81,20 @@ struct streamer_t::impl_t {
   }
 
   ~impl_t() {
+    cancelled.store(true, std::memory_order_relaxed);
     results.cancel();
     for (auto& t : readers) t.join();
   }
 
   void reader_loop(const fetch_fn_t& fetch) {
     for (;;) {
+      if (cancelled.load(std::memory_order_relaxed)) return;
       const int gi = next_group.fetch_add(1);
       if (gi >= int(groups.size())) return;
       const auto& g = groups[gi];
 
       auto chunk = fetch(g.bytes.lo, g.bytes.size());
+      if (cancelled.load(std::memory_order_relaxed)) return;
       GEODE_ASSERT(int64_t(chunk.size()) == g.bytes.size());
 
       for (const int ri : g.requests) {
