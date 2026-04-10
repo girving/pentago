@@ -196,10 +196,10 @@ http_response_t gcs_request(const string& url, const string& method,
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-      if (attempt < max_retries) continue;
+      if (attempt < max_retries) continue;  // backoff sleep at top of loop
       throw std::runtime_error(tfm::format("gcs: %s %s failed: %s", method, url, curl_easy_strerror(res)));
     }
-    if (resp.status == 429 || resp.status == 500 || resp.status == 503) {
+    if (resp.status == 429 || resp.status == 500 || resp.status == 502 || resp.status == 503) {
       if (attempt < max_retries) continue;
     }
     return resp;
