@@ -15,12 +15,15 @@
 #include <atomic>
 #include <cstring>
 #include <curl/curl.h>
+#include <mutex>
 #include <numeric>
+#include <stdexcept>
 #include <sys/stat.h>
 #include <thread>
 namespace pentago {
 
 using std::atomic;
+using std::once_flag;
 using std::sort;
 using std::thread;
 using gcs_internal::gcs_request;
@@ -50,6 +53,8 @@ struct streamer_t::impl_t {
   mpmc_queue_t<queued_result_t> results;
   atomic<int> next_group{0};
   atomic<bool> cancelled{false};  // set before results.cancel() so reader_loop stops fetching
+  std::exception_ptr reader_error;  // first error from any reader thread
+  once_flag error_flag;             // ensures only one thread stores the error
   vector<thread> readers;
 
   impl_t(const fetch_fn_t& fetch, RawArray<const request_t> reqs,
@@ -87,22 +92,33 @@ struct streamer_t::impl_t {
   }
 
   void reader_loop(const fetch_fn_t& fetch) {
-    for (;;) {
-      if (cancelled.load(std::memory_order_relaxed)) return;
-      const int gi = next_group.fetch_add(1);
-      if (gi >= int(groups.size())) return;
-      const auto& g = groups[gi];
+    try {
+      for (;;) {
+        if (cancelled.load(std::memory_order_relaxed)) return;
+        const int gi = next_group.fetch_add(1);
+        if (gi >= int(groups.size())) return;
+        const auto& g = groups[gi];
 
-      auto chunk = fetch(g.bytes.lo, g.bytes.size());
-      if (cancelled.load(std::memory_order_relaxed)) return;
-      GEODE_ASSERT(int64_t(chunk.size()) == g.bytes.size());
+        auto chunk = fetch(g.bytes.lo, g.bytes.size());
+        if (cancelled.load(std::memory_order_relaxed)) return;
+        GEODE_ASSERT(int64_t(chunk.size()) == g.bytes.size());
 
-      for (const int ri : g.requests) {
-        const auto& req = requests[ri];
-        const int local = int(req.offset - g.bytes.lo);
-        results.push({req.id, chunk.slice(local, local + req.size).copy()});
+        for (const int ri : g.requests) {
+          const auto& req = requests[ri];
+          const int local = int(req.offset - g.bytes.lo);
+          results.push({req.id, chunk.slice(local, local + req.size).copy()});
+        }
       }
+    } catch (...) {
+      std::call_once(error_flag, [this]() { reader_error = std::current_exception(); });
+      cancelled.store(true, std::memory_order_relaxed);
+      results.cancel();
     }
+  }
+
+  // Rethrow any error from a reader thread (call from main thread after consuming results).
+  void check_reader_error() {
+    if (reader_error) std::rethrow_exception(reader_error);
   }
 };
 
@@ -118,6 +134,8 @@ streamer_t::result_t streamer_t::next() {
   if (!item) return {};
   return {item->id, item->data};
 }
+
+void streamer_t::check_reader_error() { impl->check_reader_error(); }
 
 // --- Create fetch functions for local and GCS ---
 
@@ -138,7 +156,7 @@ static fetch_fn_t make_fetch(const string& path) {
       const auto resp = gcs_request(url, "GET", range, nullptr, 0);
       if (resp.status == 416) return {};
       if (resp.status != 200 && resp.status != 206)
-        die("gcs: GET %s range %s returned %ld", url, range, resp.status);
+        throw std::runtime_error(tfm::format("gcs: GET %s range %s returned %ld", url, range, resp.status));
       Array<uint8_t> result(int(resp.body.size()), uninit);
       memcpy(result.data(), resp.body.data(), resp.body.size());
       return result;
@@ -319,6 +337,8 @@ supertensor_stream_t::block_t supertensor_stream_t::next() {
   const auto& sec = impl->sections[meta.section_index];
   return {sec.header.section, meta.block, int(sec.header.filter), result.data};
 }
+
+void supertensor_stream_t::check_reader_error() { impl->streamer->check_reader_error(); }
 
 Array<Vector<super_t,2>,4> supertensor_stream_t::decompress(const block_t& block) {
   const auto bs = block_shape(block.section.shape(), block.block);

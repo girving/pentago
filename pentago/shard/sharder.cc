@@ -187,6 +187,7 @@ void toplevel(int argc, char** argv) {
                       block.block, data);
         block_progress.tick();
       });
+      stream.check_reader_error();
 
       // Encode each shard's ternary buffer in parallel, freeing as we go
       const auto dry_encode = dry(batch.size());

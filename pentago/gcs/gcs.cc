@@ -10,6 +10,7 @@
 #include <openssl/pem.h>
 #include <cstring>
 #include <ctime>
+#include <stdexcept>
 #include <chrono>
 #include <fstream>
 #include <mutex>
@@ -196,14 +197,14 @@ http_response_t gcs_request(const string& url, const string& method,
 
     if (res != CURLE_OK) {
       if (attempt < max_retries) continue;
-      die("gcs: %s %s failed: %s", method, url, curl_easy_strerror(res));
+      throw std::runtime_error(tfm::format("gcs: %s %s failed: %s", method, url, curl_easy_strerror(res)));
     }
     if (resp.status == 429 || resp.status == 500 || resp.status == 503) {
       if (attempt < max_retries) continue;
     }
     return resp;
   }
-  die("gcs: unreachable");
+  throw std::runtime_error("gcs: unreachable");
 }
 
 }  // namespace gcs_internal

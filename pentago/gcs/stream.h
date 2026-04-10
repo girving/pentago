@@ -46,6 +46,10 @@ public:
   // Returns result with id=-1 when all requests consumed.
   result_t next();
 
+  // Rethrow any error from a reader thread. Call from the main thread after
+  // next() returns empty, to distinguish normal completion from GCS errors.
+  void check_reader_error();
+
 private:
   struct impl_t;
   unique_ptr<impl_t> impl;
@@ -72,6 +76,10 @@ public:
   // Get next compressed block in file-offset order.
   // Thread-safe, multi-consumer. Returns empty block when done.
   block_t next();
+
+  // Rethrow any GCS read error from a reader thread. Call from the main thread
+  // after consuming all blocks (or after parallel_for completes early).
+  void check_reader_error();
 
   // Decompress a block returned by next() (call from any thread).
   static Array<Vector<super_t,2>,4> decompress(const block_t& block);
