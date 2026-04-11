@@ -284,39 +284,70 @@ string shard_filename(const int shards, const int shard) {
   return tfm::format("shard-%0*d-of-%0*d.pentago.shard", w, shard, w, shards - 1);
 }
 
-shard_iterator_t::shard_iterator_t(const string& dir, const int total_shards,
-                                   const Range<int> shard_range, const uint128_t seed)
-    : dir(dir), total_shards(total_shards), shard_range(shard_range),
-      locator(total_shards, shard_range), random(seed),
-      shard_cursor(0), epoch_key(random.bits<uint128_t>()), total_remaining(0) {
-  GEODE_ASSERT(!shard_range.empty());
+int parse_shard_total(const string& path) {
+  // Extract total_shards from "shard-NNNNNNN-of-NNNNNNN.pentago.shard"
+  const auto base = path.substr(path.rfind('/') + 1);
+  const auto of_pos = base.find("-of-");
+  GEODE_ASSERT(of_pos != string::npos);
+  const auto dot_pos = base.find('.', of_pos);
+  return std::stoi(base.substr(of_pos + 4, dot_pos - of_pos - 4)) + 1;
+}
+
+static vector<string> build_shard_paths(const string& dir, const int total_shards,
+                                        const Range<int> shard_range) {
+  vector<string> paths;
+  paths.reserve(shard_range.size());
+  for (const int id : shard_range)
+    paths.push_back(tfm::format("%s/%s", dir, shard_filename(total_shards, id)));
+  return paths;
+}
+
+shard_iterator_t::shard_iterator_t(vector<string> shard_paths, const uint128_t seed,
+                                   const int max_epochs)
+    : shard_paths(std::move(shard_paths)),
+      total_shards(parse_shard_total(this->shard_paths.at(0))),
+      locator(total_shards, range(0, 1)),  // dummy range; only shard_size/shuffled_index used
+      max_epochs(max_epochs), random(seed),
+      shard_cursor(0), epoch_key(random.bits<uint128_t>()),
+      epoch_count_(0), done_(false), total_remaining(0) {
+  GEODE_ASSERT(!this->shard_paths.empty());
   load_next_shard();
 }
+
+shard_iterator_t::shard_iterator_t(const string& dir, const int total_shards,
+                                   const Range<int> shard_range, const uint128_t seed,
+                                   const int max_epochs)
+    : shard_iterator_t(build_shard_paths(dir, total_shards, shard_range), seed, max_epochs) {}
 
 shard_iterator_t::~shard_iterator_t() {}
 
 void shard_iterator_t::load_next_shard() {
-  if (shard_cursor >= shard_range.size()) {
+  const int n = int(shard_paths.size());
+  if (shard_cursor >= n) {
+    epoch_count_++;
+    if (max_epochs >= 0 && epoch_count_ >= max_epochs) {
+      done_ = true;
+      return;
+    }
     epoch_key = random.bits<uint128_t>();
     shard_cursor = 0;
   }
-  const int permuted = int(random_permute(uint64_t(shard_range.size()), epoch_key,
+  const int permuted = int(random_permute(uint64_t(n), epoch_key,
                                           uint64_t(shard_cursor++)));
-  const int shard_id = shard_range.lo + permuted;
-  const auto path = tfm::format("%s/%s", dir, shard_filename(total_shards, shard_id));
-  const shard_file_t sf(path);
+  const shard_file_t sf(shard_paths[permuted]);
 
   // Initialize slices lazily on first shard load
   if (slices.empty()) {
-    const int n = sf.header.max_slice + 1;
-    slices.reserve(n);
-    for (const int s : range(n))
+    const int ns = sf.header.max_slice + 1;
+    slices.reserve(ns);
+    for (const int s : range(ns))
       slices.emplace_back(s);
   }
   GEODE_ASSERT(sf.header.max_slice + 1 == uint32_t(slices.size()) &&
                sf.header.total_shards == uint32_t(total_shards));
 
   // Decode all groups and set up per-slice state
+  const int shard_id = int(sf.header.shard_id);
   total_remaining = 0;
   for (auto& slice : slices) {
     slice.decoded.emplace(arithmetic_decode(sf.read_group(slice.mapping.slice)));
@@ -328,8 +359,7 @@ void shard_iterator_t::load_next_shard() {
 }
 
 board_value_t shard_iterator_t::next() {
-  if (total_remaining == 0)
-    load_next_shard();
+  GEODE_ASSERT(!done_);
 
   // Weighted random selection of slice
   const int last = int(slices.size()) - 1;
@@ -351,12 +381,19 @@ board_value_t shard_iterator_t::next() {
   slice.remaining--;
   total_remaining--;
 
+  // Eagerly load next shard so done() is immediately accurate
+  if (total_remaining == 0)
+    load_next_shard();
+
   return {board, value};
 }
 
-void shard_iterator_t::next_batch(RawArray<board_value_t> batch) {
-  for (const int i : range(batch.size()))
+int shard_iterator_t::next_batch(RawArray<board_value_t> batch) {
+  for (const int i : range(batch.size())) {
+    if (done_) return i;
     batch[i] = next();
+  }
+  return batch.size();
 }
 
 int shard_to_server_value(const board_t board, const int shard_value) {

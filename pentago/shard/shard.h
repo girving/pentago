@@ -197,24 +197,32 @@ struct board_value_t {
   auto operator<=>(const board_value_t&) const = default;
 };
 
+// Parse total_shards from a shard filename (e.g. "shard-0000042-of-1048575.pentago.shard" → 1048576)
+int parse_shard_total(const string& path);
+
 struct shard_iterator_t : noncopyable_t {
+  shard_iterator_t(vector<string> shard_paths, const uint128_t seed, const int max_epochs = -1);
   shard_iterator_t(const string& dir, const int total_shards, const Range<int> shard_range,
-                   const uint128_t seed);
+                   const uint128_t seed, const int max_epochs = -1);
+
   ~shard_iterator_t();
 
+  bool done() const { return done_; }
   board_value_t next();
-  void next_batch(RawArray<board_value_t> batch);
+  int next_batch(RawArray<board_value_t> batch);  // returns count filled, 0 = done
 
 private:
-  const string dir;
+  const vector<string> shard_paths;
   const int total_shards;
-  const Range<int> shard_range;
   const shard_locator_t locator;
+  const int max_epochs;  // -1 = infinite
   Random random;
 
   // Shard ordering
   int shard_cursor;
   uint128_t epoch_key;
+  int epoch_count_;
+  bool done_;
 
   // Per-slice state
   struct slice_t {

@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "shard",
-    srcs = glob(["*.h", "*.cc"], exclude=["sharder.cc", "shard_sizes.cc", "shard_permute_search.cc", "*_test.cc", "*_bench.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["sharder.cc", "shard_sizes.cc", "shard_permute_search.cc", "iterate.cc", "*_test.cc", "*_bench.cc"]),
     copts = COPTS,
     deps = [
         "//pentago/base",
@@ -89,6 +89,16 @@ cc_binary(
     ],
 )
 
+cc_binary(
+    name = "iterate",
+    srcs = ["iterate.cc"],
+    copts = COPTS,
+    deps = [
+        ":shard",
+        "//pentago/utility",
+    ],
+)
+
 cc_test(
     name = "full_test",
     srcs = ["full_test.cc"],
@@ -119,6 +129,7 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
     data = [
+        ":iterate",
         ":sharder",
         "//data:slices",
     ],

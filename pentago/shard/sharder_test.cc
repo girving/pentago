@@ -302,5 +302,94 @@ TEST_F(shard_iterator_test, epoch) {
   ASSERT_EQ(epoch1, epoch2);
 }
 
+TEST_F(shard_iterator_test, epoch_limit) {
+  const auto sr = range(3, 5);  // 2 shards
+  const uint128_t seed = 789;
+
+  // Count total entries across all shards in range
+  uint64_t total_entries = 0;
+  for (const int shard_id : sr)
+    for (const int s : range(max_slice + 1)) {
+      const shard_mapping_t mapping(s);
+      total_entries += shard_locator_t(total_shards, range(shard_id, shard_id + 1))
+          .shard_size(mapping.total(), shard_id);
+    }
+
+  // Epoch-limited iterator should produce exactly total_entries, then stop
+  shard_iterator_t limited(dir_->path, total_shards, sr, seed, 1);
+  vector<board_value_t> from_limited;
+  from_limited.reserve(total_entries);
+  const Array<board_value_t> batch(1000, uninit);
+  while (!limited.done()) {
+    const int n = limited.next_batch(batch);
+    for (const int i : range(n)) from_limited.push_back(batch[i]);
+  }
+  PENTAGO_ASSERT_EQ(uint64_t(from_limited.size()), total_entries);
+
+  // Unlimited iterator with same seed should produce identical entries
+  shard_iterator_t unlimited(dir_->path, total_shards, sr, seed);
+  for (const uint64_t i : range(total_entries)) {
+    const auto bv = unlimited.next();
+    PENTAGO_ASSERT_EQ(from_limited[i].board(), bv.board());
+    PENTAGO_ASSERT_EQ(from_limited[i].value(), bv.value());
+  }
+}
+
+TEST_F(shard_iterator_test, paths_constructor) {
+  const auto sr = range(0, 3);
+  const uint128_t seed = 123;
+
+  // Build paths manually
+  vector<string> paths;
+  for (const int id : sr)
+    paths.push_back(tfm::format("%s/%s", dir_->path, shard_filename(total_shards, id)));
+
+  // Both constructors with same seed and epochs=1 should give identical output
+  shard_iterator_t from_dir(dir_->path, total_shards, sr, seed, 1);
+  shard_iterator_t from_paths(paths, seed, 1);
+  const Array<board_value_t> batch1(500, uninit), batch2(500, uninit);
+  while (!from_dir.done()) {
+    const int n1 = from_dir.next_batch(batch1);
+    const int n2 = from_paths.next_batch(batch2);
+    PENTAGO_ASSERT_EQ(n1, n2);
+    for (const int i : range(n1))
+      PENTAGO_ASSERT_EQ(batch1[i].data, batch2[i].data);
+  }
+  ASSERT_TRUE(from_paths.done());
+}
+
+TEST_F(shard_iterator_test, iterate_binary) {
+  const auto sr = range(0, 3);
+  const uint128_t seed = 555;
+
+  // Build command
+  string path_args;
+  for (const int id : sr)
+    path_args += tfm::format(" %s/%s", dir_->path, shard_filename(total_shards, id));
+  const auto cmd = tfm::format(
+      "pentago/shard/iterate --epochs 1 --seed %d%s", int(seed), path_args);
+
+  // Read binary output via popen in batches, comparing against direct iterator
+  FILE* pipe = popen(cmd.c_str(), "r");
+  GEODE_ASSERT(pipe);
+  shard_iterator_t it(dir_->path, total_shards, sr, seed, 1);
+  static constexpr int batch_size = 1000;
+  const Array<board_value_t> from_pipe(batch_size, uninit);
+  const Array<board_value_t> from_iter(batch_size, uninit);
+  int total = 0;
+  for (;;) {
+    const int np = int(fread(from_pipe.data(), sizeof(board_value_t), batch_size, pipe));
+    const int ni = it.next_batch(from_iter);
+    PENTAGO_ASSERT_EQ(np, ni);
+    for (const int i : range(np))
+      PENTAGO_ASSERT_EQ(from_pipe[i].data, from_iter[i].data);
+    total += np;
+    if (np < batch_size) break;
+  }
+  PENTAGO_ASSERT_EQ(pclose(pipe), 0);
+  ASSERT_TRUE(it.done());
+  ASSERT_GT(total, 0);
+}
+
 }  // namespace
 }  // namespace pentago
