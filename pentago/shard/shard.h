@@ -23,17 +23,43 @@ namespace pentago {
 using std::optional;
 using std::unordered_map;
 
+// Precomputed per-section data for fast board() lookup.
+// Caches rotation-minimal quadrant arrays, shape values, and division reciprocals
+// so that board() avoids repeated rotation_minimal_quadrants calls and hardware divs.
+// Granlund-Montgomery unsigned division by constant
+struct recip_t {
+  uint64_t magic;
+  int shift;
+  bool overflow;  // true = use add-one variant
+};
+
+struct section_info_t {
+  RawArray<const quadrant_t> rmin[4];  // pointers into static rmin data
+  int shape[4];                         // rmin[i].size()
+  recip_t recip[3];  // for fast div by shape[3], shape[2], shape[1]
+};
+
 struct shard_mapping_t {
   const int slice;
   const Array<const section_t> sections;  // sections for this slice only
   const unordered_map<section_t, int> section_id;  // inverse: section → index
   const Array<const uint64_t> offsets;  // prefix sum of section.size()*256
+  const Array<const section_info_t> section_info;  // precomputed per-section data
   const shard_permute_t permute;  // cached permutation for this slice
+
+  // Direct lookup table for O(1) linear → section index.
+  // section_lookup[linear >> section_shift] is an approximate section index;
+  // a ±1 fixup gives the exact answer.
+  int section_shift;
+  Array<const uint16_t> section_lookup;
 
   shard_mapping_t(const int slice);
   ~shard_mapping_t();
 
   uint64_t total() const { return offsets.back(); }
+
+  // Find section index for a linear index (O(1) via lookup table)
+  int find_section(const uint64_t linear) const;
 
   // Lookup section → index in sections array (asserts on missing)
   int section_index(const section_t section) const;

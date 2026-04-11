@@ -3,6 +3,11 @@
 // Uses shard_iterator_t with a fixed seed to deterministically sample n_samples entries
 // from shard 0 of 1,048,576 (max_slice=18), and compares against hardcoded server values.
 //
+// portable_hash speed (Cascade Lake, 114M entries, -c opt):
+//   initial: iterate 16.3 s, 142 ns/entry
+//   precompute section_info + fast_div + local transform_board: iterate 11.6 s, 101 ns/entry
+//   direct section lookup table (replace binary search): iterate 10.1 s, 88 ns/entry
+//
 // To (re)generate server_values:
 //   bin/bazel test -c opt //pentago/shard:full_test --test_arg=--gtest_also_run_disabled_tests --test_arg='--gtest_filter=full.DISABLED_query_server' --test_output=streamed 2>&1 | grep '^{'
 // Copy the printed map initializer into server_values below.
@@ -15,6 +20,7 @@
 #include "pentago/utility/log.h"
 #include "pentago/utility/portable_hash.h"
 #include "pentago/utility/range.h"
+#include "pentago/utility/wall_time.h"
 #include "pentago/utility/test_assert.h"
 #include "gtest/gtest.h"
 #include <algorithm>
@@ -159,11 +165,16 @@ TEST(full, portable_hash) {
     total_entries += loc.shard_size(shard_mapping_t(s).total(), shard_id);
 
   // Expand the entire shard into board_value_t entries via shard_iterator_t
+  const auto t0 = wall_time();
   shard_iterator_t it("data", total_shards, range(shard_id, shard_id + 1), seed);
   const Array<board_value_t> entries(int(total_entries), uninit);
   it.next_batch(entries);
+  const auto t1 = wall_time();
   const auto h = portable_hash(entries);
-  slog("shard %d: %d entries, hash %s", shard_id, entries.size(), h);
+  const auto t2 = wall_time();
+  slog("shard %d: %d entries, iterate %.3f s, hash %.3f s, total %.3f s, %.0f ns/entry",
+       shard_id, entries.size(), (t1 - t0).seconds(), (t2 - t1).seconds(), (t2 - t0).seconds(),
+       (t1 - t0).seconds() / entries.size() * 1e9);
   ASSERT_EQ(h, "ca427dc51297b3ef810580ac65d2ee0af0e211ce");
 }
 

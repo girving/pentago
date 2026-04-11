@@ -105,6 +105,7 @@ inline symmetry_t operator*(local_symmetry_t a, symmetry_t b) {
 side_t transform_side(symmetry_t s, side_t side) __attribute__((const));
 #ifndef __wasm__
 board_t transform_board(symmetry_t s, board_t board) __attribute__((const));
+board_t transform_board(local_symmetry_t local, board_t board) __attribute__((const));
 #endif  // !__wasm__
 
 // Let B be the set of boards, and A \subset B a subset of boards invariant to global transforms

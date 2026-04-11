@@ -240,5 +240,16 @@ TEST(pentago, popcounts_over_stabilizers) {
   }
 }
 
+TEST(pentago, transform_board_local) {
+  Random random(7142);
+  for (const int step __attribute__((unused)) : range(1000)) {
+    const board_t board = random_board(random, random.uniform<int>(0, 37));
+    for (const int local : range(256)) {
+      const auto s = local_symmetry_t(uint8_t(local));
+      PENTAGO_ASSERT_EQ(transform_board(symmetry_t(s), board), transform_board(s, board));
+    }
+  }
+}
+
 }  // namespace
 }  // hamespace pentago

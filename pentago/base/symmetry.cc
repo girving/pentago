@@ -75,6 +75,24 @@ board_t transform_board(symmetry_t s, board_t board) {
   return quadrants(pack(qr[0][0],qr[0][1]),pack(qr[1][0],qr[1][1]),pack(qr[2][0],qr[2][1]),pack(qr[3][0],qr[3][1]));
 }
 
+// Specialized transform_board for local-only symmetry (global=0).
+// Skips global quadrant swapping and reflection branches.
+board_t transform_board(const local_symmetry_t local, const board_t board) {
+  if (!local.local) return board;
+  const quadrant_t qp[4] = {quadrant(board,0),quadrant(board,1),quadrant(board,2),quadrant(board,3)};
+  quadrant_t q[4][2] = {{unpack(qp[0],0),unpack(qp[0],1)},{unpack(qp[1],0),unpack(qp[1],1)},{unpack(qp[2],0),unpack(qp[2],1)},{unpack(qp[3],0),unpack(qp[3],1)}};
+  for (int i=0;i<4;i++)
+    switch ((local.local>>2*i)&3) {
+      case 1: q[i][0] = rotations[q[i][0]][0];
+              q[i][1] = rotations[q[i][1]][0]; break;
+      case 2: q[i][0] = rotations[rotations[q[i][0]][0]][0];
+              q[i][1] = rotations[rotations[q[i][1]][0]][0]; break;
+      case 3: q[i][0] = rotations[q[i][0]][1];
+              q[i][1] = rotations[q[i][1]][1]; break;
+    }
+  return quadrants(pack(q[0][0],q[0][1]),pack(q[1][0],q[1][1]),pack(q[2][0],q[2][1]),pack(q[3][0],q[3][1]));
+}
+
 tuple<board_t,symmetry_t> superstandardize(board_t board) {
   return superstandardize(unpack(board,0),unpack(board,1));
 }

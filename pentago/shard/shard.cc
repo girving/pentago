@@ -22,6 +22,25 @@ using std::make_unique;
 using std::memcpy;
 using std::upper_bound;
 
+static inline uint64_t mulhi_u64(const uint64_t a, const uint64_t b) {
+  return uint64_t((__uint128_t(a) * b) >> 64);
+}
+
+static inline uint64_t fast_div(const uint64_t x, const recip_t& r) {
+  if (!r.magic) return x >> r.shift;
+  if (!r.overflow) return mulhi_u64(x, r.magic) >> r.shift;
+  const uint64_t t = mulhi_u64(x, r.magic);
+  return (t + ((x - t) >> 1)) >> (r.shift - 1);
+}
+
+static recip_t compute_recip(const int d) {
+  if (d <= 1) return {0, 0, false};
+  if ((d & (d - 1)) == 0) return {0, __builtin_ctz(d), false};
+  const int l = 64 - __builtin_clzll(uint64_t(d) - 1);  // ceil(log2(d))
+  const __uint128_t m = (__uint128_t(1) << (64 + l)) / d + 1;
+  if (m <= ~uint64_t(0)) return {uint64_t(m), l, false};
+  return {uint64_t(m), l, true};  // overflow: add-one variant
+}
 
 shard_mapping_t::shard_mapping_t(const int slice)
     : slice(slice), permute(slice) {
@@ -36,6 +55,41 @@ shard_mapping_t::shard_mapping_t(const int slice)
     off[i + 1] = off[i] + sections[i].size() * 256;
   }
   const_cast_(offsets) = off;
+
+  // Precompute per-section info for fast board() lookup
+  Array<section_info_t> info(sections.size(), uninit);
+  for (const int i : range(sections.size())) {
+    auto& si = info[i];
+    for (const int q : range(4)) {
+      si.rmin[q] = get<0>(rotation_minimal_quadrants(sections[i].counts[q]));
+      si.shape[q] = si.rmin[q].size();
+    }
+    si.recip[0] = compute_recip(si.shape[3]);
+    si.recip[1] = compute_recip(si.shape[2]);
+    si.recip[2] = compute_recip(si.shape[1]);
+  }
+  const_cast_(section_info) = info;
+
+  // Build direct lookup table: section_lookup[linear >> shift] gives the section
+  // containing the start of that bucket.  For any linear value in the bucket,
+  // the true section is this value or a small number of steps forward.
+  const uint64_t t = total();
+  if (t <= 1) {
+    section_shift = 0;
+    const_cast_(section_lookup) = Array<uint16_t>(1);
+  } else {
+    section_shift = std::max(0, int(64 - __builtin_clzll(t - 1)) - 16);
+    const int table_size = int((t - 1) >> section_shift) + 1;
+    Array<uint16_t> lookup(table_size, uninit);
+    int si = 0;
+    for (const int i : range(table_size)) {
+      const uint64_t bucket_start = uint64_t(i) << section_shift;
+      while (si + 1 < sections.size() && offsets[si + 1] <= bucket_start)
+        si++;
+      lookup[i] = uint16_t(si);
+    }
+    const_cast_(section_lookup) = lookup;
+  }
 }
 
 shard_mapping_t::~shard_mapping_t() {}
@@ -56,12 +110,17 @@ uint64_t shard_mapping_t::forward(const section_t section, const Vector<int,4> i
   return permute.forward(linear);
 }
 
+int shard_mapping_t::find_section(const uint64_t linear) const {
+  int si = section_lookup[linear >> section_shift];
+  while (offsets[si + 1] <= linear) si++;
+  return si;
+}
+
 shard_mapping_t::location_t shard_mapping_t::inverse(const uint64_t shuffled) const {
   GEODE_ASSERT(shuffled < total());
   const uint64_t linear = permute.inverse(shuffled);
 
-  // Binary search to find section
-  const int si = int(upper_bound(offsets.begin(), offsets.end(), linear) - offsets.begin()) - 1;
+  const int si = find_section(linear);
   GEODE_ASSERT(unsigned(si) < unsigned(sections.size()));
 
   // Decompose within section
@@ -73,14 +132,35 @@ shard_mapping_t::location_t shard_mapping_t::inverse(const uint64_t shuffled) co
 }
 
 board_t shard_mapping_t::board(const uint64_t shuffled) const {
-  const auto loc = inverse(shuffled);
-  quadrant_t quads[4];
-  for (const int i : range(4)) {
-    const auto rmin = get<0>(rotation_minimal_quadrants(loc.section.counts[i]));
-    quads[i] = rmin[loc.index[i]];
+  GEODE_ASSERT(shuffled < total());
+  const uint64_t linear = permute.inverse(shuffled);
+
+  const int si = find_section(linear);
+  GEODE_ASSERT(unsigned(si) < unsigned(sections.size()));
+
+  // Decompose within section
+  const uint64_t within = linear - offsets[si];
+  const uint64_t pos = within >> 8;
+  const int rot = int(within & 255);
+
+  // Fast decompose using precomputed reciprocals (replaces decompose64 + shape())
+  const auto& info = section_info[si];
+  int index[4];
+  uint64_t rem = pos;
+  for (int i = 0; i < 3; i++) {
+    const int d = info.shape[3 - i];
+    const auto& r = info.recip[i];
+    const uint64_t q = d <= 1 ? rem : fast_div(rem, r);
+    index[3 - i] = d <= 1 ? 0 : int(rem - q * d);
+    rem = q;
   }
-  const auto b = quadrants(quads[0], quads[1], quads[2], quads[3]);
-  return transform_board(symmetry_t(loc.rotation), b);
+  index[0] = int(rem);
+
+  // Direct quadrant lookup from precomputed rmin arrays
+  const auto b = quadrants(
+      info.rmin[0][index[0]], info.rmin[1][index[1]],
+      info.rmin[2][index[2]], info.rmin[3][index[3]]);
+  return transform_board(local_symmetry_t(uint8_t(rot)), b);
 }
 
 shard_header_t::shard_header_t()
