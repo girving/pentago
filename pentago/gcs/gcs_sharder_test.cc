@@ -176,8 +176,8 @@ static void verify_iterator(const options_t& o) {
   sort(actual.begin(), actual.end());
   GEODE_ASSERT(actual.size() == expected.size());
   for (const uint64_t i : range(uint64_t(expected.size()))) {
-    GEODE_ASSERT(actual[i].board == expected[i].board);
-    GEODE_ASSERT(actual[i].value == expected[i].value);
+    GEODE_ASSERT(actual[i].board() == expected[i].board());
+    GEODE_ASSERT(actual[i].value() == expected[i].value());
   }
   slog("iterator: verified %llu entries from shard %d", uint64_t(expected.size()), shard_id);
 }

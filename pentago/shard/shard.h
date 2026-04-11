@@ -159,17 +159,17 @@ struct shard_file_t {
 string shard_filename(const int shards, const int shard);
 
 struct board_value_t {
-  board_t board;
-  int value;  // 0/1/2: black_wins + 2 * white_wins
+  uint64_t data;  // value + 3 * board, where value in {0, 1, 2}
+
+  board_value_t() = default;
+  board_value_t(const board_t board, const int value) : data(uint64_t(value) + 3 * board) {}
+
+  board_t board() const { return data / 3; }
+  int value() const { return int(data % 3); }
+
+  bool operator==(const board_value_t&) const = default;
+  auto operator<=>(const board_value_t&) const = default;
 };
-
-static inline bool operator==(const board_value_t& a, const board_value_t& b) {
-  return a.board == b.board && a.value == b.value;
-}
-
-static inline bool operator<(const board_value_t& a, const board_value_t& b) {
-  return a.board < b.board || (a.board == b.board && a.value < b.value);
-}
 
 struct shard_iterator_t : noncopyable_t {
   shard_iterator_t(const string& dir, const int total_shards, const Range<int> shard_range,

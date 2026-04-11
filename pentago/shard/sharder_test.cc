@@ -177,7 +177,7 @@ TEST(sharder, dry_run) {
 //        Random rng(uint128_t(0xfeedface));
 //        for (const auto& bv : actual)
 //          if (rng.uniform<double>() < 100.0 / actual.size())
-//            fprintf(stderr, "BOARD:%llu\n", (unsigned long long)bv.board);
+//            fprintf(stderr, "BOARD:%llu\n", (unsigned long long)bv.board());
 //   2. Run the test to collect board IDs from stderr
 //   3. Look up each board on the server:
 //        curl https://us-central1-naml-148801.cloudfunctions.net/pentago/{board_id}
@@ -212,8 +212,8 @@ TEST_F(shard_iterator_test, determinism) {
     (void)i;
     const auto a = it1.next();
     const auto b = it2.next();
-    PENTAGO_ASSERT_EQ(a.board, b.board);
-    PENTAGO_ASSERT_EQ(a.value, b.value);
+    PENTAGO_ASSERT_EQ(a.board(), b.board());
+    PENTAGO_ASSERT_EQ(a.value(), b.value());
   }
 }
 
@@ -250,8 +250,8 @@ TEST_F(shard_iterator_test, correctness) {
   for (const auto& [board, val] : server_values) {
     const auto b = lower_bound(actual.begin(), actual.end(), board_value_t{board, 0});
     ASSERT_NE(b, actual.end());
-    ASSERT_EQ(b->board, board);
-    PENTAGO_ASSERT_EQ(shard_to_server_value(board, b->value), val);
+    ASSERT_EQ(b->board(), board);
+    PENTAGO_ASSERT_EQ(shard_to_server_value(board, b->value()), val);
   }
   slog("checked %d server-verified boards", int(server_values.size()));
 }
@@ -267,8 +267,8 @@ TEST_F(shard_iterator_test, batch_equal) {
   it2.next_batch(batch);
   for (const int i : range(n)) {
     const auto a = it1.next();
-    PENTAGO_ASSERT_EQ(a.board, batch[i].board);
-    PENTAGO_ASSERT_EQ(a.value, batch[i].value);
+    PENTAGO_ASSERT_EQ(a.board(), batch[i].board());
+    PENTAGO_ASSERT_EQ(a.value(), batch[i].value());
   }
 }
 

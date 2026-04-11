@@ -13,6 +13,7 @@
 #include "pentago/mid/midengine.h"
 #include "pentago/shard/parallel.h"
 #include "pentago/utility/log.h"
+#include "pentago/utility/portable_hash.h"
 #include "pentago/utility/range.h"
 #include "pentago/utility/test_assert.h"
 #include "gtest/gtest.h"
@@ -44,9 +45,9 @@ TEST(full, vs_server) {
   const Array<board_value_t> samples(n_samples, uninit);
   it.next_batch(samples);
   for (const auto& bv : samples) {
-    const auto found = server_values.find(bv.board);
-    ASSERT_NE(found, server_values.end()) << "board " << bv.board << " not in server_values";
-    PENTAGO_ASSERT_EQ(shard_to_server_value(bv.board, bv.value), found->second);
+    const auto found = server_values.find(bv.board());
+    ASSERT_NE(found, server_values.end()) << "board " << bv.board() << " not in server_values";
+    PENTAGO_ASSERT_EQ(shard_to_server_value(bv.board(), bv.value()), found->second);
   }
   slog("checked %d server-verified boards", int(server_values.size()));
 }
@@ -73,7 +74,7 @@ TEST(full, DISABLED_query_server) {
   vector<int> results(n_samples, INT_MIN);
   const int num_threads = int(std::thread::hardware_concurrency());
   parallel_for(num_threads, n_samples, [&](const size_t i) {
-    const board_t board = samples[i].board;
+    const board_t board = samples[i].board();
 
     if (count_stones(board) == 18) {
       // 18-stone boards: use midsolve (server doesn't handle these)
@@ -128,7 +129,7 @@ TEST(full, DISABLED_query_server) {
   int mismatches = 0;
   for (const int i : range(n_samples)) {
     if (results[i] == INT_MIN) continue;  // already failed
-    const board_t board = samples[i].board;
+    const board_t board = samples[i].board();
     if (generating) {
       fprintf(stderr, "{%llu,%d},", (unsigned long long)board, results[i]);
     } else {
@@ -147,6 +148,23 @@ TEST(full, DISABLED_query_server) {
   }
   ASSERT_EQ(mismatches, 0);
   slog("verified %d boards against server/midsolve", n_samples);
+}
+
+TEST(full, portable_hash) {
+  // Count total entries in this shard across all slices
+  static constexpr int max_slice = 18;
+  const shard_locator_t loc(total_shards, range(shard_id, shard_id + 1));
+  uint64_t total_entries = 0;
+  for (const int s : range(max_slice + 1))
+    total_entries += loc.shard_size(shard_mapping_t(s).total(), shard_id);
+
+  // Expand the entire shard into board_value_t entries via shard_iterator_t
+  shard_iterator_t it("data", total_shards, range(shard_id, shard_id + 1), seed);
+  const Array<board_value_t> entries(int(total_entries), uninit);
+  it.next_batch(entries);
+  const auto h = portable_hash(entries);
+  slog("shard %d: %d entries, hash %s", shard_id, entries.size(), h);
+  ASSERT_EQ(h, "ca427dc51297b3ef810580ac65d2ee0af0e211ce");
 }
 
 }  // namespace
