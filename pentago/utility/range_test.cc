@@ -1,6 +1,6 @@
 // Range tests
 
-#include "pentago/utility/range.h"
+#include "pentago/utility/parse_range.h"
 #include "pentago/utility/exceptions.h"
 #include "pentago/utility/test_assert.h"
 #include "gtest/gtest.h"

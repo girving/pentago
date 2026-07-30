@@ -13,7 +13,7 @@
 #include "pentago/utility/debug.h"
 #include "pentago/utility/log.h"
 #include "pentago/shard/parallel.h"
-#include "pentago/utility/range.h"
+#include "pentago/utility/parse_range.h"
 #include "pentago/utility/thread.h"
 #include <atomic>
 #include <cstdlib>
