@@ -1,5 +1,8 @@
 #!/bin/bash
 
 cd "$(dirname "$0")"
-gcloud functions deploy pentago --runtime=nodejs18 --trigger-http --region=us-central1 \
-    --allow-unauthenticated --service-account=pentago-read@naml-148801.iam.gserviceaccount.com
+# --no-gen2 keeps the existing 1st gen function (new gcloud defaults to gen2).
+# --max-instances bounds worst-case spend (compute + coldline retrieval) under a request flood.
+gcloud functions deploy pentago --no-gen2 --runtime=nodejs22 --trigger-http --region=us-central1 \
+    --allow-unauthenticated --security-level=secure-always --max-instances=4 \
+    --service-account=pentago-read@naml-148801.iam.gserviceaccount.com

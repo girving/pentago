@@ -13,7 +13,9 @@ const max = Math.max
 const floor = Math.floor
 
 exports.defaults = {
-  cache: '250M',
+  // Keep well below the function's memory limit (256M): the Node runtime, lzma buffers,
+  // and transient request state need the rest, and lru eviction only sees cache entries.
+  cache: '128M',
   maxSlice: 18,
   maxSockets: 64,
 }
@@ -34,10 +36,8 @@ exports.stats = stats
 
 function parseSize (s,name) {
   const m = s.match(/^(\d+)(K|KB|M|MB|G|GB)$/)
-  if (!m) {
-    log.error("invalid %ssize '%s', expect something like 256M or 1G",name?name+' ':'',opts.cache)
-    throw Error('invalid '+(name?name+' ':'')+'size '+s)
-  }
+  if (!m)
+    throw Error('invalid '+(name?name+' ':'')+'size '+s+", expect something like 256M or 1G")
   return parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
 }
 
@@ -90,13 +90,17 @@ exports.values = (options, log) => {
     const blob = await range_get('slice-'+slice+'.pentago.index', indices[slice].blob_location(block))
 
     // Grab block data, retrying if the data is corrupt
-    for (;;) {
+    const tries = 3
+    for (let attempt = 1;; attempt++) {
       const data = await range_get('slice-'+slice+'.pentago', indices[slice].block_location(blob))
       try {
         await cache.set(block, data)
         return
       } catch (error) {
-        log.warning("corrupt block, retrying: slice %d, block [%s], error '%s'", slice, ''+block, error.message)
+        log.warning("corrupt block, attempt %d/%d: slice %d, block [%s], error '%s'",
+                    attempt, tries, slice, ''+block, error.message)
+        if (attempt == tries)
+          throw Error('corrupt block after '+tries+' attempts: slice '+slice+', block ['+block+']')
       }
     }
   })
@@ -104,9 +108,12 @@ exports.values = (options, log) => {
   // Lookup the value or board and its children, returning a promise of a board -> value map.
   async function values(board) {
     // Boards with more stones should be handled on the client
-    if (board.count >= opts.maxSlice)
-      throw Error('board ' + board.name + ' has ' + board.count +
-                  ' >= ' + opts.maxSlice + ' stones, and should be computed locally')
+    if (board.count >= opts.maxSlice) {
+      const e = Error('board ' + board.name + ' has ' + board.count +
+                      ' >= ' + opts.maxSlice + ' stones, and should be computed locally')
+      e.status = 400  // Client error, not server error
+      throw e
+    }
 
     // Collect the leaf boards whose values we need
     const results = {}

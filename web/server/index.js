@@ -22,13 +22,27 @@ exports.pentago = async (req, res) => {
     start = Date.now()
   } catch (e) {
     log.error('bad request %s', req.url)
-    res.writeHead(404)
-    res.end('bad url ' + req.url + ': expected (\d+)m? representing valid board as described below\n\n' + usage)
+    res.writeHead(404, {
+      'content-type': 'text/plain; charset=utf-8',
+      'x-content-type-options': 'nosniff'})
+    res.end('bad url ' + req.url + ': expected (\\d+)m? representing valid board as described below\n\n' + usage)
     return
   }
 
-  // Lookup!
-  const results = await values(board)
+  // Lookup!  Client mistakes (e.g., boards too deep for the database) get status 400;
+  // anything else (GCS failures, corrupt data) is a genuine 500.
+  let results
+  try {
+    results = await values(board)
+  } catch (e) {
+    const status = e.status || 500
+    log.error('lookup failed for %s (status %d): %s', board.name, status, e.message)
+    res.writeHead(status, {
+      'content-type': 'text/plain; charset=utf-8',
+      'x-content-type-options': 'nosniff'})
+    res.end('lookup failed: ' + e.message + '\n')
+    return
+  }
   const elapsed = (Date.now() - start) / 1000
 
   // Compose response
