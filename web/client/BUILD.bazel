@@ -123,6 +123,10 @@ filegroup(
 sh_test(
     name = "unit",
     srcs = ["unit_test.sh"],
+    size = "small",
+    # Midsolves are dealt round-robin to shards (see unit.js); wall time is
+    # roughly one 18-stone solve
+    shard_count = 10,
     data = [
         ":wasm",
         "src/board.js",
