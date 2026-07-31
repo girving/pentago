@@ -2,13 +2,15 @@
 
 import pending from './pending.js'
 
-// Make a web worker, and handle onmessage in order
-const worker = new Worker(new URL('mid_worker.js', import.meta.url))
+// Run midsolve in a web worker, merging simultaneous duplicate requests.
+// The worker is created lazily so that most visitors never fetch mid.wasm.
+let worker = null
 const callbacks = []
-worker.onmessage = e => callbacks.shift()(e.data)
-
-// Run midsolve in the worker, merging simultaneous duplicate requests
 const inner = pending(board => {
+  if (!worker) {
+    worker = new Worker(new URL('mid_worker.js', import.meta.url), {type: 'module'})
+    worker.onmessage = e => callbacks.shift()(e.data)
+  }
   const p = new Promise((resolve, reject) =>
     callbacks.push(x => x instanceof Error ? reject(x) : resolve(x))
   )

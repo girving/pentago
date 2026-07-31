@@ -1,8 +1,8 @@
 // Generate website svgs
 
+#include "web/client/cc/tags.h"
 #include "pentago/base/count.h"
 #include "pentago/utility/box.h"
-#include "pentago/utility/format.h"
 #include "pentago/utility/log.h"
 #include "pentago/utility/vector.h"
 #include <cmath>
@@ -12,31 +12,6 @@ namespace {
 typedef double T;
 typedef Vector<double,2> TV;
 typedef Vector<int,2> IV;
-using std::string;
-
-string start_tag(const string& name, const vector<tuple<string,string>>& attrs, const bool close = false) {
-  string tag = "<" + name;
-  for (const auto& [k,v] : attrs)
-    if (v.size())
-      tag += tfm::format(" %s=\"%s\"", k, v);
-  tag += close ? "/>" : ">";
-  return tag;
-}
-
-string close_tag(const string& name) {
-  return tfm::format("</%s>", name); 
-}
-
-string tag(const string& name, const vector<tuple<string,string>>& attrs, const string& body = "") {
-  string tag = start_tag(name, attrs, body.empty());
-  if (body.size()) tag += body + close_tag(name);
-  return tag;
-}
-
-string svg(const int width, const int height, const string& body) {
-  return tag("svg", {{"viewBox", tfm::format("0 0 %d %d", width, height)},
-                     {"xmlns", "http://www.w3.org/2000/svg"}}, body);
-}
 
 // Change to "\n" for easier reading
 const string sep = "";

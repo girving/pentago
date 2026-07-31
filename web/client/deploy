@@ -1,0 +1,8 @@
+#!/bin/bash
+# Build with bazel and deploy to firebase hosting
+
+set -e
+cd "$(dirname "$0")"
+stage=$(./stage)
+cd "$stage"
+firebase deploy

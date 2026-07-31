@@ -1,0 +1,9 @@
+#!/bin/bash
+# Serve the client locally for development
+
+set -e
+cd "$(dirname "$0")"
+stage=$(./stage)
+echo "Serving $stage/public at http://127.0.0.1:8686"
+cd "$stage/public"
+exec python3 -m http.server 8686 --bind 127.0.0.1

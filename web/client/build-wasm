@@ -1,18 +1,24 @@
 #!/bin/bash
+# Build the freestanding wasm binaries.  Run by the //web/client:wasm genrule
+# with the workspace root as the current directory:
+#   build-wasm <mid.wasm out> <tests.wasm out> <bindir with generated tables>
 
 set -e
-cd "$(dirname "$0")"/../..
+mid_out="$1"
+tests_out="$2"
+bindir="$3"
 
-bazel build //pentago/base:tables
-
+# Homebrew ships wasm-ld in the separate lld formula
 if [ -e /usr/local/opt/llvm/bin/clang ]; then
   clang=/usr/local/opt/llvm/bin/clang
+  lld=/usr/local/opt/lld/bin
 else
   clang=/opt/homebrew/opt/llvm/bin/clang
+  lld=/opt/homebrew/opt/lld/bin
 fi
 
 build () {
-  $clang --target=wasm32 \
+  $clang --target=wasm32 -B "$lld" \
     -ffreestanding -nostdlib -std=c++1z \
     -fvisibility=hidden -Wl,--no-entry \
     -Wl,--allow-undefined \
@@ -21,21 +27,19 @@ build () {
     -Wall -Werror -fcolor-diagnostics -ferror-limit=0 \
     -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
     -Wl,--export=__heap_base \
-    -isystem third_party/freestanding -I. -Ibazel-bin \
+    -isystem third_party/freestanding -I. -I"$bindir" \
     -o "$@"
   chmod -x $1
 }
 
-mkdir -p web/client/build
-
-build web/client/public/mid.wasm \
+build "$mid_out" \
   -Wl,--export={malloc,midsolve} \
   pentago/mid/{halfsuper,midengine}.cc \
   pentago/high/board.cc \
   pentago/utility/wasm_alloc.cc \
   third_party/freestanding/cstring.cc
 
-build web/client/build/tests.wasm \
+build "$tests_out" \
   -Wl,--export={malloc,sqr_test,sum_test,die_test,int64_test} \
   pentago/mid/js_test.cc \
   pentago/utility/wasm_alloc.cc \

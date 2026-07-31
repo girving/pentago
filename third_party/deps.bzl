@@ -22,4 +22,23 @@ def _deps_impl(ctx):
         build_file = Label("//third_party:tinyformat.BUILD"),
     )
 
+    # esbuild, as a pinned static binary per platform: web/client uses it to
+    # bundle and minify js/css with no npm toolchain (and hence no dependabot
+    # surface).  The tarballs are plain binary releases; only the one matching
+    # the host platform is downloaded.
+    esbuild_version = "0.25.5"
+    esbuild = [
+        ("darwin-arm64", "61a312bcb8249d058639c405cf6378dd3107de5535a9974973c48a6dd0d2d062"),
+        ("darwin-x64", "d2890be89bd7e322cd83e1665516d3c71b0ac3952655cb27076eddb621a4af24"),
+        ("linux-x64", "95a928d8187c6f7ad632a3f3bbf01f66dfd5b5adb724b8bfeec5fff73ff2d91a"),
+    ]
+    for platform, sha256 in esbuild:
+        http_archive(
+            name = "esbuild_" + platform.replace("-", "_"),
+            urls = ["https://registry.npmjs.org/@esbuild/%s/-/%s-%s.tgz" % (platform, platform, esbuild_version)],
+            sha256 = sha256,
+            strip_prefix = "package",
+            build_file_content = 'exports_files(["bin/esbuild"], visibility = ["//visibility:public"])',
+        )
+
 deps = module_extension(implementation = _deps_impl)

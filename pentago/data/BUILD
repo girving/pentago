@@ -39,3 +39,9 @@ cc_binary(
         "//pentago/end:options",
     ],
 )
+
+# All sources and headers, for the freestanding wasm build in web/client
+filegroup(
+    name = "srcs",
+    srcs = glob(["*.h", "*.cc"]),
+)

@@ -1,11 +1,12 @@
 // Lazy cache using Window.localStorage.
 // The cache resets once full.  Simplicity FTW.
-// This file works only in the browser.
+// This module also evaluates inside the web worker (which bundles the same
+// script but never calls us), so tolerate missing localStorage.
 
 // Constants
 const version = 5
 const limit = 10000  // We clear if we exceed this
-const storage = localStorage
+const storage = globalThis.localStorage
 
 // Clear and set version
 const clear = () => {
@@ -24,7 +25,7 @@ const set = (key, value) => {
 }
 
 // Wipe entries if we're not at the right version
-if (get('_version') != version)
+if (storage && get('_version') != version)
   clear()
 
 // Exports

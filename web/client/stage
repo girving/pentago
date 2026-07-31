@@ -1,0 +1,16 @@
+#!/bin/bash
+# Build all site files with bazel and assemble a servable tree,
+# printing the staging directory path on stdout
+
+set -e
+cd "$(dirname "$0")"
+bazel build //web/client:site >&2
+bin=$(bazel info bazel-bin)
+stage=$(mktemp -d)
+mkdir "$stage/public"
+cp "$bin"/web/client/public/{index.html,counts.svg,favicon.svg,mid.wasm,app.js,mid_worker.js,main.css} \
+   "$stage/public/"
+cp public/details.html "$stage/public/"
+cp firebase.json .firebaserc "$stage/"
+chmod -R u+w "$stage"  # bazel outputs are read-only
+echo "$stage"

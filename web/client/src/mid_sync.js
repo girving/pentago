@@ -1,11 +1,10 @@
 // Javascript interface to WebAssembly midsolver
 
-// rollup will strip this in the browser case
-import fs from 'fs'
-
-// Compile mid.wasm
-const code = fs.readFileSync ? Promise.resolve(fs.readFileSync('../public/mid.wasm'))
-                             : fetch('/mid.wasm').then(r => r.arrayBuffer())
+// Compile mid.wasm, reading from disk under node (unit tests, which run with
+// cwd src/) or fetching in the browser
+const code = globalThis.process?.versions?.node
+  ? import('fs').then(fs => fs.readFileSync('../public/mid.wasm'))
+  : fetch('/mid.wasm').then(r => r.arrayBuffer())
 const mid_module = code.then(b => WebAssembly.compile(b))
 
 // Instantiate a fresh copy

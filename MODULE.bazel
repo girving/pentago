@@ -6,6 +6,7 @@ module(
 # BCR dependencies
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "rules_shell", version = "0.4.1")
 bazel_dep(name = "googletest", version = "1.17.0.bcr.2", repo_name = "com_google_googletest")
 single_version_override(
     module_name = "googletest",
@@ -48,7 +49,7 @@ single_version_override(
 # Non-BCR dependencies
 bazel_dep(name = "bazel_skylib", version = "1.8.2")
 deps = use_extension("//third_party:deps.bzl", "deps")
-use_repo(deps, "random123", "tinyformat")
+use_repo(deps, "esbuild_darwin_arm64", "esbuild_darwin_x64", "esbuild_linux_x64", "random123", "tinyformat")
 
 # System MPI
 mpi = use_extension("//third_party:mpi.bzl", "mpi_ext")
