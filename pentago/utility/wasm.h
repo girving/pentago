@@ -14,6 +14,7 @@ namespace pentago {
 #define WASM_EXPORT extern "C"
 #define WASM_IMPORT extern "C"
 #define WASM_NOUNROLL _Pragma("nounroll")
+#define WASM_SMALL __attribute__((minsize))  // For cold code: optimize for wasm size
 #define NAMESPACE_PENTAGO using namespace pentago;
 #define END_NAMESPACE_PENTAGO
 #define PENTAGO_NAMESPACE
@@ -21,6 +22,7 @@ namespace pentago {
 #define WASM_EXPORT
 #define WASM_IMPORT
 #define WASM_NOUNROLL
+#define WASM_SMALL
 #define NAMESPACE_PENTAGO namespace pentago {
 #define END_NAMESPACE_PENTAGO }
 #define PENTAGO_NAMESPACE pentago

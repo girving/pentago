@@ -13,11 +13,11 @@ using std::make_tuple;
 using std::max;
 
 // We don't use this very often, so implement it on top of an expensive, hot routine
-__attribute__((cold)) static bool slow_won(const side_t side) {
+__attribute__((cold)) WASM_SMALL static bool slow_won(const side_t side) {
   return halfsuper_wins(side, 0)[0];
 }
 
-tuple<bool,int> high_board_t::done_and_value() const {
+WASM_SMALL tuple<bool,int> high_board_t::done_and_value() const {
   const bool bw = slow_won(side(0)),
              ww = slow_won(side(1));
   if (bw || ww)
@@ -37,7 +37,7 @@ int high_board_t::immediate_value() const {
   return value;
 }
 
-high_board_t high_board_t::place(const int bit) const {
+WASM_SMALL high_board_t high_board_t::place(const int bit) const {
   const auto move = side_t(1) << bit;
   NON_WASM_ASSERT(!middle() && (move & empty_mask()));
   side_t after[2] = {side(0), side(1)};
@@ -50,7 +50,7 @@ high_board_t high_board_t::place(const int x, const int y) const {
   return place(3*(x%3) + y%3 + 16*(2*(x/3) + y/3));
 }
 
-high_board_t high_board_t::rotate(const int q, const int d) const {
+WASM_SMALL high_board_t high_board_t::rotate(const int q, const int d) const {
   NON_WASM_ASSERT(middle() && 0 <= q && q < 4 && (d==1 || d==-1));
   side_t after[2] = {side(0), side(1)};
   WASM_NOUNROLL
@@ -69,7 +69,7 @@ high_board_t high_board_t::rotate(const int q, const int d) const {
   return high_board_t(after[0], after[1], s.ply_ + 1);
 }
 
-board_t high_board_t::board() const {
+WASM_SMALL board_t high_board_t::board() const {
   board_t board = 0;
   WASM_NOUNROLL
   for (const int q : range(4)) {
@@ -84,7 +84,7 @@ board_t high_board_t::board() const {
   return board;
 }
 
-high_board_t high_board_t::from_board(const board_t board, const bool middle) {
+WASM_SMALL high_board_t high_board_t::from_board(const board_t board, const bool middle) {
   side_t side0 = 0, side1 = 0;
   for (const int q : range(4)) {
     uint16_t quad = board >> 16*q;
