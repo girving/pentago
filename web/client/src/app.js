@@ -181,7 +181,7 @@ const error = msg => {
 
 const loading = msg => {
   status_el.innerHTML = msg.split('').map((c, i) =>
-    `<div class=load style=animation-delay:${(1.7 * i / msg.length).toFixed(2)}s>${c}</div>`).join('')
+    `<span class=load style=animation-delay:${(1.7 * i / msg.length).toFixed(2)}s>${c}</span>`).join('')
 }
 
 // Value of a board if we know it, else null.  Like the server, done boards

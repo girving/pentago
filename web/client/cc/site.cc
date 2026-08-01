@@ -20,11 +20,9 @@ const char* const style =
   // Layout: a grid sidebar (nav column plus content column, natively equal
   // height), folding to a top nav bar on narrow screens
   "html{overflow-y:scroll}"
-  "body{background:#d5d6d7;margin:8px;line-height:1;-webkit-tap-highlight-color:transparent}"
+  "body{background:#d5d6d7;line-height:1;-webkit-tap-highlight-color:transparent}"
   ".all{max-width:60em;margin:0 auto;background:#fff;border:1px solid;border-radius:1em;overflow:hidden}"
   "header{text-align:center;background:silver;border-bottom:1px solid;display:flow-root}"
-  "h2{font-size:1.5em;font-weight:bold;margin:.83em 0}"
-  "h3{font-size:1.17em;font-weight:bold;margin:1em 0}"
   ".main{display:grid;grid-template-columns:11em 1fr}"
   "nav{background:silver}"
   "nav a{display:block;height:3em;line-height:3em;text-align:center;text-decoration:none;"
@@ -43,7 +41,7 @@ const char* const style =
     ".contents .back{visibility:visible}}"
   // Board.  Value dots (.v circles, .rv arcs) are default-hidden; app.js
   // shows them with inline display and fill.
-  "#board{width:400px;max-width:100%;display:block;margin:0 auto;-webkit-transform:translateZ(0)}"
+  "#board{width:min(400px,100%);display:block;margin:0 auto}"
   ".c,.arrow,.five{stroke:#000;stroke-width:1;vector-effect:non-scaling-stroke}"
   ".c,.arrow,.board{fill:tan}"
   ".v,.fv,.rv{stroke:gray;stroke-width:.5;vector-effect:non-scaling-stroke}"
@@ -60,9 +58,9 @@ const char* const style =
   ".tl{text-anchor:middle;font-size:.4px}"
   ".mask{fill:#fff}"
   ".q{transition:transform .5s ease-in-out}"
-  "#status{text-align:center;width:100%;height:3em}"
+  "#status{text-align:center;height:3em}"
   "#error{color:red}"
-  ".load{display:inline;animation:l 2s infinite ease}"
+  ".load{animation:l 2s infinite ease}"
   "@keyframes l{0%{color:#000;text-shadow:none}20%{color:purple;text-shadow:0 0 6px purple}"
     "40%{color:#000;text-shadow:none}}";
 
