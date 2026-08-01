@@ -74,9 +74,6 @@ genrule(
     srcs = [
         "src/app.js",
         "src/board.js",
-        "src/cache.js",
-        "src/mid_async.js",
-        "src/pending.js",
     ],
     outs = ["public/app.js"],
     cmd = "$(location :esbuild) --bundle --minify --format=esm --log-level=warning " +
@@ -86,21 +83,10 @@ genrule(
 
 genrule(
     name = "worker",
-    srcs = [
-        "src/mid_sync.js",
-        "src/mid_worker.js",
-    ],
+    srcs = ["src/mid_worker.js"],
     outs = ["public/mid_worker.js"],
-    cmd = "$(location :esbuild) --bundle --minify --format=esm --external:fs --log-level=warning " +
+    cmd = "$(location :esbuild) --minify --log-level=warning " +
           "--outfile=$@ $(location src/mid_worker.js)",
-    tools = [":esbuild"],
-)
-
-genrule(
-    name = "css",
-    srcs = ["src/main.css"],
-    outs = ["public/main.css"],
-    cmd = "$(location :esbuild) --minify --log-level=warning --outfile=$@ $(location src/main.css)",
     tools = [":esbuild"],
 )
 
@@ -111,7 +97,6 @@ filegroup(
         "public/details.html",
         ":app",
         ":counts",
-        ":css",
         ":favicon",
         ":index",
         ":wasm",

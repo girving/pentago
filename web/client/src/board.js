@@ -41,8 +41,9 @@ function board_t(grid, middle) {
     return new board_t(g, 0)
   }
 
-  // Does the given side have 5 in a row?
-  const won = side => win_rays.some(ray => ray.every(p => grid[p] & side + 1))
+  // Coordinates of each five in a row, from which done and value derive
+  const fives = win_rays.flatMap(ray => ray.every(p => grid[p] * grid[ray[0]] & 5) ? [ray.map(p => [(p-p%6)/6, p%6])] : [])
+  const has = c => fives.some(f => grid[6*f[0][0]+f[0][1]] == c)
 
   // Most fields
   const B = this
@@ -55,16 +56,9 @@ function board_t(grid, middle) {
   B.count = count
   B.place = place
   B.rotate = rotate
-  B.done = won(0) | won(1) | (count==36 & !middle)
-  B.value = won(turn) - won(!turn)
-
-  // List moves
-  B.moves = () =>
-    middle ? flat_map2([0,1], (x,y) => [-1,1].map(d => rotate(x,y,d)))
-           : flat_map2(six, (x,y) => grid[6*x+y] ? [] : [place(x,y)])
-
-  // List of coordinates for each five in a row
-  B.fives = win_rays.flatMap(ray => ray.every(p => grid[p] * grid[ray[0]] & 5) ? [ray.map(p => [(p-p%6)/6, p%6])] : [])
+  B.fives = fives
+  B.done = fives.length > 0 || (count == 36 && !middle)
+  B.value = has(turn ? 2 : 1) - has(turn ? 1 : 2)
 }
 
 // Convert from canonical board name or raw_t

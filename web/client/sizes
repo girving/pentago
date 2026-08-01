@@ -14,7 +14,7 @@ stage = sys.argv[1] if len(sys.argv) > 1 else subprocess.check_output(['./stage'
 # Various types of files
 ignore = ()
 details = ('details.html', 'counts.svg', 'favicon.svg')
-main = ('index.html', 'main.css', 'app.js', 'mid_worker.js', 'mid.wasm')
+main = ('index.html', 'app.js', 'mid_worker.js', 'mid.wasm')
 def invert(name, paths):
   return {p:name for p in paths}
 map = {**invert('main', main), **invert('details', details), **invert('ignore', ignore)}

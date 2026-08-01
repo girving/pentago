@@ -19,7 +19,7 @@ async function test_moves() {
     if (board.name != name)
       throw Error('name inconsistency: '+name+' → '+board.name)
     const correct = moves[name]
-    const computed = board.moves().map(b => b.name)
+    const computed = list_moves(board).map(b => b.name)
     if (correct+'' != computed+'')
       throw Error('move computation failed: board '+name
         +'\n  correct '+correct.length+' = '+correct
@@ -94,6 +94,12 @@ async function test_wasm() {
   }
 }
 
+// Move enumeration, exercising place and rotate (the shipped client
+// enumerates moves inline instead of via a board method)
+const list_moves = b =>
+  b.middle ? [0, 1].flatMap(x => [0, 1].flatMap(y => [-1, 1].map(d => b.rotate(x, y, d))))
+           : [...Array(36).keys()].flatMap(s => b.grid[s] ? [] : [b.place(s / 6 | 0, s % 6)])
+
 // Bazel test sharding: each expensive work unit (a wasm midsolve) is dealt
 // round-robin to shards, which run as parallel processes.  Ticket order is
 // deterministic across shards because tickets are taken synchronously, and
@@ -115,10 +121,10 @@ function produced(board) {
   const names = new Set([board.name])
   if (board.done)
     return names
-  for (const m of board.moves()) {
+  for (const m of list_moves(board)) {
     names.add(m.name)
     if (!board.middle && !m.done)
-      for (const mm of m.moves())
+      for (const mm of list_moves(m))
         names.add(mm.name)
   }
   return names
