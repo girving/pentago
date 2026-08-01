@@ -86,15 +86,13 @@ const svg = $('board')
 {
   // Base rotator for quadrant (0,0), d=1: hover wedge, arrow, value arc.
   // The other seven rotators are signed-permutation transforms of it.
-  const r = 2.5, arrow = .4, h = .1, sel = 4, c = -1.55
-  const t0 = .85, t1 = Math.PI / 2, t2 = t1 + arrow / r
-  const pt = (rr, t) => +(c - rr * Math.cos(t)).toFixed(3) + ',' + +(rr * Math.sin(t) - c).toFixed(3)
-  const A = (rr, sweep, p) => `A${rr},${rr} 0 0 ${1 - sweep} ${p}`  // sweep is y-up
-  const v0 = t0 + .2 * (t1 - t0), v1 = t0 + .8 * (t1 - t0)
-  const SEL = `M${pt(0, 0)}L${pt(sel, t2)}${A(sel, 0, pt(sel, t0))}z`
-  const ARROW = `M${pt(r-h, t0)}${A(r-h, 1, pt(r-h, t1))}L${pt(r-arrow, t1)}L${pt(r, t2)}L${
-    pt(r+arrow, t1)}L${pt(r+h, t1)}${A(r+h, 0, pt(r+h, t0))}z`
-  const RV = `M${pt(r-h, v0)}${A(r-h, 1, pt(r-h, v1))}L${pt(r+h, v1)}${A(r+h, 0, pt(r+h, v0))}z`
+  // Frozen data; unit.js test_rotator_paths regenerates these from the
+  // geometry formulas (radius 2.5, thickness .2, arrow .4, wedge 4) and
+  // asserts this file contains the results, so they can't rot.
+  const SEL = 'M-1.55,1.55L-0.913,5.499A4,4 0 0 1 -4.19,4.555z'
+  const ARROW = 'M-3.134,3.353A2.4,2.4 0 0 0 -1.55,3.95L-1.55,3.65L-1.152,4.018L-1.55,4.45' +
+    'L-1.55,4.15A2.6,2.6 0 0 1 -3.266,3.503z'
+  const RV = 'M-2.858,3.562A2.4,2.4 0 0 0 -1.895,3.925L-1.924,4.123A2.6,2.6 0 0 1 -2.968,3.73z'
 
   // Header (turn stone and label), footer (value legend), separator bars
   let s = `<circle id=tn class=c cy=-4.5 r=.4 /><circle id=hv class=v cy=-4.5 r=.15 />` +

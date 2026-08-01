@@ -42,7 +42,7 @@ function board_t(grid, middle) {
   }
 
   // Coordinates of each five in a row, from which done and value derive
-  const fives = win_rays.flatMap(ray => ray.every(p => grid[p] * grid[ray[0]] & 5) ? [ray.map(p => [(p-p%6)/6, p%6])] : [])
+  const fives = win_rays.flatMap(ray => ray.every(p => grid[p] * grid[ray[0]] & 5) ? [ray.map(p => [p / 6 | 0, p % 6])] : [])
   const has = c => fives.some(f => grid[6*f[0][0]+f[0][1]] == c)
 
   // Most fields

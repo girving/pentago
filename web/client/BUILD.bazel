@@ -114,6 +114,7 @@ sh_test(
     shard_count = 10,
     data = [
         ":wasm",
+        "src/app.js",
         "src/board.js",
         "src/games.js",
         "src/mid_sync.js",

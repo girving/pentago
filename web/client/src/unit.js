@@ -46,6 +46,27 @@ async function test_done() {
   }
 }
 
+async function test_rotator_paths() {
+  // The base rotator paths are frozen strings in app.js; regenerate them
+  // from the geometry formulas (y-up, negated into screen coordinates,
+  // hence the flipped arc sweep flag) and require an exact match, so the
+  // formulas remain the recoverable source of truth.
+  const r = 2.5, arrow = .4, h = .1, sel = 4, c = -1.55
+  const t0 = .85, t1 = Math.PI / 2, t2 = t1 + arrow / r
+  const pt = (rr, t) => +(c - rr * Math.cos(t)).toFixed(3) + ',' + +(rr * Math.sin(t) - c).toFixed(3)
+  const A = (rr, sweep, p) => `A${rr},${rr} 0 0 ${1 - sweep} ${p}`
+  const v0 = t0 + .2 * (t1 - t0), v1 = t0 + .8 * (t1 - t0)
+  const paths = [
+    `M${pt(0, 0)}L${pt(sel, t2)}${A(sel, 0, pt(sel, t0))}z`,
+    `M${pt(r-h, t0)}${A(r-h, 1, pt(r-h, t1))}L${pt(r-arrow, t1)}L${pt(r, t2)}L${
+      pt(r+arrow, t1)}L${pt(r+h, t1)}${A(r+h, 0, pt(r+h, t0))}z`,
+    `M${pt(r-h, v0)}${A(r-h, 1, pt(r-h, v1))}L${pt(r+h, v1)}${A(r+h, 0, pt(r+h, v0))}z`,
+  ]
+  const app = readFileSync('app.js', 'utf8').replace(/' \+\n\s*'/g, '')  // Rejoin split literals
+  for (const p of paths)
+    assert(app.includes(p), 'app.js lacks rotator path ' + p)
+}
+
 async function test_wasm() {
   const verbose = false
   const tests = await instantiate(WebAssembly.compile(readFileSync('../build/tests.wasm')))
@@ -188,7 +209,7 @@ const clear = '\x1b[00m'
 
 // Run all tests in series
 async function toplevel() {
-  let tests = [test_moves, test_done, test_wasm, test_mid, test_path]
+  let tests = [test_moves, test_done, test_rotator_paths, test_wasm, test_mid, test_path]
 
   // Restrict to specific tests if desired
   if (process.argv.length > 2) {
