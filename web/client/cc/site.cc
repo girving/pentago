@@ -120,9 +120,10 @@ string board_svg() {
   s += tag("use", {{"id", "turn"}, {"href", "#s"}, {"y", fmt(-header_y)}});
   s += text("tl", "hl", {0, header_y - spot_radius - font_size}, "to play");
 
-  // Footer: legend of value colors
+  // Footer: legend of value colors (lime and blue are exactly #00ff00 and
+  // #0000ff, chosen to be nice to colorblind folk)
   const std::pair<int,string> legend[3] = {{1, "win"}, {0, "tie"}, {-1, "loss"}};
-  const string value_colors[3] = {"#00ff00", "#0000ff", "#ff0000"};  // win, tie, loss
+  const string value_colors[3] = {"lime", "blue", "red"};  // win, tie, loss
   for (const int i : {0, 1, 2}) {
     const auto& [v, label] = legend[i];
     s += tag("circle", {{"class", "fv"}, {"cx", fmt(-footer_sep*v)}, {"cy", fmt(-footer_cy)},

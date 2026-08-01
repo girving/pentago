@@ -15,7 +15,8 @@ import { get as cache_get, set as cache_set } from './cache.js'
 const backend_url = 'https://us-central1-naml-148801.cloudfunctions.net/pentago/'
 
 // Colors for each board value, taking care to be nice to colorblind folk
-const value_colors = {'1': '#00ff00', '0': '#0000ff', '-1': '#ff0000'}
+// (lime and blue are exactly #00ff00 and #0000ff)
+const value_colors = {'1': 'lime', '0': 'blue', '-1': 'red'}
 
 // Values for the empty board and all of its children, baked in at build time
 // so that the first page load paints fully without any network.  Each bit is

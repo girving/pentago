@@ -17,12 +17,18 @@ else
   lld=/opt/homebrew/opt/lld/bin
 fi
 
+# Optimization notes (benchmarked via min-of-3 node midsolves of an 18 stone
+# board, ~7.9 s): -O2 -Wl,--lto-O2 matches -O3 -Wl,--lto-O3 in speed but is
+# 11% smaller (10,382 vs 11,697 bytes).  Going further trades speed for size:
+# -Os is ~1.5% slower at 9,542, -Oz ~2.7% slower at 8,866; the difference
+# lives in the hot inlined midsolve, so it can't be reclaimed by optimizing
+# cold files separately.  --strip-all drops name/producers/target_features.
 build () {
   $clang --target=wasm32 -B "$lld" \
     -ffreestanding -nostdlib -std=c++1z \
     -fvisibility=hidden -Wl,--no-entry \
     -Wl,--allow-undefined \
-    -O3 -flto -Wl,--lto-O3 \
+    -O2 -flto -Wl,--lto-O2 -Wl,--strip-all \
     -mno-exception-handling \
     -Wall -Werror -fcolor-diagnostics -ferror-limit=0 \
     -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
