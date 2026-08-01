@@ -337,6 +337,7 @@ string halfsuper_wins() {
   line("NAMESPACE_PENTAGO\n");
 
   // Routines to expand single-quadrant supers into halfsuper_t
+  Array<uint64_t,2> only_masks(4, 4);  // Saved for the wasm table version below
   for (const int q : range(4)) {
     line("METAL_INLINE halfsuper_t only%d(bool a0, bool a1, bool a2, bool a3, bool parity) {", q);
     Array<uint64_t> masks(4);
@@ -347,6 +348,8 @@ string halfsuper_wins() {
     if (q == 3)
       for (const int i : range(2))
         masks[2+i] = masks[i];
+    for (const int i : range(4))
+      only_masks(q, i) = masks[i];
     const auto c = [=](int i) { return tfm::format("(a%d ? 0 : 0x%xull)", i, masks[i]); };
     switch (q) {
       case 0: case 1: case 2:
@@ -367,6 +370,11 @@ string halfsuper_wins() {
     line("}\n");
   }
 
+  // On wasm we interpret the win pattern terms from a data table, since data
+  // bytes are much smaller than the straight-line code below (which is
+  // faster, and used everywhere else since halfsuper_wins is called only
+  // outside the midsolve inner loop).
+  line("#ifndef __wasm__");
   line("halfsuper_t halfsuper_wins(const side_t side, const bool parity) {");
   line("  auto wins = halfsuper_t(0);\n");
   for (const int q : range(4))
@@ -409,7 +417,89 @@ string halfsuper_wins() {
   }
   line("\n  #undef M");
   line("  return wins;");
-  line("}\n\nEND_NAMESPACE_PENTAGO");
+  line("}");
+
+  // The wasm version: identical terms and only_a calls, but with the mask
+  // arguments read from data, and each only_a inlined exactly once (the
+  // straight-line version above inlines them at ~24 sites, each with four
+  // 64-bit constants, which is expensive in wasm code bytes).  All factor
+  // values are computed into o[] in four quadrant-major loops; since
+  // factors are stored in pattern-set order within each quadrant, each
+  // pattern set then combines contiguous ranges of o at fixed offsets.
+  vector<vector<uint16_t>> masks_by_a(4);            // 4 masks per factor
+  vector<tuple<int,vector<int>,vector<int>>> groups; // (npats, quads, o offsets)
+  {
+    int counts[4] = {0, 0, 0, 0};
+    for (const auto& p : quadrant_set_win_patterns)
+      for ([[maybe_unused]] const auto pat : get<1>(p))
+        for (const int q : get<0>(p))
+          counts[q]++;
+    int base[4], seen[4] = {0, 0, 0, 0};
+    base[0] = 0;
+    for (const int a : range(3))
+      base[a+1] = base[a] + counts[a];
+    for (const auto& p : quadrant_set_win_patterns) {
+      const auto& quads = get<0>(p);
+      vector<int> offsets;
+      for (const int q : quads)
+        offsets.push_back(base[q] + seen[q]);
+      groups.emplace_back(int(get<1>(p).size()), quads, offsets);
+      for (const auto pat : get<1>(p))
+        for (const int q : quads) {
+          seen[q]++;
+          for (const int r : range(4))
+            masks_by_a[q].push_back(all_rotations(uint16_t(pat >> 16*q), (4-r)%4));
+        }
+    }
+  }
+  vector<string> mask_strs, nf_strs, tf_strs;
+  int nfacs = 0;
+  for (const int a : range(4)) {
+    for (const auto m : masks_by_a[a])
+      mask_strs.push_back(tfm::format("0%o", m));
+    nfacs += int(masks_by_a[a].size() / 4);
+  }
+  // Recover per-term factor indices from the group layout
+  for (const auto& [npats, quads, offsets] : groups)
+    for (const int p : range(npats)) {
+      nf_strs.push_back(tfm::format("%d", int(quads.size())));
+      for (const int k : range(int(quads.size())))
+        tf_strs.push_back(tfm::format("%d", offsets[k] + p));
+    }
+  line("\n#else  // __wasm__");
+  line("static const quadrant_t wins_masks[%d] = {\n  %s};", mask_strs.size(), join(",", mask_strs));
+  line("static const uint8_t wins_nfactors[%d] = {%s};", nf_strs.size(), join(",", nf_strs));
+  line("static const uint8_t wins_term_facs[%d] = {%s};", tf_strs.size(), join(",", tf_strs));
+  line("");
+  line("halfsuper_t halfsuper_wins(const side_t side, const bool parity) {");
+  line("  // Evaluate all factors, one tight loop per quadrant");
+  line("  halfsuper_s o[%d];", nfacs);
+  line("  const quadrant_t* m = wins_masks;");
+  line("  int i = 0;");
+  for (const int a : range(4)) {
+    line("  {");
+    line("    const auto q = ~quadrant(side, %d);", a);
+    line("    WASM_NOUNROLL");
+    line("    for (const int end = i + %d; i < end; m += 4)", int(masks_by_a[a].size() / 4));
+    line("      o[i++] = only%d(q & m[0], q & m[1], q & m[2], q & m[3], parity);", a);
+    line("  }");
+  }
+  line("  // Combine factors into terms");
+  line("  auto wins = halfsuper_t(0);");
+  line("  const uint8_t* tf = wins_term_facs;");
+  line("  WASM_NOUNROLL");
+  line("  for (int t = 0; t < %d; t++) {", int(nf_strs.size()));
+  line("    auto w = halfsuper_t(o[*tf++]);");
+  line("    WASM_NOUNROLL");
+  line("    for (int k = 1; k < wins_nfactors[t]; k++)");
+  line("      w &= o[*tf++];");
+  line("    wins |= w;");
+  line("  }");
+  line("  return wins;");
+  line("}");
+  line("#endif  // __wasm__");
+
+  line("\nEND_NAMESPACE_PENTAGO");
   return file;
 }
 
