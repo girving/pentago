@@ -112,20 +112,20 @@ const svg = $('board')
         s += `<a class=rot transform="matrix(${
           (d > 0) ^ (qx == qy) ? [0, dy, dx, 0] : [-dx, 0, 0, -dy]} 0 0)">` +
           `<path class=sel d="${SEL}"/><path class=arrow d="${ARROW}"/><path class=rv d="${RV}"/></a>`
-      s += `<g transform="translate(${1.55 * dx} ${-1.55 * dy})"><g class=q><g>` +
+      s += `<g class=q><g>` +
         `<rect class=board x=-1.5 y=-1.5 width=3 height=3 />`
       for (let x = 3 * qx; x < 3 * qx + 3; x++)
         for (let y = 3 * qy; y < 3 * qy + 3; y++)
           s += `<a><circle class=c cx=${x % 3 - 1} cy=${1 - y % 3} r=.4 /><circle class=v cx=${
             x % 3 - 1} cy=${1 - y % 3} r=.15 /></a>`
-      s += `</g></g></g>`
+      s += `</g></g>`
     }
   svg.innerHTML = s + `<g id=fives> </g>`  // five-in-a-row markers land here
 }
 const status_el = $('status')
 const backs = document.querySelectorAll('a.back')
 const rots = [...svg.querySelectorAll('.rot')]
-const spots = [...svg.querySelectorAll('g g g a')]
+const spots = [...svg.querySelectorAll('g g a')]
 const quads = [...svg.querySelectorAll('.q')]
 const grids = quads.map(q => q.firstChild)
 const rot_d = i => (i & 1) ? 1 : -1
@@ -146,13 +146,24 @@ const dot = (e, v) => {
 // once each transition finishes.
 const swivel = [0, 0, 0, 0]
 const spinning = [false, false, false, false]
+const nospin = q => {
+  if (spinning[q]) {
+    spinning[q] = false
+    render()
+  }
+}
 for (const [q, e] of quads.entries())
-  e.addEventListener('transitionend', () => { spinning[q] = false; render() })
+  for (const ev of ['transitionend', 'transitioncancel'])
+    e.addEventListener(ev, () => nospin(q))
 for (const [i, a] of rots.entries())
   a.addEventListener('click', () => {
-    swivel[i >> 1] += rot_d(i)
-    spinning[i >> 1] = true
-    // The default link navigation then updates the hash, which redraws
+    const q = i >> 1
+    swivel[q] += rot_d(i)
+    spinning[q] = true
+    // The default link navigation then updates the hash, which redraws.
+    // If the browser skips the transition (e.g. hidden tab), no transition
+    // event ever fires, so time out just past the .5s transition.
+    setTimeout(() => nospin(q), 600)
   })
 
 // The current board
@@ -225,13 +236,22 @@ function render() {
   for (const a of backs)
     back ? a.setAttribute('href', back) : a.removeAttribute('href')
 
-  // Quadrant swivels.  A move with d=+1 turns the board contents 90°
-  // counterclockwise on screen, so the animated group sweeps to -90*swivel
-  // while the inner group counter-rotates to +90*swivel, making the new
-  // board start visually at the old orientation and settle at net zero.
+  // Quadrant swivels, from tex/transforms.tex (negated into screen
+  // coordinates): each .q group's translate-rotate chain both places the
+  // quadrant and, because consecutive transforms share the same function
+  // structure, css-interpolates as a swing that keeps the quadrant's inner
+  // corner in rolling contact with the separator cross.  The chain's net
+  // rotation is -90*swivel degrees; the inner group counter-rotates
+  // instantly so the already-updated board starts visually at the old
+  // orientation and settles at net zero.
   for (const q of [0, 1, 2, 3]) {
-    quads[q].style.transform = `rotate(${-90 * swivel[q]}deg)`
-    grids[q].setAttribute('transform', `rotate(${90 * swivel[q]})`)
+    const dx = q & 2 ? 1 : -1, dy = q & 1 ? 1 : -1
+    const t = swivel[q], j = t & 1
+    const T = v => `translate(${v * dx}px,${-v * dy}px)`
+    const R = a => `rotate(${a}turn)`
+    quads[q].style.transform = T(.05) + R(1/8 - j/4) + T(3 / 8 ** .5) + R(j/2 - 1/4) +
+      T(3 / 8 ** .5) + R(1/8 - j/4 - t/4)
+    grids[q].setAttribute('transform', `rotate(${90 * t})`)
   }
 
   // Stones, placement links, and child values
