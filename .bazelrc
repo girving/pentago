@@ -1,2 +1,5 @@
 common --repository_cache=.cache/bazel-repos
 common --repo_contents_cache=
+
+# libc++ marks std::counting_semaphore unavailable before macOS 11
+build --macos_minimum_os=11.0
