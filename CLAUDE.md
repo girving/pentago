@@ -13,6 +13,8 @@ Always use `-c opt` for tests — some are slow without optimizations.
 
 On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDisableSandbox: true`. Claude Code's `permissions.allow` doesn't bypass the OS-level macOS sandbox (`sandbox-exec`), which blocks Bazel from writing to its output base and binding to localhost.
 
+In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first: it installs bazelisk, clang/lld, and MPI, and routes bazel around download hosts the container's network proxy blocks. After that `bin/bazel` works normally.
+
 ## Project structure
 
 - `pentago/utility/` — general utilities (threads, arrays, memory, etc.)

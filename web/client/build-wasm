@@ -8,13 +8,17 @@ mid_out="$1"
 tests_out="$2"
 bindir="$3"
 
-# Homebrew ships wasm-ld in the separate lld formula
+# Homebrew ships wasm-ld in the separate lld formula; on Linux both clang and
+# wasm-ld live in PATH (e.g., /usr/bin on Ubuntu)
 if [ -e /usr/local/opt/llvm/bin/clang ]; then
   clang=/usr/local/opt/llvm/bin/clang
   lld=/usr/local/opt/lld/bin
-else
+elif [ -e /opt/homebrew/opt/llvm/bin/clang ]; then
   clang=/opt/homebrew/opt/llvm/bin/clang
   lld=/opt/homebrew/opt/lld/bin
+else
+  clang=clang
+  lld=$(dirname "$(command -v wasm-ld)")
 fi
 
 # Optimization notes (benchmarked via min-of-3 node midsolves of an 18 stone
