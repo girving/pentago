@@ -6,8 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Install MPI
-        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev
+      - name: Install MPI, clang, and lld (for wasm)
+        run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev clang lld
       - name: Build
         run: bazel build -c opt --copt=-march=native ...
       - name: Test
