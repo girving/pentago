@@ -1,9 +1,19 @@
 #!/bin/bash
-# Serve the client locally for development
+# Serve the client locally for development.  Cache-Control: no-store so that
+# plain reloads always fetch the freshly staged bundle.
 
 set -e
 cd "$(dirname "$0")"
 stage=$(./stage)
 echo "Serving $stage/public at http://127.0.0.1:8686"
 cd "$stage/public"
-exec python3 -m http.server 8686 --bind 127.0.0.1
+exec python3 -c '
+import http.server
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        super().end_headers()
+
+http.server.ThreadingHTTPServer(("127.0.0.1", 8686), Handler).serve_forever()
+'

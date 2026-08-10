@@ -42,11 +42,11 @@ const char* const style =
   // Board.  Value dots (.v circles, .rv arcs) are default-hidden; app.js
   // shows them with inline display and fill.
   "#board{width:min(400px,100%);display:block;margin:0 auto}"
-  ".c,.arrow,.five{stroke:#000;stroke-width:1;vector-effect:non-scaling-stroke}"
+  ".c,.arrow,.five{stroke:#000;stroke-width:.024}"
   ".c,.arrow,.board{fill:tan}"
-  ".v,.fv,.rv{stroke:gray;stroke-width:.5;vector-effect:non-scaling-stroke}"
+  ".v,.fv,.rv{stroke:gray;stroke-width:.012}"
   ".v,.rv{display:none;pointer-events:none}"
-  ".rv{stroke:#000;stroke-width:1}"
+  ".rv{stroke:#000;stroke-width:.024}"
   ".b .c{fill:#000}"
   ".w .c{fill:#fff}"
   ".bt .p:hover .c,.bt .rot:hover .arrow{fill:#000}"

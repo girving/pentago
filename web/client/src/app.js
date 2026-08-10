@@ -20,7 +20,7 @@ const colors = ['red', 'blue', 'lime']  // value + 1; blue and lime are exactly 
 const storage = localStorage
 const cache_get = key => JSON.parse(storage.getItem(key))
 const cache_set = (key, value) => {
-  if (storage.length > 10000)
+  if (storage.length > 40000)  // ~2MB; each server response caches ~325 boards
     storage.clear()
   storage.setItem(key, value)
 }
@@ -82,6 +82,13 @@ document.body.innerHTML =
 //   rotators: (q, d) for q in 0..3, d in (-1, 1) → q = i>>1, d = (i&1) ? 1 : -1
 //   spots: quadrant loops then x,y within → s = 6x+y as below
 const $ = id => document.getElementById(id)
+// Set or remove an attribute, skipping no-op writes: setAttribute
+// invalidates style and paint even when the value is unchanged, and
+// render() re-derives every attribute on each pass
+const set = (e, k, v) => {
+  if (e.getAttribute(k) !== (v === null ? null : '' + v))
+    v === null ? e.removeAttribute(k) : e.setAttribute(k, v)
+}
 const svg = $('board')
 {
   // Base rotator for quadrant (0,0), d=1: hover wedge, arrow, value arc.
@@ -136,9 +143,11 @@ const spot_s = i => {
 
 // Show a value dot (a .v circle or .rv arc, default-hidden in css), or hide it
 const dot = (e, v) => {
-  e.style.display = v === null ? '' : 'inline'
+  const d = v === null ? '' : 'inline'
+  if (e.style.display != d)
+    e.style.display = d
   if (v !== null)
-    e.setAttribute('fill', colors[v + 1])
+    set(e, 'fill', colors[v + 1])
 }
 
 // Swivel state: how far each quadrant has visually rotated, in quarter turns.
@@ -155,16 +164,16 @@ const nospin = q => {
 for (const [q, e] of quads.entries())
   for (const ev of ['transitionend', 'transitioncancel'])
     e.addEventListener(ev, () => nospin(q))
+
+// A rotator click only records the intended spin; render() applies it iff
+// the hash really became the clicked link.  Mutating swivel here directly
+// would race: a click that never produces its matching hashchange (e.g. a
+// fast double click, whose second navigation is a no-op) would desync the
+// accumulated rotation from the board by 90 degrees, invisible at rest but
+// animating a spurious quadrant swing on the next render.
+let pending_spin = null
 for (const [i, a] of rots.entries())
-  a.addEventListener('click', () => {
-    const q = i >> 1
-    swivel[q] += rot_d(i)
-    spinning[q] = true
-    // The default link navigation then updates the hash, which redraws.
-    // If the browser skips the transition (e.g. hidden tab), no transition
-    // event ever fires, so time out just past the .5s transition.
-    setTimeout(() => nospin(q), 600)
-  })
+  a.addEventListener('click', () => pending_spin = [i >> 1, rot_d(i), a.getAttribute('href')])
 
 // The current board
 let board = parse_board('0')
@@ -200,7 +209,8 @@ function five_path(f) {
 }
 
 function draw_fives(b) {
-  $('fives').innerHTML = b.fives.flatMap(f => {
+  const g = $('fives')
+  const html = b.fives.flatMap(f => {
     if (f.some(([x, y]) => spinning[2 * (x / 3 | 0) + (y / 3 | 0)]))
       return []
     const color = b.grid[6 * f[0][0] + f[0][1]]
@@ -208,6 +218,8 @@ function draw_fives(b) {
       // Restore the black outlines of white stones under a white stripe
       (color == 2 ? f.map(([x, y]) => `<circle class=mask cx=${tweak(x)} cy=${-tweak(y)} r=.39 />`).join('') : '')
   }).join('')
+  if (g.innerHTML != html)
+    g.innerHTML = html
 }
 
 function render() {
@@ -222,8 +234,23 @@ function render() {
   const base = '#' + hist.join(',') + ','
   const mid = b.middle && !b.done
 
+  // Start the spin recorded by a rotator click, if this render is its result
+  let spin_d = 0
+  if (pending_spin) {
+    const [q, d, href] = pending_spin
+    pending_spin = null
+    if (location.hash == href) {
+      swivel[q] += d
+      spinning[q] = true
+      spin_d = d
+      // If the browser skips the transition (e.g. hidden tab), no transition
+      // event ever fires, so time out just past the .5s transition
+      setTimeout(() => nospin(q), 600)
+    }
+  }
+
   // Turn-dependent css state, header stone and label
-  svg.setAttribute('class', (b.turn ? 'wt' : 'bt') + (mid ? ' mid' : ''))
+  set(svg, 'class', (b.turn ? 'wt' : 'bt') + (mid ? ' mid' : ''))
   $('tn').style.fill = b.turn ? '#fff' : '#000'
   const v = known(b)
   dot($('hv'), v)
@@ -234,24 +261,58 @@ function render() {
   // Back links
   const back = hist.length > 1 ? '#' + hist.slice(0, -1).join(',') : null
   for (const a of backs)
-    back ? a.setAttribute('href', back) : a.removeAttribute('href')
+    set(a, 'href', back)
 
   // Quadrant swivels, from tex/transforms.tex (negated into screen
-  // coordinates): each .q group's translate-rotate chain both places the
-  // quadrant and, because consecutive transforms share the same function
-  // structure, css-interpolates as a swing that keeps the quadrant's inner
-  // corner in rolling contact with the separator cross.  The chain's net
-  // rotation is -90*swivel degrees; the inner group counter-rotates
-  // instantly so the already-updated board starts visually at the old
-  // orientation and settles at net zero.
+  // coordinates): during a spin, each .q group carries a translate-rotate
+  // chain that both places the quadrant and, because the old and new chains
+  // share the same function structure, css-interpolates as a swing keeping
+  // the quadrant's inner corner in rolling contact with the separator
+  // cross.  The chain's net rotation is -90*swivel degrees; the inner group
+  // counter-rotates instantly so the already-updated board starts visually
+  // at the old orientation and settles at net zero.  At rest the quadrant
+  // carries only the equivalent trivial transform: repaints of a quadrant
+  // bearing the six-function chain can catch chrome mid-evaluation and
+  // paint one garbled frame (seen as a brief flash on stone placement).
   for (const q of [0, 1, 2, 3]) {
     const dx = q & 2 ? 1 : -1, dy = q & 1 ? 1 : -1
-    const t = swivel[q], j = t & 1
-    const T = v => `translate(${v * dx}px,${-v * dy}px)`
-    const R = a => `rotate(${a}turn)`
-    quads[q].style.transform = T(.05) + R(1/8 - j/4) + T(3 / 8 ** .5) + R(j/2 - 1/4) +
-      T(3 / 8 ** .5) + R(1/8 - j/4 - t/4)
-    grids[q].setAttribute('transform', `rotate(${90 * t})`)
+    const t = swivel[q]
+    const chain = t => {
+      const j = t & 1
+      const T = v => `translate(${v * dx}px,${-v * dy}px)`
+      const R = a => `rotate(${a}turn)`
+      return T(.05) + R(1/8 - j/4) + T(3 / 8 ** .5) + R(j/2 - 1/4) +
+        T(3 / 8 ** .5) + R(1/8 - j/4 - t/4)
+    }
+    const e = quads[q]
+    if (spinning[q]) {
+      if (e.style.transform != chain(t)) {
+        // Entering a spin: jump (no transition) to the chain form of the
+        // old orientation, so the transition interpolates chain-to-chain
+        e.style.transition = 'none'
+        e.style.transform = chain(t - spin_d)
+        getComputedStyle(e).transform  // flush so the jump isn't transitioned
+        e.style.transition = ''
+        e.style.transform = chain(t)
+      }
+    } else {
+      // At rest the placement lives in the svg transform attribute and the
+      // css transform is cleared entirely.  Attribute first (same matrix
+      // the chain form shows), then clear inline css with the transition
+      // disabled: the chain and rest forms are equal as matrices but not
+      // as lists, and since translate-rotate is a type prefix of the
+      // six-function chain, css would otherwise pad the shorter list with
+      // identity functions and interpolate per-function -- an animated
+      // wobble after every spin rather than the identity it looks like.
+      set(e, 'transform', `translate(${1.55 * dx} ${-1.55 * dy}) rotate(${-90 * t})`)
+      if (e.style.transform) {
+        e.style.transition = 'none'
+        e.style.transform = ''
+        getComputedStyle(e).transform  // flush so the collapse isn't transitioned
+        e.style.transition = ''
+      }
+    }
+    set(grids[q], 'transform', `rotate(${90 * t})`)
   }
 
   // Stones, placement links, and child values
@@ -260,15 +321,15 @@ function render() {
     const stone = b.grid[s]
     const q = 2 * (s / 18 | 0) + (s % 6 / 3 | 0)
     const open = !stone && !b.middle && !b.done
-    a.setAttribute('class', stone ? stone == 1 ? 'b' : 'w' : open && !spinning[q] ? 'p' : '')
+    set(a, 'class', stone ? stone == 1 ? 'b' : 'w' : open && !spinning[q] ? 'p' : '')
     let val = null
     if (open) {
       const child = b.place(s / 6 | 0, s % 6)
-      a.setAttribute('href', base + child.name)
+      set(a, 'href', base + child.name)
       val = known(child)
       complete &&= val !== null
     } else
-      a.removeAttribute('href')
+      set(a, 'href', null)
     dot(a.children[1], val)
   }
 
@@ -277,12 +338,12 @@ function render() {
     let val = null
     if (mid) {
       const child = b.rotate(i >> 2, i >> 1 & 1, rot_d(i))
-      a.setAttribute('href', base + child.name)
+      set(a, 'href', base + child.name)
       const w = known(child)
       val = w === null ? null : -w
       complete &&= w !== null
     } else
-      a.removeAttribute('href')
+      set(a, 'href', null)
     dot(a.children[2], val)
   }
 
@@ -292,11 +353,23 @@ function render() {
   if (b.done)
     status_el.innerHTML = 'Game complete<br>' +
       (b.value ? (b.value > 0) == b.turn ? 'White wins!' : 'Black wins!' : 'Tie!')
-  else if (complete)
-    status_el.textContent = ''
+  else if (complete) {
+    if (status_el.firstChild)
+      status_el.textContent = ''
+  }
   else {
     const start = Date.now()
+    const remote = b.count <= 17
+    // Show the loading animation only once the lookup has proven slow, so
+    // fast lookups (warm server, refilling after a cache wipe) don't flash
+    // text under the board
+    const slow = setTimeout(() => {
+      if (board.name == b.name)
+        loading(remote ? 'Looking up ' + b.count + ' stone board...'
+                       : 'Computing ' + b.count + ' stone board locally...')
+    }, 250)
     const absorb = (op, values) => {
+      clearTimeout(slow)
       for (const [raw, value] of Object.entries(values))
         cache_set(parse_board(raw).name, value)
       if (board.name == b.name) {
@@ -305,17 +378,18 @@ function render() {
           (Date.now() - start) / 1000 + ' s'
       }
     }
-    const fail = err => { if (board.name == b.name) error(err.message) }
-    if (b.count <= 17) {  // Look up via server
-      loading('Looking up ' + b.count + ' stone board...')
+    const fail = err => {
+      clearTimeout(slow)
+      if (board.name == b.name)
+        error(err.message)
+    }
+    if (remote)
       fetch(backend_url + b.name).then(async res => {
         if (!res.ok) throw Error('Server request failed, https status = ' + res.status)
         absorb('Received', await res.json())
       }).catch(fail)
-    } else {  // Compute locally via WebAssembly
-      loading('Computing ' + b.count + ' stone board locally...')
+    else
       midsolve(b).then(values => absorb('Computed', values)).catch(fail)
-    }
   }
 }
 
