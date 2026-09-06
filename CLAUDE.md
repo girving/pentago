@@ -90,3 +90,37 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
 - `#pragma GCC unroll N` is critical for loops over `constexpr` arrays in SIMD code — GCC won't constant-fold array indices through unrolled iterations without it. Measured 44% speedup for forward8.
 - Write tests that measure the actual use case, not proxy metrics. E.g. batch diversity (how many distinct positions per training batch) is more relevant than chi-squared uniformity for ML training quality.
 - Profile with `perf annotate` before guessing at bottlenecks — intuition about what's slow is often wrong (e.g. the 160-byte transpose was assumed cheap but was 15% of decoder time).
+
+## Web server (web/server)
+
+- **Zero npm dependencies, by design.** Auth (`auth.js`), HTTP (`request.js`), logging (`log.js`), the
+  LRU cache (`lru.js`), and xz decoding (`xz.js` + bazel-built `xz.wasm`) are all small in-repo modules.
+  Don't add packages; extend these instead. `package.json` stays because Cloud Functions requires it.
+- `make test` runs the offline suite, `make test-all` adds lookups against the real bucket (needs
+  `gcloud auth application-default login`). Both build `xz.wasm` via bazel first; in the Claude
+  sandbox use `make BAZEL=../../bin/bazel ...` with `dangerouslyDisableSandbox: true`.
+- `./deploy` needs a gcloud project: set `CLOUDSDK_CORE_PROJECT` to the project of the service account
+  in `deploy` (the local gcloud config has no default). Cloud Functions gen1 installs only
+  `dependencies`, never devDependencies, and ships its own functions-framework.
+  `gcloud meta list-files-for-upload .` shows exactly what a deploy uploads.
+- Smoke test a deploy with boards the function has never served (responses carry a one-year
+  cache-control, so repeats may not reach the function), compare against a local `Values.values`
+  run, and read `gcloud functions logs read pentago --region us-central1`.
+- Add ad hoc checks to `unit.js` as permanent tests when generally useful; `token_source` takes
+  `{adc, metadata_host}` options so tests never touch global environment.
+- Cost exposure: the function is public; `--max-instances` in `deploy` is the spend bound (gen1
+  serves one request per instance). Slices 15-18 are Coldline, so cache-miss floods cost retrieval
+  plus 2.5x per-op fees. A kill switch that only revokes `allUsers` invoker on the function (not
+  billing) was discussed but not built.
+
+## Freestanding wasm builds (web/client/build-wasm, web/server/build-wasm)
+
+- Sources of a Bazel Central Registry module are private to it; expose them with a
+  `single_version_override` patch adding a public `filegroup` (see `third_party/xz_srcs.patch`).
+  Bazel's native patcher needs exact hunk line counts.
+- clang's builtin `inttypes.h` does `#include_next <inttypes.h>` and fails without a libc one; supply
+  a one-line shim that includes `<stdint.h>`. `-ffreestanding` implies `-fno-builtin`, so hand-written
+  `mem*` loops won't be compiled back into calls to themselves.
+- liblzma: define `HAVE_CONFIG_H` and supply `config.h` (its fallback header includes `<inttypes.h>`
+  unconditionally otherwise); `filter_decoder.c` includes the simple/delta filter headers even when
+  those filters are compiled out, so keep their `-I` paths.
