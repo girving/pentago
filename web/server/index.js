@@ -3,11 +3,11 @@
 'use strict'
 const fs = require('fs')
 const board_t = require('./board.js')
-const Log = require('log')
+const {Log} = require('./log.js')
 const Values = require('./values.js')
 
 // Prepare
-const log = new Log('debug')
+const log = Log('debug')
 const values = Values.values(Values.defaults, log)
 const usage = fs.readFileSync(__dirname + '/usage.txt')
 

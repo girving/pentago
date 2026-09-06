@@ -5,7 +5,7 @@
 const board_t = require('./board.js')
 const Values = require('./values.js')
 const Pending = require('./pending.js')
-const Log = require('log')
+const {Log} = require('./log.js')
 const {parseArgs} = require('util')
 const all_games = require('./games.js')
 const block_cache = require('./block_cache.js')
@@ -170,7 +170,7 @@ async function test_values() {
       games[i].path = games[i].path.slice(2*19)
   }
 
-  const log = new Log('debug')
+  const log = Log('debug')
   const compute = Values.values(options, log)  // Use a small cache to test replacement
   async function epoch(which) {
     async function test(path, values) {
