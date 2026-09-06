@@ -20,14 +20,6 @@ exports.defaults = {
   maxSockets: 64,
 }
 
-exports.add_options = options => {
-  const d = exports.defaults
-  options.option('--cache <size>', 'Size of block cache (suffixes M/MB and G/GB are understood)', d.cache)
-         .option('--max-slice <n>', 'Maximum slice available in database (for debugging use only)', parseInt,
-                 d.maxSlice)
-         .option('--max-sockets <n>', 'Maximum number of simultaneous https connections', parseInt, d.maxSockets)
-}
-
 // Useful counters
 const stats = {
   active_gets: 0

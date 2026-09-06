@@ -6,7 +6,7 @@ const board_t = require('./board.js')
 const Values = require('./values.js')
 const Pending = require('./pending.js')
 const Log = require('log')
-const options = require('commander')
+const {parseArgs} = require('util')
 const all_games = require('./games.js')
 const block_cache = require('./block_cache.js')
 const assert = require('assert').strict
@@ -210,18 +210,34 @@ const clear = '\x1b[00m'
 
 // Parse options
 Values.defaults.cache = '4M'  // Use a small cache to test replacement
-Values.defaults.bits = 22
-Values.defaults.external = true
-Values.add_options(options)
-options.parse(process.argv)
+const flags = {
+  'cache': {type: 'string', help: 'Size of block cache (suffixes M/MB and G/GB are understood)'},
+  'max-slice': {type: 'string', help: 'Maximum slice available in database (for debugging use only)'},
+  'max-sockets': {type: 'string', help: 'Maximum number of simultaneous https connections'},
+  'help': {type: 'boolean', short: 'h', help: 'output usage information'},
+}
+const {values: args, positionals} = parseArgs({options: flags, allowPositionals: true})
+if (args.help) {
+  console.log('Usage: unit [options] [all]\n\nOptions:')
+  for (const [name, flag] of Object.entries(flags)) {
+    const arg = flag.type == 'string' ? ' <' + (name == 'cache' ? 'size' : 'n') + '>' : ''
+    console.log('  --' + (name + arg).padEnd(18) + flag.help)
+  }
+  process.exit(0)
+}
+const options = {
+  cache: args.cache,
+  maxSlice: args['max-slice'] && parseInt(args['max-slice']),
+  maxSockets: args['max-sockets'] && parseInt(args['max-sockets']),
+}
 
 // Register tests
 const tests = [test_moves, test_done, test_pending, test_str, test_section, test_transform_board, test_uninterleave,
                test_descendent_sections]
-if (options.args.length > 0) {
-  if (options.args.length > 1)
+if (positionals.length > 0) {
+  if (positionals.length > 1)
     throw Error('expected 0 or 1 arguments')
-  const cmd = options.args[0]
+  const cmd = positionals[0]
   if (cmd == 'all')
     tests.push(test_values)
   else
