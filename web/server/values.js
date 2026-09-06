@@ -1,10 +1,10 @@
 // Asynchronous board value lookup
 
 'use strict'
-const os = require('os')
 const https = require('https')
+const {setTimeout: sleep} = require('timers/promises')
 const Pending = require('./pending')
-const {Storage} = require('@google-cloud/storage')
+const {GoogleAuth} = require('google-auth-library')
 const block_cache = require('./block_cache.js')
 
 // Pull in math
@@ -41,6 +41,26 @@ function parseSize (s,name) {
   return parseInt(m[1])<<{'K':10,'M':20,'G':30}[m[2][0]]
 }
 
+// GET a url into a Buffer.  Errors are marked transient if a retry might help.
+function https_get(url, headers) {
+  return new Promise((resolve, reject) => {
+    const transient = error => Object.assign(error, {transient: true})
+    https.get(url, {headers}, res => {
+      const chunks = []
+      res.on('data', chunk => chunks.push(chunk))
+      res.on('error', error => reject(transient(error)))
+      res.on('end', () => {
+        const body = Buffer.concat(chunks)
+        const status = res.statusCode
+        if (status == 200 || status == 206)
+          return resolve(body)
+        const error = Error('GET ' + url + ' failed with status ' + status + ': ' + body.toString().trim())
+        reject(status == 429 || status >= 500 ? transient(error) : error)
+      })
+    }).on('error', error => reject(transient(error)))
+  })
+}
+
 // Create an evaluation routine with calling convention
 //   values(board) : Promise
 // The options are
@@ -62,17 +82,34 @@ exports.values = (options, log) => {
   const indices = block_cache.descendent_sections(opts.maxSlice).map(s => new block_cache.supertensor_index_t(s))
   const cache = new block_cache.block_cache_t(cache_limit)
   const cache_pending = {} // Map from block to callbacks to call once block is available
-  const bucket = new Storage().bucket('pentago-us-central1')
+  const auth = new GoogleAuth({scopes: 'https://www.googleapis.com/auth/devstorage.read_only'})
+  const bucket_url = 'https://storage.googleapis.com/storage/v1/b/pentago-us-central1/o/'
 
   // Allow more simultaneous connections
   if (!(0 < opts.maxSockets && opts.maxSockets <= 1024))
     throw Error('invalid --max-sockets value '+opts.maxSockets)
   https.globalAgent.maxSockets = opts.maxSockets
 
-  // Get a section of a file
+  // Get a section of a file, retrying transient failures (network errors, 429, 5xx) with
+  // exponential backoff.  This mirrors the @google-cloud/storage defaults we used to rely on.
+  const get_tries = 4
   async function range_get(object, blob) {
-    const data = await bucket.file(object).download({start: blob.offset, end: blob.offset + blob.size - 1})
-    return data[0]
+    const url = bucket_url + encodeURIComponent(object) + '?alt=media'
+    for (let attempt = 1;; attempt++) {
+      try {
+        const headers = Object.fromEntries(await auth.getRequestHeaders(url))
+        headers.range = 'bytes=' + blob.offset + '-' + (blob.offset + blob.size - 1)
+        const data = await https_get(url, headers)
+        if (data.length != blob.size)
+          throw Error('range get of ' + object + ' returned ' + data.length + ' bytes, expected ' + blob.size)
+        return data
+      } catch (error) {
+        if (attempt == get_tries || !error.transient)
+          throw error
+        log.warning("transient error, attempt %d/%d: %s", attempt, get_tries, error.message)
+        await sleep(1000 * 2 ** (attempt - 1) * (0.5 + Math.random()))
+      }
+    }
   }
 
   // Get a block if necessary, merging simultaneous requests

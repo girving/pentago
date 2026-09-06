@@ -4,7 +4,6 @@
 const fs = require('fs')
 const board_t = require('./board.js')
 const Log = require('log')
-const options = require('commander')
 const Values = require('./values.js')
 
 // Prepare
