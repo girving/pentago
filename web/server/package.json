@@ -10,7 +10,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "google-auth-library": "^11.0.2",
     "log": "1.4.x",
     "lru-cache": "^11.5.2",
     "lzma-native": "^8.0.6"

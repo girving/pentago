@@ -4,7 +4,8 @@
 const https = require('https')
 const {setTimeout: sleep} = require('timers/promises')
 const Pending = require('./pending')
-const {GoogleAuth} = require('google-auth-library')
+const auth = require('./auth.js')
+const {request} = require('./request.js')
 const block_cache = require('./block_cache.js')
 
 // Pull in math
@@ -34,23 +35,14 @@ function parseSize (s,name) {
 }
 
 // GET a url into a Buffer.  Errors are marked transient if a retry might help.
-function https_get(url, headers) {
-  return new Promise((resolve, reject) => {
-    const transient = error => Object.assign(error, {transient: true})
-    https.get(url, {headers}, res => {
-      const chunks = []
-      res.on('data', chunk => chunks.push(chunk))
-      res.on('error', error => reject(transient(error)))
-      res.on('end', () => {
-        const body = Buffer.concat(chunks)
-        const status = res.statusCode
-        if (status == 200 || status == 206)
-          return resolve(body)
-        const error = Error('GET ' + url + ' failed with status ' + status + ': ' + body.toString().trim())
-        reject(status == 429 || status >= 500 ? transient(error) : error)
-      })
-    }).on('error', error => reject(transient(error)))
-  })
+async function https_get(url, headers) {
+  const {status, body} = await request(url, {headers})
+  if (status == 200 || status == 206)
+    return body
+  const error = Error('GET ' + url + ' failed with status ' + status + ': ' + body.toString().trim())
+  if (status == 429 || status >= 500)
+    error.transient = true
+  throw error
 }
 
 // Create an evaluation routine with calling convention
@@ -74,7 +66,7 @@ exports.values = (options, log) => {
   const indices = block_cache.descendent_sections(opts.maxSlice).map(s => new block_cache.supertensor_index_t(s))
   const cache = new block_cache.block_cache_t(cache_limit)
   const cache_pending = {} // Map from block to callbacks to call once block is available
-  const auth = new GoogleAuth({scopes: 'https://www.googleapis.com/auth/devstorage.read_only'})
+  const token = auth.token_source()
   const bucket_url = 'https://storage.googleapis.com/storage/v1/b/pentago-us-central1/o/'
 
   // Allow more simultaneous connections
@@ -89,8 +81,8 @@ exports.values = (options, log) => {
     const url = bucket_url + encodeURIComponent(object) + '?alt=media'
     for (let attempt = 1;; attempt++) {
       try {
-        const headers = Object.fromEntries(await auth.getRequestHeaders(url))
-        headers.range = 'bytes=' + blob.offset + '-' + (blob.offset + blob.size - 1)
+        const headers = {authorization: 'Bearer ' + await token(),
+                         range: 'bytes=' + blob.offset + '-' + (blob.offset + blob.size - 1)}
         const data = await https_get(url, headers)
         if (data.length != blob.size)
           throw Error('range get of ' + object + ' returned ' + data.length + ' bytes, expected ' + blob.size)
