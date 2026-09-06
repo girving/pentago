@@ -8,7 +8,7 @@
 'use strict'
 const board_t = require('./board.js')
 const tables = require('./tables.js')
-const {LRUCache} = require('lru-cache')
+const {LRU} = require('./lru.js')
 const lzma = require('lzma-native')
 const ceil = Math.ceil
 const floor = Math.floor
@@ -208,10 +208,7 @@ function supertensor_index_t(sections) {
 
 function block_cache_t(memory_limit) {
   // block_t → uncompressed Buffer (may be empty to indicate pending)
-  const lru = new LRUCache({
-    maxSize: memory_limit,
-    sizeCalculation: (data, block) => data.length,
-  })
+  const lru = LRU(memory_limit, data => data.length)
 
   // Do we have a block?
   this.contains = block => lru.has('' + block)

@@ -9,6 +9,7 @@ const {Log} = require('./log.js')
 const {parseArgs} = require('util')
 const all_games = require('./games.js')
 const block_cache = require('./block_cache.js')
+const {LRU} = require('./lru.js')
 const assert = require('assert').strict
 const crypto = require('crypto')
 
@@ -160,6 +161,83 @@ function test_descendent_sections() {
   }
 }
 
+function test_lru() {
+  const buf = n => Buffer.alloc(n)
+  const keys = lru => [...Array(10).keys()].map(k => 'k' + k).filter(k => lru.has(k))
+
+  // Basic insertion, lookup, and accounting
+  const lru = LRU(10, b => b.length)
+  assert.equal(lru.has('a'), false)
+  assert.equal(lru.get('a'), undefined)
+  lru.set('a', buf(3))
+  lru.set('b', buf(4))
+  assert.equal(lru.has('a'), true)
+  assert.equal(lru.get('a').length, 3)
+  assert.equal(lru.size, 7)
+  assert.equal(lru.count, 2)
+
+  // Eviction is by total size, least recently used first: 'a' was just got, so 'b' goes
+  lru.set('c', buf(5))
+  assert.deepEqual([lru.has('a'), lru.has('b'), lru.has('c')], [true, false, true])
+  assert.equal(lru.size, 8)
+
+  // has() does not refresh recency, get() does
+  lru.has('a')
+  lru.set('d', buf(3))  // 8 + 3 > 10 evicts oldest: 'a'
+  assert.deepEqual([lru.has('a'), lru.has('c'), lru.has('d')], [false, true, true])
+  lru.get('c')
+  lru.set('e', buf(3))  // 8 + 3 > 10 evicts oldest: 'd', since 'c' was refreshed
+  assert.deepEqual([lru.has('c'), lru.has('d'), lru.has('e')], [true, false, true])
+
+  // Replacing a key adjusts size and refreshes recency
+  lru.set('c', buf(1))
+  assert.equal(lru.size, 4)
+  assert.equal(lru.count, 2)
+  lru.set('e', buf(9))  // Replaces 'e' (3 → 9): total 10 fits exactly
+  assert.equal(lru.size, 10)
+  assert.deepEqual([lru.has('c'), lru.has('e')], [true, true])
+
+  // A single entry may fill the cache, but anything larger is dropped (and removes the old key)
+  lru.set('f', buf(10))
+  assert.deepEqual([lru.has('c'), lru.has('e'), lru.has('f'), lru.size, lru.count], [false, false, true, 10, 1])
+  lru.set('f', buf(11))
+  assert.deepEqual([lru.has('f'), lru.size, lru.count], [false, 0, 0])
+  assert.throws(() => LRU(0, () => 1), /max_size must be positive/)
+
+  // Randomized comparison against a brute force model: an array ordered oldest → newest
+  const seed = crypto.randomBytes(4).readUInt32LE(0)
+  let state = seed
+  const rand = n => (state = (state * 1103515245 + 12345) >>> 0) % n
+  const limit = 50
+  const fast = LRU(limit, b => b.length)
+  let model = []  // [key, size] pairs, least recently used first
+  for (let step = 0; step < 20000; step++) {
+    const key = 'k' + rand(10)
+    const op = rand(3)
+    if (op == 0) {  // has
+      assert.equal(fast.has(key), model.some(([k]) => k == key), 'has mismatch at step ' + step + ', seed ' + seed)
+    } else if (op == 1) {  // get
+      const i = model.findIndex(([k]) => k == key)
+      const value = fast.get(key)
+      assert.equal(value === undefined ? undefined : value.length, i < 0 ? undefined : model[i][1],
+                   'get mismatch at step ' + step + ', seed ' + seed)
+      if (i >= 0)
+        model.push(...model.splice(i, 1))
+    } else {  // set
+      const size = rand(limit + 5)
+      fast.set(key, buf(size))
+      model = model.filter(([k]) => k != key)
+      if (size <= limit) {
+        model.push([key, size])
+        while (model.reduce((t, [, s]) => t + s, 0) > limit)
+          model.shift()
+      }
+    }
+    assert.equal(fast.size, model.reduce((t, [, s]) => t + s, 0), 'size mismatch at step ' + step + ', seed ' + seed)
+    assert.equal(fast.count, model.length, 'count mismatch at step ' + step + ', seed ' + seed)
+  }
+}
+
 async function test_values() {
   let games = all_games()
   // Truncate
@@ -233,7 +311,7 @@ const options = {
 
 // Register tests
 const tests = [test_moves, test_done, test_pending, test_str, test_section, test_transform_board, test_uninterleave,
-               test_descendent_sections]
+               test_descendent_sections, test_lru]
 if (positionals.length > 0) {
   if (positionals.length > 1)
     throw Error('expected 0 or 1 arguments')
