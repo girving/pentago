@@ -3,3 +3,8 @@
 .gitignore
 node_modules
 deploy
+BUILD.bazel
+Makefile
+build-wasm
+xz/
+unit.js

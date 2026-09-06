@@ -71,7 +71,7 @@ The website https://perfect-pentago.net is a static Firebase frontend that
 talks to a node.js Google Cloud Function.  To test and deploy the server:
 
     cd web/server
-    node unit.js all
+    make test-all
     ./deploy
 
 To deploy the client:

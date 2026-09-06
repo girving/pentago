@@ -27,7 +27,7 @@ function adc_path() {
 }
 
 // Fetch a token as {access_token, expires_in}, marking retryable failures as transient
-async function fetch_token(adc) {
+async function fetch_token(adc, metadata_host) {
   let res
   if (adc) {  // Exchange the ADC refresh token for an access token
     const creds = JSON.parse(fs.readFileSync(adc))
@@ -45,8 +45,7 @@ async function fetch_token(adc) {
       body,
     })
   } else {  // Ask the metadata server for a service account token
-    const host = process.env.GCE_METADATA_HOST || 'metadata.google.internal'
-    res = await request('http://' + host + '/computeMetadata/v1/instance/service-accounts/default/token?scopes=' + scope,
+    res = await request('http://' + metadata_host + '/computeMetadata/v1/instance/service-accounts/default/token?scopes=' + scope,
                         {headers: {'metadata-flavor': 'Google'}})
   }
   if (res.status != 200) {
@@ -62,9 +61,11 @@ async function fetch_token(adc) {
 }
 
 // Create a token source.  token() returns a Promise of a valid access token, sharing one
-// in-flight refresh between concurrent callers.
-exports.token_source = () => {
-  const adc = adc_path()
+// in-flight refresh between concurrent callers.  Options (used by unit tests) override the
+// environment: adc is the credentials file (null for none), metadata_host the metadata server.
+exports.token_source = (options = {}) => {
+  const adc = 'adc' in options ? options.adc : adc_path()
+  const metadata_host = options.metadata_host || process.env.GCE_METADATA_HOST || 'metadata.google.internal'
   let token = null      // Current access token
   let expires = 0       // Unix time (seconds) at which it expires
   let refreshing = null // In-flight refresh, if any
@@ -72,7 +73,7 @@ exports.token_source = () => {
     if (token && Date.now() / 1000 < expires - refresh_margin)
       return token
     if (!refreshing) {
-      refreshing = fetch_token(adc).then(t => {
+      refreshing = fetch_token(adc, metadata_host).then(t => {
         token = t.access_token
         expires = Date.now() / 1000 + t.expires_in
         return token

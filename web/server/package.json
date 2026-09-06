@@ -9,9 +9,6 @@
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {
-    "lzma-native": "^8.0.6"
-  },
   "keywords": [
     "pentago",
     "solved"

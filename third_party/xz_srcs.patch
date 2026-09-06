@@ -1,0 +1,13 @@
+--- a/BUILD.bazel
++++ b/BUILD.bazel
+@@ -414,3 +414,10 @@
+         "//:lzma",
+     ],
+ )
++
++# Source tree, for pentago's freestanding wasm decoder build (//web/server:xz_wasm)
++filegroup(
++    name = "srcs",
++    srcs = glob(["src/common/*.h", "src/liblzma/**/*.h", "src/liblzma/**/*.c"]),
++    visibility = ["//visibility:public"],
++)

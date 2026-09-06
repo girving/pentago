@@ -9,7 +9,7 @@
 const board_t = require('./board.js')
 const tables = require('./tables.js')
 const {LRU} = require('./lru.js')
-const lzma = require('lzma-native')
+const xz = require('./xz.js')
 const ceil = Math.ceil
 const floor = Math.floor
 const max = Math.max
@@ -217,12 +217,9 @@ function block_cache_t(memory_limit) {
   const set = async (block, compressed) => {
     if (Math.random() < flake_probability)
       throw Error('flaking for unit test purposes')
-    const data = await lzma.decompress(compressed)
     const shape = block_shape(block[0], block[1])
     const expected = 64 * shape[0] * shape[1] * shape[2] * shape[3]
-    if (data.length != expected)
-      throw Error('data for section [' + block[0] + '], block [' + block[1] +
-                  '] has length ' + data.length + ' != ' + expected)
+    const data = xz.decompress(compressed, expected)
     lru.set('' + block, uninterleave(data))
   }
 

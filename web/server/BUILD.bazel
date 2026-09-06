@@ -1,0 +1,14 @@
+# Pentago web server.  The Node.js code in this directory is deployed as-is (see ./deploy);
+# bazel builds only the WebAssembly xz decoder that block_cache.js loads via xz.js.
+
+package(default_visibility = ["//visibility:private"])
+
+# Freestanding wasm xz decoder from liblzma's sources, compiled with homebrew clang (not
+# hermetic), the same way web/client builds its midsolver.
+genrule(
+    name = "xz_wasm",
+    srcs = ["@lzma//:srcs", "xz/xz.c"] + glob(["xz/include/*.h"]),
+    outs = ["xz.wasm"],
+    cmd = "./$(location build-wasm) $@ $(locations @lzma//:srcs)",
+    tools = ["build-wasm"],
+)

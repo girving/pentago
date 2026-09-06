@@ -10,6 +10,14 @@ const {parseArgs} = require('util')
 const all_games = require('./games.js')
 const block_cache = require('./block_cache.js')
 const {LRU} = require('./lru.js')
+const xz = require('./xz.js')
+const auth = require('./auth.js')
+const {request} = require('./request.js')
+const http = require('http')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const {setTimeout: sleep} = require('timers/promises')
 const assert = require('assert').strict
 const crypto = require('crypto')
 
@@ -238,6 +246,139 @@ function test_lru() {
   }
 }
 
+function test_xz() {
+  // Fixture: `xz -6 --check=crc64` of the text below, as written by the pentago data pipeline
+  // (pentago/data/compress.cc uses liblzma's easy encoder with CRC64).
+  const text = Buffer.from(Array.from({length: 400}, (_, i) => 'pentago ' + (i*i%97)).join(' '))
+  const compressed = Buffer.from(
+    '/Td6WFoAAATm1rRGBMDzAe4hIQEWAAAAAAAAAA3om5/gEO0A610AOBlKIk4BBwn8J0veWG4g36mR4aw5NQgIkpCBTFPUh7vO' +
+    'YdkDn3lRqNni6Z4WE7PAOTNi65Xul3Y7RvZ4yq9jgMRjuATsGWUWRWUrBucKt36pRQid8p+9XMSZGwFQcDsBcXVrsjP6bKvj' +
+    'oyt3Fr4M1eGjq6ebf7A0fBZEwJ+7SOF83ZQzONAQV8RanIxhjRs1bq0UNZnuvQ0/nokf0w6QMjwPx+lPCZV0dpsXI3MFInmq' +
+    'aWp3WpR7VZWuZFNyYa8RWcKmbUIdxfoI6RMVJhe0ty1luLrfXzHCiBZAG6BzOsOXF84fKD7pd6MXAAAAG2aP/fvLxCgAAY8C' +
+    '7iEAAGw7XFmxxGf7AgAAAAAEWVo=', 'base64')
+  const decompress = (data, size) => xz.decompress(data, size === undefined ? text.length : size)
+  assert.ok(decompress(compressed).equals(text))
+  for (let i = 0; i < 3; i++)  // Repeated calls reuse the arena
+    assert.ok(decompress(compressed).equals(text))
+
+  // Everything that isn't a complete, intact, checked stream of the expected size is an error
+  const fails = (data, size, message) =>
+    assert.throws(() => decompress(data, size), {message: RegExp(message)}, message)
+  const corrupt = Buffer.from(compressed)
+  corrupt[corrupt.length >> 1] ^= 0xff
+  fails(corrupt, undefined, 'data is corrupt')
+  fails(compressed.subarray(0, compressed.length - 8), undefined, 'no progress is possible')
+  fails(Buffer.concat([compressed, Buffer.from([0])]), undefined, 'trailing data after end of stream')
+  fails(compressed, text.length - 1, 'no progress is possible')
+  fails(compressed, text.length + 1, 'produced ' + text.length + ' bytes, expected ' + (text.length + 1))
+  fails(Buffer.from('not an xz stream'), undefined, 'file format not recognized')
+  fails(Buffer.alloc(0), undefined, 'data is corrupt')
+  // Empty streams from `xz --check=crc32` (accepted), `--check=sha256` (not compiled in), and
+  // `--format=lzma` (the legacy .lzma container, also not compiled in)
+  assert.equal(decompress(Buffer.from('/Td6WFoAAAFpIt42AAAAABzfRCGQQpkNAQAAAAABWVo=', 'base64'), 0).length, 0)
+  fails(Buffer.from('/Td6WFoAAArh+wyhAAAAABzfRCEYm0uaAQAAAAAKWVo=', 'base64'), 0, 'cannot calculate the integrity check')
+  fails(Buffer.from('XQAAgAD//////////wCD//v//8AAAAA=', 'base64'), 0, 'file format not recognized')
+  // `xz --check=none` of empty input: streams without an integrity check are rejected up front
+  fails(Buffer.from('/Td6WFoAAAD/EtlBAAAAABzfRCEGcp56AQAAAAAAWVo=', 'base64'), 0, 'no integrity check')
+}
+
+function test_log() {
+  const lines = []
+  const log = Log('warning', {write: line => lines.push(line)})
+  log.info('hidden %d', 1)
+  log.warning('attempt %d/%d: %s', 1, 3, 'boom')
+  log.error('bad')
+  log.debug('hidden')
+  assert.equal(lines.length, 2)
+  // Same format as the old `log` package: "[<Date>] LEVEL <util.format'd message>"
+  assert.match(lines[0], /^\[[A-Z][a-z]{2} [A-Z][a-z]{2} \d\d \d{4} \d\d:\d\d:\d\d GMT[-+]\d{4} \(.*\)\] WARNING attempt 1\/3: boom\n$/)
+  assert.match(lines[1], /\] ERROR bad\n$/)
+  assert.throws(() => Log('bogus'), /unknown log level bogus/)
+}
+
+// Serve requests on a local port, returning {url, close}
+async function local_server(handler) {
+  const server = http.createServer(handler)
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
+  return {url: 'http://127.0.0.1:' + server.address().port,
+          close: () => new Promise(resolve => server.close(resolve))}
+}
+
+async function test_request() {
+  const server = await local_server((req, res) => {
+    let body = ''
+    req.on('data', chunk => body += chunk).on('end', () => {
+      res.writeHead(418, {'x-echo': req.method + ' ' + req.url + ' ' + req.headers['x-foo']})
+      res.end('got ' + body)
+    })
+  })
+  try {
+    const res = await request(server.url + '/path?q=1', {method: 'POST', headers: {'x-foo': 'bar'}, body: 'hello'})
+    assert.equal(res.status, 418)
+    assert.equal(res.headers['x-echo'], 'POST /path?q=1 bar')
+    assert.equal(res.body.toString(), 'got hello')
+    const get = await request(server.url + '/')
+    assert.equal(get.headers['x-echo'], 'GET / undefined')
+  } finally {
+    await server.close()
+  }
+  // Network failures (refused, or a reset keep-alive socket) are transient
+  await assert.rejects(request(server.url + '/'), e => e.transient === true && /^ECONN/.test(e.code))
+}
+
+async function test_auth() {
+  // Fake metadata server handing out short-lived tokens, to check caching and refresh
+  let mode = 'ok'
+  const seen = []
+  const server = await local_server((req, res) => {
+    seen.push(req)
+    if (mode == 'ok') {
+      res.writeHead(200, {'content-type': 'application/json'})
+      res.end(JSON.stringify({access_token: 'token' + seen.length, expires_in: 61, token_type: 'Bearer'}))
+    } else if (mode == 'garbage') {
+      res.writeHead(200)
+      res.end('{"nope": true}')
+    } else {
+      res.writeHead(parseInt(mode))
+      res.end('error ' + mode)
+    }
+  })
+  try {
+    const source = () => auth.token_source({adc: null, metadata_host: server.url.replace('http://', '')})
+    const token = source()
+    const first = await Promise.all(Array.from({length: 10}, token))
+    assert.deepEqual(first, Array(10).fill('token1'), 'concurrent callers share one fetch')
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0].url, '/computeMetadata/v1/instance/service-accounts/default/token'
+                              + '?scopes=https://www.googleapis.com/auth/devstorage.read_only')
+    assert.equal(seen[0].headers['metadata-flavor'], 'Google')
+    assert.equal(await token(), 'token1', 'cached while fresh')
+    await sleep(1100)  // 61 s lifetime with a 60 s refresh margin: stale after 1 s
+    assert.equal(await token(), 'token2', 'refreshed once inside the margin')
+    assert.equal(seen.length, 2)
+
+    // Failure modes: 5xx is transient, 4xx is not, and nonsense is caught
+    mode = '503'
+    await assert.rejects(source()(), e => e.transient === true && /status 503: error 503/.test(e.message))
+    mode = '403'
+    await assert.rejects(source()(), e => !e.transient && /status 403/.test(e.message))
+    mode = 'garbage'
+    await assert.rejects(source()(), /malformed token response/)
+  } finally {
+    await server.close()
+  }
+
+  // Only user credentials are supported in application default credentials files
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pentago-auth-'))
+  try {
+    const adc = path.join(dir, 'adc.json')
+    fs.writeFileSync(adc, JSON.stringify({type: 'service_account'}))
+    await assert.rejects(auth.token_source({adc})(), /unsupported credentials type service_account/)
+  } finally {
+    fs.rmSync(dir, {recursive: true})
+  }
+}
+
 async function test_values() {
   let games = all_games()
   // Truncate
@@ -311,7 +452,7 @@ const options = {
 
 // Register tests
 const tests = [test_moves, test_done, test_pending, test_str, test_section, test_transform_board, test_uninterleave,
-               test_descendent_sections, test_lru]
+               test_descendent_sections, test_lru, test_xz, test_log, test_request, test_auth]
 if (positionals.length > 0) {
   if (positionals.length > 1)
     throw Error('expected 0 or 1 arguments')

@@ -1,0 +1,49 @@
+#!/bin/bash
+# Build xz.wasm, a freestanding WebAssembly xz (LZMA2) decoder, from liblzma's sources.
+# Run by the //web/server:xz_wasm genrule with the workspace root as the current directory:
+#   build-wasm <xz.wasm out> <files of @lzma//:srcs>...
+# Only the second argument is used, to locate liblzma's src/ tree.
+
+set -e
+out="$1"
+lzma="${2%/src/*}/src"
+
+# Homebrew ships wasm-ld in the separate lld formula; on Linux both clang and
+# wasm-ld live in PATH (e.g., /usr/bin on Ubuntu).  Same logic as web/client/build-wasm.
+if [ -e /usr/local/opt/llvm/bin/clang ]; then
+  clang=/usr/local/opt/llvm/bin/clang
+  lld=/usr/local/opt/lld/bin
+elif [ -e /opt/homebrew/opt/llvm/bin/clang ]; then
+  clang=/opt/homebrew/opt/llvm/bin/clang
+  lld=/opt/homebrew/opt/lld/bin
+else
+  clang=clang
+  lld=$(dirname "$(command -v wasm-ld)")
+fi
+
+# Decoder-only subset of liblzma: the .xz container, the LZMA2 filter, and CRC32/CRC64 checks.
+# Encoders, LZMA1/.lzma, the BCJ and delta filters, SHA256, and threading are left out, both
+# via this file list and via xz/include/config.h.
+common=$lzma/liblzma/common
+srcs=(
+  $common/{common,block_util,filter_common,filter_decoder,filter_flags_decoder,index_hash}.c
+  $common/{stream_flags_common,stream_flags_decoder,block_header_decoder,block_decoder}.c
+  $common/{stream_decoder,stream_buffer_decoder,vli_decoder,vli_size}.c
+  $lzma/liblzma/check/{check,crc32_fast,crc32_table,crc64_fast,crc64_table}.c
+  $lzma/liblzma/lz/lz_decoder.c
+  $lzma/liblzma/lzma/{lzma_decoder,lzma2_decoder}.c
+)
+
+$clang --target=wasm32 -B "$lld" \
+  -ffreestanding -nostdlib -std=c99 \
+  -fvisibility=hidden -Wl,--no-entry \
+  -O2 -flto -Wl,--lto-O2 -Wl,--strip-all \
+  -Wall -Werror -Wno-unused-function -fcolor-diagnostics \
+  -Wl,--stack-first -Wl,-z,stack-size=$[1 << 20] \
+  -Wl,--export={xz_alloc,xz_reset,xz_decompress} \
+  -DHAVE_CONFIG_H=1 -isystem web/server/xz/include \
+  -I$lzma/common -I$lzma/liblzma/api -I$common -I$lzma/liblzma/check \
+  -I$lzma/liblzma/lz -I$lzma/liblzma/lzma -I$lzma/liblzma/rangecoder \
+  -I$lzma/liblzma/simple -I$lzma/liblzma/delta \
+  -o "$out" web/server/xz/xz.c "${srcs[@]}"
+chmod -x "$out"
