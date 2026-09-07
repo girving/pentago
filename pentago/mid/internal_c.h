@@ -16,13 +16,13 @@ typedef struct info_t_ {
   high_board_s root;
   int spots;
   empty_t empty;
-  grab_t spaces[18+2];  // output = spaces[n], input = spaces[n+1]
+  grab_t spaces[MID_MAX_SPOTS+2];  // output = spaces[n], input = spaces[n+1]
 
   // Sums of sizes of temporary arrays up to each n
-  int sets0_offsets[18+2];
-  int sets1p_offsets[18+2];
-  int cs1ps_offsets[18+2];
-  int wins1_offsets[18+2];
+  int sets0_offsets[MID_MAX_SPOTS+2];
+  int sets1p_offsets[MID_MAX_SPOTS+2];
+  int cs1ps_offsets[MID_MAX_SPOTS+2];
+  int wins1_offsets[MID_MAX_SPOTS+2];
 } info_t;
 
 // Constant information for an entire transposed midsolve
@@ -30,12 +30,12 @@ typedef struct transposed_t_ {
   high_board_s root;
   int spots;
   empty_t empty;
-  grab_t spaces[18+2];  // output = spaces[n], input = spaces[n+1]
+  grab_t spaces[MID_MAX_SPOTS+2];  // output = spaces[n], input = spaces[n+1]
 
   // Sums of sizes of temporary arrays up to each n
-  int sets0_offsets[18+2];
-  int sets1_offsets[18+2];
-  int cs0ps_offsets[18+2];
+  int sets0_offsets[MID_MAX_SPOTS+2];
+  int sets1_offsets[MID_MAX_SPOTS+2];
+  int cs0ps_offsets[MID_MAX_SPOTS+2];
 } transposed_t;
 
 // Information needed for inner
@@ -58,9 +58,9 @@ typedef struct transposed_inner_t_ {
 // Everything that's a function of just s0 in the double loop in midsolve_loop
 typedef struct set0_info_t_ {
   halfsuper_s wins0;
-  uint16_t child_s0s[18];
-  uint16_t offset0[90];
-  uint8_t empty1[18];
+  uint32_t child_s0s[MID_MAX_SPOTS];  // Absolute indices, which exceed 16 bits for 19+ spots
+  uint16_t offset0[110];  // max over n of (spots-k0)*k1
+  uint8_t empty1[MID_MAX_SPOTS];
 } set0_info_t;
 
 typedef struct wins1_t_ {
@@ -70,10 +70,10 @@ typedef struct wins1_t_ {
 // Everything that's a function of just s1 for transposed
 typedef struct set1_info_t_ {
   wins1_t wins1;
-  uint16_t s1;
-  uint16_t offset1p[90];
-  uint8_t empty0[18];
+  uint32_t s1;
+  uint16_t offset1p[110];
+  uint8_t empty0[MID_MAX_SPOTS];
 } set1_info_t;
 
 PENTAGO_STATIC_ASSERT(sizeof(wins1_t) == 32, "");
-PENTAGO_STATIC_ASSERT(sizeof(set0_info_t) == 256, "");
+PENTAGO_STATIC_ASSERT(sizeof(set0_info_t) == 336, "");

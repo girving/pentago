@@ -10,6 +10,7 @@
 #pragma once
 
 #include "halfsuper.h"
+#include "subsets_c.h"
 #include "../high/board.h"
 #include "../utility/pile.h"
 #include <tuple>
@@ -33,12 +34,12 @@ static inline int mid_supers_size(const high_board_t board) {
   return 1 + (36 - board.count());
 }
 
-struct mid_values_t : pile<tuple<raw_t,int>,1+18+8*18> {};
+struct mid_values_t : pile<tuple<raw_t,int>,1+MID_MAX_SPOTS+8*MID_MAX_SPOTS> {};
 
-// Compute the values of a board and its children, assuming the board has at least 18 stones.
+// Compute the values of a board and its children, assuming the board has at least 36-MID_MAX_SPOTS stones.
 // Results are {whether we don't lose, whether we win}
-Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t root, RawArray<halfsuper_s> workspace);
-int midsolve_traverse(const high_board_t board, const halfsuper_s* wins, const halfsuper_s* notloses, mid_values_t& results);
+Vector<halfsupers_t,1+MID_MAX_SPOTS> midsolve_internal(const high_board_t root, RawArray<halfsuper_s> workspace);
+int midsolve_traverse(const high_board_t board, const halfsupers_t* supers, mid_values_t& results);
 
 #if !defined(__wasm__) || defined(__APPLE__)
 // Compute the values of a board, its children, and possibly children's children (if !board.middle)

@@ -15,6 +15,18 @@
 #define PENTAGO_SSE 0
 #else  // defined(__SSE__)
 #define PENTAGO_SSE 1
+#endif
+
+// Without SSE, use wasm SIMD when available (clang -msimd128).  Only halfsuper_t has a wasm SIMD
+// path, since it carries the midsolve inner loop; super_t stays scalar.
+#if !PENTAGO_SSE && defined(__wasm_simd128__) && !defined(PENTAGO_FORCE_SCALAR)
+#define PENTAGO_WASM_SIMD 1
+#include <wasm_simd128.h>
+#else
+#define PENTAGO_WASM_SIMD 0
+#endif
+
+#if PENTAGO_SSE
 
 #include <xmmintrin.h>
 #include <emmintrin.h>

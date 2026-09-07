@@ -15,6 +15,20 @@ cc_library(
 )
 
 cc_library(
+    name = "codec",
+    srcs = ["codec.h", "codec.cc"],
+    copts = COPTS,
+    deps = [":halfsuper", "//pentago/utility"],
+)
+
+cc_library(
+    name = "tiled",
+    srcs = ["tiled.h", "tiled.cc"],
+    copts = COPTS,
+    deps = [":codec", ":halfsuper", ":mid", "//pentago/base", "//pentago/high", "//pentago/utility"],
+)
+
+cc_library(
     name = "halfsuper",
     srcs = ["halfsuper.h", "halfsuper_c.h", "halfsuper.cc"],
     copts = COPTS,
@@ -30,10 +44,13 @@ cc_tests(
     names = [
         "mid_test",
         "benchmark_test",
+        "tiled_test",
     ],
     deps = [
+        ":codec",
         ":halfsuper",
         ":mid",
+        ":tiled",
         "//pentago/high:check",
     ],
 )

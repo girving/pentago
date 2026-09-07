@@ -26,16 +26,21 @@ const cache_set = (key, value) => {
 }
 
 // Run midsolve in a lazily created web worker, so that most visitors never
-// fetch mid.wasm at all.  The worker answers strictly in request order.
+// fetch the wasm at all.  The worker answers strictly in request order.
+// Boards below 18 stones use the tiled solver, on as many threads as the
+// browser allows: helper workers need SharedArrayBuffer, which needs the
+// cross-origin isolation headers in firebase.json.
 let worker = null
 const worker_cbs = []
+const local_threads = () =>
+  typeof SharedArrayBuffer == 'undefined' ? 1 : Math.max(1, Math.min(8, navigator.hardwareConcurrency || 2))
 const midsolve = board => new Promise((resolve, reject) => {
   if (!worker) {
     worker = new Worker(new URL('mid_worker.js', import.meta.url), {type: 'module'})
     worker.onmessage = e => (e.data instanceof Error ? worker_cbs.shift()[1] : worker_cbs.shift()[0])(e.data)
   }
   worker_cbs.push([resolve, reject])
-  worker.postMessage(board.raw + '')
+  worker.postMessage({board: board.raw + '', threads: board.count < 18 ? local_threads() : 0})
 })
 
 // Values for the empty board and all of its children, baked in so the first
@@ -359,14 +364,15 @@ function render() {
   }
   else {
     const start = Date.now()
-    const remote = b.count <= 17
+    const remote = b.count <= 15  // 16 and 17 stone boards are solved locally by the tiled solver
     // Show the loading animation only once the lookup has proven slow, so
     // fast lookups (warm server, refilling after a cache wipe) don't flash
     // text under the board
     const slow = setTimeout(() => {
       if (board.name == b.name)
         loading(remote ? 'Looking up ' + b.count + ' stone board...'
-                       : 'Computing ' + b.count + ' stone board locally...')
+                       : 'Computing ' + b.count + ' stone board locally' +
+                         (b.count < 18 && local_threads() > 1 ? ' on ' + local_threads() + ' threads...' : '...'))
     }, 250)
     const absorb = (op, values) => {
       clearTimeout(slow)

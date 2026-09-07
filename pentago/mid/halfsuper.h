@@ -54,6 +54,11 @@ NAMESPACE_PENTAGO
 static inline bool get(const halfsuper_s s, uint8_t r) {
   return _mm_movemask_epi8(_mm_slli_epi16(s.x,7-(r&7)))>>(r>>3&15)&1;
 }
+#elif PENTAGO_WASM_SIMD
+static inline bool get(const halfsuper_s s, uint8_t r) {
+  const uint64_t w = r&64 ? wasm_u64x2_extract_lane(s.x, 1) : wasm_u64x2_extract_lane(s.x, 0);
+  return (w >> (r&63)) & 1;
+}
 #else
 static inline bool get(const halfsuper_s s, uint8_t r) {
   return ((r&64 ? s.b : s.a) >> (r&63)) & 1;
@@ -103,7 +108,39 @@ struct halfsuper_t {
     return halfsuper_t(sse_pack(hi?0:chunk,hi?chunk:0));
   }
 
-#else  // !PENTAGO_SSE
+#elif PENTAGO_WASM_SIMD
+
+  // Zero-only constructor
+  halfsuper_t(METAL_CONSTANT zero*) {
+    s.x = wasm_i64x2_splat(0);
+  }
+
+  explicit halfsuper_t(v128_t x)
+    : s{x} {}
+
+  halfsuper_t(uint64_t a, uint64_t b) {
+    s.x = wasm_u64x2_make(a, b);
+  }
+
+  explicit operator bool() const {
+    return wasm_v128_any_true(s.x);
+  }
+
+  halfsuper_t operator~() const { return halfsuper_t(wasm_v128_not(s.x)); }
+  halfsuper_t operator|(halfsuper_s h) const { return halfsuper_t(wasm_v128_or(s.x, h.x)); }
+  halfsuper_t operator&(halfsuper_s h) const { return halfsuper_t(wasm_v128_and(s.x, h.x)); }
+  halfsuper_t operator^(halfsuper_s h) const { return halfsuper_t(wasm_v128_xor(s.x, h.x)); }
+  halfsuper_t operator|=(halfsuper_s h) { s.x = wasm_v128_or(s.x, h.x); return *this; }
+  halfsuper_t operator&=(halfsuper_s h) { s.x = wasm_v128_and(s.x, h.x); return *this; }
+  halfsuper_t operator^=(halfsuper_s h) { s.x = wasm_v128_xor(s.x, h.x); return *this; }
+
+  // Do not use in performance critical code
+  static halfsuper_t singleton(uint8_t r) {
+    const auto chunk = uint64_t(1)<<(r&63);
+    return r&64 ? halfsuper_t(0, chunk) : halfsuper_t(chunk, 0);
+  }
+
+#else  // !PENTAGO_SSE && !PENTAGO_WASM_SIMD
 
   // Zero-only constructor
   halfsuper_t(METAL_CONSTANT zero*) : s{0, 0} {}
@@ -128,7 +165,7 @@ struct halfsuper_t {
     return r&64 ? halfsuper_t(0, chunk) : halfsuper_t(chunk, 0);
   }
 
-#endif  // PENATGO_SSE.  SSE independent functions follow.
+#endif  // PENTAGO_SSE / PENTAGO_WASM_SIMD.  Representation independent functions follow.
 
   bool operator==(halfsuper_t h) const { return    !(*this^h); }
   bool operator!=(halfsuper_t h) const { return bool(*this^h); }
@@ -151,7 +188,7 @@ struct halfsuper_t {
 halfsuper_t halfsuper_wins(const side_t side, const bool parity) __attribute__((const));
 
 // rmax helper functions
-#if !PENTAGO_SSE
+#if !PENTAGO_SSE && !PENTAGO_WASM_SIMD
 METAL_INLINE uint64_t rmax_rep(const uint8_t x) {
   auto y = x | uint64_t(x) << 8;
   y = y | y << 16;
@@ -174,7 +211,7 @@ METAL_INLINE uint64_t rmax_lo(const uint64_t x) {
                 | (x >> 24 & 0x000000ff000000ff);
   return y0 | y1 | y2;
 }
-#endif  // !PENTAGO_SSE
+#endif  // !PENTAGO_SSE && !PENTAGO_WASM_SIMD
 
 // Same as rmax for super_t, but twice as fast.  Flips parity.
 __attribute__((const)) METAL_INLINE halfsuper_t rmax(const halfsuper_s h) {
@@ -195,11 +232,28 @@ __attribute__((const)) METAL_INLINE halfsuper_t rmax(const halfsuper_s h) {
                    | _mm_shuffle_epi32(x,LE_MM_SHUFFLE(1,2,3,0));
   // Assemble
   return halfsuper_t(y0|y1|y2|y3);
-#else  // !PENTAGO_SSE
+#elif PENTAGO_WASM_SIMD
+  // Same steps as the SSE version, using the wasm SIMD equivalents of each intrinsic
+  const v128_t x = h.x;
+  // First (parity) quadrant
+  const v128_t t0 = wasm_v128_and(wasm_v128_or(x, wasm_u16x8_shr(x, 1)), wasm_u8x16_splat(0x55)),
+                y0 = wasm_v128_or(t0, wasm_i16x8_shl(t0, 1));
+  // Second and third quadrants
+  const v128_t y1 = wasm_v128_or(wasm_v128_or(wasm_v128_and(wasm_i16x8_shl(x, 2), wasm_u8x16_splat(0b11111100)),
+                                              wasm_v128_and(wasm_i16x8_shl(x, 6), wasm_u8x16_splat(0b11000000))),
+                                 wasm_v128_or(wasm_v128_and(wasm_u16x8_shr(x, 2), wasm_u8x16_splat(0b00111111)),
+                                              wasm_v128_and(wasm_u16x8_shr(x, 6), wasm_u8x16_splat(0b00000011))));
+  const v128_t y2 = wasm_v128_or(wasm_v128_or(wasm_i32x4_shl(x, 8), wasm_i32x4_shl(x, 24)),
+                                 wasm_v128_or(wasm_u32x4_shr(x, 8), wasm_u32x4_shr(x, 24)));
+  // Fourth quadrant
+  const v128_t y3 = wasm_v128_or(wasm_i32x4_shuffle(x, x, 3, 0, 1, 2), wasm_i32x4_shuffle(x, x, 1, 2, 3, 0));
+  // Assemble
+  return halfsuper_t(wasm_v128_or(wasm_v128_or(y0, y1), wasm_v128_or(y2, y3)));
+#else  // !PENTAGO_SSE && !PENTAGO_WASM_SIMD
   const auto a = h.a, b = h.b;
   const auto y3 = a << 32 | a >> 32 | b << 32 | b >> 32;  // Forth quadrant
   return halfsuper_t(rmax_lo(a) | y3, rmax_lo(b) | y3);  // Assemble
-#endif  // PENTAGO_SSE
+#endif  // PENTAGO_SSE / PENTAGO_WASM_SIMD
 }
 
 // Convenience operators

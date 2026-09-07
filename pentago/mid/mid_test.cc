@@ -47,7 +47,7 @@ void midsolve_internal_test(const high_board_t board) {
   const int slice = board.count();
   const bool parity = board.middle();
   const auto workspace = midsolve_workspace(slice);
-  const Vector<halfsupers_t,1+18> padded_results = midsolve_internal(board, workspace);
+  const Vector<halfsupers_t,1+MID_MAX_SPOTS> padded_results = midsolve_internal(board, workspace);
   const auto results = asarray(padded_results).slice(0, mid_supers_size(board));
   const auto boards = result_boards(board);
   ASSERT_EQ(results.size(), 37-slice);  // Only mostly true due to superstandardization, but still good

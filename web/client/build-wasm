@@ -1,12 +1,17 @@
 #!/bin/bash
 # Build the freestanding wasm binaries.  Run by the //web/client:wasm genrule
 # with the workspace root as the current directory:
-#   build-wasm <mid.wasm out> <tests.wasm out> <bindir with generated tables>
+#   build-wasm <mid.wasm out> <mid-threads.wasm out> <tests.wasm out> <bindir with generated tables>
+#
+# mid.wasm owns its memory and runs single threaded.  mid-threads.wasm imports a shared memory and
+# adds a worker pool for the tiled solver: helper workers instantiate it on the same memory, point
+# the exported stack pointer at their own stack, and call midsolve_tiled_worker.
 
 set -e
 mid_out="$1"
-tests_out="$2"
-bindir="$3"
+threads_out="$2"
+tests_out="$3"
+bindir="$4"
 
 # Homebrew ships wasm-ld in the separate lld formula; on Linux both clang and
 # wasm-ld live in PATH (e.g., /usr/bin on Ubuntu)
@@ -27,27 +32,40 @@ fi
 # -Os is ~1.5% slower at 9,542, -Oz ~2.7% slower at 8,866; the difference
 # lives in the hot inlined midsolve, so it can't be reclaimed by optimizing
 # cold files separately.  --strip-all drops name/producers/target_features.
+common=(
+  --target=wasm32 -B "$lld"
+  -ffreestanding -nostdlib -std=c++2c
+  -fvisibility=hidden -Wl,--no-entry
+  -Wl,--allow-undefined
+  -O2 -flto -Wl,--lto-O2 -Wl,--strip-all
+  -msimd128 -mno-exception-handling
+  -Wall -Werror -fcolor-diagnostics -ferror-limit=0
+  -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20]
+  -Wl,--export=__heap_base
+  -isystem third_party/freestanding -I. -I"$bindir"
+)
 build () {
-  $clang --target=wasm32 -B "$lld" \
-    -ffreestanding -nostdlib -std=c++1z \
-    -fvisibility=hidden -Wl,--no-entry \
-    -Wl,--allow-undefined \
-    -O2 -flto -Wl,--lto-O2 -Wl,--strip-all \
-    -mno-exception-handling \
-    -Wall -Werror -fcolor-diagnostics -ferror-limit=0 \
-    -Wl,--stack-first -Wl,-z,stack-size=$[3 << 20] -Wl,--initial-memory=0 \
-    -Wl,--export=__heap_base \
-    -isystem third_party/freestanding -I. -I"$bindir" \
-    -o "$@"
+  $clang "${common[@]}" -Wl,--initial-memory=0 -o "$@"
+  chmod -x $1
+}
+build_threads () {
+  # The importing JavaScript picks the actual maximum (mid_sync.js), up to the 4 GB wasm32 limit
+  # baked in here.  The pool's atomics need the atomics and bulk memory features, and workers set
+  # the stack pointer themselves, which needs it exported as a mutable global.
+  $clang "${common[@]}" -matomics -mbulk-memory -mmutable-globals \
+    -Wl,--shared-memory,--import-memory,--max-memory=$[1 << 32] \
+    -Wl,--export=__stack_pointer -o "$@"
   chmod -x $1
 }
 
-build "$mid_out" \
-  -Wl,--export={malloc,midsolve} \
-  pentago/mid/{halfsuper,midengine}.cc \
-  pentago/high/board.cc \
-  pentago/utility/wasm_alloc.cc \
+mid_srcs=(
+  pentago/mid/{halfsuper,midengine,codec,tiled}.cc
+  pentago/high/board.cc
+  pentago/utility/wasm_alloc.cc
   third_party/freestanding/cstring.cc
+)
+build "$mid_out" -Wl,--export={malloc,midsolve,midsolve_tiled} "${mid_srcs[@]}"
+build_threads "$threads_out" -Wl,--export={malloc,midsolve,midsolve_tiled,midsolve_tiled_worker} "${mid_srcs[@]}"
 
 build "$tests_out" \
   -Wl,--export={malloc,sqr_test,sum_test,die_test,int64_test} \

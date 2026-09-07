@@ -41,9 +41,10 @@ genrule(
     ],
     outs = [
         "public/mid.wasm",
+        "public/mid-threads.wasm",
         "build/tests.wasm",
     ],
-    cmd = "./$(location build-wasm) $(location public/mid.wasm) $(location build/tests.wasm) $(BINDIR)",
+    cmd = "./$(location build-wasm) $(location public/mid.wasm) $(location public/mid-threads.wasm) $(location build/tests.wasm) $(BINDIR)",
     tools = ["build-wasm"],
 )
 
@@ -68,7 +69,8 @@ alias(
 )
 
 # Bundled and minified runtime: app.js pulls in its imports, mid_worker.js
-# pulls in the wasm interface (fs is the unused node branch of mid_sync.js)
+# pulls in the wasm interface (fs and worker_threads are its unused node
+# branches), and mid_helper.js is loaded by the threaded solver's workers
 genrule(
     name = "app",
     srcs = [
@@ -83,10 +85,22 @@ genrule(
 
 genrule(
     name = "worker",
-    srcs = ["src/mid_worker.js"],
+    srcs = [
+        "src/mid_sync.js",
+        "src/mid_worker.js",
+    ],
     outs = ["public/mid_worker.js"],
-    cmd = "$(location :esbuild) --minify --log-level=warning " +
-          "--outfile=$@ $(location src/mid_worker.js)",
+    cmd = "$(location :esbuild) --bundle --minify --format=esm --log-level=warning " +
+          "--external:fs --external:worker_threads --outfile=$@ $(location src/mid_worker.js)",
+    tools = [":esbuild"],
+)
+
+genrule(
+    name = "helper",
+    srcs = ["src/mid_helper.js"],
+    outs = ["public/mid_helper.js"],
+    cmd = "$(location :esbuild) --minify --format=esm --log-level=warning " +
+          "--outfile=$@ $(location src/mid_helper.js)",
     tools = [":esbuild"],
 )
 
@@ -98,6 +112,7 @@ filegroup(
         ":app",
         ":counts",
         ":favicon",
+        ":helper",
         ":index",
         ":wasm",
         ":worker",
@@ -108,15 +123,16 @@ filegroup(
 sh_test(
     name = "unit",
     srcs = ["unit_test.sh"],
-    size = "small",
+    size = "medium",
     # Midsolves are dealt round-robin to shards (see unit.js); wall time is
-    # roughly one 18-stone solve
+    # roughly one single threaded tiled 18-stone solve
     shard_count = 10,
     data = [
         ":wasm",
         "src/app.js",
         "src/board.js",
         "src/games.js",
+        "src/mid_helper.js",
         "src/mid_sync.js",
         "src/pending.js",
         "src/unit.js",

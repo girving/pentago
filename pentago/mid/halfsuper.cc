@@ -39,6 +39,11 @@ super_t merge(const halfsuper_t even, const halfsuper_t odd) {
 #if PENTAGO_SSE
   v[0].x = v[1].y = even.s.x;
   v[0].y = v[1].x =  odd.s.x;
+#elif PENTAGO_WASM_SIMD
+  v[0].a = v[1].c = wasm_u64x2_extract_lane(even.s.x, 0);
+  v[0].b = v[1].d = wasm_u64x2_extract_lane(even.s.x, 1);
+  v[0].c = v[1].a = wasm_u64x2_extract_lane( odd.s.x, 0);
+  v[0].d = v[1].b = wasm_u64x2_extract_lane( odd.s.x, 1);
 #else
   v[0].a = v[1].c = even.s.a;
   v[0].b = v[1].d = even.s.b;
@@ -55,6 +60,8 @@ int popcount(halfsuper_s h) {
   union { __m128i a; uint64_t b[2]; } c;
   c.a = h.x;
   return popcount(c.b[0]) + popcount(c.b[1]);
+#elif PENTAGO_WASM_SIMD
+  return popcount(wasm_u64x2_extract_lane(h.x, 0)) + popcount(wasm_u64x2_extract_lane(h.x, 1));
 #else
   return popcount(h.a) + popcount(h.b);
 #endif

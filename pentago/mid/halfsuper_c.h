@@ -9,6 +9,8 @@
 typedef struct halfsuper_s_ {
 #if PENTAGO_SSE
   __m128i x;
+#elif PENTAGO_WASM_SIMD
+  v128_t x;
 #else
   uint64_t a, b;
 #endif
