@@ -74,6 +74,11 @@ struct pool_t {
       for (int i = 0; i < n; i++) f(c, i, 0);
       return;
     }
+    // Workers read the generation before registering, so once all have registered none can miss the
+    // bump below.  Without this a worker starting late waits for the following generation and this
+    // run never completes, which is what happened on slow CI machines.
+    for (int w; (w = aload(&nworkers)) < threads - 1;)
+      wait_while(&nworkers, w);
     fn = f; ctx = c;
     astore(&count, n);
     astore(&next, 0);
@@ -88,9 +93,11 @@ struct pool_t {
 
   // Worker loop: returns only when stop is set
   void worker() {
+    int gen = aload(&generation);  // Before registering, see run()
     const int me = aadd(&nworkers, 1) + 1;
-    int gen = aload(&generation);
+    wake(&nworkers);
     for (;;) {
+      if (aload(&stop)) return;  // Stop may have preceded the generation we first saw
       wait_while(&generation, gen);
       gen = aload(&generation);
       if (aload(&stop)) return;
