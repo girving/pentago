@@ -15,6 +15,26 @@ On macOS, when running `bin/bazel` via the Bash tool, always use `dangerouslyDis
 
 In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first: it installs bazelisk, clang/lld, and MPI, and routes bazel around download hosts the container's network proxy blocks. After that `bin/bazel` works normally.
 
+## CI (.github/workflows/build.yml)
+
+- `ubuntu-latest` compiles natively with GCC 13 and builds wasm with apt clang 18, so anything in
+  the wasm source set must compile under both. Guard clang-only builtins with `__has_builtin` and
+  give GCC a fallback (`__builtin_elementwise_popcount` is clang 19+, `__builtin_reduce_min` has no
+  GCC equivalent). GCC also rejects exported structs with anonymous-namespace members
+  (`-Wsubobject-linkage`) and `memset` of non-trivial types (`-Wclass-memaccess`).
+- The runner is roughly 5x slower than the dev Mac for single threaded work (tiled_test: 20 s
+  locally, 107 s there). Keep a `medium` test under about 60 s locally, or give it its own
+  `cc_tests(size = "large")` group.
+- A test that runs out its whole budget on CI but finishes quickly here is more likely a hang than
+  slowness. Thread startup races in particular never reproduce on this Mac; reproduce them by
+  temporarily delaying worker startup (e.g. a `sleep_for` at the top of the worker loop).
+
+## Branches
+
+- Deleted branches live on as `archive/<name>` tags, so nothing is lost by pruning.
+- `git-annex` and `synced/git-annex` are intentionally kept: other clones still use annex.
+- `sixteen` holds the in-progress tiled compressed midsolver for 16 and 17 stone boards.
+
 ## Project structure
 
 - `pentago/utility/` — general utilities (threads, arrays, memory, etc.)
@@ -89,6 +109,9 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
 - Benchmark with min-of-N iterations (N=10) for stable numbers. Single runs have ~15% noise on this machine.
 - `#pragma GCC unroll N` is critical for loops over `constexpr` arrays in SIMD code — GCC won't constant-fold array indices through unrolled iterations without it. Measured 44% speedup for forward8.
 - Write tests that measure the actual use case, not proxy metrics. E.g. batch diversity (how many distinct positions per training batch) is more relevant than chi-squared uniformity for ML training quality.
+- Check `uptime` before timing anything: other builds often run on this machine, and a load average
+  above the core count makes single runs vary by 30% or more. Alternate the binaries under
+  comparison rather than running all of one and then all of the other.
 - Profile with `perf annotate` before guessing at bottlenecks — intuition about what's slow is often wrong (e.g. the 160-byte transpose was assumed cheap but was 15% of decoder time).
 
 ## Settled design decisions (don't re-investigate)
@@ -140,6 +163,9 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
 - clang's builtin `inttypes.h` does `#include_next <inttypes.h>` and fails without a libc one; supply
   a one-line shim that includes `<stdint.h>`. `-ffreestanding` implies `-fno-builtin`, so hand-written
   `mem*` loops won't be compiled back into calls to themselves.
+- Wasm SIMD (`-msimd128`, the `PENTAGO_WASM_SIMD` halfsuper_t path) speeds the dense midsolve by
+  only about 2%, since it is memory bound, and a SIMD mid.wasm refuses to load on Safari before
+  16.4. Do not ship it on its own; it pays off only in the tiled solver's codec.
 - liblzma: define `HAVE_CONFIG_H` and supply `config.h` (its fallback header includes `<inttypes.h>`
   unconditionally otherwise); `filter_decoder.c` includes the simple/delta filter headers even when
   those filters are compiled out, so keep their `-I` paths.
