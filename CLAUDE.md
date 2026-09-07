@@ -91,6 +91,25 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
 - Write tests that measure the actual use case, not proxy metrics. E.g. batch diversity (how many distinct positions per training batch) is more relevant than chi-squared uniformity for ML training quality.
 - Profile with `perf annotate` before guessing at bottlenecks — intuition about what's slow is often wrong (e.g. the 160-byte transpose was assumed cheap but was 15% of decoder time).
 
+## Settled design decisions (don't re-investigate)
+
+- **Forward search for 18+ stone boards is a dead end; the backward midsolve (`pentago/mid`) stays.**
+  Re-examined in 2026 and the original rejection holds for structural reasons, not old-engine
+  inefficiency. From an 18-stone root there are 86.6M downstream positions (rotations abstracted)
+  vs 18! = 6.4e15 raw tree leaves, so the DAG collapses the tree by ~10^11 while best-case
+  alpha-beta only collapses it by ~10^8 (sqrt(18!) = 80M leaves, about the size of the whole DAG).
+  The midsolve visits every position via a perfect hash-free combinatorial index at ~18 ns per
+  position per pass covering 128 rotation states; a forward node (superstandardize, hashed TT,
+  super win detection) costs 100-1000x more, so forward only wins when it visits under ~1% of
+  positions. Random boards do; boards on best-play lines don't, because a node is cut only when
+  all 128 rotation states are decided and different rotations want different refutations, so the
+  proof DAG approaches the full reachable set. Ties also need two proofs. df-pn, a lazy top-down
+  memoized midsolve, forward-then-midsolve hybrids (18 children x 29.6M positions = 6x the root
+  sweep), and threat-space search all fail on the same tail. Real speedups are parallelizing the
+  backward sweep (outer `s0` loop in `midsolve_loop` is embarrassingly parallel per slice; Web
+  Workers or a WebGPU port of the existing Metal kernel) or serving slice 18 from the bucket so the
+  client only midsolves 19+ stones (3x smaller, but Coldline retrieval cost).
+
 ## Web server (web/server)
 
 - **Zero npm dependencies, by design.** Auth (`auth.js`), HTTP (`request.js`), logging (`log.js`), the
