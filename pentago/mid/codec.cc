@@ -40,22 +40,56 @@ inline bool is_zero(const bits128 a) { return !(a.lo | a.hi); }
 inline int pop(const bits128 a) { return __builtin_popcountll(a.lo) + __builtin_popcountll(a.hi); }
 inline bits128 bit(const int i) { return i < 64 ? bits128{uint64_t(1) << i, 0} : bits128{0, uint64_t(1) << (i - 64)}; }
 
-// Sixteen byte lanes, via clang's generic vector extensions so the same code lowers to NEON, SSE, and wasm SIMD
+// Sixteen byte lanes, via the GCC/clang generic vector extensions so the same code lowers to NEON, SSE, and wasm SIMD
 typedef uint8_t u8x16 __attribute__((vector_size(16)));
 inline u8x16 load16(const uint8_t* p) { u8x16 v; __builtin_memcpy(&v, p, 16); return v; }
 inline void store16(uint8_t* p, const u8x16 v) { __builtin_memcpy(p, &v, 16); }
 inline u8x16 splat16(const uint8_t x) { return u8x16{x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x}; }
+inline u8x16 min16(const u8x16 a, const u8x16 b) { return a < b ? a : b; }
+
+// Per-lane popcount.  Clang 19+ has __builtin_elementwise_popcount, but Ubuntu 24.04 ships clang 18 and GCC has
+// no equivalent, so spell out the instruction where we know it: i8x16.popcnt on wasm, and on x86 two pshufb
+// nibble lookups (what clang emits short of AVX512 BITALG).  Anything else falls back to bit twiddling.
+inline u8x16 popcount16(const u8x16 v) {
+#if PENTAGO_WASM_SIMD
+  return (u8x16)wasm_i8x16_popcnt((v128_t)v);
+#elif __has_builtin(__builtin_elementwise_popcount)
+  return __builtin_elementwise_popcount(v);
+#elif PENTAGO_SSE && defined(__SSSE3__)
+  const __m128i nibbles = _mm_setr_epi8(0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4);
+  return (u8x16)_mm_shuffle_epi8(nibbles, (__m128i)(v & 15)) + (u8x16)_mm_shuffle_epi8(nibbles, (__m128i)(v >> 4));
+#else
+  const u8x16 a = v - ((v >> 1) & 0x55);
+  const u8x16 b = (a & 0x33) + ((a >> 2) & 0x33);
+  return (b + (b >> 4)) & 15;
+#endif
+}
+
+// Smallest lane.  Clang has a builtin; GCC gets a tree of pairwise lane minimums
+inline uint8_t min_lane(u8x16 v) {
+#if __has_builtin(__builtin_reduce_min)
+  return __builtin_reduce_min(v);
+#else
+  v = min16(v, __builtin_shufflevector(v, v, 8, 9, 10, 11, 12, 13, 14, 15, 8, 9, 10, 11, 12, 13, 14, 15));
+  v = min16(v, __builtin_shufflevector(v, v, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7, 4, 5, 6, 7));
+  v = min16(v, __builtin_shufflevector(v, v, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3));
+  v = min16(v, __builtin_shufflevector(v, v, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1));
+  return v[0];
+#endif
+}
+
+}  // namespace
 
 // Recency caches of 128 bit values in byte-plane layout: planes[k][j] is byte k of slot j.  One pass
 // over the 16 planes then computes the masked popcount of every slot against a query at once, which
 // serves both exact matching (popcount zero) and nearest neighbor search.  Ranks are coded flat, so
-// slots are a ring: rank r is the r-th most recently inserted value.
+// slots are a ring: rank r is the r-th most recently inserted value.  Trivial, since hs_caches_init
+// zeroes it, and outside the unnamed namespace since the externally visible hs_caches_t embeds it
+// (GCC's -Wsubobject-linkage rejects fields of anonymous type there).
 template<int size> struct plane_cache_t {
   static_assert(size == 16 || size == 32);
   uint8_t planes[16][size];
-  int head = 0;  // Next slot to fill; slot of rank r is (head-1-r) mod size
-
-  plane_cache_t() { __builtin_memset(planes, 0, sizeof(planes)); }
+  int head;  // Next slot to fill; slot of rank r is (head-1-r) mod size
 
   int slot(const int rank) const { return (head - 1 - rank) & (size - 1); }
   int rank(const int slot) const { return (head - 1 - slot) & (size - 1); }
@@ -81,8 +115,8 @@ template<int size> struct plane_cache_t {
 #define PENTAGO_SCAN_STEP(k) { \
       const u8x16 xk = __builtin_shufflevector(xv, xv, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k); \
       const u8x16 ik = __builtin_shufflevector(iv, iv, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k, k); \
-      s0 += __builtin_elementwise_popcount((load16(planes[k]) ^ xk) & ik); \
-      if (size == 32) s1 += __builtin_elementwise_popcount((load16(planes[k] + 16) ^ xk) & ik); }
+      s0 += popcount16((load16(planes[k]) ^ xk) & ik); \
+      if (size == 32) s1 += popcount16((load16(planes[k] + 16) ^ xk) & ik); }
     PENTAGO_SCAN_STEP(0) PENTAGO_SCAN_STEP(1) PENTAGO_SCAN_STEP(2) PENTAGO_SCAN_STEP(3)
     PENTAGO_SCAN_STEP(4) PENTAGO_SCAN_STEP(5) PENTAGO_SCAN_STEP(6) PENTAGO_SCAN_STEP(7)
     PENTAGO_SCAN_STEP(8) PENTAGO_SCAN_STEP(9) PENTAGO_SCAN_STEP(10) PENTAGO_SCAN_STEP(11)
@@ -90,7 +124,7 @@ template<int size> struct plane_cache_t {
 #undef PENTAGO_SCAN_STEP
     store16(pops, s0);
     if (size == 32) store16(pops + 16, s1);
-    return size == 32 ? std::min(__builtin_reduce_min(s0), __builtin_reduce_min(s1)) : __builtin_reduce_min(s0);
+    return min_lane(size == 32 ? min16(s0, s1) : s0);
   }
 
   // Rank of the most recent slot with pops == 0, given that one exists
@@ -106,8 +140,6 @@ template<int size> struct plane_cache_t {
     return r;
   }
 };
-
-}  // namespace
 
 struct hs_caches_t {
   bits128 prev;
