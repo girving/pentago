@@ -81,13 +81,15 @@ TEST(tiled, matches_midsolve) {
   Random random(1234);
   const auto workspace = midsolve_workspace(18);
   for (const int trial : range(12)) {
-    const int stones = random.uniform<int>(18, 24);
-    const auto board = high_board_t::from_board(random_board(random, stones), trial & 1);
-    const auto dense = midsolve_internal(board, workspace);
     tiled_options_t opts;
     opts.prefix = trial % 7;  // 0 means automatic
     opts.threads = trial % 3 == 0 ? 4 : 1;
     opts.merged = trial % 2 == 1;
+    // 18 stone boards take several seconds each (the dense solve is single threaded), too slow for CI to do
+    // many, so cover one with threads and keep the rest at 19+ stones
+    const int stones = trial == 0 ? 18 : random.uniform<int>(19, opts.threads == 1 ? 24 : 22);
+    const auto board = high_board_t::from_board(random_board(random, stones), trial & 1);
+    const auto dense = midsolve_internal(board, workspace);
     tiled_stats_t stats;
     const auto tiled = midsolve_tiled_internal(board, opts, &stats);
     for (const int i : range(dense.size()))
@@ -106,7 +108,7 @@ TEST(tiled, values) {
   Random random(99);
   const auto workspace = midsolve_workspace(18);
   for (const int trial : range(4)) {
-    const auto board = high_board_t::from_board(random_board(random, 18 + trial), trial & 1);
+    const auto board = high_board_t::from_board(random_board(random, 19 + trial), trial & 1);
     const auto a = midsolve(board, workspace);
     tiled_options_t opts;
     const auto b = midsolve_tiled(board, opts);

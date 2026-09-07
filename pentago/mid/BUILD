@@ -44,8 +44,20 @@ cc_tests(
     names = [
         "mid_test",
         "benchmark_test",
-        "tiled_test",
     ],
+    deps = [
+        ":codec",
+        ":halfsuper",
+        ":mid",
+        ":tiled",
+        "//pentago/high:check",
+    ],
+)
+
+cc_tests(
+    names = ["tiled_test"],
+    # Solves several boards both ways, which needs more than the medium budget on slow CI runners
+    size = "large",
     deps = [
         ":codec",
         ":halfsuper",
