@@ -49,8 +49,12 @@ const char* const style =
   ".rv{stroke:#000;stroke-width:.024}"
   ".b .c{fill:#000}"
   ".w .c{fill:#fff}"
-  ".bt .p:hover .c,.bt .rot:hover .arrow{fill:#000}"
-  ".wt .p:hover .c,.wt .rot:hover .arrow{fill:#fff}"
+  // Hover previews only where hover is real: touch browsers leave :hover
+  // stuck on the last tapped element, so after a move and then back, the
+  // spot just played would keep showing a phantom stone
+  "@media(hover:hover){"
+    ".bt .p:hover .c,.bt .rot:hover .arrow{fill:#000}"
+    ".wt .p:hover .c,.wt .rot:hover .arrow{fill:#fff}}"
   ".sep{fill:darkgray}"
   ".rot{display:none}"
   ".mid .rot{display:inline}"
