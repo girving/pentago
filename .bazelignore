@@ -1,1 +1,3 @@
 .cache
+# Gitignored scratch space; its BUILD may reference targets from other branches
+tmp
