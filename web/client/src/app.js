@@ -235,13 +235,14 @@ function render() {
   const mid = b.middle && !b.done
 
   // Start the spin recorded by a rotator click, if this render is its result
-  let spin_d = 0
+  let spin_q = -1, spin_d = 0
   if (pending_spin) {
     const [q, d, href] = pending_spin
     pending_spin = null
     if (location.hash == href) {
       swivel[q] += d
       spinning[q] = true
+      spin_q = q
       spin_d = d
       // If the browser skips the transition (e.g. hidden tab), no transition
       // event ever fires, so time out just past the .5s transition
@@ -286,7 +287,11 @@ function render() {
     }
     const e = quads[q]
     if (spinning[q]) {
-      if (e.style.transform != chain(t)) {
+      // Only the render that consumed the click starts the spin; later
+      // renders mid-spin (e.g. a fast local midsolve arriving) must leave
+      // the transition alone.  Comparing e.style.transform to chain(t)
+      // can't detect this, since browsers reserialize the string.
+      if (q == spin_q) {
         // Entering a spin: jump (no transition) to the chain form of the
         // old orientation, so the transition interpolates chain-to-chain
         e.style.transition = 'none'
