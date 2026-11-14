@@ -32,3 +32,4 @@ config
 hooks
 objects
 refs
+.claude/launch.json
