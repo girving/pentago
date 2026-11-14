@@ -26,3 +26,6 @@ build:macos --host_action_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
 # passes (the directory need not exist).  Use Apple's ld, which doesn't warn,
 # and drop the --start-lib/--end-lib it doesn't understand.
 build:macos --linkopt=-fuse-ld=ld --host_linkopt=-fuse-ld=ld --nostart_end_lib
+
+# Keep curl's own code warning free (its BCR BUILD file doesn't use -Werror)
+build --per_file_copt=external/curl[+]/.*[.]c@-Werror
