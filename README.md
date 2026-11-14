@@ -5,7 +5,7 @@ A massively parallel pentago solver
 
 This project implements a strong solution of the board game pentago, which means
 that perfect play can be efficiently computed starting from any position.  The
-results can be explored at https://perfect-pentago.net.  The associated paper
+results can be explored at [perfect-pentago.net](https://perfect-pentago.net).  The associated paper
 is <a href="https://arxiv.org/abs/1404.0743">Irving 2014, Pentago is a first-player win</a>.
 
 In the quest towards a strong solution, a total of five separate engines were
