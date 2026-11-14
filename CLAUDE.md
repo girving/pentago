@@ -135,6 +135,13 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
 
 ## Web server (web/server)
 
+- **Public URL is `https://perfect-pentago.net/backend/<board>`.** The site is the `perfect-pentago`
+  Firebase Hosting site in project `naml-148801` (moved from `pentago-b8241` in 2026-11; the project's
+  default site `naml-148801` is an unrelated personal homepage, never deploy to it). A hosting rewrite
+  sends `/backend/**` to the 1st gen function `pentago`, which strips the prefix (`board_name` in
+  `index.js`); the raw `cloudfunctions.net/pentago/<board>` URL still works. Firebase's CDN caches
+  successful responses for their one-year `max-age`; errors send `no-store`, since Firebase otherwise
+  caches them for 10 minutes. DNS for perfect-pentago.net is at Squarespace, not Cloud DNS.
 - **Zero npm dependencies, by design.** Auth (`auth.js`), HTTP (`request.js`), logging (`log.js`), the
   LRU cache (`lru.js`), and xz decoding (`xz.js` + bazel-built `xz.wasm`) are all small in-repo modules.
   Don't add packages; extend these instead. `package.json` stays because Cloud Functions requires it.

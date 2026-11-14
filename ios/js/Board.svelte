@@ -203,7 +203,7 @@
   const floor = Math.floor
 
   // Backend, with a bit of caching to avoid flicker on the back button
-  const backend_url = 'https://us-central1-naml-148801.cloudfunctions.net/pentago/'
+  const backend_url = 'https://perfect-pentago.net/backend/'
 
   // Track url hash
   let hash = window.location.hash || '#0'

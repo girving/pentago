@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "perfect-pentago",
     "public": "public",
     "ignore": [
       "firebase.json",
@@ -9,10 +10,28 @@
     "headers": [
       {
         "source": "**/*.wasm",
-        "headers": [{
-          "key": "Content-Type",
-          "value": "application/wasm"
-        }]
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/wasm"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/backend",
+        "function": {
+          "functionId": "pentago",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/backend/**",
+        "function": {
+          "functionId": "pentago",
+          "region": "us-central1"
+        }
       }
     ]
   }

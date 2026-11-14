@@ -95,7 +95,7 @@ TEST(full, DISABLED_query_server) {
     } else {
       // <18-stone boards: query the server with exponential backoff
       const string url = tfm::format(
-          "https://us-central1-naml-148801.cloudfunctions.net/pentago/%llu",
+          "https://perfect-pentago.net/backend/%llu",
           (unsigned long long)board);
       for (int attempt = 0; attempt <= max_retries; attempt++) {
         if (attempt > 0)

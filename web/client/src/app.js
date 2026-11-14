@@ -13,7 +13,7 @@
 
 import { parse_board } from './board.js'
 
-const backend_url = 'https://us-central1-naml-148801.cloudfunctions.net/pentago/'
+const backend_url = 'https://perfect-pentago.net/backend/'
 const colors = ['red', 'blue', 'lime']  // value + 1; blue and lime are exactly #0000ff and #00ff00
 
 // Lazy localStorage cache of board values, cleared wholesale if full

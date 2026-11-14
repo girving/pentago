@@ -1,4 +1,4 @@
-Usage: https://backend.perfect-pentago.net/<board>
+Usage: https://perfect-pentago.net/backend/<board>
 
 If <board> describes a valid pentago position, compute or lookup the values
 of all children of <board> (valid moves starting at <board>) and return the

@@ -297,6 +297,14 @@ function test_log() {
 }
 
 // Serve requests on a local port, returning {url, close}
+function test_board_name() {
+  // Direct function calls and the perfect-pentago.net/backend rewrite both work
+  const {board_name} = require('./index.js')
+  for (const [url, name] of [['/0', '0'], ['/1m', '1m'], ['/backend/0', '0'], ['/backend/1m', '1m'],
+                           ['/', ''], ['/backend', ''], ['/backend/', ''], ['/backendx', 'backendx']])
+    assert.equal(board_name(url), name)
+}
+
 async function local_server(handler) {
   const server = http.createServer(handler)
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -452,7 +460,7 @@ const options = {
 
 // Register tests
 const tests = [test_moves, test_done, test_pending, test_str, test_section, test_transform_board, test_uninterleave,
-               test_descendent_sections, test_lru, test_xz, test_log, test_request, test_auth]
+               test_descendent_sections, test_lru, test_xz, test_log, test_request, test_auth, test_board_name]
 if (positionals.length > 0) {
   if (positionals.length > 1)
     throw Error('expected 0 or 1 arguments')
