@@ -5,10 +5,12 @@ common --repo_contents_cache=
 try-import %workspace%/.bazelrc.local
 
 # libc++ marks std::counting_semaphore unavailable before macOS 11, and from
-# the macOS 27 SDK rejects any target before macOS 11 outright.  Tools built for the
-# exec configuration (e.g. web/client/cc:site) default to 10.11, so set both.
-build --macos_minimum_os=11.0
-build --host_macos_minimum_os=11.0
+# the macOS 27 SDK rejects any target before macOS 11 outright.  Homebrew's
+# libmpi is built for macOS 26, so linking it against an older target warns.
+# Tools built for the exec configuration (e.g. web/client/cc:site) default to
+# 10.11, so set both.
+build --macos_minimum_os=26.0
+build --host_macos_minimum_os=26.0
 
 # rules_cc's autoconfigured toolchain lists only the Command Line Tools SDK
 # root as builtin, so with xcode-select pointing at Xcode.app every compile
@@ -18,3 +20,9 @@ common --enable_platform_specific_config
 common:macos --repo_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
 build:macos --action_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
 build:macos --host_action_env=DEVELOPER_DIR=/Library/Developer/CommandLineTools
+
+# rules_cc links with Homebrew's ld64.lld whenever it is on PATH, and lld warns
+# on every link about the -L/usr/local/lib that Apple's clang driver always
+# passes (the directory need not exist).  Use Apple's ld, which doesn't warn,
+# and drop the --start-lib/--end-lib it doesn't understand.
+build:macos --linkopt=-fuse-ld=ld --host_linkopt=-fuse-ld=ld --nostart_end_lib
