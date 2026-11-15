@@ -49,7 +49,6 @@ In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first
   does a 17 stone board and all its children, or gives up so the client falls back to the tiled solver
 - `pentago/high/` — high-level public API
 - `pentago/mpi/` — MPI distributed computation
-- `pentago/learn/` — ML (TensorFlow ops)
 - `third_party/` — external dependency BUILD files and detection (.bzl)
 - `web/server/` — Node.js backend (Google Cloud Functions)
 - `web/client/` — Svelte + WebAssembly frontend
