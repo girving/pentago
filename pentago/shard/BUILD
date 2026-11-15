@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "shard",
-    srcs = glob(["*.h", "*.cc"], exclude=["sharder.cc", "shard_sizes.cc", "shard_permute_search.cc", "iterate.cc", "*_test.cc", "*_bench.cc"]),
+    srcs = glob(["*.h", "*.cc"], exclude=["sharder.cc", "shard_sizes.cc", "shard_permute_search.cc", "iterate.cc", "strip.cc", "*_test.cc", "*_bench.cc"]),
     copts = COPTS,
     deps = [
         "//pentago/base",
@@ -89,6 +89,18 @@ cc_binary(
     ],
 )
 
+# Drop high slices from shard files, verifying each output
+cc_binary(
+    name = "strip",
+    srcs = ["strip.cc"],
+    copts = COPTS,
+    deps = [
+        ":shard",
+        "//pentago/data",
+        "//pentago/utility",
+    ],
+)
+
 cc_binary(
     name = "iterate",
     srcs = ["iterate.cc"],
@@ -106,7 +118,7 @@ cc_test(
     deps = [
         ":shard",
         "//pentago/high",
-        "//pentago/mid",
+        "//pentago/mid:tiled",
         "//pentago/utility",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",

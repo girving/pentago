@@ -3,6 +3,10 @@
 Generate ~100 GB of shard files (8500 of 1048576 total shards, slices 0–18) for initial
 ML training.
 
+In 2026-11 slice 18 was deleted from the buckets, and `strip` (strip.cc) dropped it from every
+shard in gs://pentago-shards, leaving slices 0–17 (about 58 GB).  A rerun of this plan can't
+regenerate slice 18.
+
 ## Prep
 
 ```bash

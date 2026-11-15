@@ -150,6 +150,50 @@ TEST(shard, file_roundtrip) {
   }
 }
 
+// strip_shard keeps the header and the low groups byte for byte, and the result reads back
+TEST(shard, strip) {
+  const int max_slice = 4;
+  vector<arithmetic_t> groups;
+  for (const int s : range(max_slice + 1)) {
+    const uint64_t n = 50 + s * 211;
+    ternaries_t data(n);
+    for (uint64_t i = 0; i < n; i++)
+      data.set(i, int((i * 7 + s) % 3));
+    groups.push_back(arithmetic_encode(data));
+  }
+  shard_header_t h;
+  h.max_slice = max_slice;
+  h.shard_id = 3;
+  h.total_shards = 8;
+  const auto full = serialize_shard(h, asarray(groups));
+
+  for (const int keep : range(max_slice)) {
+    const auto stripped = strip_shard(full, keep);
+
+    // Same bytes as serializing just the kept groups
+    shard_header_t hk = h;
+    hk.max_slice = keep;
+    const auto direct = serialize_shard(hk, asarray(groups).slice(0, keep + 1));
+    ASSERT_TRUE(stripped == direct) << "keep " << keep;
+
+    // Reads back with the same header fields and group contents
+    const shard_file_t sf(stripped);
+    PENTAGO_ASSERT_EQ(sf.header.max_slice, uint32_t(keep));
+    PENTAGO_ASSERT_EQ(sf.header.shard_id, 3u);
+    PENTAGO_ASSERT_EQ(sf.header.total_shards, 8u);
+    for (const int s : range(keep + 1)) {
+      const auto decoded = arithmetic_decode(sf.read_group(s));
+      PENTAGO_ASSERT_EQ(decoded.size, 50 + uint64_t(s) * 211);
+      for (uint64_t i = 0; i < decoded.size; i++)
+        PENTAGO_ASSERT_EQ(decoded[i], int((i * 7 + s) % 3));
+    }
+
+    // Stripping in two steps matches one step
+    if (keep > 0)
+      ASSERT_TRUE(strip_shard(strip_shard(full, keep), keep - 1) == strip_shard(full, keep - 1));
+  }
+}
+
 // Verify shard_locator_t::shard() and position() are consistent with shuffled_index()
 TEST(shard, locator_roundtrip) {
   for (const int slice : range(5)) {

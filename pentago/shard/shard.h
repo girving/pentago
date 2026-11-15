@@ -163,6 +163,11 @@ struct shard_header_t {
 Array<uint8_t> serialize_shard(const shard_header_t& header,
                                RawArray<const arithmetic_t> groups);
 
+// Drop the groups of slices above max_slice from a serialized shard.  The header and the remaining
+// groups are copied byte for byte, so nothing is re-encoded.  Each slice has its own shuffled
+// mapping, so the result reads exactly like the original restricted to slices 0..max_slice.
+Array<uint8_t> strip_shard(RawArray<const uint8_t> data, const int max_slice);
+
 // Write a complete shard file to a local path
 void write_shard(const string& path, const shard_header_t& header,
                  RawArray<const arithmetic_t> groups);

@@ -236,6 +236,32 @@ Array<uint8_t> serialize_shard(const shard_header_t& header,
   return buf;
 }
 
+Array<uint8_t> strip_shard(RawArray<const uint8_t> data, const int max_slice) {
+  const shard_file_t sf(data.copy());
+  const int old_n = sf.header.max_slice + 1, n = max_slice + 1;
+  GEODE_ASSERT(0 <= max_slice && max_slice < int(sf.header.max_slice));
+  const auto& offs = sf.group_offsets;
+  GEODE_ASSERT(offs[old_n] == uint32_t(data.size()), "shard has trailing bytes");
+  for (const int i : range(old_n))
+    GEODE_ASSERT(offs[i] < offs[i + 1]);
+  GEODE_ASSERT(offs[0] == uint32_t(shard_header_t::header_size + (old_n + 1) * 4));
+
+  // Groups 0..max_slice move down by the bytes the offset table shrinks
+  const uint32_t shift = (old_n - n) * 4;
+  const uint32_t end = offs[n] - shift;
+  Array<uint8_t> buf(int(end), uninit);
+  shard_header_t h = sf.header;
+  h.max_slice = max_slice;
+  h.pack(buf.slice(0, shard_header_t::header_size));
+  Array<uint32_t> new_offs(n + 1, uninit);
+  for (const int i : range(n + 1))
+    new_offs[i] = offs[i] - shift;
+  to_little_endian_inplace(new_offs);
+  memcpy(buf.data() + shard_header_t::header_size, new_offs.data(), (n + 1) * 4);
+  memcpy(buf.data() + offs[0] - shift, data.data() + offs[0], offs[n] - offs[0]);
+  return buf;
+}
+
 void write_shard(const string& path, const shard_header_t& header,
                  RawArray<const arithmetic_t> groups) {
   const auto buf = serialize_shard(header, groups);
