@@ -17,7 +17,9 @@ exports.defaults = {
   // Keep well below the function's memory limit (256M): the Node runtime, lzma buffers,
   // and transient request state need the rest, and lru eviction only sees cache entries.
   cache: '128M',
-  maxSlice: 18,
+  // Boards with fewer stones are served, reading slices up to this one.  17 stone boards are solved
+  // on the client (web/client/src/app.js), so slice 18 is not needed.
+  maxSlice: 17,
   maxSockets: 64,
 }
 

@@ -387,6 +387,15 @@ async function test_auth() {
   }
 }
 
+// Boards with maxSlice or more stones are refused as client errors, before any lookup
+async function test_max_slice() {
+  const compute = Values.values({}, Log('error'))
+  const board = new board_t('5061495148003858120')
+  assert.equal(board.count, 17)
+  assert.equal(Values.defaults.maxSlice, 17)
+  await assert.rejects(compute(board), e => e.status == 400 && /computed locally/.test(e.message))
+}
+
 async function test_values() {
   let games = all_games()
   // Truncate
@@ -399,12 +408,13 @@ async function test_values() {
 
   const log = Log('debug')
   const compute = Values.values(options, log)  // Use a small cache to test replacement
+  const max_slice = options.maxSlice || Values.defaults.maxSlice
   async function epoch(which) {
     async function test(path, values) {
       const seen = {}
       async function step(name) {
         const board = new board_t(name)
-        if (board.count >= 18)
+        if (board.count >= max_slice)
           return
         log.info('board %s launched', name)
         const results = await compute(board)
@@ -419,7 +429,7 @@ async function test_values() {
       if (!truncate) {
         for (const b in values) {
           const board = new board_t(b)
-          if (!seen[b] && board.count - board.middle < 18)
+          if (!seen[b] && board.count - board.middle < max_slice)
             throw Error('missed board ' + b + ', count = ' + board.count)
         }
       }
@@ -460,7 +470,8 @@ const options = {
 
 // Register tests
 const tests = [test_moves, test_done, test_pending, test_str, test_section, test_transform_board, test_uninterleave,
-               test_descendent_sections, test_lru, test_xz, test_log, test_request, test_auth, test_board_name]
+               test_descendent_sections, test_lru, test_xz, test_log, test_request, test_auth, test_board_name,
+               test_max_slice]
 if (positionals.length > 0) {
   if (positionals.length > 1)
     throw Error('expected 0 or 1 arguments')
