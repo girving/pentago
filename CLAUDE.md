@@ -31,9 +31,9 @@ In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first
 
 ## Branches
 
-- Deleted branches live on as `archive/<name>` tags, so nothing is lost by pruning.
+- Older deleted branches live on as `archive/<name>` tags. Branches whose work is on main, and
+  temporary `claude/*` session branches, are deleted without a tag.
 - `git-annex` and `synced/git-annex` are intentionally kept: other clones still use annex.
-- `sixteen` holds the in-progress tiled compressed midsolver for 16 and 17 stone boards.
 
 ## Project structure
 
@@ -42,9 +42,11 @@ In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first
 - `pentago/search/` — forward tree search
 - `pentago/data/` — file I/O, compression, serialization
 - `pentago/end/` — backward endgame solver (retrograde analysis)
-- `pentago/mid/` — midgame solver (18+ stones)
-- `pentago/cascade/` — exact values of 18+ stone boards by cheap provers first: superengine, then an
-  undo-strategy tie prover (`tie.h`), then midsolve
+- `pentago/mid/` — midgame solver: dense midsolve for 18+ stones, tiled compressed solver (`tiled.h`)
+  for 16 and 17 stones in a few hundred MB, threaded
+- `pentago/cascade/` — exact values of 18+ stone boards by cheap provers first: a halfsuper_t forward
+  search (`halfengine.h`), then an undo-strategy tie prover (`tie.h`), then midsolve. `children()`
+  does a 17 stone board and all its children, or gives up so the client falls back to the tiled solver
 - `pentago/high/` — high-level public API
 - `pentago/mpi/` — MPI distributed computation
 - `pentago/learn/` — ML (TensorFlow ops)
@@ -132,8 +134,9 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
   memoized midsolve, forward-then-midsolve hybrids (18 children x 29.6M positions = 6x the root
   sweep), and threat-space search all fail on the same tail. Real speedups are parallelizing the
   backward sweep (outer `s0` loop in `midsolve_loop` is embarrassingly parallel per slice; Web
-  Workers or a WebGPU port of the existing Metal kernel) or serving slice 18 from the bucket so the
-  client only midsolves 19+ stones (3x smaller, but Coldline retrieval cost).
+  Workers or a WebGPU port of the existing Metal kernel). Since 2026-11 the client solves 17 stone
+  boards itself (cascade first, then the threaded tiled solver), the server only answers 16 or fewer,
+  and slice 18 is deleted from both buckets (pentago-us-central1 and pentago-archive).
 
 ## Web server (web/server)
 
@@ -159,10 +162,32 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
   run, and read `gcloud functions logs read pentago --region us-central1`.
 - Add ad hoc checks to `unit.js` as permanent tests when generally useful; `token_source` takes
   `{adc, metadata_host}` options so tests never touch global environment.
+- `maxSlice` in `values.js` is 17: boards with 17+ stones get a 400 ("computed locally"), and a 16
+  stone lookup reads slice 17. The client looks up only 16 or fewer (`remote` in `app.js`).
 - Cost exposure: the function is public; `--max-instances` in `deploy` is the spend bound (gen1
-  serves one request per instance). Slices 15-18 are Coldline, so cache-miss floods cost retrieval
+  serves one request per instance). Slices 15-17 are Coldline, so cache-miss floods cost retrieval
   plus 2.5x per-op fees. A kill switch that only revokes `allUsers` invoker on the function (not
   billing) was discussed but not built.
+
+## Web client (web/client)
+
+- Deploy with `./deploy` (stages, then `firebase deploy` to the `perfect-pentago` site); `./serve`
+  serves a staged build at http://127.0.0.1:8686 with the same isolation headers.
+- One wasm module, `mid.wasm`, built with shared memory and atomics: it serves the cascade, dense
+  midsolve, and tiled solver, single threaded solves included (no slower than a plain build).
+- Threads need cross-origin isolation: COOP `same-origin` and COEP `require-corp` in `firebase.json`
+  (Safari lacks `credentialless`). Firebase omits these headers on 304s, so a page cached from before
+  they were added stays unisolated until its bytes change.
+- Helper workers are started by the page (`start_helper` in `app.js`), not by `mid_worker.js`: some
+  browsers, including the desktop app's built-in browser, can't start workers from a worker.
+- Caching: `index.html` loads `app.js?v=<hash>`, and the hash covers `app.js`, `mid_worker.js`,
+  `mid_helper.js`, and `mid.wasm`, which all get the same `?v=`. Those are cached for a year; pages
+  keep Firebase's one hour default, and a reload picks up a deploy. Firebase ignores the query, so a
+  page cached from before a deploy can still fetch a not-yet-loaded file's new version.
+- Phone layout is CSS only, below 800px: the menu is a label toggling a hidden checkbox. `details.html`
+  carries its own copy of the layout css from `cc/site.cc`.
+- The built-in browser pane has run solves about 4x slower than node while the user was away from the
+  Mac (likely throttling); time solves in node (`mid_sync.js` from `bazel-bin/web/client/public`).
 
 ## Freestanding wasm builds (web/client/build-wasm, web/server/build-wasm)
 
@@ -174,7 +199,10 @@ The `perf record` command must run with `dangerouslyDisableSandbox: true` in Cla
   `mem*` loops won't be compiled back into calls to themselves.
 - Wasm SIMD (`-msimd128`, the `PENTAGO_WASM_SIMD` halfsuper_t path) speeds the dense midsolve by
   only about 2%, since it is memory bound, and a SIMD mid.wasm refuses to load on Safari before
-  16.4. Do not ship it on its own; it pays off only in the tiled solver's codec.
+  16.4. It ships because the tiled solver's codec needs it.
+- Size: keep cold code `WASM_SMALL` and invariant asserts `NON_WASM_ASSERT` (assert strings cost
+  bytes). Whole-file `minsize` on `tie.cc`, `halfengine.cc`, `codec.cc`, or `tiled.cc` saves 5-13 KB
+  each but slows the cascade or tiled solve by 1-11%, so don't.
 - liblzma: define `HAVE_CONFIG_H` and supply `config.h` (its fallback header includes `<inttypes.h>`
   unconditionally otherwise); `filter_decoder.c` includes the simple/delta filter headers even when
   those filters are compiled out, so keep their `-I` paths.
