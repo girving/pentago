@@ -18,7 +18,9 @@ using std::string;
 // stylesheet request.  Layout section mirrors details.html's copy.
 const char* const style =
   // Layout: a grid sidebar (nav column plus content column, natively equal
-  // height), folding to a top nav bar on narrow screens
+  // height).  On narrow screens the page goes full width, and a bar under the
+  // title holds a menu button (a label toggling a hidden checkbox, which shows
+  // the nav links below it) and the back link.
   "html{overflow-y:scroll}"
   "body{background:#d5d6d7;line-height:1;-webkit-tap-highlight-color:transparent}"
   ".all{max-width:60em;margin:0 auto;background:#fff;border:1px solid;border-radius:1em;overflow:hidden}"
@@ -31,14 +33,21 @@ const char* const style =
   "nav.back{position:absolute;top:0;right:0;width:7em}"
   "nav.back a{border-left:1px solid #000}"
   ".contents .back{visibility:hidden}"
+  "#menu,nav label{display:none}"
   ".content{border-left:1px solid #000;position:relative}"
   "@media(max-width:800px){"
-    ".main{display:block}"
-    "nav.contents{text-align:center;border-bottom:1px solid #000}"
-    "nav a{display:inline-block;height:1.5em;line-height:1.5em;padding:0 .5em;border:none;"
-      "text-decoration:underline}"
-    "nav.back{visibility:hidden}"
-    ".contents .back{visibility:visible}}"
+    "html{background:silver}"
+    "body{margin:0;background:none}"
+    ".all{border:0;border-radius:0;min-height:100vh;min-height:100dvh}"
+    ".main{position:relative;display:block;padding-top:3em;"
+      "background:linear-gradient(silver,silver) 0 0/100% 3em no-repeat}"
+    ".content{position:static;border-left:0;border-top:1px solid}"
+    "nav.contents{position:absolute;top:0;left:0;z-index:1;width:12em}"
+    "nav label{display:block;height:3em;line-height:3em;text-align:center;border-right:1px solid;cursor:pointer}"
+    "#menu:checked+label{border-bottom:1px solid}"
+    "nav.contents a{display:none;border-right:1px solid}"
+    "#menu:checked~a:not(.back){display:block}"
+    "nav.back a{border-bottom:0}}"
   // Board.  Value dots (.v circles, .rv arcs) are default-hidden; app.js
   // shows them with inline display and fill.
   "#board{width:min(400px,100%);display:block;margin:0 auto}"
@@ -68,17 +77,19 @@ const char* const style =
   "@keyframes l{0%{color:#000;text-shadow:none}20%{color:purple;text-shadow:0 0 6px purple}"
     "40%{color:#000;text-shadow:none}}";
 
-void site() {
+// version is a hash of app.js, so each deploy loads app.js from a new url that no browser has cached
+void site(const string& version) {
   string html;
   html += "<!DOCTYPE html>\n<html lang=en>\n<head>\n";
   html += "<meta charset=utf8>\n";
+  html += "<meta name=viewport content=\"width=device-width,initial-scale=1\">\n";
   html += "<title>Pentago is a first player win</title>\n";
   // No favicon link: app.js installs one as a data uri
   html += "<meta name=description content=\"pentago strongly solved\">\n";
   html += "<style>" + string(style) + "</style>\n";
   html += "</head>\n<body>\n";
   // The page itself is built by app.js
-  html += "<script type=module src=app.js></script>\n";
+  html += "<script type=module src=app.js?v=" + version + "></script>\n";
   html += "</body>\n</html>";
   std::cout << html << std::endl;
 }
@@ -86,7 +97,11 @@ void site() {
 }  // namespace
 }  // namespace pentago
 
-int main() {
-  pentago::site();
+int main(int argc, char** argv) {
+  if (argc != 2) {
+    std::cerr << "usage: site <version>" << std::endl;
+    return 1;
+  }
+  pentago::site(argv[1]);
   return 0;
 }

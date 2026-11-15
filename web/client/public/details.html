@@ -1,10 +1,12 @@
-<!DOCTYPE.html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pentago is a first player win</title>
   <style>
-    /* Layout: grid sidebar folding to a top nav bar on narrow screens.
+    /* Layout: grid sidebar.  On narrow screens the page goes full width, and a bar under the title
+     * holds a menu button: a label toggling a hidden checkbox, which shows the nav links below it.
      * Mirrors the css generated into index.html by cc/site.cc. */
     html { overflow-y: scroll }
     body {
@@ -36,20 +38,34 @@
     nav.back { position: absolute; top: 0; right: 0; width: 7em }
     nav.back a { border-left: 1px solid #000 }
     .contents .back { visibility: hidden }
+    #menu, nav label { display: none }
     .content { border-left: 1px solid #000; position: relative }
     @media (max-width: 800px) {
-      .main { display: block }
-      nav.contents { text-align: center; border-bottom: 1px solid #000 }
-      nav a {
-        display: inline-block;
-        height: 1.5em;
-        line-height: 1.5em;
-        padding: 0 0.5em;
-        border: none;
-        text-decoration: underline;
+      /* Silver behind the page, which phones also show around the status bar, and a white panel that
+       * fills the screen */
+      html { background: silver }
+      body { margin: 0; background: none }
+      .all { border: 0; border-radius: 0; min-height: 100vh; min-height: 100dvh }
+      .main {
+        position: relative;
+        display: block;
+        padding-top: 3em;
+        background: linear-gradient(silver, silver) 0 0 / 100% 3em no-repeat;
       }
-      nav.back { visibility: hidden }
-      .contents .back { visibility: visible }
+      .content { position: static; border-left: 0; border-top: 1px solid }
+      nav.contents { position: absolute; top: 0; left: 0; z-index: 1; width: 12em }
+      nav label {
+        display: block;
+        height: 3em;
+        line-height: 3em;
+        text-align: center;
+        border-right: 1px solid;
+        cursor: pointer;
+      }
+      #menu:checked + label { border-bottom: 1px solid }
+      nav.contents a { display: none; border-right: 1px solid }
+      #menu:checked ~ a:not(.back) { display: block }
+      nav.back a { border-bottom: 0 }
     }
     /* Details-only styles */
     a img { border: none }
@@ -99,11 +115,11 @@
 <div class="all">
   <header>
     <h2>Pentago is a first player win</h2>
-    <h3>An interactive explorer for perfect pentago play</h3>
+    <h3>Explore perfect pentago play</h3>
   </header>
 
   <div class="main">
-    <nav class="contents">
+    <nav class="contents"><input type="checkbox" id="menu"><label for="menu">&#9776; Menu</label>
       <a href="/">Home</a>
       <a href="details.html#intro">Introduction</a>
       <a href="details.html#rules">Pentago rules</a>
@@ -134,10 +150,11 @@
         "Strongly" means that perfect play is efficiently computable for any position.  For example,
         <a href="/#0">the first player wins</a>.
         </p><p>
-        This site demonstrates the strong solution.  For boards with 17 or fewer stones, the result is read out
-        of a 4 terabyte database.  Since the number of positions increases exponentially with the number of stones,
-        the database stops after this, and the result must be computed from scratch.  This takes about 8 seconds
-        in the client (using WebAssembly) for an 18 stone board, much less for boards with 19 or more stones.
+        This site demonstrates the strong solution.  For boards with 16 or fewer stones, the result is read out
+        of a 3.7 terabyte database.  Since the number of positions increases exponentially with the number of
+        stones, larger boards are computed from scratch in your browser (using WebAssembly) instead.  Most 17 stone
+        boards take well under a second, and the hardest about 10 to 20 seconds; an 18 stone board takes a few
+        seconds, and boards with 19 or more stones much less.
         </p>
       </section>
 
@@ -209,24 +226,32 @@
         high latency, possibly exacerbated by the asynchronous structure of the communication.
         </p><p>
         The above discussion applies to the full solve required to compute the 3.7 TB database, which this website
-        uses to lookup perfect play for positions with 17 or fewer stones.
-        If the site sees a position with 18 or more stones, its children are outside the database, so we perform
-        a much smaller traversal over all downstream positions.  The set of downstream positions is much easier to
+        uses to look up perfect play for positions with 16 or fewer stones.
+        If the site sees a position with 17 or more stones, it instead performs
+        a much smaller traversal over all downstream positions, in the browser.  The set of downstream positions is much easier to
         deal with thanks to abstracting away the rotations, as the set of empty spots does not
-        move around.  These smaller solves have the same structure as the full solve, but require only 1/2 GB of RAM
-        and 8 seconds on a single thread.  We take advantage of parity to store only half of the 256 possible rotations
+        move around.  From 18 stones, these smaller solves have the same structure as the full solve, but require
+        only 1/2 GB of RAM and a few seconds on a single thread.  We take advantage of parity to store only half of the 256 possible rotations
         at each step since the rotation parity flips every move, and do two passes to compute "whether we win" and
         "whether we don't lose" to cut memory in half (from 1 GB to 1/2 GB).
+        </p><p>
+        From 17 stones the same traversal needs much more memory, so the site first tries cheaper provers.  A forward
+        search over the same rotation-abstracted positions finds most wins and losses quickly, and a tie prover shows
+        that a player cannot lose by placing a stone and then undoing the opponent's last rotation, which keeps the
+        quadrants fixed and turns the rest of the game into a much simpler one.  These settle about 85% of the
+        17 stone positions seen on this site in under a second.  The rest go to a variant of the traversal that
+        keeps only one slice of positions in memory at a time, compressed and processed in tiles, which fits in
+        about 250 MB and runs on several threads at once.
         </p>
       </section>
 
       <section id="server"><h2>Server setup</h2>
         <p>
-        The 3.7 TB data set, this website, and the backend server is hosted on <a href="https://cloud.google.com">Google Cloud</a>.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 17 or fewer stones.  For positions with 18 or more stones, a
-        specialized retrograde solver computes the value from scratch; this solver has been ported to WebAssembly and runs in the client.
+        The 3.7 TB data set, this website, and the backend server are hosted on <a href="https://cloud.google.com">Google Cloud</a>.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 16 or fewer stones.  For positions with 17 or more stones,
+        specialized solvers compute the value from scratch; they have been ported to WebAssembly and run in the client.
         </p><p>
         The backend server is
-        <a href="https://perfect-pentago.net/backend/">perfect-pentago.net/backend</a>.  The API is fairly simple: give it the code for a pentago board and it replies with json containing the values of all child positions.  For example,
+        <a href="https://perfect-pentago.net/backend/">perfect-pentago.net/backend</a>.  The API is fairly simple: give it the code for a pentago board with 16 or fewer stones and it replies with json containing the values of all child positions.  For example,
         <a href="https://perfect-pentago.net/backend/0">here is the start position</a>.  You are welcome to use the server directly for small numbers of queries, but please email me if you want to use it
         more intensively.
         </p>

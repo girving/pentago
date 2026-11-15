@@ -6,10 +6,12 @@ load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 package(default_visibility = ["//visibility:private"])
 
+# index.html loads app.js?v=<hash of app.js>, so a deploy never runs a cached app.js against new css
 genrule(
     name = "index",
+    srcs = [":app"],
     outs = ["public/index.html"],
-    cmd = "$(location //web/client/cc:site) > $@",
+    cmd = "$(location //web/client/cc:site) $$(shasum -a 256 $(location :app) | cut -c1-12) > $@",
     tools = ["//web/client/cc:site"],
 )
 

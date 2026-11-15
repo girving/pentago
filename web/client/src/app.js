@@ -80,8 +80,8 @@ if (cache_get('0') === null) {
 // Page chrome
 document.body.innerHTML =
   `<div class=all><header><h2>Pentago is a first player win</h2>` +
-  `<h3>An interactive explorer for perfect pentago play</h3></header>` +
-  `<div class=main><nav class=contents>` +
+  `<h3>Explore perfect pentago play</h3></header>` +
+  `<div class=main><nav class=contents><input type=checkbox id=menu><label for=menu>&#9776; Menu</label>` +
   ['/;Home', 'intro;Introduction', 'rules;Pentago rules', 'algorithms;Algorithms',
    'server;Server setup', 'open;Code and data', 'useful;Usefulness',
    'thanks;Acknowledgements', 'contact;Contact'].map(x => {
