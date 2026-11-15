@@ -70,7 +70,7 @@ const char* const style =
 
 void site() {
   string html;
-  html += "<!DOCTYPE html>\n<html>\n<head>\n";
+  html += "<!DOCTYPE html>\n<html lang=en>\n<head>\n";
   html += "<meta charset=utf8>\n";
   html += "<title>Pentago is a first player win</title>\n";
   // No favicon link: app.js installs one as a data uri
