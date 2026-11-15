@@ -43,6 +43,8 @@ In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first
 - `pentago/data/` — file I/O, compression, serialization
 - `pentago/end/` — backward endgame solver (retrograde analysis)
 - `pentago/mid/` — midgame solver (18+ stones)
+- `pentago/cascade/` — exact values of 18+ stone boards by cheap provers first: superengine, then an
+  undo-strategy tie prover (`tie.h`), then midsolve
 - `pentago/high/` — high-level public API
 - `pentago/mpi/` — MPI distributed computation
 - `pentago/learn/` — ML (TensorFlow ops)
