@@ -45,9 +45,9 @@ cc_tests(
     ],
     deps = [
         ":cascade",
+        "//pentago/search",
         "//pentago/utility",
     ],
-    size = "small",
 )
 
 # Generators for the stored test positions

@@ -17,8 +17,7 @@ cascade_t::cascade_t(const cascade_options_t& options)
 
 cascade_t::~cascade_t() {}
 
-int cascade_t::superengine(const high_board_t board, const double seconds) {
-  GEODE_ASSERT(!board.middle() && !board.done());
+static int superengine_search(const high_board_t board, const double seconds) {
   // The superengine wants the player to move as side 0
   const board_t b = flip_board(board.board(), board.turn());
   const int full = 36 - board.count();
@@ -40,6 +39,11 @@ int cascade_t::superengine(const high_board_t board, const double seconds) {
     if ((wall_time() - start).seconds() > seconds) break;
   }
   return 2;
+}
+
+int cascade_t::superengine(const high_board_t board, const double seconds) {
+  GEODE_ASSERT(!board.middle() && !board.done());
+  return superengine_search(board, seconds);
 }
 
 int cascade_t::midsolve(const high_board_t board) {

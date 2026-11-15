@@ -103,22 +103,6 @@ template<bool aggressive> superlookup_t super_lookup(int depth, side_t side0, si
 template superlookup_t super_lookup<true>(int,side_t,side_t);
 template superlookup_t super_lookup<false>(int,side_t,side_t);
 
-__attribute__((noinline)) static void store_error(int depth, const superlookup_t& data,
-                                                  const superinfo_t& info) {
-  const uint64_t board_flag = inverse_hash_board(data.hash);
-  const board_t board = board_flag&~aggressive_mask;
-  const bool aggressive = board_flag>>aggressive_bit;
-  const superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
-  const auto existing = mcast<superinfo_t>(entry.info);
-  const super_t errors = (info.wins^existing.wins)&info.known&existing.known;
-  const uint8_t r = first(errors);
-  slog("inconsistency detected in super_store:\n  standard %lld, rotation %d, transformed %lld, "
-       "aggressive %d\n  existing depth %d, existing value %d\n  new depth %d, new value %d",
-       board, r, transform_board(symmetry_t(0,r),board), aggressive, entry.depth, existing.wins(r),
-       depth, info.wins(r));
-  trace_error(aggressive,depth,board,"super_store");
-}
-
 template<bool aggressive> void super_store(int depth, const superlookup_t& data) {
   GEODE_ASSERT(data.hash);
   superentry_t& entry = table[data.hash&((1<<table_bits)-1)];
@@ -146,11 +130,19 @@ template<bool aggressive> void super_store(int depth, const superlookup_t& data)
         TRACE(trace_dependency(max_depth,inverse_hash_board(data.hash),entry.depth,inverse_hash_board(data.hash),existing));
         TRACE(trace_check(max_depth,inverse_hash_board(data.hash),existing,"super_store.existing"));
       }
-      // Common knowledge should match.  Unfortunately, this assertion can generate false positives in cases where the table is
-      // "polluted" with information with higher than reported depth.  However, I'm going to leave it in, since the false positives
-      // never occur if the table depth always increases, and it's important to have validity checks wherever possible.
-      if ((info.wins^existing.wins)&info.known&existing.known)
-        store_error(depth,data,info);
+      // Within one search mode, exact information (wins when aggressive, losses otherwise) can never
+      // disagree with itself, so any disagreement is between exact information and depth limited
+      // information of the opposite kind.  Both can be true: a lookup may use entries deeper than
+      // the current search, so exact results can be "polluted" with information beyond their depth
+      // label, and a later search at that depth correctly fails to see them.  Keep the exact value.
+      // (This used to be an assertion, which fired whenever the table was reused across searches
+      // whose depths do not always increase.)
+      const super_t conflict = (info.wins^existing.wins)&info.known&existing.known;
+      if (conflict) {
+        const super_t exact = aggressive ? conflict : super_t(0);
+        info.wins = (info.wins&~conflict)|exact;
+        existing.wins = (existing.wins&~conflict)|exact;
+      }
       // Merge information
       entry.depth = max_depth;
       existing.known |= info.known;

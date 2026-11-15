@@ -12,7 +12,7 @@
 // On uniformly random 18 stone boards with the default options, about 97% are settled before
 // midsolve, at a mean cost of about 0.08 s per board.  The superengine stage checks its time only
 // between depths, so it can overrun.  The superengine's transposition table is global; cascade_t
-// initializes it if needed and never clears it, which is sound since its entries are exact.
+// initializes it if needed and keeps it across boards, which is sound since its entries are exact.
 #pragma once
 
 #include "pentago/cascade/tie.h"

@@ -5,6 +5,7 @@
 // settles a board depends on timing.
 
 #include "pentago/cascade/cascade.h"
+#include "pentago/search/supertable.h"
 #include "pentago/utility/test_assert.h"
 #include "gtest/gtest.h"
 namespace pentago {
@@ -42,6 +43,34 @@ const cascade_case_t cascade_cases[] = {
   {4295087560213080432ull, 1, 0},  // 26 stones, 0.000 s
   {2954709034208274521ull, 1, 0},  // 26 stones, 0.000 s
 };
+
+// Children of the 17 stone board 217635266476703744 (from a real game), in the order a 17 stone
+// client search visits them.  Searching them in turn with the superengine's table kept across
+// searches used to make super_store throw a false positive consistency error.
+const cascade_case_t reused_table_cases[] = {
+  {217635266476703762ull, 0, 0},
+  {217635266476705202ull, 0, 0},
+  {217635266081914882ull, 0, 0},
+  {217635265762623490ull, 0, 0},
+  {217595718417842178ull, 0, 0},
+  {217648976012312578ull, 1, 0},
+  {1989801719846993922ull, 1, 0},
+  {2888269845507407874ull, 0, 0},
+  {217635266476704230ull, 0, 0},
+};
+
+TEST(cascade, reused_table) {
+  cascade_t cascade;
+  clear_supertable();
+  for (const auto& c : reused_table_cases) {
+    const auto board = high_board_t::from_raw(c.raw);
+    SCOPED_TRACE(board.name());
+    const int s = cascade.superengine(board, cascade.options.super_seconds);
+    if (s != 2) {
+      PENTAGO_ASSERT_EQ(s, c.value);
+    }
+  }
+}
 
 // The full cascade gets every value right
 TEST(cascade, values) {
