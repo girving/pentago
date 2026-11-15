@@ -15,12 +15,13 @@ forward engine was essential in developing and testing the backwards engines.
 Descriptions of the various engines are given below.
 
 The easiest interface to the strong solution is the website at
-https://perfect-pentago.net, implemented in the `web` directory.  Positions with 17
-or fewer stones are looked up in a 3.7 TB database using a minimal node.js server
-(`web/server`).  Positions with 18 or more stones are solved from scratch in the
-client, using small-scale backwards engine compiled to WebAssembly.
+https://perfect-pentago.net, implemented in the `web` directory.  Positions with 16
+or fewer stones are looked up in a 2.35 TB database (all positions with up to 17
+stones) using a minimal node.js server (`web/server`).  Positions with 17 or more
+stones are solved from scratch in the client, using engines compiled to WebAssembly:
+cheap provers first for 17 stones, then small-scale backwards engines.
 
-The pentago code is released under a BSD license, and the 3.7 TB data set is
+The pentago code is released under a BSD license, and the 2.35 TB data set is
 released into the public domain for anyone who wants to tinker around: please contact
 me if you want access to the raw data!
 
@@ -163,7 +164,14 @@ rotation group.  On my M2 MacBook Air, the midgame engine takes around 3.1 s in 
 using WebAssembly for *any* 18 stone position; unlike the forward solver performance does not
 vary with the board.  The code for the midgame engine is in `pentago/mid`.
 
-Together, the 3.7 TB data set and the midgame engine comprise a strong solution of pentago.
+Later, a tiled variant of the midgame engine that keeps only one slice in memory, compressed,
+and runs on several threads (`pentago/mid/tiled.h`) brought 17 stone positions within reach of
+the browser, in about 250 MB.  Most real 17 stone positions don't even need it: a cascade of
+cheap provers (`pentago/cascade`), a rotation-abstracted forward search and a tie prover based
+on undoing the opponent's rotations, settles them in well under a second.  The website now
+solves 17 stone positions locally, so slice 18 of the database is no longer kept.
+
+Together, the database and the midgame engines comprise a strong solution of pentago.
 Go to https://perfect-pentago.net to see the results.
 
 ### Code structure
@@ -177,20 +185,22 @@ The code is organized into the following directories:
 * `pentago/end`: Everything in the backwards engine that doesn't directly touch mpi
 * `pentago/mpi`: Everything in the backwards engine that does touch mpi
 * `pentago/high`: High level interface used in the website backend
-* `pentago/mid`: "Midgame" backward solver used to complete the strong solution for 18 or more stone boards
-* `web/server`: <a href="https://nodejs.org">node.js</a> lookup server for access to the 3.7 TB database
-* `web/client`: <a href="https://svelte.dev">svelte</a> + <a href="https://webassembly.org">wasm</a> client
+* `pentago/mid`: "Midgame" backward solvers used to complete the strong solution for 17 or more stone boards
+* `pentago/cascade`: Cheap provers tried before the midgame solver
+* `web/server`: <a href="https://nodejs.org">node.js</a> lookup server for access to the database
+* `web/client`: JavaScript + <a href="https://webassembly.org">wasm</a> client
 
 Most files have summarizing comments at the top, but otherwise documentation is scant.
 Email me if you have questions at <irving@naml.us>!
 
 ### Data
 
-The total computed database size is 3.7 TB, using custom formats accessible using the code.
+The total computed database size was 3.7 TB, using custom formats accessible using the code.
 [`data/edison/final.txt`](https://github.com/girving/pentago/tree/master/data/edison/final.txt) shows the
-list of files and sizes.  There are three types of files:
+list of files and sizes.  Slice 18 (1.95 TB) was deleted in 2026 once the website solved 17 stone
+positions itself, leaving 2.35 TB.  There are three types of files:
 
-* `slice-{0...18}.pentago`: Full data for positions with at most 18 stones
+* `slice-{0...17}.pentago`: Full data for positions with at most 17 stones
 * `sparse-{0...36}.pentago`: A sparse subsample of positions with any number of stones
 * `counts-{0...36}.pentago`: Counts of positions that each player wins, at each number of stones
 

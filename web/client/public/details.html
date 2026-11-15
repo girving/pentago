@@ -151,7 +151,7 @@
         <a href="/#0">the first player wins</a>.
         </p><p>
         This site demonstrates the strong solution.  For boards with 16 or fewer stones, the result is read out
-        of a 3.7 terabyte database.  Since the number of positions increases exponentially with the number of
+        of a 2.35 terabyte database.  Since the number of positions increases exponentially with the number of
         stones, larger boards are computed from scratch in your browser (using WebAssembly) instead.  Most 17 stone
         boards take well under a second, and the hardest about 10 to 20 seconds; an 18 stone board takes a few
         seconds, and boards with 19 or more stones much less.
@@ -225,8 +225,9 @@
         <a href="https://www.nersc.gov/users/computational-systems/hopper">Hopper</a> due to unexpectedly
         high latency, possibly exacerbated by the asynchronous structure of the communication.
         </p><p>
-        The above discussion applies to the full solve required to compute the 3.7 TB database, which this website
-        uses to look up perfect play for positions with 16 or fewer stones.
+        The above discussion applies to the full solve required to compute the database, which this website
+        uses to look up perfect play for positions with 16 or fewer stones.  (Positions with 18 stones were
+        later dropped from it, leaving 2.35 TB.)
         If the site sees a position with 17 or more stones, it instead performs
         a much smaller traversal over all downstream positions, in the browser.  The set of downstream positions is much easier to
         deal with thanks to abstracting away the rotations, as the set of empty spots does not
@@ -247,7 +248,7 @@
 
       <section id="server"><h2>Server setup</h2>
         <p>
-        The 3.7 TB data set, this website, and the backend server are hosted on <a href="https://cloud.google.com">Google Cloud</a>.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 16 or fewer stones.  For positions with 17 or more stones,
+        The 2.35 TB data set, this website, and the backend server are hosted on <a href="https://cloud.google.com">Google Cloud</a>.  Prior to 2020 it used hosting generously donated by <a href="https://rackspace.com">Rackspace</a>.  The data is stored in a Google Cloud Storage bucket, and the backend server uses this data to look up optimal play for positions with 16 or fewer stones.  For positions with 17 or more stones,
         specialized solvers compute the value from scratch; they have been ported to WebAssembly and run in the client.
         </p><p>
         The backend server is
