@@ -6,12 +6,20 @@ load("@rules_shell//shell:sh_test.bzl", "sh_test")
 
 package(default_visibility = ["//visibility:private"])
 
-# index.html loads app.js?v=<hash of app.js>, so a deploy never runs a cached app.js against new css
+# index.html loads app.js?v=<hash>, and app.js passes the same ?v=<hash> on to the worker, helper, and
+# wasm, where the hash covers all four files.  So every deploy that changes any of them moves all of
+# them to new urls, and they can be cached for a year (firebase.json) without ever mixing versions.
 genrule(
     name = "index",
-    srcs = [":app"],
+    srcs = [
+        ":app",
+        ":helper",
+        ":worker",
+        "public/mid.wasm",
+    ],
     outs = ["public/index.html"],
-    cmd = "$(location //web/client/cc:site) $$(shasum -a 256 $(location :app) | cut -c1-12) > $@",
+    cmd = "$(location //web/client/cc:site) $$(cat $(location :app) $(location :worker) " +
+          "$(location :helper) $(location public/mid.wasm) | shasum -a 256 | cut -c1-12) > $@",
     tools = ["//web/client/cc:site"],
 )
 

@@ -77,7 +77,7 @@ const char* const style =
   "@keyframes l{0%{color:#000;text-shadow:none}20%{color:purple;text-shadow:0 0 6px purple}"
     "40%{color:#000;text-shadow:none}}";
 
-// version is a hash of app.js, so each deploy loads app.js from a new url that no browser has cached
+// version is a hash of the runtime files (see BUILD.bazel), so each deploy loads them from new urls
 void site(const string& version) {
   string html;
   html += "<!DOCTYPE html>\n<html lang=en>\n<head>\n";

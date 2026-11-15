@@ -35,8 +35,10 @@ let worker = null
 const worker_cbs = []
 const local_threads = () =>
   typeof SharedArrayBuffer == 'undefined' ? 1 : Math.max(1, Math.min(8, navigator.hardwareConcurrency || 2))
+// The ?v=<hash> this script was loaded with, passed on to the files it loads (see BUILD.bazel)
+const version = new URL(import.meta.url).search
 function start_helper(data, port) {
-  const h = new Worker(new URL('mid_helper.js', import.meta.url), {type: 'module'})
+  const h = new Worker(new URL('mid_helper.js' + version, import.meta.url), {type: 'module'})
   h.onmessage = e => port.postMessage(e.data)
   h.onerror = e => port.postMessage(e.message || 'could not start')
   port.onmessage = () => { h.terminate(); port.close() }
@@ -44,7 +46,7 @@ function start_helper(data, port) {
 }
 const midsolve = board => new Promise((resolve, reject) => {
   if (!worker) {
-    worker = new Worker(new URL('mid_worker.js', import.meta.url), {type: 'module'})
+    worker = new Worker(new URL('mid_worker.js' + version, import.meta.url), {type: 'module'})
     worker.onmessage = e => e.data?.helper ? start_helper(e.data.helper, e.data.port)
       : (e.data instanceof Error ? worker_cbs.shift()[1] : worker_cbs.shift()[0])(e.data)
   }

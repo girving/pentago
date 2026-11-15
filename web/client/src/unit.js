@@ -76,10 +76,11 @@ async function test_site() {
   for (const h of config.hosting.headers.find(h => h.source == '**').headers)
     headers[h.key] = h.value
   assert.deepEqual(headers, isolation)
-  // The page, scripts and wasm revalidate on every load, so a deploy can't leave a browser running a
-  // cached copy of one against a fresh copy of another (e.g. css in index.html against markup in app.js)
-  const revalidate = config.hosting.headers.find(h => h.headers.some(k => k.value == 'no-cache'))
-  assert.equal(revalidate.source, '{/,**/*.@(html|js|wasm)}')
+  // Scripts and wasm are loaded under ?v=<hash of all of them> (see BUILD.bazel), so they can be cached
+  // for a year; pages keep the default short cache, and a reload fetches the latest
+  const long = config.hosting.headers.find(h => h.headers.some(k => /max-age=31536000/.test(k.value)))
+  assert.equal(long.source, '**/*.@(js|wasm)')
+  assert(!config.hosting.headers.some(h => /html|\{\//.test(h.source)), 'pages must keep a short cache')
   const serve = readFileSync('../serve', 'utf8')
   for (const [k, v] of Object.entries(isolation))
     assert(serve.includes(`"${k}", "${v}"`), k)

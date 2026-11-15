@@ -11,7 +11,7 @@
 const node = globalThis.process?.versions?.node
 const read = name => node
   ? import('fs').then(fs => fs.readFileSync('../public/' + name))
-  : fetch('/' + name).then(r => r.arrayBuffer())
+  : fetch('/' + name + new URL(import.meta.url).search).then(r => r.arrayBuffer())  // Same ?v=<hash> as us
 const compile = name => read(name).then(b => WebAssembly.compile(b))
 const mid_module = compile('mid.wasm')
 
