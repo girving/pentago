@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 load("//pentago:pentago.bzl", "cc_tests", "COPTS")
 package(default_visibility = ["//visibility:public"])
 
@@ -12,6 +12,20 @@ cc_library(
         "//pentago/high",
         "//pentago/utility",
     ],
+)
+
+cc_library(
+    name = "codec",
+    srcs = ["codec.h", "codec.cc"],
+    copts = COPTS,
+    deps = [":halfsuper", "//pentago/utility"],
+)
+
+cc_library(
+    name = "tiled",
+    srcs = ["tiled.h", "tiled.cc"],
+    copts = COPTS,
+    deps = [":codec", ":halfsuper", ":mid", "//pentago/base", "//pentago/high", "//pentago/utility"],
 )
 
 cc_library(
@@ -32,10 +46,33 @@ cc_tests(
         "benchmark_test",
     ],
     deps = [
+        ":codec",
         ":halfsuper",
         ":mid",
+        ":tiled",
         "//pentago/high:check",
     ],
+)
+
+cc_tests(
+    names = ["tiled_test"],
+    # Solves several boards both ways, which needs more than the medium budget on slow CI runners
+    size = "large",
+    deps = [
+        ":codec",
+        ":halfsuper",
+        ":mid",
+        ":tiled",
+        "//pentago/high:check",
+    ],
+)
+
+# Times the tiled solver on a file of raw boards
+cc_binary(
+    name = "tiled_bench",
+    srcs = ["tiled_bench.cc"],
+    copts = COPTS,
+    deps = [":codec", ":mid", ":tiled", "//pentago/high", "//pentago/utility"],
 )
 
 # All sources and headers, for the freestanding wasm build in web/client

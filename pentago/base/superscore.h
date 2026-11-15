@@ -255,6 +255,20 @@ uint8_t first(super_t s);
 
 int popcount(super_t s);
 
+// Shift left by shift, or right by -shift, then mask.  A template rather than a ternary so that the
+// untaken direction never has a negative shift count.
+#if PENTAGO_SSE
+template<int shift> static inline __m128i shift_mask(const __m128i x, const uint32_t mask) {
+  if constexpr (shift > 0) return _mm_slli_epi32(x,shift)&_mm_set1_epi32(mask);
+  else return _mm_srli_epi32(x,-shift)&_mm_set1_epi32(mask);
+}
+#else
+template<int shift> static inline uint64_t shift_mask(const uint64_t x, const uint64_t mask) {
+  if constexpr (shift > 0) return (x<<shift)&mask;
+  else return (x>>-shift)&mask;
+}
+#endif
+
 #if PENTAGO_SSE // SSE version of rmax
 
 // Version of shuffle with arguments in expected little endian order
@@ -264,8 +278,7 @@ int popcount(super_t s);
 static inline super_t rmax(const super_t f) {
   const uint32_t each0 = 0x11111111,
                  each1 = 0x000f000f;
-  #define SHIFT_MASK(x,shift,mask) /* 2 ops */ \
-    ((shift>0?_mm_slli_epi32(x,shift):_mm_srli_epi32(x,-(shift)))&_mm_set1_epi32(mask))
+  #define SHIFT_MASK(x,shift,mask) /* 2 ops */ shift_mask<shift>(x, mask)
   const int left = LE_MM_SHUFFLE(3,0,1,2), right = LE_MM_SHUFFLE(1,2,3,0);
   #define FIRST_THREE(x) /* 9+2*8+4 = 29 ops */ \
     (  SHIFT_MASK(x, 1,~each0)   |SHIFT_MASK(x, -3,each0)       /* Rotate quadrant 0 left */ \
@@ -291,7 +304,7 @@ static inline super_t rmax(const super_t f) {
   const uint64_t each0 = 0x1111111111111111,
                  each1 = 0x000f000f000f000f,
                  each2 = 0x000000000000ffff;
-  #define SHIFT_MASK(x,shift,mask) ((shift>0?x<<(shift):x>>-(shift))&(mask))
+  #define SHIFT_MASK(x,shift,mask) shift_mask<shift>(x, mask)
   #define FIRST_THREE(x) \
     (  SHIFT_MASK(x,  1,~each0)    |SHIFT_MASK(x, -3,each0)       /* Rotate quadrant 0 left */ \
      | SHIFT_MASK(x, -1,~each0>>1) |SHIFT_MASK(x,  3,each0<<3)    /* Rotate quadrant 0 right */ \

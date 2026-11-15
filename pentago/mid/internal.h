@@ -259,12 +259,14 @@ static inline set0_info_t make_set0_info(METAL_CONSTANT const info_t& I, const i
 }
 
 typedef struct {
-  uint16_t s0, s1p;
+  uint32_t s0;  // Absolute, so it exceeds 16 bits for 19+ spots
+  uint16_t s1p;
 } s0s1p;
 
 // Turn I1, s0p into (s0,s1p)
 static inline s0s1p commute(METAL_CONSTANT const set1_info_t& I1, const sets_t sets0p, const int s0p) {
-  uint16_t s0 = 0, s1p = I1.s1;
+  uint32_t s0 = 0;
+  uint16_t s1p = I1.s1;
   for (int mask = subset_mask(sets0p, s0p), m = 0; m < sets0p.k; m++) {
     const int j = pop_bit(mask);
     s0 += fast_choose(I1.empty0[j], m+1);
@@ -273,9 +275,9 @@ static inline s0s1p commute(METAL_CONSTANT const set1_info_t& I1, const sets_t s
   return s0s1p{s0, s1p};
 }
 
-static inline set1_info_t make_set1_info(METAL_CONSTANT const transposed_t& I, const int n, const int s1) {
+template<class Info> static inline set1_info_t make_set1_info(METAL_CONSTANT const Info& I, const int n, const int s1) {
   set1_info_t I1;
-  const helper_t<METAL_CONSTANT const transposed_t&> H{I, n};
+  const helper_t<METAL_CONSTANT const Info&> H{I, n};
   const auto sets1 = H.sets1();
   const int k0 = H.k0();
   const int k1 = H.k1();
@@ -375,7 +377,7 @@ inner(METAL_CONSTANT const inner_t& I, METAL_CONSTANT const uint16_t* cs1ps, MET
 
   // Convert indices
   uint32_t filled1p = 0;
-  uint16_t s1 = 0;
+  uint32_t s1 = 0;
   uint16_t s0p = 0;
   for (int i = 0; i < k1; i++) {
     const int q = set1p>>5*i&0x1f;

@@ -1512,8 +1512,11 @@ struct __alloc_traits_difference_type<_Alloc, _Ptr, true>
 template <class _Tp>
 struct __is_default_allocator : false_type {};
 
+#ifndef __wasm__  // no std::allocator without allocation
 template <class _Tp>
 struct __is_default_allocator<_VSTD::allocator<_Tp> > : true_type {};
+#endif  // !__wasm__
+
 
 template <class _Alloc>
 struct _LIBCPP_TEMPLATE_VIS allocator_traits
@@ -1782,6 +1785,7 @@ struct __rebind_alloc_helper
 #endif
 };
 
+#ifndef __wasm__  // no std::allocator without allocation
 // allocator
 
 template <class _Tp>
@@ -1996,6 +2000,8 @@ bool operator==(const allocator<_Tp>&, const allocator<_Up>&) _NOEXCEPT {return 
 template <class _Tp, class _Up>
 inline _LIBCPP_INLINE_VISIBILITY
 bool operator!=(const allocator<_Tp>&, const allocator<_Up>&) _NOEXCEPT {return false;}
+#endif  // !__wasm__
+
 
 template <class _OutputIterator, class _Tp>
 class _LIBCPP_TEMPLATE_VIS raw_storage_iterator
@@ -2024,6 +2030,7 @@ public:
 #endif
 };
 
+#ifndef __wasm__  // no temporary buffers without allocation
 template <class _Tp>
 _LIBCPP_NODISCARD_EXT _LIBCPP_NO_CFI
 pair<_Tp*, ptrdiff_t>
@@ -2075,6 +2082,8 @@ void return_temporary_buffer(_Tp* __p) _NOEXCEPT
 {
   _VSTD::__libcpp_deallocate_unsized((void*)__p, _LIBCPP_ALIGNOF(_Tp));
 }
+#endif  // !__wasm__
+
 
 #if _LIBCPP_STD_VER <= 14 || defined(_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR)
 template <class _Tp>

@@ -90,7 +90,7 @@ static void midsolve_loop(const info_t& I, const int n, halfsuper_s* results,
   }
 }
 
-Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<halfsuper_s> workspace) {
+Vector<halfsupers_t,1+MID_MAX_SPOTS> midsolve_internal(const high_board_t board, RawArray<halfsuper_s> workspace) {
   const info_t I = make_info(board);
   NON_WASM_ASSERT(workspace.size() >= bottleneck(I.spots));
 
@@ -105,7 +105,7 @@ Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
                         cs1ps + I.cs1ps_offsets[n]);
 
   // Compute all slices
-  Vector<halfsuper_s,1+18> raw[2];
+  Vector<halfsuper_s,1+MID_MAX_SPOTS> raw[2];
   for (const int aggressive : range(2))
     for (int n = I.spots; n >= 0; n--)
       midsolve_loop(I, n, raw[aggressive].data(), workspace, sets1p + I.sets1p_offsets[n],
@@ -117,7 +117,7 @@ Vector<halfsupers_t,1+18> midsolve_internal(const high_board_t board, RawArray<h
   free(cs1ps);
 
   // Interleave results.  We need to swap win and notlose for 0 < i.
-  Vector<halfsupers_t,1+18> results;
+  Vector<halfsupers_t,1+MID_MAX_SPOTS> results;
   for (const int i : range(results.size()))
     for (const int j : range(2))
       get(results[i], j) = raw[j ^ (i == 0)][i];
