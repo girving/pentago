@@ -5,7 +5,8 @@
 // settles a board depends on timing.
 
 #include "pentago/cascade/cascade.h"
-#include "pentago/search/supertable.h"
+#include "pentago/base/score.h"
+#include "pentago/utility/random.h"
 #include "pentago/utility/test_assert.h"
 #include "gtest/gtest.h"
 namespace pentago {
@@ -61,7 +62,6 @@ const cascade_case_t reused_table_cases[] = {
 
 TEST(cascade, reused_table) {
   cascade_t cascade;
-  clear_supertable();
   for (const auto& c : reused_table_cases) {
     const auto board = high_board_t::from_raw(c.raw);
     SCOPED_TRACE(board.name());
@@ -124,6 +124,66 @@ TEST(cascade, fallback) {
   }
   // Depth one superengine searches still settle some boards
   PENTAGO_ASSERT_GE(fallbacks, 1);
+}
+
+// Placements of a real 17 stone position: the cascade agrees with midsolving every placement
+TEST(cascade, placement) {
+  cascade_t cascade;
+  cascade_options_t options;
+  options.placement_seconds = 0;
+  cascade_t mid(options);
+  const auto board = high_board_t::from_raw(108387709992836170ull);
+  int placements = 0, cheap = 0;
+  for (int c = 0; c < 64 && placements < 2; c++) {
+    if (!(board.empty_mask() >> c & 1)) continue;
+    const auto placed = board.place(c);
+    if (placed.done()) continue;
+    SCOPED_TRACE(placed.name());
+    placements++;
+    cascade_result_t fast[8], slow[8];
+    cascade.placement(placed, fast);
+    mid.placement(placed, slow);
+    for (const int s : range(8)) {
+      PENTAGO_ASSERT_EQ(fast[s].value, slow[s].value);
+      const auto child = placed.rotate(s >> 1, s & 1 ? -1 : 1);
+      PENTAGO_ASSERT_EQ(slow[s].stage == cascade_stage_t::midsolve, !child.done());
+      cheap += fast[s].stage != cascade_stage_t::midsolve;
+    }
+  }
+  PENTAGO_ASSERT_EQ(placements, 2);
+  PENTAGO_ASSERT_GE(cheap, 2);
+}
+
+// Whole boards: children() matches midsolve's values and order, or gives up
+TEST(cascade, children) {
+  Random random(1717);
+  cascade_t cascade;
+  cascade_options_t options;
+  options.max_dense = 36;
+  options.children_seconds = 1e9;
+  cascade_t dense(options);
+  const auto workspace = midsolve_workspace(19);
+  int complete = 0, gave_up = 0;
+  for (int i = 0; i < 20; i++) {
+    const auto board = high_board_t::from_board(random_board(random, 19 + i % 4), false);
+    if (board.done()) continue;
+    SCOPED_TRACE(board.name());
+    const auto expected = midsolve(board, workspace);
+    for (auto* c : {&cascade, &dense}) {
+      mid_values_t values;
+      if (!c->children(board, values)) {
+        PENTAGO_ASSERT_EQ(c, &cascade);  // With max_dense = 36 and no time limit, nothing gives up
+        gave_up++;
+        continue;
+      }
+      PENTAGO_ASSERT_EQ(values.size(), expected.size());
+      for (const int j : range(values.size()))
+        ASSERT_TRUE(values[j] == expected[j]) << j;
+      complete += c == &cascade;
+    }
+  }
+  PENTAGO_ASSERT_GE(complete, 5);
+  PENTAGO_ASSERT_LT(gave_up, 20);
 }
 
 }  // namespace

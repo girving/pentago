@@ -304,6 +304,53 @@ struct reference_t {
     return false;
   }
 
+  // The 32 lines, built from geometry
+  static const vector<side_t>& lines() {
+    static const vector<side_t> lines = [] {
+      vector<side_t> lines;
+      const int dirs[4][2] = {{1,0},{0,1},{1,1},{1,-1}};
+      for (const auto& dir : dirs)
+        for (const int x : range(6))
+          for (const int y : range(6)) {
+            if (x + 4*dir[0] >= 6 || y + 4*dir[1] < 0 || y + 4*dir[1] >= 6) continue;
+            side_t line = 0;
+            for (const int i : range(5)) {
+              const int cx = x + i*dir[0], cy = y + i*dir[1];
+              line |= high_board_t::from_raw(0).place(cx, cy).side(0);
+            }
+            lines.push_back(line);
+          }
+      return lines;
+    }();
+    return lines;
+  }
+
+  // Is c a threat after the Maker places p: some line, maybe after one rotation, through both p and
+  // c, whose other three cells are the Maker's?  Completing a line whose fifth cell came earlier is
+  // either a win at once or, if that would be a tie, never a win, so those aren't threats.
+  static bool threat(const side_t m, const side_t p, const side_t c) {
+    const side_t s = m | p | c;
+    for (const auto line : lines())
+      for (const int r : range(9)) {
+        const auto f = [r](const side_t x) { return r < 8 ? rot(x, r) : x; };
+        if ((f(s) & line) == line && (f(p) & line) && (f(c) & line)) return true;
+      }
+    return false;
+  }
+
+  // Does the Maker (m, to move) win at once: a placement five, or a rotation that completes a Maker
+  // line but no Breaker line?
+  static bool wins_now(const side_t m, const side_t b) {
+    for (const int c : range(64)) {
+      const side_t x = side_t(1) << c;
+      if (!(x & side_mask) || (x & (m|b))) continue;
+      if (won(m | x)) return true;
+      for (const int r : range(8))
+        if (won(rot(m | x, r)) && !won(rot(b, r))) return true;
+    }
+    return false;
+  }
+
   // Can the Maker (m, to move, k placements left) beat undo?
   bool maker(const side_t m, const side_t b, const int k) {
     if (k <= 0) return false;
@@ -314,8 +361,7 @@ struct reference_t {
       const side_t x = side_t(1) << c;
       if ((x & side_mask) && !(x & (m|b))) empty.push_back(x);
     }
-    bool result = covers(m);
-    for (const auto p : empty) result = result || covers(m | p);
+    bool result = wins_now(m, b);
     if (!result && k > 1) {
       for (const auto p : empty) {
         // Some rotation must leave the Breaker no immediate win or tie
@@ -324,7 +370,7 @@ struct reference_t {
         if (!safe) continue;
         vector<side_t> threats;
         for (const auto c : empty)
-          if (c != p && covers(m | p | c)) threats.push_back(c);
+          if (c != p && threat(m, p, c)) threats.push_back(c);
         if (threats.size() >= 2) { result = true; break; }
         if (k == 2) continue;
         bool all = true;
@@ -381,8 +427,10 @@ void check_exact(const tie_case_t* cases, const int n, const int min_deep) {
   PENTAGO_ASSERT_GE(deep, min_deep);
 }
 
+// Most of these boards needed free replies before rotations completing fives for both sides counted
+// as ties, but few do now
 TEST(tie, exact_late) {
-  check_exact(exact_cases, sizeof(exact_cases) / sizeof(tie_case_t), 150);
+  check_exact(exact_cases, sizeof(exact_cases) / sizeof(tie_case_t), 15);
 }
 
 // Rotations that tie, or hand the opponent the win, stress the rules for ties and rotations
@@ -394,6 +442,8 @@ TEST(tie, rotation_edge_cases) {
 // move one stone from a line, which decides the static game at once, so we keep only boards where
 // it isn't and the search has to run.
 TEST(tie, static_reference) {
+  PENTAGO_ASSERT_EQ(reference_t::lines().size(), 32u);
+  for (const auto line : reference_t::lines()) ASSERT_TRUE(won(line) && popcount(line) == 5);
   Random random(4417);
   tie_prover_t prover;
   int holds = 0, total = 0, searched = 0;
@@ -417,6 +467,37 @@ TEST(tie, static_reference) {
   PENTAGO_ASSERT_GT(holds, total / 10);
   PENTAGO_ASSERT_LT(holds, total - total / 10);
   PENTAGO_ASSERT_GT(searched, total / 4);
+}
+
+// Boards where the Maker is one stone from a line and the Breaker covers a rotated line, so some
+// Maker rotations complete fives for both sides, which are ties.  static_reference skips these.
+TEST(tie, double_five) {
+  Random random(8011);
+  tie_prover_t prover;
+  prover.set_paranoid(true);
+  int total = 0, holds = 0, searched = 0;
+  for (int attempt = 0; attempt < 1000000 && total < 300; attempt++) {
+    const int stones = random.uniform<int>(24, 35);
+    const auto board = attempt & 1 ? sensible_position(random, stones) : random_position(random, stones);
+    const side_t m = board.side(board.turn()), b = board.side(!board.turn());
+    if (!reference_t::covers(b)) continue;
+    bool one_away = false;
+    for (const int c : range(64)) {
+      const side_t x = side_t(1) << c;
+      if ((x & side_mask) && !(x & (m|b))) one_away = one_away || reference_t::covers(m | x);
+    }
+    // Keep boards where every immediate Maker line is a tie
+    if (!one_away || reference_t::wins_now(m, b)) continue;
+    total++;
+    reference_t ref;
+    const bool expected = !ref.maker(m, b, (36 - stones + 1) / 2);
+    ASSERT_EQ(prover.undo_holds(board), expected) << board;
+    holds += expected, searched += ref.memo.size() > 1;
+  }
+  PENTAGO_ASSERT_EQ(total, 300);
+  PENTAGO_ASSERT_GT(holds, 30);
+  PENTAGO_ASSERT_LT(holds, 295);
+  PENTAGO_ASSERT_GT(searched, 25);
 }
 
 // Incremental memo keys and line counts match scratch recomputation at every node
@@ -452,7 +533,7 @@ TEST(tie, memo) {
   vector<high_board_t> boards;
   for (const int stones : {22, 24, 26, 28, 30})
     for (int i = 0; i < 6; i++) boards.push_back(random_position(random, stones));
-  tie_prover_t tiny(2), small(8), shared;
+  tie_prover_t tiny(5), small(8), shared;
   for (const auto& board : boards) {
     tie_prover_t fresh;
     const auto r = fresh.prove(board, 2, 1e9);
@@ -462,6 +543,31 @@ TEST(tie, memo) {
       ASSERT_EQ(r.other, s.other) << board;
     }
   }
+}
+
+// The outer memo keeps, per position, the fewest free replies known to hold and the most known to
+// fail.  Raw calls at mixed depths on one long lived prover must match fresh complete proofs.
+TEST(tie, raw_calls) {
+  Random random(9241);
+  tie_prover_t shared;
+  int holds = 0, fails = 0;
+  for (const int stones : {22, 24, 26, 28, 30})
+    for (int i = 0; i < 6; i++) {
+      const auto board = i & 1 ? sensible_position(random, stones) : random_position(random, stones);
+      tie_prover_t fresh;
+      const auto r = fresh.prove(board, 2, 1e9);
+      const side_t a = board.side(board.turn()), o = board.side(!board.turn());
+      int depths[3] = {0, 1, 2};
+      for (int j = 2; j > 0; j--) std::swap(depths[j], depths[random.uniform<int>(0, j + 1)]);
+      for (const int d : depths) {
+        const bool mover = r.mover >= 0 && r.mover <= d, other = r.other >= 0 && r.other <= d;
+        ASSERT_EQ(shared.mover_holds(a, o, d, 1e9), mover) << board << " depth " << d;
+        ASSERT_EQ(shared.other_holds(a, o, d, 1e9), other) << board << " depth " << d;
+        holds += mover + other, fails += !mover + !other;
+      }
+    }
+  PENTAGO_ASSERT_GT(holds, 20);
+  PENTAGO_ASSERT_GT(fails, 20);
 }
 
 // A timed out search never claims more than a complete one.  Checking the time at every node makes
@@ -476,6 +582,7 @@ TEST(tie, timeout) {
       const auto board = random_position(random, stones);
       const auto full = prover.prove(board, 2, 1e9);
       for (const double cap : {0.0, 1e-4, 1e-3}) {
+        prover.clear();  // Otherwise the memo answers at once
         const auto r = prover.prove(board, 2, cap);
         timeouts += r.timeout;
         if (r.mover >= 0) {
@@ -488,6 +595,38 @@ TEST(tie, timeout) {
     }
   }
   PENTAGO_ASSERT_GT(timeouts, 10);
+}
+
+// Early boards have up to 36 empty cells, so up to 288 first moves.  The raw calls must handle them
+// (they used to overrun fixed arrays below 18 stones).
+TEST(tie, early_boards) {
+  Random random(1207);
+  tie_prover_t prover;
+  prover.set_paranoid(true);
+  for (const int stones : {0, 1, 4, 8, 12, 16})
+    for (int i = 0; i < 3; i++) {
+      const auto board = random_position(random, stones);
+      const side_t a = board.side(board.turn()), o = board.side(!board.turn());
+      prover.mover_holds(a, o, 1, 0.05);
+      prover.other_holds(a, o, 1, 0.05);
+      prover.prove(board, 1, 0.05);
+    }
+}
+
+// The clock is pluggable: a clock that jumps a second per reading times out every search, and
+// without a clock searches never time out
+static double fake_now = 0;
+static double fake_clock() { return fake_now += 1; }
+
+TEST(tie, clock) {
+  Random random(3301);
+  const auto board = random_position(random, 24);
+  tie_prover_t prover;
+  prover.set_time_check_bits(0);
+  prover.set_clock(fake_clock);
+  ASSERT_TRUE(prover.prove(board, 2, 0.5).timeout);
+  prover.set_clock(nullptr);
+  ASSERT_FALSE(prover.prove(board, 2, 0).timeout);
 }
 
 }  // namespace

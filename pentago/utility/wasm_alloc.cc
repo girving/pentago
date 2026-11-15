@@ -35,5 +35,12 @@ void* malloc(size_t size) {
   return begin;
 }
 
+size_t wasm_heap_mark() { return next; }
+
+void wasm_heap_rewind(const size_t mark) {
+  GEODE_ASSERT(mark <= next);
+  next = mark;
+}
+
 }  // namespace pentago
 #endif  // __wasm__
