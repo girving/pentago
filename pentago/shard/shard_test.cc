@@ -189,8 +189,9 @@ TEST(shard, strip) {
     }
 
     // Stripping in two steps matches one step
-    if (keep > 0)
+    if (keep > 0) {
       ASSERT_TRUE(strip_shard(strip_shard(full, keep), keep - 1) == strip_shard(full, keep - 1));
+    }
   }
 }
 
