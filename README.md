@@ -15,7 +15,7 @@ forward engine was essential in developing and testing the backwards engines.
 Descriptions of the various engines are given below.
 
 The easiest interface to the strong solution is the website at
-https://perfect-pentago.net, implemented in the `web` directory.  Positions with 16
+perfect-pentago.net, implemented in the `web` directory.  Positions with 16
 or fewer stones are looked up in a 2.35 TB database (all positions with up to 17
 stones) using a minimal node.js server (`web/server`).  Positions with 17 or more
 stones are solved from scratch in the client, using engines compiled to WebAssembly:
@@ -68,7 +68,7 @@ Then build and test:
 
 ### Website
 
-The website https://perfect-pentago.net is a static Firebase frontend that
+The website perfect-pentago.net is a static Firebase frontend that
 talks to a node.js Google Cloud Function.  To test and deploy the server:
 
     cd web/server
@@ -172,7 +172,7 @@ on undoing the opponent's rotations, settles them in well under a second.  The w
 solves 17 stone positions locally, so slice 18 of the database is no longer kept.
 
 Together, the database and the midgame engines comprise a strong solution of pentago.
-Go to https://perfect-pentago.net to see the results.
+Go to perfect-pentago.net to see the results.
 
 ### Code structure
 

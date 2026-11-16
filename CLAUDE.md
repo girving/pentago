@@ -1,6 +1,6 @@
 # Pentago
 
-A massively parallel solver for the board game Pentago. Results at https://perfect-pentago.net.
+A massively parallel solver for the board game Pentago. Results at perfect-pentago.net.
 
 ## Build
 
