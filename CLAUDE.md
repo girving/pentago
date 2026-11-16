@@ -33,7 +33,9 @@ In Claude remote containers (claude.ai/code), run `bin/sandbox-setup` once first
 
 - Older deleted branches live on as `archive/<name>` tags. Branches whose work is on main, and
   temporary `claude/*` session branches, are deleted without a tag.
-- `git-annex` and `synced/git-annex` are intentionally kept: other clones still use annex.
+- git-annex is retired: it held the old `data/` run outputs, whose symlinks left main in 2026-04.
+  Its branches are `archive/git-annex` and `archive/synced-git-annex`, and the file contents stay in
+  `gs://pentago-annex`, named by SHA-256.
 
 ## Project structure
 
